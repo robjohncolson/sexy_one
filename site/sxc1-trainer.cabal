@@ -5,6 +5,8 @@ synopsis:           SXC-1 Trainer - M0 toolchain spike
 build-type:         Simple
 
 extra-source-files: ../translations/*.md
+                    ../content/exercises/*.md
+                    ../content/exercises/INDEX
 
 common app-options
   if arch(wasm32)
@@ -22,6 +24,12 @@ library
                     SXC1.Content.Outline
                     SXC1.Content.Stats
                     SXC1.Route
+                    SXC1.Exercise.Types
+                    SXC1.Exercise.Parse
+                    SXC1.Exercise.Lint
+                    SXC1.Exercise.Verify
+                    SXC1.Exercise.Engine
+                    SXC1.Exercise.Report
   hs-source-dirs:   src
   build-depends:    base < 5, text, containers, bytestring, template-haskell
   default-language: Haskell2010
@@ -31,7 +39,11 @@ executable app
   import:           app-options
   main-is:          Main.hs
   hs-source-dirs:   app
-  other-modules:    View.Blocks, View.Pages
+  other-modules:    View.Blocks
+                    View.Pages
+                    Exercises.Embed
+                    Exercises.Corpus
+                    View.Exercise
   build-depends:    base < 5, miso == 1.12.0.0, sxc1-trainer, text, containers
   default-language: Haskell2010
   ghc-options:      -O1 -Wall -ferror-spans
@@ -40,5 +52,12 @@ executable content-check
   main-is:          CheckContent.hs
   hs-source-dirs:   test
   build-depends:    base < 5, text, containers, sxc1-trainer
+  default-language: Haskell2010
+  ghc-options:      -O1 -Wall -ferror-spans
+
+executable exercise-check
+  main-is:          CheckExercises.hs
+  hs-source-dirs:   test
+  build-depends:    base < 5, text, containers, bytestring, directory, filepath, time, sxc1-trainer
   default-language: Haskell2010
   ghc-options:      -O1 -Wall -ferror-spans

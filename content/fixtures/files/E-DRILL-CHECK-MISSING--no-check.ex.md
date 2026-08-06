@@ -1,0 +1,28 @@
+# Tap the pads
+
+deck: fx-safe-drill
+chapter: Part: Pad play
+summary: Tap pads and listen to one-shot and looped sounds.
+cite: guide-book 17 "Tap the pads to make sounds"
+
+## Tap the pads and listen
+
+type: drill
+id: fx-first-drill
+cite: guide-book 17 "Tap the pads to make sounds"
+tags: pad-play, intro
+
+Make your first sounds on BANK 1.
+
+### Step
+
+cite: guide-book 17 "A pad you tap lights up white"
+
+Tap pad `13` and listen to the drums plus percussion rhythm.
+
+### Step
+
+cite: guide-book 17 "Tap the same pad again and it stops"
+check: The pad returns to its original color when the loop stops.
+
+Tap pad `13` again to stop the loop.

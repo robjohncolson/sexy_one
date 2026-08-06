@@ -26,6 +26,7 @@ module SXC1.Content.Markdown
   , countStrictTableSeparators
   , countUnparsedRawApprox
   , orderedItemOf
+  , bulletItemOf
     -- * Slugs
   , slugify
   , dedupeSlugs
@@ -486,24 +487,52 @@ parseBlocksEngine = parseBlocksEngineWith classifyLine
 -- 'Unparsed' is produced AND that the engine terminates -- see
 -- @test\/CheckContent.hs@'s A1 fixture.
 --
--- STRUCTURAL PROGRESS (A1 1a): every branch below that groups a run of
--- lines with 'span' consumes the CURRENT line @l@ unconditionally before
--- ever re-checking anything -- 'span' is only ever applied to
--- @(l : ls)@, and each of the six named shapes' own grouping predicate is
--- true of @l@ by construction (that is what selected this case
--- alternative). Only the final, catch-all arm can fail to consume @l@ --
--- when @classify l@ is 'ParaShape' but a later line breaks the run, @l@
--- is still consumed; the ONLY way 'span' can consume nothing is
--- @classify l@ being something the arm's own predicate
--- (@classify x == 'ParaShape'@) rejects, i.e. 'DeclinedShape' (or, for a
--- dishonest classifier, a shape whose own specific predicate does not
--- actually hold on re-check, e.g. a claimed 'HeadingShape' that
+-- STRUCTURAL PROGRESS (A1 1a; widened by NEW11): every branch below that
+-- groups a run of lines with 'span' consumes the CURRENT line @l@
+-- unconditionally before ever re-checking anything -- 'span' is only
+-- ever applied to @(l : ls)@, and each of the four 'span'-based shapes'
+-- own grouping predicate is true of @l@ by construction (that is what
+-- selected this case alternative). Only the final, catch-all arm can
+-- fail to consume @l@ -- when @classify l@ is 'ParaShape' but a later
+-- line breaks the run, @l@ is still consumed; the ONLY way 'span' can
+-- consume nothing is @classify l@ being something the arm's own
+-- predicate (@classify x == 'ParaShape'@) rejects, i.e. 'DeclinedShape'
+-- (or, for a dishonest classifier, a shape whose own specific predicate
+-- does not actually hold on re-check, e.g. a claimed 'HeadingShape' that
 -- 'headingLineOf' disagrees with). In THAT case the branch below
 -- unconditionally emits 'Unparsed' for just @l@ and recurses on @ls@ --
--- never on the untouched @(l : ls)@ -- so termination holds for every
--- finite input regardless of how @classify@ behaves. This is what turns
--- Codex's \">10 minute hang\" reproduction into a red-but-terminating
--- 'Unparsed' report instead.
+-- never on the untouched @(l : ls)@.
+--
+-- 'OrderedShape' and 'BulletShape' do NOT use 'span' -- they hand @(l :
+-- ls)@ to 'parseList', which decides for itself how much of the input a
+-- list item claims. Production's 'classifyLine' guarantees 'OrderedShape'
+-- only when @'orderedItemOf' l@ already succeeds ('BulletShape' /
+-- 'bulletItemOf' likewise), so 'parseList' always collects at least
+-- @l@ itself as its first item and 'parseList''s own @remaining@ is
+-- always a strict suffix of @ls@ (never the untouched @l : ls@) for any
+-- real corpus line. NEW11: a dishonest test classifier can claim
+-- 'OrderedShape'\/'BulletShape' for a line its own matcher rejects --
+-- @'parseBlocksEngineWith' (const 'OrderedShape') 1 False []
+-- [\"ordinary text\"]@ is exactly this, and it used to loop forever,
+-- because 'parseList' then collects ZERO items and returns the
+-- untouched @(l : ls)@ as its remaining, and @go@ recursed on that
+-- identical list under the very same dishonest classifier -- a real,
+-- reproduced (not theoretical) non-terminating case, contradicting this
+-- Haddock's own claim. The fix is the same progress check as the
+-- catch-all arm's, applied to 'parseList''s result: 'blockHasNoItems'
+-- below is 'True' exactly when 'parseList' collected nothing (which, by
+-- the guarantee above, cannot happen for the real classifier), and in
+-- that case the 'OrderedShape'\/'BulletShape' branches also fall back to
+-- emitting 'Unparsed' for just @l@ and recursing on @ls@ -- never on
+-- 'parseList''s own @remaining@, which would just be @l : ls@ again.
+-- With this, EVERY branch below either structurally shrinks its input by
+-- at least one line or explicitly falls back to the same
+-- shrink-by-emitting-'Unparsed' rule, so termination now genuinely holds
+-- for every finite input regardless of how @classify@ behaves -- true,
+-- not merely claimed. This is what turns Codex's \">10 minute hang\"
+-- reproduction (and NEW11's P-L reproduction, a 60-second timeout on the
+-- @(const OrderedShape)@ probe) into a red-but-terminating 'Unparsed'
+-- report instead.
 parseBlocksEngineWith :: (Text -> LineShape) -> Int -> Bool -> [Text] -> [Text] -> ([Block], [Text])
 parseBlocksEngineWith classify pageCount consumesSlugs = go
   where
@@ -544,15 +573,28 @@ parseBlocksEngineWith classify pageCount consumesSlugs = go
               (restBlocks, slugsFinal)  = go slugs ls'
           in (Quote inner : restBlocks, slugsFinal)
 
+      -- NEW11: 'parseList' is trusted to make progress only because
+      -- 'classify l' being 'OrderedShape'/'BulletShape' is SUPPOSED to
+      -- guarantee @'orderedItemOf' l@/@'bulletItemOf' l@ already succeeds
+      -- (true of the real 'classifyLine', by its own definition). A
+      -- dishonest test classifier can break that guarantee; 'blockHasNoItems'
+      -- below is the progress check that catches it -- see this
+      -- function's Haddock.
       OrderedShape ->
-          let (blk, ls')               = parseList pageCount OrderedK (l : ls)
-              (restBlocks, slugsFinal) = go slugs ls'
-          in (blk : restBlocks, slugsFinal)
+          let (blk, ls') = parseList pageCount OrderedK (l : ls)
+          in if blockHasNoItems blk
+               then emitUnparsed slugs l ls
+               else
+                 let (restBlocks, slugsFinal) = go slugs ls'
+                 in (blk : restBlocks, slugsFinal)
 
       BulletShape ->
-          let (blk, ls')               = parseList pageCount BulletK (l : ls)
-              (restBlocks, slugsFinal) = go slugs ls'
-          in (blk : restBlocks, slugsFinal)
+          let (blk, ls') = parseList pageCount BulletK (l : ls)
+          in if blockHasNoItems blk
+               then emitUnparsed slugs l ls
+               else
+                 let (restBlocks, slugsFinal) = go slugs ls'
+                 in (blk : restBlocks, slugsFinal)
 
       -- ParaShape (the normal case) or DeclinedShape (only ever supplied
       -- by a test classifier). The span predicate below is intentionally
@@ -582,6 +624,16 @@ parseBlocksEngineWith classify pageCount consumesSlugs = go
 
     popSlug (s : rest) = (s, rest)
     popSlug []          = ("section", [])
+
+    -- | NEW11's progress check for the 'OrderedShape'\/'BulletShape'
+    -- branches: 'True' exactly when 'parseList' collected zero items,
+    -- which by construction (see 'parseList') means its @remaining@ is
+    -- the untouched input it was given -- unreachable for the real
+    -- classifier, reachable only via a dishonest test classifier.
+    blockHasNoItems :: Block -> Bool
+    blockHasNoItems (Numbered _ items) = null items
+    blockHasNoItems (Bullets items)    = null items
+    blockHasNoItems _                  = False
 
     promote [Placeholder k full] = Figure k (parseInline pageCount (placeholderCaptionOf (placeholderInner full)))
     promote inlines               = Para inlines

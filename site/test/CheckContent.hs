@@ -89,6 +89,8 @@ assertionLabel 17 = "17. NEW3: dedupeSlugs reserves every emitted name"
 assertionLabel 18 = "18. NEW8: route classifications (zero/out-of-range/overflow/malformed/unknown)"
 assertionLabel 19 = "19. A6: anchor-supply invariant fixture (nested heading before a duplicate)"
 assertionLabel 20 = "20. A7 guard: ordered-list numbers consecutive-ascending; fragment census pinned"
+assertionLabel 21 = "21. NEW11: OrderedShape/BulletShape dishonest-classifier fixtures (list-branch progress evidence)"
+assertionLabel 22 = "22. NEW12: groupsOk vacuity guard (permanent negative-control demo)"
 assertionLabel n = show n ++ ". ?"
 
 --------------------------------------------------------------------------
@@ -1184,6 +1186,131 @@ a7FragmentCensusChecks =
   ]
 
 --------------------------------------------------------------------------
+-- 21. NEW11: 'parseBlocksEngineWith' must TERMINATE and emit 'Unparsed'
+-- when a dishonest classifier claims 'OrderedShape'\/'BulletShape' for a
+-- line 'orderedItemOf'\/'bulletItemOf' does not actually recognise --
+-- see "SXC1.Content.Markdown"'s Haddock on 'parseBlocksEngineWith''s list
+-- branches for the mechanism, and briefs/M2-manifest.json's probe P-L
+-- for the live reproduction (a 60-second timeout against the pre-fix
+-- engine; the same binary with only that probe call removed finished in
+-- well under a second).
+--------------------------------------------------------------------------
+
+-- | Ordinary prose -- not heading/table/quote/list-shaped by any honest
+-- rule -- so a classifier that nonetheless reports 'OrderedShape' or
+-- 'BulletShape' for it is lying, exactly as A1's 'a1DecliningClassifier'
+-- lies about 'DeclinedShape'.
+new11PoisonLine :: Text
+new11PoisonLine = "ordinary text that is not an ordered or bulleted list item"
+
+new11SecondPoisonLine :: Text
+new11SecondPoisonLine = "a second ordinary line, also not list-shaped"
+
+-- | Always reports 'OrderedShape', regardless of the line's real shape --
+-- the exact probe from P-L (@const OrderedShape@).
+new11OrderedLiar :: Text -> LineShape
+new11OrderedLiar = const OrderedShape
+
+-- | Always reports 'BulletShape', regardless of the line's real shape.
+new11BulletLiar :: Text -> LineShape
+new11BulletLiar = const BulletShape
+
+new11OrderedSingle :: [Block]
+new11OrderedSingle = fst (parseBlocksEngineWith new11OrderedLiar 1 False [] [new11PoisonLine])
+
+new11BulletSingle :: [Block]
+new11BulletSingle = fst (parseBlocksEngineWith new11BulletLiar 1 False [] [new11PoisonLine])
+
+-- | Two poisoned lines in a row -- proves 'go' recursed on the
+-- STRICTLY SHRINKING tail (never on the untouched input) across more
+-- than one call, not just that a single-line input happens to stop.
+new11OrderedPair :: [Block]
+new11OrderedPair =
+  fst (parseBlocksEngineWith new11OrderedLiar 1 False [] [new11PoisonLine, new11SecondPoisonLine])
+
+new11Checks :: [Check]
+new11Checks =
+  [ mkCheck 21 "new11/ordered-liar-terminates"
+      (length new11OrderedSingle == 1)
+      ("blocks=" ++ show (length new11OrderedSingle) ++ " (want 1 -- proves 'go' terminated on the finite input)")
+  , mkCheck 21 "new11/ordered-liar-emits-unparsed"
+      (case new11OrderedSingle of
+         [Unparsed t] -> t == new11PoisonLine
+         _            -> False)
+      ("blocks=" ++ show new11OrderedSingle)
+  , mkCheck 21 "new11/bullet-liar-terminates"
+      (length new11BulletSingle == 1)
+      ("blocks=" ++ show (length new11BulletSingle) ++ " (want 1 -- proves 'go' terminated on the finite input)")
+  , mkCheck 21 "new11/bullet-liar-emits-unparsed"
+      (case new11BulletSingle of
+         [Unparsed t] -> t == new11PoisonLine
+         _            -> False)
+      ("blocks=" ++ show new11BulletSingle)
+  , mkCheck 21 "new11/ordered-liar-recurses-on-shrinking-tail"
+      (new11OrderedPair == [Unparsed new11PoisonLine, Unparsed new11SecondPoisonLine])
+      ("blocks=" ++ show new11OrderedPair ++ " (want both lines individually Unparsed, in order)")
+  , mkCheck 21 "new11/real-classifier-never-lies-about-this-line"
+      -- Belt-and-suspenders, mirroring a1Checks' third case: the REAL
+      -- 'classifyLine' never reports OrderedShape/BulletShape for
+      -- 'new11PoisonLine', so this fix path is unreachable via
+      -- production -- reachable only via the two liar classifiers above.
+      (classifyLine new11PoisonLine /= OrderedShape && classifyLine new11PoisonLine /= BulletShape)
+      ("classifyLine new11PoisonLine = " ++ show (classifyLine new11PoisonLine))
+  ]
+
+--------------------------------------------------------------------------
+-- 22. NEW12: an empty assertion group must make the run exit non-zero,
+-- not print FAIL and still exit 0. 'groupsAllOk' is the accumulator
+-- 'runChecks' folds into its final exit condition; these are a permanent,
+-- self-verifying demonstration that it actually closes the hole -- see
+-- 'anchorVacuityGuardChecks' (group 16) for the pattern this follows.
+--------------------------------------------------------------------------
+
+-- | 'True' iff every group @1..maxGroup@ is present in @checks@ (has at
+-- least one 'Check') AND every 'Check' in it passed. A group with ZERO
+-- checks -- the NEW12 hole -- reads 'False' here, unlike the old exit
+-- condition (@totalPassed == totalAll@), which such a group cannot
+-- perturb at all since it contributes nothing to either side of that
+-- equality.
+groupsAllOk :: Int -> [Check] -> Bool
+groupsAllOk maxGroup checks = all groupOk [1 .. maxGroup]
+  where
+    groupOk g =
+      let inGroup = filter ((== g) . chkGroup) checks
+      in not (null inGroup) && all chkOk inGroup
+
+-- | The adversarial checklist NEW12 is about: three groups declared
+-- (@maxGroup = 3@) but group 2 contributes zero 'Check's -- exactly what
+-- a group dropped from @allChecks@, or a dynamic generator that becomes
+-- empty, looks like from the exit condition's point of view.
+new12MissingGroupChecklist :: [Check]
+new12MissingGroupChecklist = [mkCheck 1 "a" True "", mkCheck 3 "c" True ""]
+
+new12GuardChecks :: [Check]
+new12GuardChecks =
+  [ mkCheck 22 "new12-guard/missing-group-is-not-ok"
+      (groupsAllOk 3 new12MissingGroupChecklist == False)
+      "a checklist that never mentions group 2 at all must make groupsAllOk report False -- this is the bug NEW12 fixes"
+  , mkCheck 22 "new12-guard/fully-passing-groups-are-ok"
+      (groupsAllOk 3 [mkCheck 1 "a" True "", mkCheck 2 "b" True "", mkCheck 3 "c" True ""] == True)
+      "three non-empty, fully-passing groups must read True"
+  , mkCheck 22 "new12-guard/one-failing-check-is-not-ok"
+      (groupsAllOk 3 [mkCheck 1 "a" True "", mkCheck 2 "b" False "", mkCheck 3 "c" True ""] == False)
+      "a failing check inside an otherwise-present group must still make groupsAllOk report False"
+  , mkCheck 22 "new12-guard/old-exit-condition-would-have-missed-the-missing-group"
+      -- The OLD exit condition ('totalPassed == totalAll && totalAll > 0')
+      -- applied to the SAME adversarial checklist as the first case above
+      -- (group 2 entirely absent) still reads True, because an absent
+      -- group contributes zero to both totalPassed and totalAll -- this
+      -- is NEW12 itself, reproduced as a permanent demonstration that the
+      -- old condition really was insufficient, not just theoretically so.
+      (let totalPassed = length (filter chkOk new12MissingGroupChecklist)
+           totalAll    = length new12MissingGroupChecklist
+       in totalPassed == totalAll && totalAll > 0)
+      "the pre-NEW12 exit condition reads True on a checklist missing group 2 entirely -- this is the bug"
+  ]
+
+--------------------------------------------------------------------------
 -- main
 --------------------------------------------------------------------------
 
@@ -1256,7 +1383,10 @@ runChecks verboseMode = do
           ++ orderedListAscendingChecks
           ++ a7GuardDemoChecks
           ++ a7FragmentCensusChecks
-  forM_ [1 .. 20] $ \g -> do
+          ++ new11Checks
+          ++ new12GuardChecks
+      maxGroup = 22 :: Int
+  forM_ [1 .. maxGroup] $ \g -> do
     let inGroup = filter ((== g) . chkGroup) allChecks
         passed  = length (filter chkOk inGroup)
         total   = length inGroup
@@ -1267,7 +1397,17 @@ runChecks verboseMode = do
       forM_ inGroup $ \c ->
         unless (chkOk c && not verboseMode) $
           putStrLn ("    " ++ (if chkOk c then "ok  " else "FAIL") ++ " " ++ chkName c ++ ": " ++ chkMsg c)
+  -- NEW12: 'totalPassed == totalAll' alone cannot see a group that
+  -- contributes ZERO checks to 'allChecks' -- such a group prints FAIL
+  -- above (via 'allOk' in the loop) but perturbs neither side of that
+  -- equality below. 'groupsOk' (via 'groupsAllOk') is the accumulator
+  -- that closes the hole: it requires every group 1..maxGroup to be
+  -- BOTH present and fully passing, and is folded into the exit
+  -- condition directly, so a labelled-but-empty group can no longer
+  -- print FAIL and still exit 0 (see group 22's permanent
+  -- negative-control demonstration).
   let totalPassed = length (filter chkOk allChecks)
       totalAll    = length allChecks
+      groupsOk    = groupsAllOk maxGroup allChecks
   putStrLn ("content-check: " ++ show totalPassed ++ "/" ++ show totalAll ++ " checks passed")
-  if totalPassed == totalAll && totalAll > 0 then exitSuccess else exitFailure
+  if totalPassed == totalAll && totalAll > 0 && groupsOk then exitSuccess else exitFailure

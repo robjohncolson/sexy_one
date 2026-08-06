@@ -1,0 +1,29 @@
+# content/terminology-rules.tsv -- SXC-1 Trainer terminology linter rules (M2)
+#
+# Six TAB-separated columns, '#' comments and blank lines ignored:
+#   rule_id  kind  phrases  replacement  glossary_anchor  message
+#
+# kind=forbid  none of the comma-separated phrases may appear in learner-facing
+#              text (case-insensitive, word-bounded: not flanked by an ASCII
+#              letter, digit or hyphen).
+# kind=caseof  each phrase is a canonical on-device spelling; any
+#              case-insensitive occurrence that is not byte-exact is an error.
+#
+# glossary_anchor must occur verbatim (a literal substring) in
+# translations/glossary.md -- every rule here is traceable to the binding
+# glossary, never invented house style. Parsed by SXC1.Exercise.Lint.parseRules;
+# grounding checked by SXC1.Exercise.Lint.groundRules.
+#
+# Learner-facing text = deck title/summary, exercise titles, all body prose
+# (including inline code spans), option labels, check: sentences, and
+# Answer/Why/Hint blocks. EXCLUDED: id, deck, tags, verify:, and the quoted
+# anchor inside cite:/find: lines.
+term-register	forbid	register,registers,registered,registering,registration	assign	never "register"	Use "assign" (or "store" when saving into memory) instead of "register" -- the glossary marks registered as a rejected translation of 登録する.
+term-machine	forbid	this machine,the machine,this product	this unit	this machine/product	Refer to the device as "this unit" (or "SXC-1"), never "this machine" or "this product".
+term-tap-pad	forbid	hit the pad,hit a pad,strike the pad,press the pad	tap a pad	tap a pad	Use "tap a pad" (or "tap pad <N>") -- the glossary fixes パッドを叩く as "tap a pad", not "hit/strike/press".
+term-sound-source	forbid	sound source	sound	sound source	Use "sound" for 音源 in exercise prose; "sound source" is reserved for input-source contexts (see the glossary's note on 音源).
+term-device-name	caseof	SXC-1		SXC-1	The device name is spelled exactly "SXC-1".
+term-company	caseof	CASIO		CASIO	The company name is spelled exactly "CASIO".
+term-app-name	caseof	CASIO Sampler App		CASIO Sampler App	The companion app's name is spelled exactly "CASIO Sampler App", never translated or abbreviated.
+term-chapters	caseof	Part: Preparation,Part: Pad play,Part: Sampling,Part: Sequencer,Part: Leveling up		these exact five titles	Chapter titles must match one of the five binding "Part: X" titles exactly, including capitalization and punctuation.
+term-screen-labels	caseof	SELECT BANK,MASTER BPM,SOUND EDIT,AUTO TRIGGER,LOW STRAGE SPACE,ONE SHOT,INPUT VOL,MAIN VOL,LINE OUT,AUDIO IN,POWER/DATA,INPUT SELECT,Beat Sync,APO Time		Screen text likewise stays verbatim	On-device and on-screen labels must be spelled exactly as printed on the SXC-1, including the device's own misspelling LOW STRAGE SPACE -- do not "correct" it.

@@ -40,6 +40,7 @@ module SXC1.Content.Stats
   , countUnparsedInDoc
   , statsJson
   , renderStatsJson
+  , jsonEscape
   ) where
 
 import           Data.Maybe            (fromMaybe)

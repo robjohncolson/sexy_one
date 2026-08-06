@@ -7,6 +7,7 @@ module SXC1.Route
   ( Route (..)
   , parseRoute
   , renderRoute
+  , parseDigits
   ) where
 
 import           Data.Maybe (fromMaybe)
@@ -15,8 +16,11 @@ import qualified Data.Text  as T
 
 data Route
   = RHome
-  | RManual   !Text                -- ^ \"#/m/guide-book\"
-  | RPage     !Text !Int !Bool     -- ^ \"#/m/guide-book/p/17\" (+ \"/ja\")
+  | RManual    !Text               -- ^ \"#/m/guide-book\"
+  | RPage      !Text !Int !Bool    -- ^ \"#/m/guide-book/p/17\" (+ \"/ja\")
+  | RExercises                     -- ^ \"#/x\" (M2)
+  | RDeck      !Text               -- ^ \"#/x/\<deck\>\" (M2)
+  | RExercise  !Text !Text         -- ^ \"#/x/\<deck\>/\<ex\>\" (M2)
   | RNotFound !Text
   deriving (Eq, Show)
 
@@ -38,6 +42,17 @@ classify ["m", slug, "p", nTxt] = case parseDigits nTxt of
 classify ["m", slug, "p", nTxt, "ja"] = case parseDigits nTxt of
   Just n  -> RPage slug n True
   Nothing -> notFound ["m", slug, "p", nTxt, "ja"]
+-- M2: the exercise engine's own three routes. NOTE (probe P-M): before
+-- these clauses existed, "#/x", "#/x/deck" and "#/x/deck/ex" ALREADY
+-- round-tripped through 'renderRoute' . 'parseRoute' as 'RNotFound',
+-- because @renderRoute (RNotFound p) = \"#/\" <> p@ -- so a bare
+-- round-trip assertion over these three strings is VACUOUS and proves
+-- nothing about whether this clause is even reached; the self-test must
+-- assert the CONSTRUCTOR (@parseRoute \"#/x\" == RExercises@) and carry a
+-- negative control that it is NOT 'RNotFound'.
+classify ["x"] = RExercises
+classify ["x", deck] = RDeck deck
+classify ["x", deck, ex] = RExercise deck ex
 classify segs = notFound segs
 
 notFound :: [Text] -> Route
@@ -72,4 +87,7 @@ renderRoute RHome            = "#/"
 renderRoute (RManual slug)   = "#/m/" <> slug
 renderRoute (RPage slug n ja) =
   "#/m/" <> slug <> "/p/" <> T.pack (show n) <> (if ja then "/ja" else "")
+renderRoute RExercises            = "#/x"
+renderRoute (RDeck deck)          = "#/x/" <> deck
+renderRoute (RExercise deck exId) = "#/x/" <> deck <> "/" <> exId
 renderRoute (RNotFound path) = "#/" <> path
