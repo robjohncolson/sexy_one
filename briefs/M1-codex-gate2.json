@@ -1,0 +1,167 @@
+{
+  "task_type": "review",
+  "reviewed_head": "a139429d3eaf0f475e75c991e6b12eb360f7c3c6",
+  "scope": "Focused M1 gate re-review of commits 2b6a9fd556ca4f758ea74fae947848ce6e0b196d and a139429d3eaf0f475e75c991e6b12eb360f7c3c6",
+  "verdict": "GATE-CLEAR",
+  "summary": "All six findings that blocked the prior M1 gate are closed in the production paths. A1 now has a real Unparsed-producing fallback, production dispatch and paragraph grouping share classifyLine, and the checker forces the parsed-model count. NEW1 preserves heading-event order and corrects subsection ownership. NEW2 adds the promised 50-check parsed-model census. NEW5 is a fresh initial-hash navigation, NEW6 decodes all 108 JA images in Chrome and performs the required host-side RIFF/WebP parsing, and NEW7 makes every currently skippable axis non-complete. NEW3, NEW4, NEW8 and NEW10 are fixed. NEW9 is materially improved but remains PARTIALLY-FIXED at minor severity because its accepted expectation schema still permits omission of title/partTitles and its reverse comparison does not reject duplicate slugs in the app payload. The new fixture family is effective against the specific sabotages reported, including the live QuoteShape corruption, but it is not exhaustive: two additional non-production can-not-fail edges remain and are recorded below as NEW11 and NEW12. Neither is reachable in the current app path, so they do not keep M1 blocked.",
+  "per_finding_verdicts": [
+    {
+      "id": "A1",
+      "severity": "blocker",
+      "verdict": "FIXED",
+      "evidence": "site/src/SXC1/Content/Markdown.hs:442-450 defines the sole production classifier; lines 479-480 mechanically specialize parseBlocksEngine to parseBlocksEngineWith classifyLine; lines 511-572 use that classifier for dispatch and the paragraph span; and lines 574-581 emit Unparsed while recursing on the strict tail. site/test/CheckContent.hs:638-690 injects DeclinedShape, requires [Para, Unparsed, Para], forces the finite three-block result, and checks every real corpus line against the real classifier. Stats.hs:150-178 recursively derives stUnparsed from real blocks for content-check, and CheckContent.hs:1225 uses buildStatsFromDocs for --json while the app retains its lazy raw approximation. The original impossible-constructor, vacuous-count and paragraph non-progress defects are closed. NEW11 is a narrower inconsistency in the exported test seam, not the production classifier path."
+    },
+    {
+      "id": "NEW1",
+      "severity": "blocker",
+      "verdict": "FIXED",
+      "evidence": "site/src/SXC1/Content/Outline.hs:54-86 flattens headings without losing within-page order, and lines 130-153 attach each subsection to the preceding section event and clamp a co-located section's end to its own page. site/test/CheckContent.hs:701-747 checks secEndPage >= secPage across all manuals and exact Startup Guide p.10/p.14 ownership, with midi p.2 and OSS p.11 represented as well. View.Pages renders each section's corrected secSubs at lines 204-216, so the TOC nesting defect is closed. The separate choice of which co-located section a page-level breadcrumb names is ruled on under advisory 1."
+    },
+    {
+      "id": "NEW2",
+      "severity": "blocker",
+      "verdict": "FIXED",
+      "evidence": "site/test/CheckContent.hs:781-849 traverses parsed blocks and recursively traverses inlines for nine dimensions: top-level headings, figures, tables, numbered blocks/items, bullet blocks/items, PageRefs and residual Placeholders. Lines 913-945 pin 36 per-document values, lines 966-981 add 12 independent reconciliations, and lines 987-995 add two legitimate raw-table equalities: exactly 50 group-15 checks. The values are documented as derived from --census rather than copied from the plan at lines 871-912. The table result is correctly 20/4/6/0, with strict separator counts explaining the two blank-header discrepancies; this also closes A2. The non-empty anchor guard at lines 342-388 removes the old empty-list vacuity."
+    },
+    {
+      "id": "NEW5",
+      "severity": "blocker",
+      "verdict": "FIXED",
+      "evidence": "scripts/browser-check.mjs:1094-1105 creates and attaches a second target whose creation URL already contains #/m/guide-book/p/17/ja. Lines 1107-1163 independently wait for that target's boot, page/panel and image decode; lines 1172-1182 assert the initial hash, page, JA class, panel and source. This is a cold app/navigation instance even though Chrome may share its browser-level HTTP cache. The reported startup-hash sabotage result is consistent with the control flow: the old warm hash-change assertion remains separate at lines 1067-1085."
+    },
+    {
+      "id": "NEW6",
+      "severity": "blocker",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:648-683 parses VP8, VP8L and VP8X dimensions; lines 697-754 check all expected files, RIFF size equality, first payload chunk and plausible dimensions; and lines 756-770 enforce size totals and propagate failure. scripts/browser-check.mjs:1247-1322 visits every default route in /ja form, checks the expected image source, calls img.decode(), requires nonzero natural dimensions, and incorporates CDP image loading failures. check-site invokes the non-quick sweep at both root and subpath. The host parser is deliberately not a decoder, but the browser half is authoritative; together they close the header-preserving corruption hole."
+    },
+    {
+      "id": "NEW7",
+      "severity": "blocker",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:287-290 makes every skip increment SKIPPED; lines 802-813 route all current content-axis omissions through skip; lines 1224-1229 do the same for the browser axis; and lines 1284-1294 emit result=complete only at SKIPPED == 0. .github/workflows/site.yml:153-160 asserts both the complete marker and absence of a nonzero skipped suffix. The SXC1_SKIP_CONTENT=1 regression is closed for every current axis. Advisory 3 correctly notes that the two CI assertions are not genuinely independent of the same counter."
+    },
+    {
+      "id": "NEW3",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "site/src/SXC1/Content/Markdown.hs:315-332 tracks every emitted slug in a Set and advances candidates until unused. CheckContent.hs:1003-1035 retains the old algorithm solely as a negative-control oracle and exercises natural-suffix, repeated-base and multi-collision inputs against the new implementation."
+    },
+    {
+      "id": "NEW4",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "site/test/CheckContent.hs:1193-1213 exposes exact embedded UTF-8 bytes for all four manuals plus glossary, rejecting unknown slugs. scripts/check-site.sh:1030-1048 invokes that mode for all five documents and cmp -s compares the output to translations/<slug>.md. An equal-metric source edit can no longer pass the standard build/check path."
+    },
+    {
+      "id": "NEW8",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "site/src/SXC1/Route.hs:58-67 folds decimal text into Integer, bounds it against maxBound :: Int, and only then converts to Int. site/test/CheckContent.hs:1043-1062 pins the exact 4294967297 case, a 40-digit value, malformed suffixes and ordinary route classifications. This is target-width independent and prevents the wasm32 wrap to page 1."
+    },
+    {
+      "id": "NEW9",
+      "severity": "minor",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "scripts/browser-check.mjs:126-161 now rejects missing/extra expected document slugs, duplicate expected slugs, and missing numeric/unparsed fields; lines 978-1001 compare expected documents and unexpected actual slugs in both directions. The original docs:[] and slug-only vacuities are closed. Residual: REQUIRED_STATS_FIELDS omits title and partTitles (lines 117-127 deliberately treats them as optional), so a four-document expectation containing only the required numeric fields still passes without checking those emitted fields. Also, the reverse loop uses a Set membership test and does not reject two actual documents with the same known slug. Thus the comparison is bidirectional for slug membership, but not an exact schema/multiset comparison."
+    },
+    {
+      "id": "NEW10",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "scripts/render-page-images.sh:61-62 centralizes the supported set and lines 114-132 reject an unknown --slug before preflight. Lines 237-276 compute/compare SHA-256 instead of mtimes; lines 279-289 record the digest atomically; and lines 319-408 force a full-document re-render on digest mismatch and record success only after all pages encode. The four committed manuals/.digests/*.sha256 sidecars are present."
+    }
+  ],
+  "related_closures": [
+    {
+      "id": "A2",
+      "verdict": "FIXED-BY-NEW2",
+      "evidence": "The parsed Table census and strict-separator reconciliation at site/test/CheckContent.hs:927-928,971-973 fail if table production disappears while raw loose metrics remain green."
+    },
+    {
+      "id": "A3",
+      "verdict": "FIXED",
+      "evidence": "site/app/View/Pages.hs:121-134 suppresses the section crumb only when it equals the resolved group title, leaving the PART section in the TOC."
+    },
+    {
+      "id": "A6",
+      "verdict": "FIXED-FOR-THE-REPORTED-SABOTAGE; COVERAGE-ADVISORY-REMAINS",
+      "evidence": "site/test/CheckContent.hs:1074-1115 places a Quote heading before a later duplicate top-level heading and pins the empty nested anchor plus alpha/alpha-2 supply. This directly observes the QuoteShape corruption that the old corpus pins missed. It does not exercise the separate list-child and same-line titled-step anchor paths; see advisory 2."
+    }
+  ],
+  "fixture_family_assessment": {
+    "verdict": "ADEQUATE-FOR-THE-FILED-SABOTAGES-BUT-NOT-EXHAUSTIVE",
+    "evidence": "Groups 13-20 add 100 subchecks: 3 A1, 13 outline/ownership, 50 census, 3 anchor-vacuity, 12 slug-deduplication, 7 route, 3 A6 and 9 ordered-list checks, taking the reported suite from 247 to 347. The checks use real producers and pinned adversarial inputs; in particular, group 19's shape explains why the reported live QuoteShape corruption alone turned 347/347 into 346/347 while unrelated goldens remained green. Remaining can-not-fail patterns are narrow but real: group 19 covers only the Quote nested-heading entry path; parseBlocksEngineWith's progress promise does not cover inconsistent OrderedShape/BulletShape classifiers (NEW11); and an accidentally empty assertion group prints FAIL (0/0) without influencing the final exit status (NEW12).",
+    "recommended_followup": "Add a general assertion that every recursively nested Heading has an empty anchor, with quote, indented-list-child and same-line titled-step fixtures; make list parsing return Unparsed if it consumes no input; and fold every per-group allOk result into the final process status."
+  },
+  "advisory_rulings": [
+    {
+      "id": "1",
+      "topic": "Breadcrumb names the last co-located section",
+      "verdict": "ACCEPT-FOR-M1; TRACK-M5",
+      "ruling": "The behavior is deterministic and total, but the UX concern is real: View.Pages:100-110 selects the last section at or before the page while TOC links at lines 204-216 carry only the page route, so a link labelled Try applying an effect lands at the top of p.10 with a Try sampling breadcrumb. This is presentation polish rather than incorrect TOC ownership and is non-blocking for M1."
+    },
+    {
+      "id": "2",
+      "topic": "Anchor uniqueness is top-level only",
+      "verdict": "VALID-NONBLOCKING-TEST-GAP",
+      "ruling": "Top-level scope is intentional at CheckContent.hs:315-352, and production nested anchors are currently empty. However, View.Blocks.hs:104-107 emits an id for any non-empty anchor, while group 19 exercises only a Quote fixture and groups 9/12 count nested headings without checking their anchors. A list-child or titled-step regression could therefore introduce duplicate DOM ids without group 6 or 19 failing. Add the general nested-empty assertion described above."
+    },
+    {
+      "id": "3",
+      "topic": "Both NEW7 CI assertions derive from SKIPPED",
+      "verdict": "VALID-NONBLOCKING-HARDENING",
+      "ruling": "The marker and skipped suffix at check-site.sh:1284-1294 both derive from SKIPPED, so workflow lines 155-160 are not independent evidence despite the comment. Current skip-content and skip-browser paths do call skip(), so NEW7 itself is fixed. CI should additionally reject any '^SKIP - ' output (or accept a separately emitted per-axis completion record), which would still catch a forgotten counter increment."
+    },
+    {
+      "id": "4",
+      "topic": "Index linkification remains deferred",
+      "verdict": "ACCEPT-DEFER-TO-M5-WITH-CONTRACT-DEBT",
+      "ruling": "A4 remains true: bare Index values are not PageRefs, so M1-plan section 4.6's navigable-Index claim is false today. This does not block reading or page reachability and may remain an explicit M5 item."
+    },
+    {
+      "id": "5",
+      "topic": "Ordered-list fragmentation remains deferred",
+      "verdict": "ACCEPT-DEFER-TO-M5",
+      "ruling": "Markdown.hs:612-678 intentionally retains the fragmentation behavior. Group 20 at CheckContent.hs:1127-1184 detects repeated/nonconsecutive source numbering and pins the current fragment census, so the currently correct visual numbers cannot silently turn wrong. Semantic list grouping remains real accessibility debt for M5."
+    },
+    {
+      "id": "6",
+      "topic": "Wasm gzip budget",
+      "verdict": "ACCEPT",
+      "ruling": "The reported 828138-byte gzip artifact has 171862 bytes of headroom below the enforced 1000000-byte ceiling at check-site.sh:581-590. This is an appropriate M1 tripwire, not a present size blocker."
+    },
+    {
+      "id": "7",
+      "topic": "Browser-suite runtime and timeout increase",
+      "verdict": "ACCEPT-FOR-CANONICAL-GATE",
+      "ruling": "The canonical check-site invocation supplies 120000 ms independently to each root/subpath browser stage at lines 1182-1203, and the workflow allows 30 minutes. That is proportionate to decoding 108 images twice. The standalone browser-check default remains 45000 ms at browser-check.mjs:168-175, so aligning it with the canonical budget would reduce local-only flakes but is not an M1 gate blocker."
+    },
+    {
+      "id": "8",
+      "topic": "DeclinedShape and parseBlocksEngineWith are exported test seams",
+      "verdict": "ACCEPT-WITH-NEW11-CAVEAT",
+      "ruling": "Repository-wide uses show production only reaches parseBlocksEngineWith through parseBlocksEngine = parseBlocksEngineWith classifyLine at Markdown.hs:479-480; the only direct caller is CheckContent's fixture. That mechanically pins current production inertness. The exported seam's broader termination documentation is nevertheless too strong for inconsistent list classifications, as NEW11 details."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "NEW11",
+      "severity": "minor",
+      "title": "The exported classifier seam can still recurse without consuming input for inconsistent list shapes",
+      "location": "site/src/SXC1/Content/Markdown.hs:507-508,547-555,626-678",
+      "failure_scenario": "parseBlocksEngineWith (const OrderedShape) 1 False [] [\"ordinary text\"] dispatches to parseList, but orderedItemOf rejects the first line. parseList returns an empty Numbered block and the original input as remaining; go then recurses on that identical input forever. BulletShape has the same failure. This contradicts lines 489-505 and 574-578's claim that termination holds regardless of classifier behavior. The current app is unaffected because classifyLine only emits those shapes when the same list predicate succeeds, but a future classifier/list-rule drift or a direct test-seam caller can reproduce the hang.",
+      "recommendation": "Have parseList return Maybe/progress evidence and emit Unparsed when remaining input is unchanged, or make LineShape carry the parsed list payload so dispatch cannot disagree with consumption. Add OrderedShape and BulletShape dishonest-classifier fixtures alongside DeclinedShape."
+    },
+    {
+      "id": "NEW12",
+      "severity": "minor",
+      "title": "An empty assertion group prints FAIL but content-check can still exit successfully",
+      "location": "site/test/CheckContent.hs:1259-1273",
+      "failure_scenario": "The per-group loop computes allOk = passed == total && total > 0 and prints FAIL (0/0), but final success is based only on totalPassed == totalAll over the Check values that exist. If a fixture group is accidentally omitted from allChecks or a dynamic generator becomes empty, the checker can print that group as FAIL, then print N/N checks passed and exit 0; check-site consumes only its exit status. This is a residual can-not-fail pattern in the groups 13-20 family.",
+      "recommendation": "Accumulate a groupsOk boolean (all groups 1..20 nonempty and fully passing) and require it in the final exit condition; optionally include group failures in the final count."
+    }
+  ],
+  "method": "Read-only inspection of git show/diffs for the two scoped commits and all directly affected production, test, harness, workflow and fixture paths. No build, browser run, content-check execution, install, product modification or commit was performed; only this required result JSON was written. Reported sabotage/PIL results were assessed against the implemented control flow rather than rerun under the read-only constraint.",
+  "final_line": "GATE-CLEAR — all six prior M1 blockers are closed in production; remaining items are minor verification hardening (NEW9 partial, NEW11, NEW12) and explicitly accepted M5 polish/debt."
+}
