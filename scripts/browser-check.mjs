@@ -9,10 +9,20 @@
 //   node scripts/browser-check.mjs [--url URL] [--browser PATH]
 //                                   [--timeout MS] [--self-test] [--keep-open]
 //
+// The whole run is bounded by ONE monotonic deadline derived from
+// --timeout: the WebSocket handshake, every individual CDP command and
+// every polling loop are all routed through it, so a peer that hangs (TCP
+// connects but the WebSocket handshake never completes, a command is sent
+// but the response never arrives, the page never boots, ...) fails within
+// the --timeout budget instead of hanging indefinitely.
+//
 // Exit codes:
 //   0  every assertion passed
-//   1  at least one assertion failed (including a reported boot error)
-//   2  harness error: no browser found, CDP unreachable, or overall timeout
+//   1  at least one assertion failed (including a reported boot error, a
+//      missing required DOM node, or a click on a missing element)
+//   2  harness error: no browser found, CDP unreachable, the browser
+//      process died out from under us, or the --timeout deadline expired
+//      before the harness itself could finish
 //
 // See the "Shared boot / test contract" in briefs/M0-manifest.json for the
 // window.__SXC1_BOOTED / window.__SXC1_BOOT_ERROR / #boot-status / #counter-value
@@ -81,7 +91,9 @@ Options:
   --browser <path>  Browser executable (default: $SXC1_BROWSER, else the
                      first of google-chrome, google-chrome-stable, chromium,
                      chromium-browser found on PATH)
-  --timeout <ms>    Overall run timeout in milliseconds (default: 45000)
+  --timeout <ms>    Overall run timeout in milliseconds (default: 45000).
+                     Bounds the WebSocket connect, every CDP command and
+                     every polling loop -- not just the polling loops.
   --self-test       Check the driver itself against a synthetic fixture
                      page instead of the real site
   --keep-open       Do not kill the browser on exit (debugging)
@@ -191,6 +203,58 @@ function resolveBrowser(explicitPath) {
 }
 
 // ---------------------------------------------------------------------------
+// Deadline plumbing (M4 fix).
+//
+// The whole run shares ONE monotonic deadline, computed once in main() from
+// --timeout. `remaining()` reports the budget left; `withDeadline()` races
+// an arbitrary promise against it. Every await that could otherwise hang --
+// the WebSocket handshake (connectWebSocket), the DevTools HTTP poll, and
+// (via CDPClient.send's own per-command timer, which consults the same
+// clock through a `getRemaining` callback) every CDP command including the
+// boot- and counter-polling loops that repeatedly call it -- is bounded by
+// this single clock.
+// ---------------------------------------------------------------------------
+
+// Milliseconds left until `deadline` (a Date.now()-style timestamp). Can be
+// negative once the deadline has passed.
+function remaining(deadline) {
+  return deadline - Date.now();
+}
+
+// Race `promise` against the remaining deadline budget. Rejects with a
+// clearly labelled error the instant the budget runs out; otherwise settles
+// exactly as `promise` does. Never leaves a dangling timer behind.
+function withDeadline(promise, deadline, label) {
+  return new Promise((resolve, reject) => {
+    const budget = remaining(deadline);
+    if (budget <= 0) {
+      reject(new Error(`${label} exceeded the --timeout budget`));
+      return;
+    }
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(`${label} exceeded the --timeout budget`));
+    }, budget);
+    promise.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Minimal Chrome DevTools Protocol client over the global WebSocket.
 //
 // CDP messages are JSON. Commands carry a monotonically increasing `id`;
@@ -203,11 +267,13 @@ function resolveBrowser(explicitPath) {
 // ---------------------------------------------------------------------------
 
 class CDPClient {
-  constructor(ws) {
+  constructor(ws, { getRemaining } = {}) {
     this.ws = ws;
     this.nextId = 1;
     this.pending = new Map(); // id -> {resolve, reject}
     this.eventHandlers = new Map(); // method -> [handler(params, sessionId)]
+    this.getRemaining = getRemaining || (() => Infinity);
+    this.fatalError = null; // set once the socket/browser is known dead
     ws.addEventListener('message', (ev) => this._onMessage(ev));
   }
 
@@ -240,19 +306,59 @@ class CDPClient {
     this.eventHandlers.get(method).push(handler);
   }
 
+  // Send a CDP command, bounded by the shared deadline via getRemaining().
+  // A per-command timer guarantees that a dropped response (the peer never
+  // replies, e.g. because the socket died without a clean 'close' event)
+  // rejects the call instead of leaking a pending entry forever; the timer
+  // is cleared the instant the promise settles by any route -- a real
+  // response, the timer itself, or failFatally().
   send(method, params = {}, sessionId) {
     return new Promise((resolve, reject) => {
+      if (this.fatalError) {
+        reject(this.fatalError);
+        return;
+      }
+      const budget = this.getRemaining();
+      if (budget <= 0) {
+        reject(new Error(`CDP command '${method}' exceeded the --timeout budget`));
+        return;
+      }
+
       const id = this.nextId++;
       const payload = { id, method, params };
       if (sessionId) payload.sessionId = sessionId;
-      this.pending.set(id, { resolve, reject });
+
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`CDP command '${method}' exceeded the --timeout budget (no response received)`));
+      }, budget);
+
+      this.pending.set(id, {
+        resolve: (value) => { clearTimeout(timer); resolve(value); },
+        reject: (err) => { clearTimeout(timer); reject(err); },
+      });
+
       try {
         this.ws.send(JSON.stringify(payload));
       } catch (err) {
         this.pending.delete(id);
+        clearTimeout(timer);
         reject(err);
       }
     });
+  }
+
+  // Reject every currently-pending command with `err` and clear them, so
+  // none can outlive whatever just killed the connection (socket
+  // close/error, browser process exit/error). Also remembers `err` so any
+  // command sent *after* this point fails immediately instead of hanging
+  // on a socket already known to be dead.
+  failFatally(err) {
+    if (!this.fatalError) this.fatalError = err;
+    for (const [, entry] of this.pending) {
+      entry.reject(err);
+    }
+    this.pending.clear();
   }
 
   close() {
@@ -350,6 +456,22 @@ async function main() {
     process.exit(code);
   };
 
+  // Set once the CDP client exists, so the browser-process and WebSocket
+  // failure listeners below (some registered before the client exists) can
+  // reject any command that is in flight -- or sent later -- when the
+  // browser dies out from under us, instead of leaving it pending forever.
+  let cdp = null;
+
+  // Set by the browser child's 'exit' (unexpected) or 'error' event. Checked
+  // by the pre-CDP DevTools-poll loop; fans out to cdp.failFatally() once
+  // the CDP client exists so an in-flight or future command fails fast with
+  // a message naming the exit code/signal instead of hanging.
+  let browserFailure = null;
+  const noteBrowserFailure = (message) => {
+    if (!browserFailure) browserFailure = new Error(message);
+    if (cdp) cdp.failFatally(browserFailure);
+  };
+
   try {
     let targetUrl = opts.url;
 
@@ -420,8 +542,18 @@ async function main() {
     // running just long enough to keep writing into --user-data-dir after
     // our own cleanup has already tried to remove it.
     const browserProc = spawn(browserPath, browserArgs, { stdio: 'ignore', detached: true });
-    let browserExitedEarly = false;
-    browserProc.on('exit', () => { browserExitedEarly = true; });
+    // Any exit/error of the browser child while we still need it is a
+    // harness failure: note it so both the early DevTools-poll loop and
+    // any CDP command already or later in flight can fail fast instead of
+    // hanging until the overall deadline.
+    browserProc.on('exit', (code, signal) => {
+      noteBrowserFailure(
+        `browser process exited unexpectedly (code=${code === null ? 'null' : code}, signal=${signal || 'none'})`,
+      );
+    });
+    browserProc.on('error', (err) => {
+      noteBrowserFailure(`browser process error: ${err && err.message ? err.message : err}`);
+    });
     if (!opts.keepOpen) {
       cleanupFns.push(() => new Promise((resolve) => {
         const killGroup = (signal) => {
@@ -447,18 +579,23 @@ async function main() {
     // 3. Poll /json/version until the browser's DevTools HTTP endpoint answers.
     let versionInfo = null;
     while (Date.now() < deadline) {
-      if (browserExitedEarly) {
-        await die(2, `error: browser process exited before DevTools became reachable (${browserPath})`);
+      if (browserFailure) {
+        await die(2, `error: ${browserFailure.message} (before DevTools became reachable at ${browserPath})`);
         return;
       }
       try {
-        const info = await httpGetJson(`http://127.0.0.1:${debugPort}/json/version`);
+        const info = await withDeadline(
+          httpGetJson(`http://127.0.0.1:${debugPort}/json/version`),
+          deadline,
+          'DevTools /json/version request',
+        );
         if (info && info.webSocketDebuggerUrl) {
           versionInfo = info;
           break;
         }
       } catch {
-        // not up yet
+        // not up yet, or this attempt ran past the deadline -- the loop
+        // condition above is what ultimately bounds total wait time
       }
       await sleep(200);
     }
@@ -468,9 +605,25 @@ async function main() {
     }
 
     // 4. Connect and set up a flat CDP session for a fresh page target.
-    const ws = await connectWebSocket(versionInfo.webSocketDebuggerUrl);
+    // The handshake itself is bounded by the shared deadline: a peer that
+    // accepts the TCP connection but never completes the WebSocket upgrade
+    // must not be able to hang the run.
+    const ws = await withDeadline(
+      connectWebSocket(versionInfo.webSocketDebuggerUrl),
+      deadline,
+      'WebSocket connect',
+    );
     cleanupFns.push(() => { try { ws.close(); } catch { /* ignore */ } });
-    const cdp = new CDPClient(ws);
+    cdp = new CDPClient(ws, { getRemaining: () => remaining(deadline) });
+
+    // If the socket dies underneath us -- cleanly or not -- no in-flight
+    // (or future) CDP command may be left hanging.
+    ws.addEventListener('close', () => {
+      cdp.failFatally(new Error('CDP WebSocket closed unexpectedly'));
+    });
+    ws.addEventListener('error', (ev) => {
+      cdp.failFatally(new Error(`CDP WebSocket error: ${ev && ev.message ? ev.message : ev}`));
+    });
 
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
@@ -495,7 +648,9 @@ async function main() {
     await cdp.send('Page.enable', {}, sessionId);
 
     // Evaluate an expression in the page and return its value, throwing on
-    // a JS-level exception (as opposed to a CDP transport error).
+    // a JS-level exception (as opposed to a CDP transport error). Routed
+    // through cdp.send(), so it is bounded by the shared deadline and by
+    // failFatally() the same way every other command is.
     const evaluate = async (expression) => {
       const res = await cdp.send('Runtime.evaluate', {
         expression,
@@ -558,6 +713,41 @@ async function main() {
     };
     const click = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
 
+    // m3(a)/(b) fix: never let a missing required DOM node throw out of
+    // this block (which used to escape as an uncaught exception and get
+    // misreported as exit 2 "harness error") and never treat absence as a
+    // pass. elementExists()/assertElement() always resolve to a boolean and
+    // always go through report(), so a missing node is an ordinary FAILED
+    // assertion (exit 1).
+    const elementExists = (selector) => evaluate(
+      `document.querySelector(${JSON.stringify(selector)}) !== null`,
+    );
+    const assertElement = async (selector, label) => {
+      const exists = await elementExists(selector);
+      report(label, exists === true, exists);
+      return exists === true;
+    };
+
+    // Click `selector`, reporting both its presence and the click itself as
+    // ordinary assertions, instead of a bare evaluate() whose
+    // `.click()` on a null querySelector() result would throw out of this
+    // block.
+    const clickAssert = async (selector, label) => {
+      const present = await assertElement(selector, `${selector} is present before clicking it`);
+      if (!present) {
+        report(label, false, `skipped: ${selector} not found`);
+        return false;
+      }
+      try {
+        await click(selector);
+        report(label, true, null);
+        return true;
+      } catch (err) {
+        report(label, false, { error: err && err.message ? err.message : String(err) });
+        return false;
+      }
+    };
+
     if (!bootOutcome || !bootOutcome.ok) {
       // The app never booted successfully. This is the single most useful
       // diagnostic this tool produces, so surface it loudly and skip the
@@ -583,25 +773,34 @@ async function main() {
       const initial = await pollCounterFor('0');
       report('counter starts at 0', initial === '0', initial);
 
-      await click('#btn-increment');
+      await clickAssert('#btn-increment', 'click #btn-increment');
       const afterIncrement = await pollCounterFor('1');
       report('increment sets counter to 1', afterIncrement === '1', afterIncrement);
 
-      await click('#btn-decrement');
-      await click('#btn-decrement');
+      await clickAssert('#btn-decrement', 'click #btn-decrement (1 of 2)');
+      await clickAssert('#btn-decrement', 'click #btn-decrement (2 of 2)');
       const afterTwoDecrements = await pollCounterFor('-1');
       report('two decrements set counter to -1', afterTwoDecrements === '-1', afterTwoDecrements);
 
-      await click('#btn-reset');
+      await clickAssert('#btn-reset', 'click #btn-reset');
       const afterReset = await pollCounterFor('0');
       report('reset sets counter to 0', afterReset === '0', afterReset);
 
-      const bootStatusHidden = await evaluate(`(() => {
+      // m3(b) fix: the boot-status contract requires #boot-status to exist
+      // -- without it a boot failure has nowhere to render -- so absence is
+      // now a FAILED assertion rather than a vacuous pass. Existence and
+      // hiddenness are asserted together in one CDP round trip so there is
+      // no window between checking one and checking the other.
+      const bootStatus = await evaluate(`(() => {
         const e = document.querySelector('#boot-status');
-        if (!e) return true;
-        return Boolean(e.hidden) || e.offsetParent === null;
+        if (!e) return { exists: false, hidden: false };
+        return { exists: true, hidden: Boolean(e.hidden) || e.offsetParent === null };
       })()`);
-      report('#boot-status is hidden after boot', bootStatusHidden === true, bootStatusHidden);
+      report(
+        '#boot-status is hidden after boot',
+        Boolean(bootStatus && bootStatus.exists === true && bootStatus.hidden === true),
+        bootStatus,
+      );
 
       const noErrors = consoleErrors.length === 0 && exceptions.length === 0;
       report('no console errors or uncaught exceptions', noErrors, { consoleErrors, exceptions });
