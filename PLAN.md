@@ -117,7 +117,12 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
 
 ## Open questions for the owner
 
-1. GitHub repo: name and visibility? (GitHub Pages on a free account requires public.)
-2. Site title — "SXC-1 Trainer" is a placeholder.
+1. Site title — "SXC-1 Trainer" is a placeholder ("SEXY ONE" is a natural
+   candidate given the repo name; owner to confirm).
 
-Resolved: Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).
+Resolved:
+- Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).
+- GitHub repo (2026-08-06, owner-confirmed): **public**, `robjohncolson/sexy_one`.
+  Pages via Actions workflow; `ENABLE_PAGES=true` repo variable set. Site will
+  live at https://robjohncolson.github.io/sexy_one/ — the sub-path the M0
+  checker validates against.
