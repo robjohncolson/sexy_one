@@ -30,22 +30,43 @@ import           SXC1.Route
 
 import qualified View.Blocks            as Blocks
 
--- | The whole Miso root for the given route: header, the hidden stats
--- blob, one of the three route bodies, and the footer -- identical shape
--- on every route, per the DOM contract.
-viewRoute :: action -> Route -> View model action
-viewRoute toggleAction route = H.main_ [ P.id_ "app" ]
+-- | The whole Miso root for the given route: header, the two hidden
+-- stats\/log blobs (M1's own @#sxc1-content-stats@ plus M2's
+-- @#sxc1-exercise-stats@\/@#sxc1-event-log@), one of the route bodies,
+-- and the footer -- identical shape on every route, per the DOM
+-- contract. @mExerciseBody@ is 'Just' the already-built exercise-runner
+-- view (from "View.Exercise", built in Main.hs, which alone knows the
+-- concrete 'Action' type) exactly when @route@ is one of M2's three
+-- exercise routes -- this module never constructs exercise views
+-- itself, only slots one in, keeping "View.Exercise" reusable and this
+-- module free of a Main-import cycle.
+viewRoute
+  :: action
+  -> T.Text                     -- ^ #sxc1-exercise-stats JSON
+  -> T.Text                     -- ^ #sxc1-event-log JSON
+  -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
+  -> Route
+  -> View model action
+viewRoute toggleAction exStatsJson eventLogJson mExerciseBody route = H.main_ [ P.id_ "app" ]
   [ headerView route
   , statsView
-  , routeBody toggleAction route
+  , exerciseStatsView exStatsJson
+  , eventLogView eventLogJson
+  , routeBody toggleAction mExerciseBody route
   , footerView
   ]
 
-routeBody :: action -> Route -> View model action
-routeBody _   RHome              = homeView
-routeBody _   (RManual slug)     = tocView slug
-routeBody act (RPage slug n ja)  = pageView act slug n ja
-routeBody _   (RNotFound path)   = notFoundView path
+routeBody :: action -> Maybe (View model action) -> Route -> View model action
+routeBody _   _              RHome              = homeView
+routeBody _   _              (RManual slug)      = tocView slug
+routeBody act _              (RPage slug n ja)    = pageView act slug n ja
+routeBody _   (Just exBody)  RExercises           = exBody
+routeBody _   (Just exBody)  (RDeck _)            = exBody
+routeBody _   (Just exBody)  (RExercise _ _)      = exBody
+routeBody _   Nothing        r@RExercises         = notFoundView (renderRoute r)
+routeBody _   Nothing        r@(RDeck _)          = notFoundView (renderRoute r)
+routeBody _   Nothing        r@(RExercise _ _)    = notFoundView (renderRoute r)
+routeBody _   _              (RNotFound path)     = notFoundView path
 
 --------------------------------------------------------------------------
 -- Corpus-wide, text-level lookups shared by several views below. None of
@@ -83,6 +104,9 @@ breadcrumbFor (RManual slug) = case statsFor slug of
 breadcrumbFor (RPage slug n _ja) = case (statsFor slug, rawFor slug) of
   (Just st, Just raw) | n >= 1 && n <= stPages st -> [ pageBreadcrumb slug st (buildOutline raw) n ]
   _                                                 -> []
+breadcrumbFor RExercises      = [ H.nav_ [] [ text "Training" ] ]
+breadcrumbFor (RDeck _)       = [ H.nav_ [] [ text "Training" ] ]
+breadcrumbFor (RExercise _ _) = [ H.nav_ [] [ text "Training" ] ]
 breadcrumbFor (RNotFound _) = []
 
 pageBreadcrumb :: T.Text -> DocStats -> Outline -> Int -> View model action
@@ -158,6 +182,18 @@ statsView :: View model action
 statsView = H.div_ [ P.id_ "sxc1-content-stats", P.hidden_ True ] [ text (ms statsJsonText) ]
 
 --------------------------------------------------------------------------
+-- #sxc1-exercise-stats / #sxc1-event-log: always [hidden]; M2's own
+-- machine-readable carriers, present on every route beside M1's own
+-- #sxc1-content-stats above -- see "Exercises.Corpus" and Main.hs.
+--------------------------------------------------------------------------
+
+exerciseStatsView :: T.Text -> View model action
+exerciseStatsView t = H.div_ [ P.id_ "sxc1-exercise-stats", P.hidden_ True ] [ text (ms t) ]
+
+eventLogView :: T.Text -> View model action
+eventLogView t = H.div_ [ P.id_ "sxc1-event-log", P.hidden_ True ] [ text (ms t) ]
+
+--------------------------------------------------------------------------
 -- Home ("#/"): project blurb + one card per manual.
 --------------------------------------------------------------------------
 
@@ -167,7 +203,18 @@ homeView = H.section_ [ P.id_ "sxc1-home" ]
       [ "An interactive reader for the SXC-1 manuals: browse each translated "
       , "document page by page, with the original Japanese page a tap away."
       ]
-  , H.ul_ [ P.class_ "manual-list" ] (map manualCard allDocStats)
+  , H.ul_ [ P.class_ "manual-list" ] (map manualCard allDocStats ++ [ trainingCard ])
+  ]
+
+-- | The Training entry point (briefs/M2-manifest.json, task
+-- "exercise-ui", item 4): links to "#/x", the exercise index -- reuses
+-- M1's own @.manual-card@ styling rather than inventing a new one.
+trainingCard :: View model action
+trainingCard = H.li_ []
+  [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RExercises)) ]
+      [ H.strong_ [] [ "Training" ]
+      , H.small_ [] [ "Quizzes, drills and lookups from the manuals" ]
+      ]
   ]
 
 manualCard :: DocStats -> View model action

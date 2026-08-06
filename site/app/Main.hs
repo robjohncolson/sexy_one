@@ -3,13 +3,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
-import qualified Data.Text   as T
+import           Data.IORef            (modifyIORef', newIORef, readIORef)
+import           Data.List              (find)
+import qualified Data.Map.Strict        as Map
+import           Data.Map.Strict        (Map)
+import qualified Data.Text              as T
+import           Data.Text              (Text)
+
+import           GHC.Clock              (getMonotonicTimeNSec)
 
 import           Miso
+import qualified Miso.Date              as Date
 
-import           SXC1.Route  (Route (..), parseRoute, renderRoute)
+import           SXC1.Exercise.Engine
+import           SXC1.Exercise.Types
+import           SXC1.Route             (Route (..), parseDigits, parseRoute, renderRoute)
 
-import           View.Pages  (viewRoute)
+import           Exercises.Corpus       (exerciseCorpus, exerciseStatsJson, jArr, jBool, jInt, jInteger, jKV, jObj,
+                                          jStr)
+import           View.Exercise          (ExHandlers (..))
+import qualified View.Exercise          as Exercise
+import           View.Pages             (viewRoute)
 
 -- | Read window.location.hash via Miso's own DSL.
 --
@@ -35,12 +49,119 @@ setHash h = do
   loc <- jsg ("window" :: MisoString) ! ("location" :: MisoString)
   setProp ("hash" :: MisoString) (ms h) (Object loc)
 
-newtype Model = Model { mRoute :: Route } deriving (Eq)
+--------------------------------------------------------------------------
+-- Clocks (briefs/M2-manifest.json, task "exercise-ui").
+--
+-- Monotonic elapsed time: 'GHC.Clock.getMonotonicTimeNSec' (base --
+-- always visible). Wall-clock epoch: NOT 'Data.Time.Clock.POSIX' --
+-- MEASURED against the real committed site/sxc1-trainer.cabal (not
+-- owned by this task): exe:app's build-depends does not list the `time`
+-- package, and importing Data.Time.Clock.POSIX anywhere in site/app
+-- fails to compile with "Could not load module 'Data.Time.Clock.POSIX'
+-- ... hidden package 'time'" (confirmed empirically; see this task's
+-- final report). 'Miso.Date' (already exposed by the `miso` dependency
+-- exe:app DOES have) wraps the browser's own JS Date object through
+-- Miso's ordinary JS DSL -- NOT a `foreign import javascript` -- so
+-- 'Date.getTime' gives the same milliseconds-since-epoch value
+-- 'Data.Time.Clock.POSIX.getPOSIXTime' would have, without the missing
+-- dependency. The engine itself ("SXC1.Exercise.Engine") stays pure: it
+-- never reads a clock itself, only ever receives already-read 'Integer'
+-- millisecond values as action arguments, exactly as specified.
+--------------------------------------------------------------------------
 
+readClocks :: IO (Integer, Integer)
+readClocks = do
+  monoNs <- getMonotonicTimeNSec
+  d      <- Date.new
+  wallMs <- Date.getTime d
+  pure (toInteger monoNs `div` 1000000, round wallMs)
+
+--------------------------------------------------------------------------
+-- THE M4 FORWARD HOOK (briefs/M2-manifest.json). Parsed and validated in
+-- M2 ("SXC1.Exercise.Verify"), executed in M4. 'noDeviceVerifier' is
+-- wired in below; no WebMIDI call and no device permission request
+-- exists anywhere in site/app -- the manual confirmation path (a
+-- learner clicking a .btn-ex-confirm button) is the only path in M2 and
+-- must, and does, work on every browser.
+--------------------------------------------------------------------------
+
+data DeviceVerifier = DeviceVerifier
+  { dvAvailable :: IO Bool
+  , dvWatch     :: VerifySpec -> (ConfirmSource -> IO ()) -> IO (IO ())
+  }
+
+noDeviceVerifier :: DeviceVerifier
+noDeviceVerifier = DeviceVerifier
+  { dvAvailable = pure False
+  , dvWatch     = \_spec _onConfirm -> pure (pure ())
+  }
+
+--------------------------------------------------------------------------
+-- THE M3 FORWARD HOOK. One in-memory 'ProgressSink' over an 'IORef',
+-- capped at 200 events. M2 persists nothing: 'sinkLoad' is never called
+-- by this module (nothing in M2 needs to read progress back), and
+-- nothing else in the app writes progress -- 'applyExAction' below is
+-- the single call site for 'sinkRecord'. The Model keeps its OWN capped
+-- mirror of the same events ('mEventLog') purely because Miso's
+-- 'viewModel' is a pure function of 'Model' and cannot read an 'IORef'
+-- at render time; the two are always fed the identical event list in
+-- the same handler, so they never drift.
+--------------------------------------------------------------------------
+
+eventCap :: Int
+eventCap = 200
+
+capEvents :: [ProgressEvent] -> [ProgressEvent]
+capEvents xs = let n = length xs in if n > eventCap then drop (n - eventCap) xs else xs
+
+mkProgressSink :: IO ProgressSink
+mkProgressSink = do
+  ref <- newIORef []
+  pure ProgressSink
+    { sinkRecord = \ev -> modifyIORef' ref (capEvents . (++ [ev]))
+    , sinkLoad   = readIORef ref
+    }
+
+--------------------------------------------------------------------------
+-- Model / Action
+--------------------------------------------------------------------------
+
+-- | Keyed by the raw 'Text' underneath 'ExId'\/'PromptId' rather than
+-- those newtypes themselves: "SXC1.Exercise.Types" derives only 'Eq'\/
+-- 'Show' for them (its own size-discipline Haddock explains why), and
+-- this task does not own that module to add 'Ord'.
+data Model = Model
+  { mRoute     :: !Route
+  , mExStates  :: !(Map Text ExerciseState)
+  , mExResults :: !(Map Text (Outcome, Int))
+  , mEventLog  :: ![ProgressEvent]
+  } deriving (Eq)
+
+unDeckId :: DeckId -> Text
+unDeckId (DeckId t) = t
+
+unExId :: ExId -> Text
+unExId (ExId t) = t
+
+unPromptId :: PromptId -> Text
+unPromptId (PromptId t) = t
+
+-- | Two exercise-action constructors cover everything the runner needs
+-- (kept to two, rather than one per 'ExerciseAction' shape, to hold
+-- app.wasm's size down -- see this task's final report): 'ExBatch' applies
+-- an already-resolved list of engine actions in order against the SAME
+-- pre-batch state (so e.g. a drill confirm's 'ConfirmStep' immediately
+-- followed by 'Advance' is one undivided step from the learner's
+-- perspective); 'ExClocked' reads both clocks once and then dispatches
+-- an 'ExBatch' built from them -- covers Submit\/SelfGrade_\/ConfirmStep\/
+-- SubmitPage\/Advance\/Restart\/Begin uniformly.
 data Action
   = HashChanged
   | SetRoute Route
   | ToggleJA
+  | NoOp
+  | ExBatch ExId [ExerciseAction]
+  | ExClocked ExId (Integer -> Integer -> [ExerciseAction])
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
@@ -48,20 +169,36 @@ foreign export javascript "hs_start" main :: IO ()
 
 main :: IO ()
 main = do
-  h <- currentHash
-  startApp defaultEvents (readerApp (parseRoute h))
+  h    <- currentHash
+  sink <- mkProgressSink
+  -- THE M4 FORWARD HOOK, wired in (never a WebMIDI call, never a device
+  -- permission request -- 'dvAvailable' is a constant 'pure False' in M2):
+  _ <- dvAvailable noDeviceVerifier
+  startApp defaultEvents (readerApp sink (parseRoute h))
 
-readerApp :: Route -> App Model Action
-readerApp r0 = (component (Model r0) updateModel viewModel)
-  { subs = [ windowSub "hashchange" emptyDecoder (const HashChanged) ] }
+readerApp :: ProgressSink -> Route -> App Model Action
+readerApp sink r0 =
+  (component (Model r0 Map.empty Map.empty []) (updateModel sink) viewModel)
+    { subs = [ windowSub "hashchange" emptyDecoder (const HashChanged) ] }
 
-updateModel :: Action -> Effect parent props Model Action
-updateModel = \case
+findExerciseById :: [Deck] -> ExId -> Maybe Exercise
+findExerciseById decks eid = find ((== eid) . exId) (concatMap dkExercises decks)
+
+safeIndexL :: [a] -> Int -> Maybe a
+safeIndexL xs i
+  | i < 0     = Nothing
+  | otherwise = case drop i xs of { (x : _) -> Just x; [] -> Nothing }
+
+updateModel :: ProgressSink -> Action -> Effect parent props Model Action
+updateModel sink = \case
   HashChanged ->
     io (SetRoute . parseRoute <$> currentHash)
 
+  NoOp -> pure ()
+
   SetRoute r -> do
     modify (\m -> m { mRoute = r })
+    beginIfNeeded r
     io_ (scrollIntoView "app")
 
   ToggleJA -> do
@@ -73,5 +210,124 @@ updateModel = \case
         io_ (setHash (renderRoute r'))
       _ -> pure ()
 
+  ExBatch exid acts -> applyExActions sink exid acts
+
+  ExClocked exid mk -> io $ do
+    (mono, wall) <- readClocks
+    pure (ExBatch exid (mk mono wall))
+
+-- | On first navigation to an exercise (no state recorded for it yet),
+-- seed a fresh attempt with a real wall-clock reading. Never re-fires
+-- for an exercise that already has state -- this is what lets following
+-- a citation into the manual reader and coming back preserve the
+-- learner's prompt and selections (the model keys state by 'ExId', not
+-- by "the current exercise", exactly per the acceptance criteria).
+beginIfNeeded :: Route -> Effect parent props Model Action
+beginIfNeeded (RExercise _ exSlug) = do
+  let exid = ExId exSlug
+  states <- gets mExStates
+  if Map.member (unExId exid) states
+    then pure ()
+    else case findExerciseById exerciseCorpus exid of
+      Nothing -> pure ()
+      Just _  -> io (ExBatch exid . (: []) . Begin . snd <$> readClocks)
+beginIfNeeded _ = pure ()
+
+-- | Apply a list of pure engine steps IN ORDER against one pre-batch
+-- state, fold the combined state change into the model, record each
+-- event's per-prompt outcome (for the runner's feedback), append the
+-- events to the capped log, and forward them to the M3 sink -- the ONE
+-- call site that ever touches 'sinkRecord'.
+applyExActions :: ProgressSink -> ExId -> [ExerciseAction] -> Effect parent props Model Action
+applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
+  Nothing -> pure ()
+  Just ex -> do
+    states <- gets mExStates
+    let key          = unExId exid
+        st0          = Map.findWithDefault (initialState exid 0) key states
+        (st1, evsAll) = foldl' applyOne (st0, []) acts
+        applyOne (st, evs) act = let (st', ev') = step ex act st in (st', evs ++ ev')
+    modify (\m -> m
+      { mExStates  = Map.insert key st1 (mExStates m)
+      , mExResults = foldr recordResult (mExResults m) evsAll
+      , mEventLog  = capEvents (mEventLog m ++ evsAll)
+      })
+    io_ (mapM_ (sinkRecord sink) evsAll)
+  where
+    recordResult ev acc = case pePrompt ev of
+      Nothing  -> acc
+      Just pid -> Map.insert (unPromptId pid) (peOutcome ev, peElapsed ev) acc
+
+--------------------------------------------------------------------------
+-- View
+--------------------------------------------------------------------------
+
+exHandlersFor :: ExId -> ExHandlers Action
+exHandlersFor exid = ExHandlers
+  { exOnToggle     = \i optIdent -> ExBatch exid [Toggle i optIdent]
+  , exOnSubmit     = \i -> ExClocked exid (\mono wall -> [Submit i mono wall])
+  , exOnReveal     = \i -> ExBatch exid [Reveal i]
+  , exOnGot        = \i -> ExClocked exid (\mono wall -> [SelfGrade_ i Got mono wall])
+  , exOnMissed     = \i -> ExClocked exid (\mono wall -> [SelfGrade_ i Missed mono wall])
+  , exOnConfirm    = \i -> ExClocked exid (\mono wall -> [ConfirmStep i ByLearner mono wall, Advance wall])
+  , exOnFindInput  = \i txt -> case parseDigits (fromMisoString txt) of
+      Just n  -> ExBatch exid [EnterPage i n]
+      Nothing -> NoOp
+  , exOnFindSubmit = \i -> ExClocked exid (\mono wall -> [SubmitPage i mono wall])
+  , exOnShowHint   = \i -> ExBatch exid [ShowHint i]
+  , exOnNext       = ExClocked exid (\_ wall -> [Advance wall])
+  , exOnRestart    = ExClocked exid (\_ wall -> [Restart wall])
+  }
+
+-- | The current prompt's last graded result, if any -- looked up by
+-- 'PromptId' text so the runner never re-derives correctness itself
+-- (see "View.Exercise"'s Haddock).
+currentResult :: Model -> ExId -> ExerciseState -> Maybe (Outcome, Int)
+currentResult m exid st = do
+  ex     <- findExerciseById exerciseCorpus exid
+  prompt <- safeIndexL (exPrompts ex) (esCursor st)
+  Map.lookup (unPromptId (prId prompt)) (mExResults m)
+
+exerciseBodyView :: Model -> Route -> Maybe (View Model Action)
+exerciseBodyView m route = case route of
+  RExercises -> Just (Exercise.viewExerciseIndex exerciseCorpus)
+  RDeck slug -> Just (Exercise.viewDeck exerciseCorpus slug)
+  RExercise deckSlug exSlug ->
+    let exid   = ExId exSlug
+        st     = Map.findWithDefault (initialState exid 0) (unExId exid) (mExStates m)
+        result = currentResult m exid st
+    in Just (Exercise.viewExerciseRunner (exHandlersFor exid) exerciseCorpus deckSlug exSlug st result)
+  _ -> Nothing
+
+eventLogJson :: [ProgressEvent] -> Text
+eventLogJson evs = jArr (map eventJson evs)
+
+-- | Reuses "Exercises.Corpus"'s tiny JSON combinators (themselves built
+-- on 'SXC1.Content.Stats.jsonEscape') rather than a second encoder.
+eventJson :: ProgressEvent -> Text
+eventJson ev = jObj
+  [ jKV "deck"      (jStr (unDeckId (peDeck ev)))
+  , jKV "exercise"  (jStr (unExId (peExercise ev)))
+  , jKV "prompt"    (maybe "null" (jStr . unPromptId) (pePrompt ev))
+  , jKV "kind"      (jStr (kindText (peKind ev)))
+  , jKV "outcome"   (jStr (outcomeText (peOutcome ev)))
+  , jKV "attempt"   (jInt (peAttempt ev))
+  , jKV "revealed"  (jBool (peRevealed ev))
+  , jKV "hints"     (jInt (peHints ev))
+  , jKV "elapsedMs" (jInt (peElapsed ev))
+  , jKV "at"        (jInteger (peAt ev))
+  ]
+
+kindText :: Kind -> Text
+kindText KQuiz   = "quiz"
+kindText KDrill  = "drill"
+kindText KLookup = "lookup"
+
+outcomeText :: Outcome -> Text
+outcomeText Correct   = "correct"
+outcomeText Incorrect = "incorrect"
+outcomeText Skipped   = "skipped"
+outcomeText Completed = "completed"
+
 viewModel :: props -> Model -> View Model Action
-viewModel _ (Model r) = viewRoute ToggleJA r
+viewModel _ m = viewRoute ToggleJA exerciseStatsJson (eventLogJson (mEventLog m)) (exerciseBodyView m (mRoute m)) (mRoute m)

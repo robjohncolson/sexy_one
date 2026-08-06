@@ -124,7 +124,11 @@ const GUIDE_BOOK_PART_TITLES = [
 // ---------------------------------------------------------------------------
 
 const REQUIRED_DOC_SLUGS = ['guide-book', 'startup-guide', 'midi', 'oss'];
-const REQUIRED_STATS_FIELDS = [...GOLDEN_FIELDS, 'unparsed'];
+// NEW9-partial fix (briefs/M2-manifest.json, task "exercise-ui"): 'title'
+// and 'partTitles' were deliberately omitted here at M1's gate, so a
+// four-document expectation carrying only the numeric fields passed
+// without ever checking those two emitted fields. Both are now required.
+const REQUIRED_STATS_FIELDS = [...GOLDEN_FIELDS, 'unparsed', 'title', 'partTitles'];
 
 // Returns null when `parsed` is an acceptable --expect-json payload,
 // otherwise a human-readable string explaining exactly what is wrong.
@@ -162,6 +166,97 @@ function validateExpectJson(parsed, filePath) {
 }
 
 // ---------------------------------------------------------------------------
+// M2: --expect-exercise-json schema validation and comparison against
+// #sxc1-exercise-stats. Same discipline as --expect-json above, but exact
+// in BOTH directions from birth (briefs/M2-manifest.json, task
+// "exercise-ui"): every expected deck present, none unexpected, none
+// duplicated, and every field compared -- an expectation satisfiable by a
+// subset is not an expectation. The schema below matches exactly what
+// Exercises.Corpus.exerciseStatsJson (site/app/Exercises/Corpus.hs)
+// emits.
+// ---------------------------------------------------------------------------
+
+const REQUIRED_EX_TOTALS_FIELDS = ['decks', 'exercises', 'prompts', 'quiz', 'drill', 'lookup'];
+const REQUIRED_EX_DECK_FIELDS = ['file', 'deck', 'chapter', 'title', 'exercises', 'prompts', 'chars', 'lines', 'fnv1a'];
+
+// Returns null when `parsed` is an acceptable --expect-exercise-json
+// payload, otherwise a human-readable string explaining exactly what is
+// wrong -- exercised by one of this task's negative controls
+// (`--self-test --expect-exercise-json '{"totals":{"exercises":999}}'`
+// must be rejected, which it is here because that payload is missing
+// almost every required field, never merely because the number itself
+// happens to be wrong).
+function validateExpectExerciseJson(parsed, filePath) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return `--expect-exercise-json '${filePath}' must be a JSON object with "totals" and "decks"`;
+  }
+  if (!parsed.totals || typeof parsed.totals !== 'object' || Array.isArray(parsed.totals)) {
+    return `--expect-exercise-json '${filePath}' has no "totals" object`;
+  }
+  const missingTotals = REQUIRED_EX_TOTALS_FIELDS.filter((f) => !(f in parsed.totals));
+  if (missingTotals.length > 0) {
+    return `--expect-exercise-json '${filePath}': totals is missing required field(s): ${missingTotals.join(', ')} -- an expectation must supply every totals field it wants compared, not a partial subset`;
+  }
+  if (!Array.isArray(parsed.decks)) {
+    return `--expect-exercise-json '${filePath}' has no top-level "decks" array`;
+  }
+  const seenFiles = new Set();
+  for (let i = 0; i < parsed.decks.length; i++) {
+    const edeck = parsed.decks[i];
+    if (!edeck || typeof edeck !== 'object' || Array.isArray(edeck) || typeof edeck.file !== 'string' || edeck.file === '') {
+      return `--expect-exercise-json '${filePath}': decks[${i}] is missing a non-empty string "file" field`;
+    }
+    if (seenFiles.has(edeck.file)) {
+      return `--expect-exercise-json '${filePath}': duplicate file "${edeck.file}" in decks[]`;
+    }
+    seenFiles.add(edeck.file);
+    const missing = REQUIRED_EX_DECK_FIELDS.filter((f) => !(f in edeck));
+    if (missing.length > 0) {
+      return `--expect-exercise-json '${filePath}': decks[${i}] (file "${edeck.file}") is missing required field(s): ${missing.join(', ')}`;
+    }
+  }
+  return null;
+}
+
+// Exact bidirectional comparison: every expected totals field and every
+// expected deck's every field, PLUS every actual deck accounted for (no
+// extra, no duplicate). Returns a list of human-readable mismatches
+// (empty means an exact match).
+function compareExerciseStats(actual, expected) {
+  if (!actual || typeof actual !== 'object') {
+    return ['#sxc1-exercise-stats did not parse as a JSON object'];
+  }
+  const mismatches = [];
+  const at = (actual.totals && typeof actual.totals === 'object') ? actual.totals : {};
+  for (const f of REQUIRED_EX_TOTALS_FIELDS) {
+    if (JSON.stringify(at[f]) !== JSON.stringify(expected.totals[f])) {
+      mismatches.push(`totals.${f}: got ${JSON.stringify(at[f])} want ${JSON.stringify(expected.totals[f])}`);
+    }
+  }
+  const actualDecks = Array.isArray(actual.decks) ? actual.decks : [];
+  const expectedByFile = new Map(expected.decks.map((d) => [d.file, d]));
+  const actualFileCounts = new Map();
+  for (const ad of actualDecks) {
+    const f = ad && ad.file;
+    if (typeof f === 'string') actualFileCounts.set(f, (actualFileCounts.get(f) || 0) + 1);
+  }
+  for (const [file, count] of actualFileCounts) {
+    if (count > 1) mismatches.push(`${file}: appears ${count} times in app exercise stats (duplicate deck)`);
+    if (!expectedByFile.has(file)) mismatches.push(`${file}: present in app exercise stats but not named in --expect-exercise-json`);
+  }
+  for (const ed of expected.decks) {
+    const ad = actualDecks.find((d) => d && d.file === ed.file);
+    if (!ad) { mismatches.push(`${ed.file}: missing from app exercise stats`); continue; }
+    for (const f of REQUIRED_EX_DECK_FIELDS) {
+      if (JSON.stringify(ad[f]) !== JSON.stringify(ed[f])) {
+        mismatches.push(`${ed.file}.${f}: got ${JSON.stringify(ad[f])} want ${JSON.stringify(ed[f])}`);
+      }
+    }
+  }
+  return mismatches;
+}
+
+// ---------------------------------------------------------------------------
 // Argument parsing
 // ---------------------------------------------------------------------------
 
@@ -173,6 +268,10 @@ function parseArgs(argv) {
     keepOpen: false,
     expectJson: null,
     quick: false,
+    selfTest: false,
+    selfTestNegative: false,
+    exerciseFixture: null,
+    expectExerciseJson: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -194,6 +293,18 @@ function parseArgs(argv) {
         break;
       case '--keep-open':
         opts.keepOpen = true;
+        break;
+      case '--self-test':
+        opts.selfTest = true;
+        break;
+      case '--self-test-negative':
+        opts.selfTestNegative = true;
+        break;
+      case '--exercise-fixture':
+        opts.exerciseFixture = argv[++i];
+        break;
+      case '--expect-exercise-json':
+        opts.expectExerciseJson = argv[++i];
         break;
       case '--help':
       case '-h':
@@ -542,6 +653,727 @@ function connectWebSocket(url) {
 }
 
 // ---------------------------------------------------------------------------
+// M2 exercise engine: the self-test fixture, and the assertion routine
+// shared between --self-test/--self-test-negative (driven against the
+// fixture below) and a real run (driven against the real app via
+// --exercise-fixture) -- briefs/M2-manifest.json, task "exercise-ui":
+// "--self-test extension: ... the same assertion code runs against it."
+//
+// The fixture is a single self-contained HTML document (no server, no
+// navigation beyond hash changes) reproducing the DOM contract for one
+// quiz, one drill and one lookup exercise in plain JavaScript. It is
+// deliberately independent of the real Haskell app: --self-test proves
+// the BROWSER ASSERTIONS themselves can fail (and --self-test-negative
+// proves it on a SABOTAGED grader), never that the real app matches it.
+// ---------------------------------------------------------------------------
+
+const SELF_TEST_FIXTURE = {
+  quiz: { deck: 'demo-deck', id: 'demo-quiz', correctOpt: 'opt-a', wrongOpt: 'opt-b', citeSlug: 'guide-book', citePage: 3 },
+  drill: { deck: 'demo-deck', id: 'demo-drill', steps: 2, hasVerify: true },
+  lookup: { deck: 'demo-deck', id: 'demo-lookup', targetPage: 7 },
+};
+
+// The #sxc1-exercise-stats payload the fixture below emits verbatim --
+// matches the schema Exercises.Corpus.exerciseStatsJson produces
+// (totals + one entry per deck with file/deck/chapter/title/exercises/
+// prompts/chars/lines/fnv1a). --self-test's own --expect-exercise-json
+// negative control compares against exactly this.
+const SELF_TEST_EXERCISE_STATS = {
+  totals: { decks: 1, exercises: 3, prompts: 4, quiz: 1, drill: 1, lookup: 1 },
+  decks: [
+    { file: 'demo-deck.ex.md', deck: 'demo-deck', chapter: 'Front matter', title: 'Demo deck',
+      exercises: 3, prompts: 4, chars: 42, lines: 3, fnv1a: 12345 },
+  ],
+};
+
+// Builds the fixture page. `sabotage` selects the negative-control
+// grader: when true, EVERY submit reports "correct" regardless of what
+// was actually selected/entered/confirmed -- the one and only thing
+// --self-test-negative changes.
+function selfTestFixtureHtml(sabotage) {
+  const fx = SELF_TEST_FIXTURE;
+  const statsJson = JSON.stringify(SELF_TEST_EXERCISE_STATS).replace(/</g, '\\u003c');
+  const fixtureJson = JSON.stringify(fx).replace(/</g, '\\u003c');
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>sxc1-self-test</title></head>
+<body>
+<div id="boot-status" hidden></div>
+<div id="app">
+  <div id="sxc1-exercise-stats" hidden>${statsJson}</div>
+  <div id="sxc1-event-log" hidden>[]</div>
+  <div id="sxc1-root"></div>
+</div>
+<script>
+window.__SXC1_BOOTED = true;
+(function () {
+  var SABOTAGE = ${sabotage ? 'true' : 'false'};
+  var FIXTURE = ${fixtureJson};
+  var eventLog = [];
+  var quizSelected = Object.create(null);
+  var quizAttempted = false;
+  var lastQuizCorrect = false;
+  var drillCursor = 0;
+  var lookupStartedAt = 0;
+  var lookupResult = null;
+
+  function root() { return document.getElementById('sxc1-root'); }
+  function setEventLog() { document.getElementById('sxc1-event-log').textContent = JSON.stringify(eventLog); }
+  function pushEvent(exId, kind, outcome) {
+    eventLog.push({ deck: FIXTURE.quiz.deck, exercise: exId, prompt: exId + '#1', kind: kind,
+      outcome: outcome, attempt: 1, revealed: false, hints: 0, elapsedMs: 1, at: Date.now() });
+    setEventLog();
+  }
+
+  function renderIndex() {
+    root().innerHTML =
+      '<section id="sxc1-exercise-index">' +
+        '<section class="ex-chapter"><h2 class="ex-chapter-title">Demo chapter</h2>' +
+        '<ul class="ex-deck-list"><li><a class="ex-deck-card" href="#/x/' + FIXTURE.quiz.deck + '">' +
+        '<span class="ex-deck-title">Demo deck</span><span class="ex-deck-count">3 exercises</span>' +
+        '</a></li></ul></section></section>';
+  }
+
+  function renderDeck() {
+    root().innerHTML = '<section id="sxc1-deck"><h1 id="ex-deck-title">Demo deck</h1>' +
+      '<p id="ex-deck-summary">A demo deck.</p><ol class="ex-list">' +
+      '<li><a class="ex-link" href="#/x/' + FIXTURE.quiz.deck + '/' + FIXTURE.quiz.id + '"><span class="ex-kind kind-quiz">Quiz</span><span class="ex-title">Demo quiz</span></a></li>' +
+      '<li><a class="ex-link" href="#/x/' + FIXTURE.drill.deck + '/' + FIXTURE.drill.id + '"><span class="ex-kind kind-drill">Drill</span><span class="ex-title">Demo drill</span></a></li>' +
+      '<li><a class="ex-link" href="#/x/' + FIXTURE.lookup.deck + '/' + FIXTURE.lookup.id + '"><span class="ex-kind kind-lookup">Lookup</span><span class="ex-title">Demo lookup</span></a></li>' +
+      '</ol></section>';
+  }
+
+  function feedbackHtml(correct) {
+    return '<p id="ex-feedback" class="' + (correct ? 'correct' : 'incorrect') + '" role="status">' +
+      (correct ? 'Correct.' : 'Not quite. Try again.') + '</p>' +
+      (correct ? ('<div id="ex-note"><p>Why: demo note.</p></div>' +
+        '<ul id="ex-cites"><li><a class="cite" href="#/m/' + FIXTURE.quiz.citeSlug + '/p/' + FIXTURE.quiz.citePage + '">cite</a></li></ul>' +
+        '<button id="btn-ex-next">Next</button>') : '');
+  }
+
+  function renderQuiz() {
+    var optsHtml =
+      '<li><button id="' + FIXTURE.quiz.correctOpt + '" class="ex-option" aria-pressed="' + (quizSelected[FIXTURE.quiz.correctOpt] ? 'true' : 'false') + '">Correct option</button></li>' +
+      '<li><button id="' + FIXTURE.quiz.wrongOpt + '" class="ex-option" aria-pressed="' + (quizSelected[FIXTURE.quiz.wrongOpt] ? 'true' : 'false') + '">Wrong option</button></li>';
+    root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-quiz">' +
+      '<h1 id="ex-title">Demo quiz</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Pick the right one.</p></div>' +
+      '<ul id="ex-options">' + optsHtml + '</ul>' +
+      '<button id="btn-ex-submit">Submit</button>' +
+      (quizAttempted ? feedbackHtml(lastQuizCorrect) : '') +
+      '</article>';
+    Array.prototype.forEach.call(document.querySelectorAll('.ex-option'), function (btn) {
+      btn.addEventListener('click', function () {
+        quizSelected[btn.id] = !quizSelected[btn.id];
+        renderQuiz();
+      });
+    });
+    var submitBtn = document.getElementById('btn-ex-submit');
+    submitBtn.addEventListener('click', function () {
+      var selectedIds = Object.keys(quizSelected).filter(function (k) { return quizSelected[k]; });
+      var isCorrect = SABOTAGE ? true : (selectedIds.length === 1 && selectedIds[0] === FIXTURE.quiz.correctOpt);
+      quizAttempted = true;
+      lastQuizCorrect = isCorrect;
+      pushEvent(FIXTURE.quiz.id, 'quiz', isCorrect ? 'correct' : 'incorrect');
+      renderQuiz();
+    });
+  }
+
+  function renderDrill() {
+    var stepsHtml = '';
+    for (var i = 1; i <= FIXTURE.drill.steps; i++) {
+      var idx0 = i - 1;
+      stepsHtml += '<li class="ex-step" id="ex-step-' + i + '"><div class="ex-step-instruction"><p>Step ' + i + '.</p></div>' +
+        '<p class="ex-step-check" id="ex-step-' + i + '-check">Check ' + i + '.</p>' +
+        ((FIXTURE.drill.hasVerify && i === 1) ? '<p class="ex-verify" id="ex-step-1-verify">Automatic device confirmation arrives with WebMIDI support in a future update; confirm manually for now.</p>' : '') +
+        (idx0 === drillCursor ? ('<button class="btn-ex-confirm" id="btn-ex-confirm-' + i + '">Confirm</button>') : '') +
+        '</li>';
+    }
+    root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-drill">' +
+      '<h1 id="ex-title">Demo drill</h1><p id="ex-progress">' + Math.min(drillCursor + 1, FIXTURE.drill.steps) + ' / ' + FIXTURE.drill.steps + '</p>' +
+      '<div id="ex-stem"><p>Do the thing.</p></div><ol id="ex-steps">' + stepsHtml + '</ol></article>';
+    var btn = document.getElementById('btn-ex-confirm-' + (drillCursor + 1));
+    if (btn) btn.addEventListener('click', function () {
+      pushEvent(FIXTURE.drill.id, 'drill', 'correct');
+      drillCursor += 1;
+      renderDrill();
+    });
+  }
+
+  function elapsedStr() {
+    var ms = Math.max(0, Date.now() - lookupStartedAt);
+    var s = Math.floor(ms / 1000);
+    var m = Math.floor(s / 60);
+    var ss = s % 60;
+    return m + ':' + (ss < 10 ? '0' : '') + ss;
+  }
+
+  function renderLookup() {
+    root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-lookup">' +
+      '<h1 id="ex-title">Demo lookup</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Find the page.</p></div>' +
+      '<p id="ex-find-task">Find it.</p>' +
+      '<input id="ex-find-input" type="number" inputmode="numeric">' +
+      '<button id="btn-ex-find-submit">Submit</button>' +
+      (lookupResult !== null ? (feedbackHtml(lookupResult) + (lookupResult ? ('<p id="ex-elapsed">' + elapsedStr() + '</p>') : '')) : '') +
+      '</article>';
+    if (lookupStartedAt === 0) lookupStartedAt = Date.now();
+    var input = document.getElementById('ex-find-input');
+    var submitBtn = document.getElementById('btn-ex-find-submit');
+    submitBtn.addEventListener('click', function () {
+      var n = parseInt(input.value, 10);
+      var isCorrect = SABOTAGE ? true : (n === FIXTURE.lookup.targetPage);
+      lookupResult = isCorrect;
+      pushEvent(FIXTURE.lookup.id, 'lookup', isCorrect ? 'correct' : 'incorrect');
+      renderLookup();
+    });
+  }
+
+  function renderManualPage(slug, n) {
+    root().innerHTML = '<article id="sxc1-page"><div class="page-body" id="page-' + n + '">Manual page ' + n + ' of ' + slug + '.</div></article>';
+  }
+
+  function render() {
+    var h = location.hash.replace(/^#/, '');
+    var parts = h.split('/').filter(Boolean);
+    if (parts[0] === 'x' && parts.length === 1) { renderIndex(); return; }
+    if (parts[0] === 'x' && parts.length === 2) { renderDeck(); return; }
+    if (parts[0] === 'x' && parts.length === 3) {
+      var exId = parts[2];
+      if (exId === FIXTURE.quiz.id) { renderQuiz(); return; }
+      if (exId === FIXTURE.drill.id) { drillCursor = 0; renderDrill(); return; }
+      if (exId === FIXTURE.lookup.id) { lookupStartedAt = 0; lookupResult = null; renderLookup(); return; }
+    }
+    if (parts[0] === 'm' && parts.length >= 4 && parts[2] === 'p') { renderManualPage(parts[1], parts[3]); return; }
+    renderIndex();
+  }
+  window.addEventListener('hashchange', render);
+  render();
+})();
+<\/script>
+</body></html>`;
+}
+
+// The assertion routine shared between --self-test/--self-test-negative
+// and a real run driven with --exercise-fixture. `h` bundles everything
+// that differs between "a self-test fixture page" and "the real app" --
+// evaluate/report/goto/click/assertElement/typeText -- so this function
+// itself never knows which one it is talking to. Returns the list of
+// {name, ok} results (in order), so callers (both --self-test-negative
+// and a real run) can inspect individual outcomes, not just the total.
+async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
+  const results = [];
+  const report = (name, ok, observed) => {
+    results.push({ name, ok });
+    h.report(name, ok, observed);
+  };
+
+  // 1. "#/x" renders #sxc1-exercise-index containing the fixture's deck.
+  await h.goto('#/x', '#sxc1-exercise-index');
+  const indexHtml = await h.evaluate(`(() => {
+    const e = document.querySelector('#sxc1-exercise-index');
+    return e ? e.outerHTML : null;
+  })()`);
+  const indexOk = Boolean(indexHtml)
+    && indexHtml.includes('ex-chapter')
+    && indexHtml.includes('ex-deck-card')
+    && indexHtml.includes(`#/x/${fixture.quiz.deck}`);
+  report('#/x renders #sxc1-exercise-index with a deck card for the fixture deck', indexOk, indexHtml && indexHtml.slice(0, 300));
+
+  // 2. #sxc1-exercise-stats parses as JSON and matches --expect-exercise-json.
+  if (expectedExerciseJson) {
+    const statsRaw = await h.evaluate(`(() => {
+      const e = document.querySelector('#sxc1-exercise-stats');
+      return e ? e.textContent : null;
+    })()`);
+    let statsParsed = null;
+    try { statsParsed = JSON.parse(statsRaw); } catch { /* reported below */ }
+    if (statsParsed === null) {
+      report('#sxc1-exercise-stats is valid JSON', false, statsRaw);
+    } else {
+      const mismatches = compareExerciseStats(statsParsed, expectedExerciseJson);
+      report('#sxc1-exercise-stats matches --expect-exercise-json', mismatches.length === 0, mismatches);
+    }
+  }
+
+  // 3. QUIZ ANSWER PATH. Ready selectors below are the KIND-specific
+  // class (.kind-quiz/.kind-drill/.kind-lookup), never the shared
+  // #sxc1-exercise id: that id persists across every exercise route (the
+  // runner's own outer wrapper), so waiting for it alone can observe the
+  // PREVIOUS exercise still on screen mid-navigation -- MEASURED on a
+  // real run under load (the 108-route sweep just before this section):
+  // it raced and read a stale drill/lookup page's content.
+  await h.goto(`#/x/${fixture.quiz.deck}/${fixture.quiz.id}`, '.kind-quiz');
+  await h.clickAssert(`#${fixture.quiz.wrongOpt}`, `click the wrong quiz option (${fixture.quiz.wrongOpt})`);
+  await h.clickAssert('#btn-ex-submit', 'click #btn-ex-submit (wrong answer)');
+  // Submitting reads both clocks via an async IO round trip (real Main.hs:
+  // Miso's 'io' runs "after the VDOM has been patched", and Miso.Date's
+  // wall-clock read is itself a real JS round trip) before the graded
+  // state materialises, so this polls for #ex-feedback rather than
+  // reading it the instant the click's own evaluate() call returns.
+  const wrongFeedback = await h.evaluate(`(async () => {
+    const start = Date.now();
+    let e;
+    while (Date.now() - start < 3000) {
+      e = document.querySelector('#ex-feedback');
+      if (e) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return e ? { text: e.textContent, cls: e.className } : null;
+  })()`);
+  report(
+    'wrong quiz answer: #ex-feedback starts with "Not quite" and carries class "incorrect"',
+    Boolean(wrongFeedback && /^Not quite/.test(wrongFeedback.text) && wrongFeedback.cls.split(/\s+/).includes('incorrect')),
+    wrongFeedback,
+  );
+  await h.clickAssert(`#${fixture.quiz.wrongOpt}`, 'deselect the wrong quiz option');
+  await h.clickAssert(`#${fixture.quiz.correctOpt}`, `click the correct quiz option (${fixture.quiz.correctOpt})`);
+  await h.clickAssert('#btn-ex-submit', 'click #btn-ex-submit (correct answer)');
+  // #ex-feedback already EXISTS (from the wrong attempt above), so this
+  // polls for its TEXT to actually flip to "Correct" -- existence alone
+  // would not detect the async re-grade landing (see the comment above).
+  const rightFeedback = await h.evaluate(`(async () => {
+    const start = Date.now();
+    let fb;
+    while (Date.now() - start < 3000) {
+      fb = document.querySelector('#ex-feedback');
+      if (fb && /^Correct/.test(fb.textContent)) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const note = document.querySelector('#ex-note');
+    const next = document.querySelector('#btn-ex-next');
+    return fb ? {
+      text: fb.textContent, cls: fb.className,
+      noteVisible: Boolean(note) && note.offsetParent !== null,
+      nextPresent: Boolean(next),
+    } : null;
+  })()`);
+  report(
+    'correct quiz answer: #ex-feedback starts with "Correct", class "correct", #ex-note visible, #btn-ex-next present',
+    Boolean(rightFeedback && /^Correct/.test(rightFeedback.text) && rightFeedback.cls.split(/\s+/).includes('correct')
+      && rightFeedback.noteVisible && rightFeedback.nextPresent),
+    rightFeedback,
+  );
+
+  // 4. CITATION ROUND TRIP.
+  const citeInfo = await h.evaluate(`(() => {
+    const a = document.querySelector('#ex-cites a.cite');
+    return a ? { href: a.getAttribute('href') } : null;
+  })()`);
+  const expectedHref = `#/m/${fixture.quiz.citeSlug}/p/${fixture.quiz.citePage}`;
+  report('#ex-cites a.cite href matches the fixture citation', Boolean(citeInfo && citeInfo.href === expectedHref), citeInfo);
+  await h.clickAssert('#ex-cites a.cite', 'click the citation link');
+  const pageId = `#page-${fixture.quiz.citePage}`;
+  const onManualPage = await h.evaluate(`(async () => {
+    const start = Date.now();
+    while (Date.now() - start < 5000) {
+      if (document.querySelector(${JSON.stringify(pageId)})) return true;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return document.querySelector(${JSON.stringify(pageId)}) !== null;
+  })()`);
+  report(`clicking the citation renders ${pageId}`, onManualPage === true, onManualPage);
+  await h.evaluate('window.history.back(); true');
+  const backOk = await h.evaluate(`(async () => {
+    const start = Date.now();
+    while (Date.now() - start < 5000) {
+      const opt = document.querySelector(${JSON.stringify(`#${fixture.quiz.correctOpt}`)});
+      if (opt && opt.getAttribute('aria-pressed') === 'true') return true;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const opt = document.querySelector(${JSON.stringify(`#${fixture.quiz.correctOpt}`)});
+    return Boolean(opt) && opt.getAttribute('aria-pressed') === 'true';
+  })()`);
+  report('going back preserves the quiz prompt with the previous selection still applied', backOk === true, backOk);
+
+  // 5. DRILL.
+  await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
+  const stepCount = await h.evaluate('document.querySelectorAll("#ex-steps > li").length');
+  report('#ex-steps > li count equals the fixture drill step count', stepCount === fixture.drill.steps, stepCount);
+  const progressBefore = await h.evaluate(`(() => {
+    const e = document.querySelector('#ex-progress');
+    return e ? e.textContent : null;
+  })()`);
+  await h.clickAssert('#btn-ex-confirm-1', 'click #btn-ex-confirm-1');
+  const progressAfter = await h.evaluate(`(async () => {
+    const start = Date.now();
+    while (Date.now() - start < 5000) {
+      const e = document.querySelector('#ex-progress');
+      if (e && e.textContent !== ${JSON.stringify(progressBefore)}) return e.textContent;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const e = document.querySelector('#ex-progress');
+    return e ? e.textContent : null;
+  })()`);
+  report(
+    `confirming step 1 moves #ex-progress from "${progressBefore}" to "2 / ${fixture.drill.steps}"`,
+    progressAfter === `2 / ${fixture.drill.steps}`,
+    { progressBefore, progressAfter },
+  );
+  if (fixture.drill.hasVerify) {
+    const verifyText = await h.evaluate(`(() => {
+      const e = document.querySelector('.ex-verify');
+      return e ? e.textContent : null;
+    })()`);
+    report('a drill step with a verify hook has a non-empty .ex-verify', Boolean(verifyText && verifyText.trim().length > 0), verifyText);
+  }
+
+  // 6. LOOKUP -- CDP Input.insertText, never a synthetic input event (P-D).
+  await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
+  const wrongPage = fixture.lookup.targetPage > 1 ? fixture.lookup.targetPage - 1 : fixture.lookup.targetPage + 1;
+  await h.typeText('#ex-find-input', String(wrongPage));
+  await h.clickAssert('#btn-ex-find-submit', 'submit the wrong lookup page');
+  // Same async-clock-round-trip reasoning as the quiz feedback above.
+  const lookupWrong = await h.evaluate(`(async () => {
+    const start = Date.now();
+    let e;
+    while (Date.now() - start < 3000) {
+      e = document.querySelector('#ex-feedback');
+      if (e) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return e ? e.textContent : null;
+  })()`);
+  report('lookup: wrong page submits to "Not quite"', Boolean(lookupWrong && /^Not quite/.test(lookupWrong)), lookupWrong);
+  await h.typeText('#ex-find-input', String(fixture.lookup.targetPage));
+  await h.clickAssert('#btn-ex-find-submit', 'submit the correct lookup page');
+  const lookupRight = await h.evaluate(`(async () => {
+    const start = Date.now();
+    let fb;
+    while (Date.now() - start < 3000) {
+      fb = document.querySelector('#ex-feedback');
+      if (fb && /^Correct/.test(fb.textContent)) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const el = document.querySelector('#ex-elapsed');
+    return { text: fb ? fb.textContent : null, elapsed: el ? el.textContent : null };
+  })()`);
+  report(
+    'lookup: correct page submits to "Correct" and #ex-elapsed matches ^[0-9]+:[0-9][0-9]$',
+    Boolean(lookupRight.text && /^Correct/.test(lookupRight.text) && lookupRight.elapsed && /^[0-9]+:[0-9][0-9]$/.test(lookupRight.elapsed)),
+    lookupRight,
+  );
+
+  // 7. #sxc1-event-log.
+  const eventLog = await h.evaluate(`(() => {
+    const e = document.querySelector('#sxc1-event-log');
+    if (!e) return null;
+    try { return JSON.parse(e.textContent); } catch { return 'PARSE_ERROR'; }
+  })()`);
+  const lastEvent = Array.isArray(eventLog) && eventLog.length > 0 ? eventLog[eventLog.length - 1] : null;
+  report(
+    '#sxc1-event-log is a non-empty JSON array whose last entry is a correct outcome for the fixture exercise',
+    Boolean(lastEvent && lastEvent.outcome === 'correct' && lastEvent.exercise === fixture.lookup.id),
+    { length: Array.isArray(eventLog) ? eventLog.length : eventLog, lastEvent },
+  );
+
+  // 8. 390x844: no horizontal overflow on the runner.
+  await h.setMobileViewport();
+  const overflow = await h.evaluate(`(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }))()`);
+  await h.clearViewport();
+  report(
+    'exercise runner has no horizontal overflow at 390x844',
+    Boolean(overflow) && overflow.scrollWidth <= overflow.innerWidth + 1,
+    overflow,
+  );
+
+  // 9. Console hygiene.
+  const hygiene = h.consoleHygiene();
+  report('zero console errors and uncaught exceptions during the exercise run', hygiene.ok, hygiene);
+
+  return results;
+}
+
+// `value` is either inline JSON text or a path to a JSON file (matches
+// --exercise-fixture's documented "<path|json>" and, pragmatically,
+// --expect-exercise-json too). Tries inline JSON first; falls back to
+// reading it as a file.
+function parseJsonOrFile(value, label) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    // fall through to file
+  }
+  let raw;
+  try {
+    raw = fs.readFileSync(value, 'utf8');
+  } catch (err) {
+    throw new Error(`${label} is neither valid inline JSON nor a readable file path: ${err.message}`);
+  }
+  return JSON.parse(raw);
+}
+
+const EXERCISE_FIXTURE_FIELDS = {
+  quiz: ['deck', 'id', 'correctOpt', 'wrongOpt', 'citeSlug', 'citePage'],
+  drill: ['deck', 'id', 'steps', 'hasVerify'],
+  lookup: ['deck', 'id', 'targetPage'],
+};
+
+// Validates the shape exercise-check --browser-fixture emits. Returns
+// null when acceptable, else a human-readable error.
+function validateExerciseFixture(fx) {
+  if (!fx || typeof fx !== 'object') return '--exercise-fixture must be a JSON object with "quiz", "drill" and "lookup" keys';
+  for (const [kind, fields] of Object.entries(EXERCISE_FIXTURE_FIELDS)) {
+    const obj = fx[kind];
+    if (!obj || typeof obj !== 'object') return `--exercise-fixture is missing its "${kind}" object`;
+    const missing = fields.filter((f) => !(f in obj));
+    if (missing.length > 0) return `--exercise-fixture's "${kind}" object is missing field(s): ${missing.join(', ')}`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// --self-test / --self-test-negative: launches its OWN throwaway browser
+// (independent of --url and of any static file server -- the fixture is
+// a data: URL, so there is nothing to serve), navigates to the fixture
+// built by selfTestFixtureHtml(), and runs runExerciseAssertions()
+// against it -- the SAME function a real run drives against the real
+// app via --exercise-fixture. `negative` selects the sabotaged grader
+// and the negative-control exit-code rule (see below).
+// ---------------------------------------------------------------------------
+
+async function runSelfTest(opts, negative) {
+  const deadline = Date.now() + opts.timeout;
+  const cleanupFns = [];
+  const runCleanup = async () => {
+    for (const fn of cleanupFns.splice(0).reverse()) {
+      try { await fn(); } catch { /* best-effort cleanup */ }
+    }
+  };
+  const die = async (code, message) => {
+    if (message) console.error(message);
+    await runCleanup();
+    process.exit(code);
+  };
+
+  let expectedExJson = SELF_TEST_EXERCISE_STATS;
+  if (!negative && opts.expectExerciseJson) {
+    let parsed;
+    try {
+      parsed = parseJsonOrFile(opts.expectExerciseJson, '--expect-exercise-json');
+    } catch (err) {
+      await die(2, `error: ${err.message}`);
+      return;
+    }
+    const schemaError = validateExpectExerciseJson(parsed, '--expect-exercise-json');
+    if (schemaError) {
+      await die(2, `error: ${schemaError}`);
+      return;
+    }
+    expectedExJson = parsed;
+  }
+
+  const browserPath = resolveBrowser(opts.browser);
+  if (!browserPath) {
+    await die(2, 'error: no browser found for --self-test. Install Google Chrome/Chromium, or set ' +
+      'SXC1_BROWSER to a browser executable path, or pass --browser <path>.');
+    return;
+  }
+
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sxc1-selftest-profile-'));
+  cleanupFns.push(() => removeDirWithRetry(userDataDir));
+  const debugPort = await findFreePort();
+  const browserArgs = [
+    '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
+    '--disable-dev-shm-usage', `--user-data-dir=${userDataDir}`, `--remote-debugging-port=${debugPort}`, 'about:blank',
+  ];
+  const browserProc = spawn(browserPath, browserArgs, { stdio: 'ignore', detached: true });
+  let cdp = null;
+  let browserFailure = null;
+  const noteBrowserFailure = (message) => {
+    if (!browserFailure) browserFailure = new Error(message);
+    if (cdp) cdp.failFatally(browserFailure);
+  };
+  browserProc.on('exit', (code, signal) => {
+    noteBrowserFailure(`browser process exited unexpectedly (code=${code === null ? 'null' : code}, signal=${signal || 'none'})`);
+  });
+  browserProc.on('error', (err) => {
+    noteBrowserFailure(`browser process error: ${err && err.message ? err.message : err}`);
+  });
+  cleanupFns.push(() => new Promise((resolve) => {
+    const killGroup = (signal) => { try { process.kill(-browserProc.pid, signal); } catch { /* group already gone */ } };
+    if (browserProc.exitCode !== null || browserProc.signalCode !== null) { killGroup('SIGKILL'); resolve(); return; }
+    const forceKillTimer = setTimeout(() => killGroup('SIGKILL'), 3000);
+    browserProc.once('exit', () => { clearTimeout(forceKillTimer); killGroup('SIGKILL'); resolve(); });
+    killGroup('SIGTERM');
+  }));
+
+  let versionInfo = null;
+  while (Date.now() < deadline) {
+    if (browserFailure) {
+      await die(2, `error: ${browserFailure.message} (before DevTools became reachable at ${browserPath})`);
+      return;
+    }
+    try {
+      const info = await withDeadline(
+        httpGetJson(`http://127.0.0.1:${debugPort}/json/version`),
+        deadline,
+        'DevTools /json/version request',
+      );
+      if (info && info.webSocketDebuggerUrl) { versionInfo = info; break; }
+    } catch { /* not up yet, or this attempt ran past the deadline */ }
+    await sleep(200);
+  }
+  if (!versionInfo) {
+    await die(2, `error: timed out waiting for DevTools at 127.0.0.1:${debugPort} (--self-test)`);
+    return;
+  }
+
+  const ws = await withDeadline(connectWebSocket(versionInfo.webSocketDebuggerUrl), deadline, 'WebSocket connect');
+  cleanupFns.push(() => { try { ws.close(); } catch { /* ignore */ } });
+  cdp = new CDPClient(ws, { getRemaining: () => remaining(deadline) });
+  ws.addEventListener('close', () => cdp.failFatally(new Error('CDP WebSocket closed unexpectedly')));
+  ws.addEventListener('error', (ev) => cdp.failFatally(new Error(`CDP WebSocket error: ${formatWsErrorEvent(ev)}`)));
+
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+
+  const consoleErrors = [];
+  const exceptions = [];
+  cdp.on('Runtime.consoleAPICalled', (params, sid) => {
+    if (sid !== sessionId) return;
+    if (params.type === 'error') {
+      consoleErrors.push((params.args || []).map((a) => a.description ?? a.value ?? String(a.type)).join(' '));
+    }
+  });
+  cdp.on('Runtime.exceptionThrown', (params, sid) => {
+    if (sid !== sessionId) return;
+    const detail = params.exceptionDetails;
+    exceptions.push(detail?.exception?.description || detail?.text || JSON.stringify(detail));
+  });
+
+  await cdp.send('Runtime.enable', {}, sessionId);
+  await cdp.send('Page.enable', {}, sessionId);
+
+  const evaluate = async (expression) => {
+    const res = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+    if (res.exceptionDetails) {
+      const d = res.exceptionDetails;
+      throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
+    }
+    return res.result ? res.result.value : undefined;
+  };
+
+  // A real file:// URL, not a data: URL: hash-based routing (setting
+  // window.location.hash and reacting to 'hashchange', exactly like the
+  // real app) needs a URL that HAS a path for the fragment to attach to.
+  // Still fully offline and hermetic -- a throwaway temp file removed in
+  // the same cleanup pass as the browser profile.
+  const html = selfTestFixtureHtml(negative);
+  const fixturePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sxc1-selftest-html-')), 'fixture.html');
+  fs.writeFileSync(fixturePath, html, 'utf8');
+  cleanupFns.push(() => removeDirWithRetry(path.dirname(fixturePath)));
+  await cdp.send('Page.navigate', { url: `file://${fixturePath}` }, sessionId);
+
+  let booted = false;
+  while (Date.now() < deadline) {
+    let b;
+    try { b = await evaluate('window.__SXC1_BOOTED === true'); } catch { b = false; }
+    if (b === true) { booted = true; break; }
+    await sleep(50);
+  }
+  if (!booted) {
+    await die(2, 'error: the self-test fixture never set window.__SXC1_BOOTED');
+    return;
+  }
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); } else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+  const elementExists = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)}) !== null`);
+  const assertElement = async (selector, label) => {
+    const exists = await elementExists(selector);
+    report(label, exists === true, exists);
+    return exists === true;
+  };
+  const goto = (hash, readySelector, timeoutMs = 5000) => evaluate(`(async () => {
+    window.location.hash = ${JSON.stringify(hash)};
+    const start = Date.now();
+    while (Date.now() - start < ${timeoutMs}) {
+      if (document.querySelector(${JSON.stringify(readySelector)})) return true;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return document.querySelector(${JSON.stringify(readySelector)}) !== null;
+  })()`);
+  const click = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+  const clickAssert = async (selector, label) => {
+    const present = await assertElement(selector, `${selector} is present before clicking it`);
+    if (!present) { report(label, false, `skipped: ${selector} not found`); return false; }
+    try {
+      await click(selector);
+      report(label, true, null);
+      return true;
+    } catch (err) {
+      report(label, false, { error: err && err.message ? err.message : String(err) });
+      return false;
+    }
+  };
+  // P-D: Miso's onInput ignores a synthetic 'input' event dispatched from
+  // page JavaScript; only a trusted CDP Input.insertText reaches it. This
+  // clears the field with a direct .value assignment (never dispatches a
+  // synthetic input event of its own) and then types via the real CDP
+  // input pipeline, exactly as a real run must against the real app.
+  const typeText = async (selector, text) => {
+    const focused = await evaluate(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) return false;
+      el.focus();
+      el.value = '';
+      return true;
+    })()`);
+    if (!focused) return false;
+    await cdp.send('Input.insertText', { text }, sessionId);
+    return true;
+  };
+  const setMobileViewport = () => cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true }, sessionId);
+  const clearViewport = () => cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+  const consoleHygiene = () => ({ ok: consoleErrors.length === 0 && exceptions.length === 0, consoleErrors, exceptions });
+
+  const results = await runExerciseAssertions(
+    { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene },
+    SELF_TEST_FIXTURE,
+    negative ? null : expectedExJson,
+  );
+
+  await runCleanup();
+
+  if (negative) {
+    // --self-test-negative: exit 0 ONLY IF the specific assertions this
+    // sabotaged grader is expected to break actually failed, and nothing
+    // else did -- a re-runnable proof the browser assertions can fail on
+    // their own subject, not a one-time manual demonstration.
+    const expectedToFail = [
+      'wrong quiz answer: #ex-feedback starts with "Not quite" and carries class "incorrect"',
+      'lookup: wrong page submits to "Not quite"',
+    ];
+    const byName = new Map(results.map((r) => [r.name, r.ok]));
+    const problems = [];
+    for (const name of expectedToFail) {
+      if (byName.get(name) !== false) problems.push(`expected "${name}" to FAIL under the sabotaged grader, but it passed (or did not run)`);
+    }
+    for (const r of results) {
+      if (!expectedToFail.includes(r.name) && r.ok === false) {
+        problems.push(`unrelated assertion "${r.name}" unexpectedly failed`);
+      }
+    }
+    if (problems.length === 0) {
+      console.log(`browser-check --self-test-negative: ok -- the sabotaged grader was caught exactly as expected (${expectedToFail.length} assertion(s) failed on cue, nothing else did)`);
+      process.exit(0);
+    } else {
+      console.error('browser-check --self-test-negative: FAILED');
+      for (const p of problems) console.error(`  - ${p}`);
+      process.exit(1);
+    }
+  } else {
+    console.log(`browser-check --self-test: ${passed}/${total} assertions passed`);
+    process.exit(passed === total ? 0 : 1);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Route helpers -- build the 108-route (or --quick sample) sweep list from
 // DOC_PAGES, so the list of routes lives in exactly one place.
 // ---------------------------------------------------------------------------
@@ -570,6 +1402,21 @@ function quickRouteList() {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
+
+  // --self-test / --self-test-negative short-circuit the whole real-app
+  // flow below: no --url, no static file server, nothing to boot except
+  // the fixture itself. Mutually exclusive with each other; checked
+  // before anything else so a --self-test run never needs a live server.
+  if (opts.selfTest && opts.selfTestNegative) {
+    console.error('error: --self-test and --self-test-negative are mutually exclusive');
+    process.exit(2);
+    return;
+  }
+  if (opts.selfTest || opts.selfTestNegative) {
+    await runSelfTest(opts, opts.selfTestNegative === true);
+    return;
+  }
+
   const deadline = Date.now() + opts.timeout;
 
   const cleanupFns = [];
@@ -647,6 +1494,48 @@ async function main() {
       return;
     }
     expected = { docs: parsed.docs, fields: null, full: true };
+  }
+
+  // M2: load --exercise-fixture / --expect-exercise-json up front too, for
+  // the same reason -- a bad fixture must not launch a browser first. Both
+  // are optional: when --exercise-fixture is absent, the M2 exercise
+  // assertions below are skipped entirely (reported, not silently
+  // omitted) rather than run against nothing.
+  let exerciseFixture = null;
+  if (opts.exerciseFixture) {
+    let parsed;
+    try {
+      parsed = parseJsonOrFile(opts.exerciseFixture, '--exercise-fixture');
+    } catch (err) {
+      console.error(`error: ${err.message}`);
+      process.exit(2);
+      return;
+    }
+    const fixtureError = validateExerciseFixture(parsed);
+    if (fixtureError) {
+      console.error(`error: ${fixtureError}`);
+      process.exit(2);
+      return;
+    }
+    exerciseFixture = parsed;
+  }
+  let expectedExerciseJson = null;
+  if (opts.expectExerciseJson) {
+    let parsed;
+    try {
+      parsed = parseJsonOrFile(opts.expectExerciseJson, '--expect-exercise-json');
+    } catch (err) {
+      console.error(`error: ${err.message}`);
+      process.exit(2);
+      return;
+    }
+    const schemaError = validateExpectExerciseJson(parsed, '--expect-exercise-json');
+    if (schemaError) {
+      console.error(`error: ${schemaError}`);
+      process.exit(2);
+      return;
+    }
+    expectedExerciseJson = parsed;
   }
 
   try {
@@ -989,15 +1878,22 @@ async function main() {
             }
           }
         }
-        // NEW9 fix: compare in the OTHER direction too, so a document the
-        // running app reports that --expect-json never mentioned is a
-        // mismatch rather than silently ignored (an expectation could
-        // otherwise be trivially satisfied by naming a strict subset of
-        // what the app actually serves).
+        // NEW9 fix, made an EXACT MULTISET comparison for NEW9-partial
+        // (briefs/M2-manifest.json, task "exercise-ui"): the previous
+        // reverse direction was a Set-membership test, so two actual
+        // documents sharing the same known slug were both silently
+        // accepted. Count occurrences of every actual slug: more than one
+        // is a duplicate-slug mismatch in its own right, and any slug
+        // outside the expected set is still a mismatch as before.
+        const actualSlugCounts = new Map();
         for (const adoc of actualDocs) {
-          if (adoc && typeof adoc.slug === 'string' && !expectedSlugs.has(adoc.slug)) {
-            mismatches.push(`${adoc.slug}: present in app stats but not named in the expected document set`);
+          if (adoc && typeof adoc.slug === 'string') {
+            actualSlugCounts.set(adoc.slug, (actualSlugCounts.get(adoc.slug) || 0) + 1);
           }
+        }
+        for (const [slug, count] of actualSlugCounts) {
+          if (count > 1) mismatches.push(`${slug}: appears ${count} times in app stats (duplicate slug)`);
+          if (!expectedSlugs.has(slug)) mismatches.push(`${slug}: present in app stats but not named in the expected document set`);
         }
         report(
           `#sxc1-content-stats matches ${opts.expectJson ? `--expect-json ${opts.expectJson}` : 'the golden numbers'}`,
@@ -1362,6 +2258,33 @@ async function main() {
       // -- 12. Console hygiene across the WHOLE run ---------------------------------
       const noErrors = consoleErrors.length === 0 && exceptions.length === 0;
       report('no console errors or uncaught exceptions across the whole run', noErrors, { consoleErrors, exceptions });
+
+      // -- 13 (M2). Exercise engine assertions -- ONLY when --exercise-fixture
+      // was supplied (see its up-front loading above): reuses the EXACT
+      // same runExerciseAssertions() function --self-test drives against
+      // its static fixture, here driven against the real, running app.
+      if (exerciseFixture) {
+        const typeText = async (selector, text) => {
+          const focused = await evaluate(`(() => {
+            const el = document.querySelector(${JSON.stringify(selector)});
+            if (!el) return false;
+            el.focus();
+            el.value = '';
+            return true;
+          })()`);
+          if (!focused) return false;
+          await cdp.send('Input.insertText', { text }, sessionId);
+          return true;
+        };
+        const setMobileViewport = () => cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true }, sessionId);
+        const clearViewport = () => cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+        const consoleHygiene = () => ({ ok: consoleErrors.length === 0 && exceptions.length === 0, consoleErrors, exceptions });
+        await runExerciseAssertions(
+          { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene },
+          exerciseFixture,
+          expectedExerciseJson,
+        );
+      }
     }
 
     console.log(`browser-check: ${passed}/${total} assertions passed`);
