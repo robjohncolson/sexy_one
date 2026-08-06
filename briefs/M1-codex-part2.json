@@ -1,0 +1,110 @@
+{
+  "task_type": "review",
+  "reviewed_head": "c575ae60acd2231a3a56a740edab4d1adea54852",
+  "scope": "M1 app, view, routing, static page images, build/check/browser harnesses, and CI; global verdict integrating briefs/M1-codex-part1.json",
+  "verdict": "GATE-BLOCKED",
+  "summary": "The view layer has no raw-HTML or arbitrary-attribute path and the CI cache keys correctly cover the runner/toolchain identity, Haskell sources, and embedded translations. The view does, however, render A3's duplicate group/section breadcrumb verbatim, while A7's parser fragmentation becomes separate semantic ordered lists. A4 can reasonably be tracked to M5 because ordinary p./pp. PageRef values render correctly and all pages remain reachable, but the M1 plan's claim that the Index is navigable is false today. A5 is not yet a release blocker, although app.wasm is 3,742,777 bytes raw / 823,588 gzipped, 27.8% above M0 gzip, with no enforced budget. New Part 2 blockers are verification failures: the purported cold deep-link test is an in-session hash change after the same image was loaded; 107 of 108 JA images are never decoded and the structural test accepts header-preserving corruption; and --skip-content still yields result=complete, allowing the workflow's completeness assertion to pass with the content axis skipped.",
+  "advisories": [
+    {
+      "id": "A3",
+      "severity": "minor",
+      "verdict": "CONFIRMED-BOTH-LAYERS",
+      "evidence": "Part 1 established that a PART section is both the Group title and the first Section. View.Pages.pageBreadcrumb independently appends grpTitle and secTitle whenever both resolve, without equality suppression (site/app/View/Pages.hs:88-103). On a PART section route the breadcrumb therefore visibly contains the same title twice.",
+      "required_direction": "Either remove the duplicated PART section from the outline representation or suppress sectionCrumb when secTitle == grpTitle. Add a breadcrumb assertion on a representative PART page."
+    },
+    {
+      "id": "A4",
+      "severity": "minor",
+      "verdict": "ACCEPT-DEFER-TO-M5-WITH-TRACKED-CONTRACT-DEBT",
+      "evidence": "The renderer is not the cause: every table cell is passed through renderInlines and every PageRef becomes a safe hash link (site/app/View/Blocks.hs:55-68,85-86). Part 1 showed that bare Index numbers never become PageRef values. This does not prevent any page from being reached or read, and M5 explicitly owns the content-completeness audit, so deferral is operationally sound; nevertheless briefs/M1-plan.md:279-281's statement that the rule makes the Index navigable is currently false and should remain an explicit M5 item.",
+      "required_direction": "At M5, add Index-aware reference parsing or a structured Index rule and assert representative bare, ranged, and comma-separated entries as links."
+    },
+    {
+      "id": "A5",
+      "severity": "advisory",
+      "verdict": "WATCH-NOT-M1-BLOCKING",
+      "evidence": "The present artifact is 3,742,777 bytes raw / 823,588 gzipped, versus M0's 2,856,541 / 644,452: +886,236 raw (+31.0%) and +179,136 gzip (+27.8%). It is also about 99.9 KB gzip above the 723,724-byte design probe. scripts/check-site.sh:508-523 reports sizes but never fails on growth, and .github/workflows/site.yml:122-124 discusses only the much looser Pages artifact limit. The current sub-1-MB gzip app remains reasonable for M1, but M2/M3 will add more code and content with no tripwire.",
+      "required_direction": "Before M2 lands, record a compressed app budget or maximum allowed delta in CI and investigate section stripping/optimization if the next milestone materially exceeds it."
+    },
+    {
+      "id": "A7",
+      "severity": "minor",
+      "verdict": "CONFIRMED; VISUAL-NUMBERING-PRESERVED, SEMANTICS-NOT-PRESERVED",
+      "evidence": "View.Blocks renders every Numbered block as its own ol[start] (site/app/View/Blocks.hs:49-52), and index.html explicitly retains decimal markers for each fragment (site/static/index.html:473-478). Thus current explicit source numbers remain visually correct, but the parser's blank-line splits become multiple one-item list structures, so assistive technology announces separate lists and repeated-1 source syntax would visibly restart at 1.",
+      "required_direction": "Fix grouping in the parser rather than merging DOM lists heuristically; then add block-model and DOM assertions for a blank-separated multi-item ordered list."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "NEW5",
+      "severity": "major",
+      "title": "The cold deep-link assertion never performs a cold deep-link load",
+      "location": "scripts/browser-check.mjs:547,708-727,886-931",
+      "scenario": "Chrome initially navigates only to opts.url and boots there. The claimed cold '#/m/guide-book/p/17/ja' case is later reached by assigning window.location.hash in the already-running app, after the preceding toggle test has loaded and decoded the identical page-17 image. If Main.main ignored currentHash at startup but the hashchange subscription still worked, every browser assertion including this one would pass while a shared deep link opened at the home route. The immediate deep-link imgOk check also relies on the warm cache rather than waiting for a fresh decode.",
+      "recommendation": "Create a fresh target or reload/navigation whose initial URL already ends in #/m/guide-book/p/17/ja, wait independently for boot and image decode, and assert the hash, page, JA class, panel, and image source."
+    },
+    {
+      "id": "NEW6",
+      "severity": "major",
+      "title": "The page-image gate accepts corrupt WebP payloads and never decodes 107 images",
+      "location": "scripts/check-site.sh:526-595; scripts/browser-check.mjs:886-932,997-1016",
+      "scenario": "The structural check reads only 12 bytes and accepts any file beginning RIFF....WEBP; it does not validate RIFF length/chunks, dimensions, or decodability. The 108-route sweep visits translation routes without enabling JA, while the only decoded image is guide-book page 17. Replacing (for example) midi/page-03.webp after byte 12 with corrupt bytes while preserving that prefix and staying below 300 KB passes the image check and route sweep, but users see a broken original-page panel. The prescribed 'write junk' negative control exercises only the easy bad-magic case.",
+      "recommendation": "During the browser sweep visit every /ja route and await img.decode() (or complete && naturalWidth > 0) with the expected src; also listen for network loading failures. If a CI decoder is introduced, validate every committed file and expected dimensions there."
+    },
+    {
+      "id": "NEW7",
+      "severity": "major",
+      "title": "Skipping the content axis still reports complete and satisfies CI",
+      "location": "scripts/check-site.sh:627-633,1021-1035; .github/workflows/site.yml:138-143",
+      "scenario": "SXC1_SKIP_CONTENT=1 marks five checks skipped, but the final marker depends only on SKIP_BROWSER, so a successful browser run exits 0 and prints result=complete. The workflow checks only the command exit and greps that marker. Consequently an inherited/job/repository environment setting can silently remove the parser and three-way gates while CI declares full verification, regressing the M0-hardened meaning of 'complete'.",
+      "recommendation": "Emit result=complete only when SKIPPED == 0 (or add an explicit content-complete marker) and make CI assert zero skipped checks/content completion as well as browser completion."
+    },
+    {
+      "id": "NEW8",
+      "severity": "minor",
+      "title": "Unbounded decimal folding lets huge page numbers wrap into valid routes",
+      "location": "site/src/SXC1/Route.hs:46-54",
+      "scenario": "parseDigits accumulates into bounded Int without an overflow check. On wasm32, a decimal such as 4294967297 wraps to 1, so '#/m/guide-book/p/4294967297' can render page 1 instead of the visible not-found panel promised for out-of-range pages. Unknown slugs and ordinary out-of-range values are safely rejected by View.Pages, /ja is accepted only as the exact final segment, and route-derived translation text cannot inject attributes; the overflow alias is the residual edge case.",
+      "recommendation": "Reject before acc*10+d would exceed maxBound (or parse as Integer and bound it), and assert classifications—not merely non-throwing totality—for zero, oversized, overflow-length, malformed-suffix, and unknown-slug routes."
+    },
+    {
+      "id": "NEW9",
+      "severity": "minor",
+      "title": "Browser --expect-json comparison has an empty/subset vacuity",
+      "location": "scripts/browser-check.mjs:518-543,839-856",
+      "scenario": "Any JSON with a docs array is accepted as an expectation. The comparison iterates only expected documents and only Object.keys(edoc); therefore {\"docs\":[]} reports a match, a document containing only slug checks no stats, and extra actual documents are ignored. check-site's Python comparison normally prevents its own full capture from taking this shape, but browser-check's advertised field-for-field contract and standalone negative-control surface are weaker than stated.",
+      "recommendation": "Validate the exact four-document schema and required fields, compare document sets in both directions, and reject duplicate slugs before field comparison."
+    },
+    {
+      "id": "NEW10",
+      "severity": "minor",
+      "title": "The image regeneration command can silently do no work or trust stale outputs",
+      "location": "scripts/render-page-images.sh:173-187,207-220,311-319",
+      "scenario": "--slug is never validated: a typo filters out every PDF, prints a zero-page TOTAL, and exits 0. Up-to-date decisions use only PDF/output mtimes, so a changed PDF with preserved/older timestamps (or a checkout where committed images receive later mtimes) can also leave unrelated old WebPs in place without detecting that their source bytes changed.",
+      "recommendation": "Reject unsupported slugs and record/compare source-PDF digests (or require --force with an explicit warning when regeneration was requested) rather than treating mtimes as source integrity."
+    }
+  ],
+  "security_assessment": {
+    "verdict": "CLEAR-IN-CURRENT-SURFACE",
+    "evidence": "All corpus strings render through Miso text nodes (site/app/View/Blocks.hs:40-99; site/app/View/Pages.hs:78-174,203-224,250-254). There is no raw-HTML constructor or translation-controlled attribute map. Heading anchors are assigned through id_, not interpolated markup; PageRef hrefs are constructed from a corpus-validated document slug and bounded page number; image src is reached only after statsFor/lookupDoc validates the slug. A hostile route slug is rendered only as escaped not-found text. No script, javascript: URL, event-handler, or attribute-breakout path was found for crafted translations or future exercise prose that reuses these constructors."
+  },
+  "route_and_ja_assessment": {
+    "route": "Ordinary unknown slugs, zero/negative/non-digit/out-of-range pages, and non-exact /ja suffixes end in a visible not-found view; empty slash segments are deliberately ignored by the plan. NEW8 is the bounded-Int overflow exception. Slug injection does not reach href/src attributes because page rendering requires an exact corpus lookup.",
+    "ja": "Missing expected files are caught structurally and guide-book page 17 is genuinely decoded in the toggle case. The panel has no user-facing load-error fallback, the alleged cold assertion is warm (NEW5), and the remaining images are not decoded at all (NEW6)."
+  },
+  "harness_and_ci_assessment": {
+    "m0_baseline": "The M0 server ownership/byte-match check, root and subpath browser stages, timeout discipline, cleanup tracking, non-silent missing-browser handling, and pipefail-based workflow failure remain intact. NEW7 is the new completeness-marker regression introduced by adding a skippable content axis without broadening the marker semantics.",
+    "cache": "PASS. The immutable toolchain cache key contains runner.os, runner.arch, the ImageOS/ImageVersion step output, and the installer-script hash, with no restore prefix. The incremental dist-newstyle exact key hashes cabal inputs, site/app/**, site/src/**, site/test/**, and translations/*.md. Its broad restore prefix can restore an older incremental tree, but Cabal's registered TH dependencies then rebuild changed translations and the new exact key is saved; this does not itself create stale embeds. Part 1 NEW4 remains a detector weakness for equal-metric stale artifacts, not a missing cache-key input.",
+    "page_images": "All 108 expected paths are represented in the tree, sizes range below the stated cap, and spot-checked files identify as WebP; that observation does not repair NEW6's verification gap."
+  },
+  "method": "Read-only source/diff inspection of the requested surfaces at c575ae6 (HEAD differs only by the Part 1 result brief), plus file metadata/header spot checks. No builds, installs, product edits, commits, tests, or lint runs were performed; only this required result JSON was written.",
+  "blocking_findings": [
+    "A1 (Part 1): Unparsed fallback is impossible, three gates are vacuous, and a maintenance edit can make parsing non-terminating",
+    "NEW1 (Part 1): outline order loss currently misattaches subsections and produces wrong navigation",
+    "NEW2 (Part 1): the Haskell/DOM/Python agreement does not validate the parsed block model",
+    "NEW5: the cold-deep-link guarantee is not actually tested",
+    "NEW6: the all-page JA image gate does not establish decodability",
+    "NEW7: CI can report complete with the content axis skipped"
+  ],
+  "final_line": "GLOBAL VERDICT: GATE-BLOCKED — consolidated blockers are Part 1 A1, NEW1, and NEW2, plus Part 2 NEW5 (no real cold-deep-link test), NEW6 (107 JA images never decoded; corrupt payloads pass), and NEW7 (skipped content checks still satisfy result=complete/CI)."
+}
