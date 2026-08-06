@@ -18,10 +18,16 @@ dependency graph).
 
 ## Size mandate (from the M2 designer's budget ruling, 2026-08-07)
 
-M2 ships at ~984-986 KB gzip against the 1,000,000 ceiling — under ~16 KB
-headroom (the gate-fix round added rendering/validation code; per-build
-variance ~±1.5 KB, so quote ranges, not points), deliberately not raised at
-the M2 gate. **M3's first implementation task is
+M2 shipped at 988,367 B gzip against the 1,000,000 ceiling — 11,633 B of
+headroom (final gate-cleared artifact; per-build variance ~±1.5 KB, so plan
+for ~10 KB usable), deliberately not raised at the M2 gate. Codex's gate-3
+condition: M2 is FROZEN (no further feature growth) and M3 must reduce
+before any feature work. Two further LOWs inherited by M3: a new
+StaticCode constructor with a forgotten pattern synonym/codeText arm is
+not caught mechanically (add a self-test totality sweep over
+allIssueCodes), and EXERCISE_FIXTURE_FIELDS validation in browser-check
+does not yet require the declared-target fields (citeSlug/citePage/
+targetSlug). **M3's first implementation task is
 size reduction, before any feature work**: split `parseDeck` (pure structural
 reader) from `validateDeck` (lint + citations + inventory binding) so
 `exe:app` links only the reader — the validating parser's measured browser

@@ -1,0 +1,56 @@
+{
+  "task_type": "review",
+  "status": "completed",
+  "scope": "Read-only static review of commit 02f5eef and its seven touched files. No build, test, lint, install, or runtime command was run; coordinator-supplied verification and sabotage results are treated as reported evidence.",
+  "summary": "Both round-2 gate blockers are fixed in the current binary. Static issue-code enumeration can no longer silently omit a StaticCode constructor, and the cold-route browser gate now directly observes whether mount-time Begin created a positive prompt baseline before any interaction. The declared-target citation LOW is fixed. The M3 size-baseline LOW is not fully fixed because the committed 984-986 KB range excludes the supplied final 988,367 B artifact, but that documentation defect is non-blocking. At 11,633 B headroom, the size ruling remains ship-sound-with-risk only for a frozen M2 and a strict M3 reduce-first entry condition.",
+  "residual_verdicts": [
+    {
+      "id": "M2 issue-code enumeration",
+      "verdict": "FIXED",
+      "evidence": "site/src/SXC1/Exercise/Report.hs:148-164 defines the entire static family as a nullary StaticCode deriving Enum and Bounded, and lines 251-257 derive allIssueCodes as map Static [minBound .. maxBound]. The former hand-maintained allIssueCodes list is gone, so every added StaticCode value necessarily enters enumeration. The one-to-one E_* pattern synonyms preserve the existing IssueCode values; codeText retains the same 40 static strings plus E-TERM.<id>, and issueClassOf retains the same nine dir mappings, one seam mapping, and file default (lines 171-315). StaticCode's value constructors are not exported, so external call sites use the source-compatible E_* layer. A future pattern/mapping maintenance caveat is recorded as a LOW finding, but it fails closed rather than reintroducing silent under-enumeration.",
+      "e_term_ruling": "E_TERM Text remains syntactically open, but no current exercise-check path uses that opening arbitrarily. The only repository issue emitter is termIssue in site/src/SXC1/Exercise/Lint.hs:156-161, which takes ruleId from a Rule loaded by parseRules; runListCodes parses the same loaded TSV and passes every loaded ruleId to listCodesLines (site/test/CheckExercises.hs:347-354; Report.hs:322-334). Thus every E-TERM code the current binary can emit is listed. E_TERM cannot evade the seam cap because issueClassOf classifies it as FileClass. A future new emitter could misuse the public constructor, but that is an exposed-library maintenance risk, not a reachable current binary escape or a remaining gate blocker."
+    },
+    {
+      "id": "M4/M5 cold-route observability",
+      "verdict": "FIXED",
+      "evidence": "Main.promptBaselineJson returns esPromptAt for the current exercise only when its ExerciseState exists, otherwise null (site/app/Main.hs:379-388); View.Pages always renders that payload in the hidden #sxc1-prompt-baseline element (site/app/View/Pages.hs:44-59,195-205). scripts/browser-check.mjs:1011-1021 reads it on the fresh cold target before waiting or clicking, converts it with Number, and requires Number.isFinite(value) && value > 0. A missing element yields null/NaN and fails; text null, empty text, non-numeric text, zero, negative, and Infinity all fail, so the assertion cannot pass vacuously. On the known-valid fixture exercise, readerApp starts with an empty state map and only mount -> SetRoute -> beginIfNeeded -> ExBatch Begin can insert the positive state before interaction (Main.hs:187-205,222-258,282-301). Globally null is normal on non-exercise/unknown routes, but the assertion is scoped to a corpus-derived valid cold exercise, where null specifically exposes a lost or failed Begin path. Removing the mount action therefore leaves null and is separated from the page-uptime elapsed window. The self-test fixture mirrors positive-vs-null and its negative expected-failure list includes the fixed baseline assertion name (browser-check.mjs:710-727,1781-1813)."
+    }
+  ],
+  "round_2_low_verdicts": [
+    {
+      "id": "declared drill/lookup citation targets",
+      "verdict": "FIXED",
+      "evidence": "DrillFixture now derives citeSlug/citePage from the first prompt's declared prCites and LookupFixture derives targetSlug/targetPage from the declared FindPage target; browserFixtureJson emits all four fields (site/test/CheckExercises.hs:370-438). The completed-drill assertion requires every observed href to be well formed and at least one to equal the declared full href (scripts/browser-check.mjs:1350-1370). The graded-lookup assertion requires the rendered href to equal the full declared slug/page target (lines 1421-1433). These comparisons are against fixture data derived from content declarations, not values read back from rendered anchors."
+    },
+    {
+      "id": "M3 size baseline",
+      "verdict": "NOT-FULLY-FIXED (LOW, non-blocking)",
+      "evidence": "briefs/M3-course-and-memory.md:21-23 now states approximately 984-986 KB and under approximately 16 KB headroom, while the supplied final artifact is 988,367 B with 11,633 B headroom. The urgency and reduce-before-feature mandate at lines 24-32 are correct, but the quoted artifact range does not include the final measured point and should be updated to a range centered on approximately 988 KB (or state 988,367 B / 11,633 B explicitly)."
+    }
+  ],
+  "size_ruling": {
+    "verdict": "SHIP-SOUND-WITH-RISK (UNCHANGED, stricter condition)",
+    "analysis": "988,367 B gzip is 11,633 B, or 1.1633%, below the unchanged 1,000,000-byte ceiling. The loss of another 4,128 B from the round-2 reviewed 984,239 B artifact materially increases risk but does not cross the hard gate. Clearance is conditional on accepting no further M2 growth and treating M3 size reduction as an entry gate before content, persistence, scheduling, or other feature work. The brief contains a credible primary reader/validator split and a fallback pre-parsed model, so the prior ruling does not become GATE-BLOCKED solely from this shrink in headroom."
+  },
+  "new_findings": [
+    {
+      "severity": "LOW",
+      "location": "site/src/SXC1/Exercise/Report.hs:148-164,227-301",
+      "title": "The COMPLETE declaration masks a future missing static pattern/mapping",
+      "scenario": "Add a new StaticCode constructor but forget its E_* pattern synonym and codeText arm. allIssueCodes correctly includes Static NewCode, so enumeration is not under-complete, but the manually asserted COMPLETE set still tells -Wall that codeText is exhaustive. --list-codes then reaches the new value and throws a non-exhaustive-pattern exception at runtime instead of producing a compile-time warning. This fails the gate closed, so it is not the former silent-omission blocker, but the comment that COMPLETE keeps future matches exhaustiveness-checked is too strong. Matching codeText directly on StaticCode, or otherwise deriving/centralizing the mapping, would restore compile-time maintenance safety. The module header at lines 8-13 also still incorrectly describes allIssueCodes as a hand list."
+    },
+    {
+      "severity": "LOW",
+      "location": "scripts/browser-check.mjs:1487-1503",
+      "title": "Exercise-fixture schema validation was not extended for the new declared-target fields",
+      "scenario": "EXERCISE_FIXTURE_FIELDS still requires only drill deck/id/steps/hasVerify and lookup deck/id/targetPage. A hand-supplied or stale fixture missing drill.citeSlug/citePage or lookup.targetSlug passes upfront validation, then produces #/m/undefined/... expectations and fails later with misleading browser output. This is not vacuous and cannot yield a false green, because the equality assertions fail, but adding the new fields to the schema would preserve the stated fail-fast contract."
+    },
+    {
+      "severity": "LOW",
+      "location": "briefs/M3-course-and-memory.md:21-23",
+      "title": "The revised M3 gzip range is already below the final artifact",
+      "scenario": "An M3 implementer reading 984-986 KB may plan around at least roughly 14 KB of room, while the supplied final build has only 11,633 B. Keep the reduce-first mandate, but quote a range that contains 988,367 B and its observed variance."
+    }
+  ],
+  "final_line": "GATE-CLEAR — both round-2 blockers are closed in the current binary; the remaining findings are LOW maintenance/documentation issues, and size remains acceptable only under frozen-M2/M3-reduce-first discipline."
+}
