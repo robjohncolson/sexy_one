@@ -130,6 +130,16 @@ workflow deploys: set `ENABLE_PAGES=true`, PUT `build_type=workflow`, push.
 Branch deploys are manual: build + verify locally, copy `site/public` onto
 `gh-pages`, push.
 
+Vercel (2026-08-07, owner-requested): the same static build also deploys to
+**https://sexy-one-gray.vercel.app/** (project `sexy-one`; the bare
+sexy-one.vercel.app belongs to an unrelated third party — never share that
+one). Deploy: copy `site/public` to a scratch dir named `sexy-one`, run
+`vercel deploy --prod --yes` (CLI authenticated as the owner's account).
+Verified 70/70 by browser-check against production; correct
+`application/wasm` content type; first-visit CDN cold-decode latency on the
+108-image sweep warms after one pass. Audience note: the site will be shared
+with a Japanese speaker — M3 adds a persistent JA-first reading mode.
+
 Resolved:
 - Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).
 - GitHub repo (2026-08-06, owner-confirmed): **public**, `robjohncolson/sexy_one`.
