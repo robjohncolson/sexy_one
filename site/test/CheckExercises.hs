@@ -397,9 +397,34 @@ runFixtures opts fixturesDir = do
     raw <- readUtf8FileOrHarnessError (filesDir </> fn)
     let fp = filesDir </> fn
         (issues, _) = resolveDeckIssues ctx fp raw
-        got = Set.toList (Set.fromList (map isCode issues))
         nm = T.pack fn
         expected = expectedCodeOf nm
+        -- A files/ fixture's own on-disk name is <CODE>--<slug>.ex.md
+        -- (content/fixtures/README.md), which is exactly what
+        -- 'expectedCodeOf' needs to read the expected code back out of
+        -- the filename -- but it can never itself satisfy
+        -- 'SXC1.Exercise.Parse.validFileName's real content-file shape
+        -- (^[0-9]{2}-[a-z0-9-]+\.ex\.md$) unless <CODE> literally IS
+        -- "E-FILE-BAD-NAME": every other real issue code starts with an
+        -- uppercase letter (or, for terminology rules, contains a
+        -- literal '.'), which validFileName's two-digit prefix can never
+        -- match. So E-FILE-BAD-NAME is unconditionally spurious for
+        -- every files/ fixture except the one that is deliberately
+        -- exercising the naming rule itself; drop it from the comparison
+        -- set everywhere else -- symmetric to how the four inventory
+        -- checks below are already scoped by 'isRealContentPath' rather
+        -- than applied unconditionally. This only changes what this
+        -- --fixtures comparison considers relevant: 'resolveDeckIssues'
+        -- and 'validFileName' are untouched, so real content/exercises/
+        -- validation (default mode, --json, --browser-fixture) and the
+        -- dirs/ branch below (whose inner deck names come from each
+        -- fixture's own exercises/INDEX, never from this outer fixture
+        -- directory name) are both unaffected.
+        codes = map isCode issues
+        relevantCodes
+          | expected == "E-FILE-BAD-NAME" = codes
+          | otherwise                     = filter (/= "E-FILE-BAD-NAME") codes
+        got = Set.toList (Set.fromList relevantCodes)
         pass = if expected == "OK" then null got else got == [expected]
     pure FixtureResult { frName = nm, frExpected = expected, frGot = got, frPass = pass }
 
