@@ -1,0 +1,91 @@
+{
+  "task_type": "review",
+  "reviewed_commit": "3eccabdb25a022fa7b5b6ebd153ec649c84c8830",
+  "scope": [
+    "B1",
+    "M1",
+    "M3",
+    "NEW1",
+    "NEW2"
+  ],
+  "summary": {
+    "verdict_counts": {
+      "FIXED": 5,
+      "PARTIALLY-FIXED": 0,
+      "NOT-FIXED": 0,
+      "REGRESSION": 0
+    },
+    "statement": "All five scoped functional items are fixed. B1 still intentionally trusts a syntactically valid, unauthenticated Class A stamp and M1 still treats its count field as local attestation, but neither is a bypass of the triaged requirements. One minor documentation inconsistency was introduced when the Class B behavior changed."
+  },
+  "per_item": [
+    {
+      "id": "B1",
+      "severity": "blocker",
+      "verdict": "FIXED",
+      "evidence": "scripts/install-toolchain.sh:350-383 now recognizes Class A only when the stamp is a readable regular file, every non-empty line has key=value form, the effective ghc_wasm_meta_commit is exactly 40 hexadecimal characters, and the effective flavour is non-empty. Lines 397-418 classify the live prefix as EMPTY/A/B/C. The pre-clone gate at lines 480-510 accepts EMPTY/A, refuses B without --force, permits B with --force after printing the canonical prefix and its top-level entries, and refuses C even with --force. The sink gate at lines 819-840 invokes classify_prefix again rather than consulting the earlier PREFIX_CLASS value; it permits only EMPTY/A or B with --force immediately before setup.sh at lines 842-848. Therefore no static Class B or Class C shape reaches upstream rm -rf without --force. EMPTY and Class A still do so intentionally. A two-line stamp with an all-zero 40-hex commit and non-empty flavour is Class A and can be planted, so this is syntactic recognition rather than authenticity; that is the explicit pin-upgrade trade-off in the approved design, not an undisclosed bypass. PREFIX was previously canonicalized at lines 441-472, and the quoted upstream rm removes that canonical prefix. rm -rf unlinks symlinks encountered beneath the prefix rather than traversing their targets. Ordinary blast radius is consequently the canonical PREFIX tree; bind mounts and a concurrent ancestor/content swap remain generic filesystem/TOCTOU caveats, not new static prefix shapes."
+    },
+    {
+      "id": "M1",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "EXPECTED_SRI_DOWNLOADS=7 is defined at scripts/install-toolchain.sh:34-39. health_check reads sri_verified_downloads at lines 580-604 and gives distinct failures for missing/empty (612-613), non-decimal (614-615), and less than seven (616-617), before checking the live GHC and cabal executables. Thus the filed same-pin pre-SRI stamp is no longer healthy. After pinned setup.sh returns, lines 850-864 derive the count from the shim's private count file and abort if it is not a non-negative decimal or is below seven; the stamp is not written until lines 936-943. The check counts successful shim verifications, not distinct URLs, but the reviewed pinned setup has exactly seven distinct artifact curl -o calls; source substitution is also prevented by the checked-out HEAD assertion at lines 688-698. A forged stamp containing sri_verified_downloads=7 can lie, and an old functional unverified toolchain plus a forged current-pin stamp can pass the runtime probe. Likewise, a same-UID process could tamper with transient state. The stamp/count is therefore local attestation, not a cryptographic provenance boundary. No CDN response or ordinary pre-SRI cache restore can forge it through the code in this commit, and treating an attacker who can rewrite the user's toolchain directory as out of scope is consistent with the existing local-filesystem trust model. This caveat does not reopen the specific M1 residual."
+    },
+    {
+      "id": "M3",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": ".github/workflows/site.yml:47-52 reads ImageOS and ImageVersion from the run step's process environment, supplies explicit unknown fallbacks, and publishes the composed value through GITHUB_OUTPUT. The toolchain cache key at line 74 consumes steps.runner-image.outputs.id; env.ImageOS is gone. The intended populated path is structurally correct and changes the key when either hosted-runner image value changes. The lack of a real hosted-runner execution is a confidence gap, not a code defect; if both variables were unexpectedly absent, unknown-unknown would visibly collapse image identities rather than silently proving them."
+    },
+    {
+      "id": "NEW1",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:233-240 initializes TEMP_DIRS before the traps. cleanup at lines 242-269 removes every registered directory on EXIT, INT, and TERM, and the register/unregister helpers are at lines 274-289. SUBPATH_TMP is registered immediately after mktemp at lines 629-630 and unregistered only after its happy-path removal at lines 635-636. A failure or signal anywhere after registration leaves the path for trap cleanup, closing the reported bundle-copy leak."
+    },
+    {
+      "id": "NEW2",
+      "severity": "nit",
+      "verdict": "FIXED",
+      "evidence": "scripts/browser-check.mjs:369-380 implements the required ev.error.stack -> ev.error.message -> ev.message -> String(ev) precedence, and both the connection failure at line 386 and established-socket fatal path at lines 637-639 use it. If Node supplies only the string TypeError as stack content, the result remains thin, but the requested diagnostic chain is present and settlement behavior is unchanged."
+    }
+  ],
+  "advisory_notes": [
+    {
+      "number": 1,
+      "verdict": "CONFIRMED-AS-DESIGNED-WITH-CAVEATS",
+      "evidence": "The regex at scripts/install-toolchain.sh:381 accepts every 40-hex value, including forty zeroes, and Class A then reaches setup.sh without --force when health_check rejects it. This preserves pin upgrades but makes the marker forgeable. The deletion operand is the canonical, quoted PREFIX and nested symlinks are unlinked, not followed, so the normal blast radius is that prefix. The statement is not absolute in the presence of bind mounts inside PREFIX or a concurrent path swap after the second check."
+    },
+    {
+      "number": 2,
+      "verdict": "CONFIRMED",
+      "evidence": "Both [ -f \"$dir/env\" ] and [ -d \"$dir/wasm32-wasi-ghc\" ] at scripts/install-toolchain.sh:413 follow symlinks, so a third party able to populate the directory can cheaply create the Class B shape using symlinks. Without --force the first gate refuses it, and the independently refreshed sink gate refuses it again. With --force it reaches setup.sh after the script names the canonical prefix and lists its entries. rm -rf removes the symlink directory entry rather than descending into its target. This is plausibly plantable content, but exploitation still requires the operator's explicit --force and only removes the containing prefix tree under ordinary filesystem semantics."
+    },
+    {
+      "number": 3,
+      "verdict": "CONFIRMED-CONFIDENCE-GAP",
+      "evidence": "There is no recorded real GitHub-hosted execution of the populated ImageOS/ImageVersion path. Static workflow semantics support the implementation, so M3 is fixed, but the first real CI run should be inspected for the logged runner image identity and resulting non-unknown cache key."
+    },
+    {
+      "number": 4,
+      "verdict": "CONFIRMED-HARMLESS",
+      "evidence": "formatWsErrorEvent returns the first truthy stack value exactly. A runtime-provided stack equal only to TypeError therefore remains name-only. The required precedence is implemented, so this is diagnostic thinness in the source event rather than an incomplete fix."
+    },
+    {
+      "number": 5,
+      "verdict": "CONFIRMED-SAFE",
+      "evidence": "A # comment has no equals sign and is rejected by stamp_is_class_a at scripts/install-toolchain.sh:366-373 and by health_check at lines 588-607. Current generated stamps contain only key=value lines. Keeping comments invalid narrows Class A and is the safer recognition policy."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "NEW3",
+      "severity": "minor",
+      "title": "Class B safety documentation contradicts the implemented --force override",
+      "location": "README.md:38-41; scripts/install-toolchain.sh:106-110,125-132",
+      "scenario": "The new implementation treats env plus wasm32-wasi-ghc as plausible-but-unvalidated Class B and allows its initial refusal to be overridden with --force. README still calls that shape one of the installer's own recognized toolchains and says none of the listed refusals has a --force override. The --force help paragraph likewise says --force only permits an already recognized toolchain, while the more detailed environment paragraph correctly documents Class B. A user therefore gets contradictory guidance about which easily planted directory shapes --force may recursively replace.",
+      "recommendation": "Update README and the short --force help paragraph to use the same Class A/Class B/Class C distinction as the detailed environment help. This is documentation-only and does not weaken the runtime gates."
+    }
+  ],
+  "method": "Read-only inspection of commit 3eccabd, its parent diff, the exact committed file versions, briefs/M0-codex-gate2.json, and briefs/M0-fixes2-triage.md. No builds, installs, functional tests, lint runs, or commits were performed; only this required result JSON was written.",
+  "final_line": "GATE-CLEAR — B1, M1, M3, NEW1, and NEW2 are fixed; the unauthenticated stamp/count and unexercised hosted-runner path are explicit trust/confidence caveats, and NEW3 is a non-blocking documentation inconsistency."
+}
