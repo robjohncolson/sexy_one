@@ -1,0 +1,185 @@
+{
+  "task_type": "review",
+  "reviewed_head": "2132661",
+  "verdict": {
+    "no_blockers": false,
+    "statement": "One blocker was found: the documented GHC_WASM_PREFIX override can cause upstream setup.sh to recursively delete an arbitrary existing directory. M0 should not be released until that path is guarded.",
+    "counts": {
+      "blocker": 1,
+      "major": 9,
+      "minor": 5,
+      "nit": 2
+    }
+  },
+  "findings": [
+    {
+      "id": "B1",
+      "severity": "blocker",
+      "title": "The prefix override can recursively delete arbitrary user data without --force",
+      "location": "scripts/install-toolchain.sh:35, scripts/install-toolchain.sh:198-207, scripts/install-toolchain.sh:232; README.md:24-25",
+      "scenario": "The wrapper publicly supports GHC_WASM_PREFIX, does not canonicalize or constrain it, and invokes pinned upstream setup.sh, which begins with rm -rf \"$PREFIX\". For example, GHC_WASM_PREFIX=\"$HOME\" ./scripts/install-toolchain.sh reaches setup.sh whenever $HOME does not happen to satisfy the shallow GHC probe and recursively removes the user's home directory. No --force is required, and the warning is printed only when --force was supplied. A typo pointing at the repository or another populated directory is similarly destructive. This directly contradicts README.md's statement that nothing outside $HOME/.ghc-wasm is touched.",
+      "recommendation": "Resolve PREFIX to an absolute canonical path and reject empty, /, $HOME, the repository, and ancestors of either. Refuse any existing non-toolchain directory unless it contains a validated sentinel and the caller explicitly confirms replacement. Prefer installing into a fresh sibling staging directory and renaming it into place."
+    },
+    {
+      "id": "M1",
+      "severity": "major",
+      "title": "Pinned bindist hashes exist but none of the approximately 785 MB of downloads are verified",
+      "location": "scripts/install-toolchain.sh:219-232; briefs/M0-plan.md:56,114-120; README.md:67-71",
+      "scenario": "The git commit authenticates only the checked-out ghc-wasm-meta source. Inspection of that exact commit's autogen.json shows SRI hash fields for wasi-sdk, libffi, Node, binaryen, wasm-tools/wasmtime, GHC, and cabal, while its setup.sh reads only each .url, curls the response, and immediately extracts or executes it. A replaced release asset, compromised hosting account/CDN, or bad TLS trust path therefore installs attacker-controlled native tools despite the expected hashes already being pinned. The downloaded Node binary is used to run npm during setup, and the GHC archive's configure/make path also executes downloaded content. The plan and README incorrectly generalize git's object verification into a claim that no download checksums are needed.",
+      "recommendation": "Fetch each selected URL in the wrapper (or patch the pinned setup script), convert the matching autogen.json SRI value to a digest, verify it before extraction or execution, and abort on mismatch. Correct the README/plan distinction between source-commit integrity and bindist integrity."
+    },
+    {
+      "id": "M2",
+      "severity": "major",
+      "title": "Inherited ghc-wasm-meta control variables can bypass the supposedly pinned download sources",
+      "location": "scripts/install-toolchain.sh:231-232",
+      "scenario": "The wrapper overrides only FLAVOUR and PREFIX and inherits the rest of the caller's environment. The pinned setup.sh honors variables including UPSTREAM_WASI_SDK_PIPELINE_ID, UPSTREAM_GHC_PIPELINE_ID, UPSTREAM_GHC_PROJECT_ID, UPSTREAM_GHC_JOB_NAME, SKIP_GHC, PLAYWRIGHT, and NIX_SYSTEM. An ambient UPSTREAM_GHC_* setting switches the GHC download from pinned autogen.json to a caller-selected GitLab project/pipeline artifact, with no hash verification; SKIP_GHC can destructively clear the prefix and then skip the compiler. Thus the wrapper's fixed constants do not actually close all input channels controlling the install.",
+      "recommendation": "Invoke setup.sh with the upstream override variables explicitly unset (and PLAYWRIGHT/SKIP_GHC forced empty), or use a narrowly constructed environment containing only the variables the wrapper intends to support."
+    },
+    {
+      "id": "M3",
+      "severity": "major",
+      "title": "Restore-key cache fallback silently defeats toolchain pin upgrades",
+      "location": "scripts/install-toolchain.sh:147-178, scripts/install-toolchain.sh:198-200; .github/workflows/site.yml:35-47",
+      "scenario": "check_installed accepts any readable env plus any executable wasm32-wasi-ghc that prints a version; it does not require the stamp, compare the recorded commit/flavour, check the expected GHC version, or check cabal. After a legitimate pin change, the new exact Actions cache key misses, restore-keys restores the prior ~/.ghc-wasm cache, and cache-hit is false so the installer runs. The installer then sees the old compiler work and exits 0 without installing the new pin. If the build succeeds, a new cache key can even save the old toolchain under the new installer hash. runner.os is also only \"Linux\", so an ubuntu-latest image migration can restore native binaries built for a materially different image and skip installation.",
+      "recommendation": "Make health/idempotency require an exact, parseable stamp match for commit, flavour, and expected compiler/cabal identity. Remove the broad toolchain restore key (the cache is immutable, not incrementally reusable), include architecture/image identity where appropriate, and run --check after every restore."
+    },
+    {
+      "id": "M4",
+      "severity": "major",
+      "title": "The CDP client's overall timeout does not bound WebSocket connection or protocol commands",
+      "location": "scripts/browser-check.mjs:205-255, scripts/browser-check.mjs:263-274, scripts/browser-check.mjs:470-513; .github/workflows/site.yml:65-66",
+      "scenario": "CDPClient.send stores an unresolved promise with no timer, and the client registers no WebSocket close/error handler that rejects pending calls. connectWebSocket itself has no deadline after construction. If Chrome dies or drops the socket after /json/version responds, or never responds to Target.attachToTarget, Runtime.evaluate, or Page.navigate, the await never settles; the advertised --timeout is consulted only by polling loops. check-site.sh has no outer timeout and the workflow gives the Verify site step no timeout-minutes, so a 45-second harness can hang until GitHub's multi-hour job limit while leaving cleanup pending.",
+      "recommendation": "Race connection and every CDP command against the remaining deadline, reject and clear all pending calls on WebSocket close/error, handle browser child error/exit throughout the run, and add a workflow-level backstop timeout to the verify step."
+    },
+    {
+      "id": "M5",
+      "severity": "major",
+      "title": "The documented fresh-clone prerequisites omit the Node runtime required by verification",
+      "location": "README.md:15-22, README.md:29-34; scripts/check-site.sh:186-208, scripts/check-site.sh:356",
+      "scenario": "A minimal Linux host satisfying every listed prerequisite can have no system node. install-toolchain.sh installs a private Node under $HOME/.ghc-wasm, but build-site.sh sources that env only in its child process, so the following README command ./scripts/check-site.sh does not inherit the private PATH. The wasm export checks report node missing and the browser driver invocation fails. Even a system Node that is too old to provide global WebSocket will fail later, yet no minimum Node version is documented.",
+      "recommendation": "Have check-site.sh source the pinned toolchain env or invoke its private Node explicitly, and validate the required WebSocket/WebAssembly capabilities. Otherwise document a concrete supported Node version as a prerequisite."
+    },
+    {
+      "id": "M6",
+      "severity": "major",
+      "title": "The Pages deploy job is not inert while Pages is disabled",
+      "location": ".github/workflows/site.yml:83-98; briefs/M0-plan.md:230-236; README.md:116-121",
+      "scenario": "The comment and plan say deployment stays inert until the owner enables Pages, but the only condition is a non-PR main ref. The first push to main after creating the repository will run actions/deploy-pages even if Pages has not been configured for GitHub Actions, causing the deploy job and overall workflow to fail. The gate does not encode Pages enablement at all.",
+      "recommendation": "Gate deploy on an explicit repository variable such as vars.ENABLE_PAGES == 'true', or omit the job until Pages is configured. Keep the build/check job independent so main remains green before launch."
+    },
+    {
+      "id": "M7",
+      "severity": "major",
+      "title": "PR build code receives deployment and OIDC permissions",
+      "location": ".github/workflows/site.yml:8-17, .github/workflows/site.yml:23-28, .github/workflows/site.yml:62-66",
+      "scenario": "pages:write and id-token:write are declared at workflow scope, so the build job also receives them while executing repository-controlled shell scripts on pull_request. Fork PR permissions may be downgraded by GitHub, but a same-repository PR, compromised branch, or compromised build dependency runs with the checkout credential persisted by actions/checkout and with OIDC request capability. That unnecessarily exposes deployment/cloud identity authority to untrusted build code even though only deploy-pages needs it.",
+      "recommendation": "Set contents:read on the build job, grant pages:write and id-token:write only on the deploy job, and consider persist-credentials:false for checkout when later steps do not need git authentication."
+    },
+    {
+      "id": "M8",
+      "severity": "major",
+      "title": "Workflow-wide constant concurrency can discard a pending main deployment when an unrelated PR arrives",
+      "location": ".github/workflows/site.yml:19-21",
+      "scenario": "Every push, PR, and manual run shares group pages for the entire expensive build plus deployment. cancel-in-progress:false preserves the one running run, but GitHub's default concurrency queue retains only one pending run and replaces an existing pending run with the newest. If run A is building, a main push B becomes pending, and then PR C arrives, B is canceled and C replaces it; the main commit may never be built or deployed. PR checks are also serialized behind 15-60 minute installs despite never deploying. GitHub documents this pending-run replacement behavior at https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency.",
+      "recommendation": "Do not put all CI in the Pages deployment group. Use a per-ref build group if desired and put concurrency on deploy only; if every main deploy must occur, use the supported queued-deployment setting rather than the one-pending default."
+    },
+    {
+      "id": "M9",
+      "severity": "major",
+      "title": "The Pages-subpath grep misses ordinary root-absolute syntax that passes the real browser test",
+      "location": "scripts/check-site.sh:239-277; briefs/M0-manifest.json:186-187",
+      "scenario": "The root-absolute scan recognizes only four double-quoted spellings. Changing fetch(\"./app.wasm\") to the valid fetch('/app.wasm') is not detected; it also misses single-quoted imports/attributes, template literals, CSS url(/...), new URL('/...', ...), and protocol-relative // origins. The browser test serves at http://127.0.0.1:<port>/, where /app.wasm works, so every check can pass while the deployed GitHub Pages project subpath 404s. This is a concrete vacuous-success path for a central M0 invariant.",
+      "recommendation": "Exercise the artifact under a non-root local prefix and assert successful boot there. Supplement that behavioral test with parsing or broader scans covering both quote styles, template literals, CSS URLs, and protocol-relative origins."
+    },
+    {
+      "id": "m1",
+      "severity": "minor",
+      "title": "Port selection has a TOCTOU race and can validate an unrelated server",
+      "location": "scripts/check-site.sh:300-319, scripts/check-site.sh:342-365; scripts/browser-check.mjs:117-127, scripts/browser-check.mjs:403-455",
+      "scenario": "Both clients find a free port by probing/binding and then release it before spawning the intended process. check-site additionally stops after 50 increments without proving the final port is free. If another process takes the port, serve-site exits, wait_for_port still succeeds because it tests only that somebody is listening, and the browser is pointed at the unrelated service. A service exposing the same simple boot/counter contract can make verification pass against the wrong directory; otherwise this produces flaky, misleading failures.",
+      "recommendation": "Let a server bind port 0 and report its actual port, or retain the listening socket until handoff. Check that the spawned server is alive and fetch a per-run nonce or known artifact before launching the browser."
+    },
+    {
+      "id": "m2",
+      "severity": "minor",
+      "title": "Skipping the browser axis still reports a complete 16/16 success",
+      "location": "scripts/check-site.sh:336-338, scripts/check-site.sh:372-380",
+      "scenario": "With --skip-browser or SXC1_SKIP_BROWSER=1, no check is added to TOTAL and the script exits 0 with check-site: 16/16 checks passed. Any caller that records only status or the final fraction cannot distinguish the full M0 gate from structural-only verification. CI does not currently set the flag, but an accidental environment/workflow change silently removes the defining browser axis.",
+      "recommendation": "Keep the explicit local escape hatch but report 16/17 with one skipped, use a distinct machine-readable status, and make CI explicitly reject skip mode or require a browser-ran marker."
+    },
+    {
+      "id": "m3",
+      "severity": "minor",
+      "title": "Missing required DOM nodes are handled inconsistently and one assertion passes vacuously",
+      "location": "scripts/browser-check.mjs:546-559, scripts/browser-check.mjs:586-604, scripts/browser-check.mjs:613-615",
+      "scenario": "A missing increment/decrement/reset button makes querySelector(...).click() throw, which escapes the assertion block and is reported as exit 2 harness error rather than exit 1 assertion failure. Conversely, a missing #boot-status explicitly returns true, so the named assertion '#boot-status is hidden after boot' passes even though the shared DOM contract requires the element and boot failures can no longer be shown there.",
+      "recommendation": "Query each required element through an assertion helper that reports absence as an ordinary failed assertion, and require #boot-status to exist and be hidden rather than treating absence as success."
+    },
+    {
+      "id": "m4",
+      "severity": "minor",
+      "title": "--check can call a healthy install unhealthy for irrelevant installer prerequisites",
+      "location": "scripts/install-toolchain.sh:103-141, scripts/install-toolchain.sh:144-190",
+      "scenario": "--check always runs the full installation preflight, including curl, tar, unzip, compiler tools, and 12 GiB free space. After a valid install, removing curl or filling the filesystem below 12 GiB makes --check fail before probing the compiler, despite help text defining the mode as reporting whether the existing install is healthy and performing no downloads. This also makes it unsuitable as the proposed post-cache validation unless preflight is split.",
+      "recommendation": "Separate install prerequisites/disk capacity from runtime health checks; --check should validate the exact stamp and required installed executables only."
+    },
+    {
+      "id": "m5",
+      "severity": "minor",
+      "title": "Opening the bundle directly from a local directory is claimed but unsupported",
+      "location": "README.md:112-114; site/static/index.html:213; site/static/index.js:10-11,26",
+      "scenario": "README says the same bundle works offline from a local directory, but directly opening index.html as file:// loads an ES module that imports sibling modules and fetches app.wasm. Browser file-origin/CORS restrictions normally block that graph. Offline through the supplied localhost server works; direct-directory operation does not.",
+      "recommendation": "Say 'offline when served locally' and direct users to serve-site.sh, or add a packaging strategy that genuinely supports file:// if that is a requirement."
+    },
+    {
+      "id": "n1",
+      "severity": "nit",
+      "title": "The successful server path leaks one mktemp log per check run",
+      "location": "scripts/check-site.sh:133-143, scripts/check-site.sh:349-368",
+      "scenario": "SERVER_LOG is created on every browser run, but cleanup only kills/waits for SERVER_PID and never removes the file. Repeated local or CI checks leave sxc1-check-site-server.* files in the temp directory. This confirms advisory thread 1.",
+      "recommendation": "Track SERVER_LOG in cleanup and remove it on success; optionally retain or print it only after server/browser failure."
+    },
+    {
+      "id": "n2",
+      "severity": "nit",
+      "title": "The obfuscated hostname is unjustified, but it is not needed to evade the exact manifest grep",
+      "location": "scripts/install-toolchain.sh:5-16; briefs/M0-manifest.json:16-17",
+      "scenario": "Writing gitlab#dot#haskell#dot#org in prose needlessly resembles test evasion and defeats generic hostname searches. However, advisory thread 3's stronger claim is not supported by the exact verify command: that regex requires curl, wget, git clone, or git -C earlier on the same line, and line 7 contains none of those. The script also spells gitlab.haskell.org normally at lines 26 and 219. Thus the obfuscation is suspicious/noisy but not what makes the manifest's actual negative grep pass.",
+      "recommendation": "Spell the hostname normally. Validate behavior by inspecting parsed shell commands or constraining download URLs, rather than shaping comments around brittle line-based greps."
+    }
+  ],
+  "advisory_threads": [
+    {
+      "thread": 1,
+      "assessment": "confirmed",
+      "finding": "n1",
+      "note": "SERVER_LOG is never removed by cleanup."
+    },
+    {
+      "thread": 2,
+      "assessment": "confirmed",
+      "finding": "m3",
+      "note": "Missing button nodes throw through evaluate and reach the outer harness-error catch (exit 2), while a missing counter is correctly reported as an assertion failure."
+    },
+    {
+      "thread": 3,
+      "assessment": "partly refuted",
+      "finding": "n2",
+      "note": "The obfuscation is inappropriate, but the exact manifest negative grep would not match that prose line even with the normal hostname."
+    },
+    {
+      "thread": 4,
+      "assessment": "confirmed and deepened",
+      "finding": "M1, M2",
+      "note": "All pinned bindist SRI values are ignored, and inherited upstream environment switches can bypass the autogen URLs entirely."
+    },
+    {
+      "thread": 5,
+      "assessment": "confirmed",
+      "finding": "m2",
+      "note": "Skip mode exits 0 with a complete-looking 16/16 summary; current CI does not request it."
+    }
+  ],
+  "method": "Read-only inspection of every requested HEAD file, the M0 implementation commit/history, the exact manifest checks, the locally retained pinned ghc-wasm-meta setup.sh/autogen.json inspection artifacts, and current GitHub concurrency documentation. No builds, installs, tests, lint, commits, or repository-source modifications were performed."
+}
