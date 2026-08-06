@@ -604,6 +604,24 @@ check_no_external_origin "$DIR/index.js" "index.js"
 # never skipped, because it is a pure source-tree scan with no toolchain
 # dependency.
 #
+# M2 gate fix (M4): this check certifies PRESENCE, not WIRING -- it marks
+# success once getMonotonicTimeNSec, Date.getTime and noDeviceVerifier
+# occur ANYWHERE on a non-comment line, which is satisfied even when the
+# app feeds the WRONG clock into Begin/Restart or never calls
+# beginIfNeeded at all on a cold route (H1/H6 -- both shipped past this
+# very check). Identifier presence is not wiring, so this grep is now
+# explicitly SUBORDINATE, cheap defence in depth and a better error
+# message ONLY: it may still run and still fail loudly on a genuinely
+# missing mechanism, but it is NOT the check that certifies the clock
+# seam is correctly wired. The BEHAVIOURAL gate for that is checks 7/8
+# below (the real, running app under a headless browser):
+# scripts/browser-check.mjs's cold-load + known-wait + first-try
+# elapsedMs assertion, its Restart-yields-a-blank-prompt assertion, and
+# its drill/lookup citation assertions -- see that script's own
+# COLD_ELAPSED_ASSERTION_NAME and runExerciseAssertions. THOSE are what
+# must go green for the clock/M4 seam to be considered proven; this grep
+# going green proves nothing on its own.
+#
 # task "exercise-ui" ships its own verify command:
 #   grep -RqE "getMonotonicTimeNSec" site/app \
 #     && grep -RqE "getPOSIXTime|POSIX" site/app \
@@ -667,14 +685,14 @@ if command -v python3 >/dev/null 2>&1; then
   CLOCK_STUB_OUT="$(python3 "$CLOCK_STUB_PY" "$REPO_ROOT/site/app" 2>&1)" || true
   case "$CLOCK_STUB_OUT" in
     "OK "*)
-      ok "clocks and the M4 stub are wired on non-comment lines (getMonotonicTimeNSec, Date.getTime, noDeviceVerifier) (${CLOCK_STUB_OUT#OK })"
+      ok "clock/M4 identifiers present on non-comment lines (SUBORDINATE defence-in-depth only -- the BEHAVIOURAL clock-wiring gate is checks 7/8's browser assertions below) (${CLOCK_STUB_OUT#OK })"
       ;;
     *)
-      fail "clocks and the M4 stub are wired on non-comment lines (getMonotonicTimeNSec, Date.getTime, noDeviceVerifier) (observed: ${CLOCK_STUB_OUT#FAIL })"
+      fail "clock/M4 identifiers present on non-comment lines (SUBORDINATE defence-in-depth only -- the BEHAVIOURAL clock-wiring gate is checks 7/8's browser assertions below) (observed: ${CLOCK_STUB_OUT#FAIL })"
       ;;
   esac
 else
-  fail "clocks and the M4 stub are wired on non-comment lines (getMonotonicTimeNSec, Date.getTime, noDeviceVerifier) (observed: python3 not found on PATH)"
+  fail "clock/M4 identifiers present on non-comment lines (SUBORDINATE defence-in-depth only -- the BEHAVIOURAL clock-wiring gate is checks 7/8's browser assertions below) (observed: python3 not found on PATH)"
 fi
 rm -f "$CLOCK_STUB_PY"
 
@@ -944,6 +962,20 @@ CONTENT_JSON_FILE=""
 
 if [ "$SKIP_CONTENT" -eq 1 ]; then
   echo "SKIPPED -- content checker + three-way content agreement + exact-bytes source integrity (requested via --skip-content or SXC1_SKIP_CONTENT=1)"
+  # L2 fix (M2 gate round): a full run increments TOTAL for BOTH of these
+  # two preconditions (sourcing the toolchain env, resolving the
+  # exe:content-check binary -- see the `else` branch below) before it
+  # ever gets to running content-check itself. The skip branch used to
+  # jump straight to "exe:content-check runs..." without a skip() for
+  # either precondition, so TOTAL differed between
+  # `./check-site.sh` and `SXC1_SKIP_CONTENT=1 ./check-site.sh` -- CI
+  # could not pass either way, and it contradicted NEW7's promise that a
+  # skipped check stays a counted member of the total. Base label text
+  # matches the real ok()/fail() calls below exactly (sans their
+  # parenthetical "(observed: ...)" detail), same convention every other
+  # skip() in this branch already follows.
+  skip "GHC WebAssembly toolchain env sourced"
+  skip "exe:content-check binary resolved"
   skip "exe:content-check runs under wasm-run.mjs and exits 0"
   skip "three-way content agreement/guide-book (content-check --json vs translations/guide-book.md)"
   skip "three-way content agreement/startup-guide (content-check --json vs translations/startup-guide.md)"
@@ -966,7 +998,7 @@ if [ "$SKIP_CONTENT" -eq 1 ]; then
   skip "exercise-stats/index-directory-agreement (content/exercises/INDEX vs directory, both directions)"
   skip "exercise-stats/totals-agreement (python re-derivation vs exercise-check --json totals)"
   skip "exercise-stats/per-deck-agreement (chapter/title/exercises/prompts/sourceChars)"
-  skip "exercise-stats/citation-count-agreement (^cite:/^find: line count vs exercise-check --json)"
+  skip "exercise-stats/citation-recount-independent (scripts/recount-citations.py: blind ^cite:/^find: line scan vs exercise-check --json totals.citations, no knowledge of exCites/prCites/FindPage)"
   skip "exercise-stats/citation-independent-resolution (page range + anchor re-checked from translations/*.md)"
   skip "disk-derived exercise stats computed for browser-check.mjs --expect-exercise-json (python re-derivation from content/exercises/, never from the app payload)"
   skip "exercise-check --browser-fixture produced JSON for browser-check.mjs --exercise-fixture"
@@ -1499,7 +1531,6 @@ def load_decks():
 
     decks = []
     totals = {"exercises": 0, "prompts": 0, "quiz": 0, "drill": 0, "lookup": 0}
-    citation_total = 0
     citation_failures = []
     resolved_count = 0
 
@@ -1539,12 +1570,6 @@ def load_decks():
         drill_count = sum(1 for l in lines_list if l == "type: drill")
         lookup_count = sum(1 for l in lines_list if l == "type: lookup")
 
-        # The deck's OWN cite: line(s) (dkCites -- required, repeatable),
-        # in its field block before the first "## " exercise heading.
-        # Counted once each toward citation_total, same as exCites below.
-        deck_preamble = lines_list[:ex_idx[0]] if ex_idx else lines_list
-        citation_total += sum(1 for l in deck_preamble if l.startswith("cite: "))
-
         prompts = 0
         for k, start in enumerate(ex_idx):
             end = ex_idx[k + 1] if k + 1 < len(ex_idx) else len(lines_list)
@@ -1556,45 +1581,30 @@ def load_decks():
                     kind = kv[1].strip()
                     break
 
-            # Split the span on its own level-3 (### role) headings, so an
-            # exercise-level cite: (in the preamble, before any role) can be
-            # told apart from a drill step's OWN cite: (inside its "### Step"
-            # chunk). Mirrors SXC1.Exercise.Report.buildTotals's real
-            # formula (verified empirically against exercise-check --json
-            # on the real seed content, briefs/M2-plan-amendments.md-style):
-            # a quiz/lookup's single Prompt carries the SAME Citation list
-            # as its Exercise (site/src/SXC1/Exercise/Parse.hs's
-            # `theExCites`, at both `exCites` and, for quiz/lookup,
-            # `prCites`) -- so totCitations counts a quiz's own cite: line
-            # TWICE (once as exCites, once via its prompt's prCites) and a
-            # lookup's find: line ZERO times (it lives only in the prompt's
-            # FindPage payload, which totCitations never visits at all) --
-            # while a drill's exercise-level cite: is counted once (exCites)
-            # and each step's own cite: is counted once per step (prCites),
-            # with no duplication. This is what agreement with A actually
-            # requires; the raw ^cite:/^find: LINE SCAN just below (used for
-            # independent citation RESOLUTION, not this count) stays
-            # deliberately blind to this scoping -- see its own comment.
+            # A drill's prompt count is its STEP count (one "### Step"
+            # role heading per prompt); every other kind has exactly one
+            # prompt. (M2 gate fix, M1 harness half: this function used
+            # to ALSO accumulate a "citation_total" here by reproducing
+            # SXC1.Exercise.Report.buildTotals's own per-kind citation
+            # scoping rule in Python -- a quiz's cite: line counted
+            # twice, a lookup's find: line never counted, etc. -- so
+            # "agreement" with the model proved nothing: one
+            # implementation, checked twice. That comparison has moved to
+            # scripts/recount-citations.py, a genuinely independent
+            # ^cite:/^find: line scan with NO knowledge of this scoping
+            # at all; see its own module docstring. Only the STEP-COUNTING
+            # half of this logic (needed for the `prompts` TOTAL, which
+            # recount-citations.py does not compute) stays here.)
             role_idx = [i for i, l in enumerate(span) if heading_level(l) == 3]
-            preamble = span[:role_idx[0]] if role_idx else span
-            ex_cite_count = sum(1 for l in preamble if l.startswith("cite: "))
-            step_cite_counts = []
-            for ri, rstart in enumerate(role_idx):
-                rend = role_idx[ri + 1] if ri + 1 < len(role_idx) else len(span)
-                rh = heading_of(span[rstart])
-                if rh and rh[1] == "Step":
-                    step_cite_counts.append(sum(1 for l in span[rstart:rend] if l.startswith("cite: ")))
-
             if kind == "drill":
-                prompts += len(step_cite_counts)
-                citation_total += ex_cite_count + sum(step_cite_counts)
+                step_count = 0
+                for ri, rstart in enumerate(role_idx):
+                    rh = heading_of(span[rstart])
+                    if rh and rh[1] == "Step":
+                        step_count += 1
+                prompts += step_count
             else:
                 prompts += 1
-                # quiz: exCites + prCites duplicate = 2x. lookup: same
-                # formula, but ex_cite_count is normally 0 (lookups use
-                # find:, not cite:, at exercise level) and find: itself is
-                # never counted (see the comment above).
-                citation_total += 2 * ex_cite_count
 
         for l in lines_list:
             if not (l.startswith("cite: ") or l.startswith("find: ")):
@@ -1636,7 +1646,7 @@ def load_decks():
     return {
         "orphan": orphan, "dangling": dangling,
         "decks": decks, "totals": totals,
-        "citation_total": citation_total, "citation_failures": citation_failures,
+        "citation_failures": citation_failures,
         "resolved_count": resolved_count,
     }
 
@@ -1675,7 +1685,6 @@ def main():
         msg = "could not read exercise-check --json capture: %s" % e
         print("TOTALS FAIL " + msg)
         print("PERDECK FAIL " + msg)
-        print("CITECOUNT FAIL " + msg)
         print("CITERESOLVE FAIL " + msg)
         sys.exit(1)
 
@@ -1708,11 +1717,6 @@ def main():
     else:
         print("PERDECK OK %d decks agree on chapter/title/exercises/prompts/sourceChars" % len(data["decks"]))
 
-    if a_totals.get("citations") != data["citation_total"]:
-        print("CITECOUNT FAIL exercise-check=%r python=%r" % (a_totals.get("citations"), data["citation_total"]))
-    else:
-        print("CITECOUNT OK %d citations (^cite:/^find: lines) agree" % data["citation_total"])
-
     if data["citation_failures"]:
         print("CITERESOLVE FAIL " + "; ".join(data["citation_failures"]))
     else:
@@ -1728,7 +1732,6 @@ PYEOF
       INDEXDIR)    echo "exercise-stats/index-directory-agreement (content/exercises/INDEX vs directory, both directions)" ;;
       TOTALS)      echo "exercise-stats/totals-agreement (python re-derivation vs exercise-check --json totals)" ;;
       PERDECK)     echo "exercise-stats/per-deck-agreement (chapter/title/exercises/prompts/sourceChars)" ;;
-      CITECOUNT)   echo "exercise-stats/citation-count-agreement (^cite:/^find: line count vs exercise-check --json)" ;;
       CITERESOLVE) echo "exercise-stats/citation-independent-resolution (page range + anchor re-checked from translations/*.md)" ;;
       *)           echo "exercise-stats/$1" ;;
     esac
@@ -1738,7 +1741,7 @@ PYEOF
     if [ -n "$EXERCISE_JSON_FILE" ]; then
       EXSTATS_OUT="$(cd "$REPO_ROOT" && python3 "$EXERCISE_STATS_PY" diff "$REPO_ROOT/content" "$REPO_ROOT/translations" "$EXERCISE_JSON_FILE" 2>&1)" || true
     else
-      EXSTATS_OUT="$(printf 'FNV1A FAIL no exercise-check --json capture available (see checks above)\nINDEXDIR FAIL no exercise-check --json capture available (see checks above)\nTOTALS FAIL no exercise-check --json capture available (see checks above)\nPERDECK FAIL no exercise-check --json capture available (see checks above)\nCITECOUNT FAIL no exercise-check --json capture available (see checks above)\nCITERESOLVE FAIL no exercise-check --json capture available (see checks above)\n')"
+      EXSTATS_OUT="$(printf 'FNV1A FAIL no exercise-check --json capture available (see checks above)\nINDEXDIR FAIL no exercise-check --json capture available (see checks above)\nTOTALS FAIL no exercise-check --json capture available (see checks above)\nPERDECK FAIL no exercise-check --json capture available (see checks above)\nCITERESOLVE FAIL no exercise-check --json capture available (see checks above)\n')"
     fi
     while IFS= read -r line; do
       [ -n "$line" ] || continue
@@ -1754,9 +1757,38 @@ PYEOF
       esac
     done <<< "$EXSTATS_OUT"
   else
-    for tag in FNV1A INDEXDIR TOTALS PERDECK CITECOUNT CITERESOLVE; do
+    for tag in FNV1A INDEXDIR TOTALS PERDECK CITERESOLVE; do
       fail "$(exstats_label "$tag") (observed: python3 not found on PATH)"
     done
+  fi
+
+  # -------------------------------------------------------------------------
+  # M2 gate fix (M1, harness half): the GENUINELY independent citation
+  # recount, factored out into scripts/recount-citations.py so its
+  # falsifiability can be demonstrated on its own (see that script's own
+  # module docstring, and this task's negative control: doctor a COPY of
+  # $EXERCISE_JSON_FILE's totals.citations and require the script to
+  # reject it -- never a corpus mutation, which would go red on the
+  # UNRELATED stale-build/FNV-1a comparison above before the citation
+  # logic itself was ever exercised). Replaces the CITECOUNT check that
+  # used to live inside EXERCISE_STATS_PY above, which did not
+  # independently count anything -- it reproduced
+  # SXC1.Exercise.Report.buildTotals's own per-kind citation-scoping rule
+  # in Python, so agreement proved nothing.
+  # -------------------------------------------------------------------------
+  RECOUNT_LABEL="exercise-stats/citation-recount-independent (scripts/recount-citations.py: blind ^cite:/^find: line scan vs exercise-check --json totals.citations, no knowledge of exCites/prCites/FindPage)"
+  if [ -n "$EXERCISE_JSON_FILE" ]; then
+    set +e
+    RECOUNT_OUT="$("$REPO_ROOT/scripts/recount-citations.py" --report "$EXERCISE_JSON_FILE" --content-dir "$REPO_ROOT/content/exercises" 2>&1)"
+    RECOUNT_RC=$?
+    set -e
+    if [ "$RECOUNT_RC" -eq 0 ]; then
+      ok "$RECOUNT_LABEL ($RECOUNT_OUT)"
+    else
+      fail "$RECOUNT_LABEL (observed: $RECOUNT_OUT)"
+    fi
+  else
+    fail "$RECOUNT_LABEL (observed: no exercise-check --json capture available -- see checks above)"
   fi
 
   # -------------------------------------------------------------------------

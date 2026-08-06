@@ -7,6 +7,19 @@
 -- engine itself has no ambient time and is fully deterministic under
 -- test.
 --
+-- THE CLOCK SEAM (M2 gate H1/H6): 'MonoMs' and 'WallMs' are distinct
+-- newtypes over the SAME underlying 'Integer' millisecond representation
+-- -- deliberately, so the two clock domains can never be silently
+-- swapped at a call site. Before this fix, both were bare 'Integer', and
+-- Main.hs seeded a fresh attempt's prompt clock from the WALL epoch
+-- (~1.79e12) instead of the MONOTONIC clock 'gradeStep' actually
+-- subtracts against, so every first-graded prompt (and every prompt
+-- immediately after a 'Restart') reported a false near-zero elapsed
+-- time. Distinct newtypes make that swap a TYPE ERROR rather than a
+-- semantic bug a corrected call site could quietly regress back into --
+-- see @site\/app\/Main.hs@'s 'readClocks' and the H1 self-test group in
+-- @site\/test\/CheckExercises.hs@.
+--
 -- THE M3 FORWARD HOOK: 'ProgressEvent' and 'ProgressSink' are shapes
 -- only. M2 persists nothing -- no 'Miso.Storage' import, no storage
 -- schema, no scheduling algorithm. M3 must be able to bind localStorage
@@ -17,6 +30,8 @@ module SXC1.Exercise.Engine
   , SelfGrade (..)
   , ConfirmSource (..)
   , Outcome (..)
+  , MonoMs (..)
+  , WallMs (..)
   , ExerciseState (..)
   , ExerciseAction (..)
   , ProgressEvent (..)
@@ -58,6 +73,24 @@ data Outcome = Correct | Incorrect | Skipped | Completed
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------
+-- The two clock domains -- see the module Haddock's "THE CLOCK SEAM".
+-- Both newtypes over 'Integer' milliseconds, kept DISTINCT on purpose:
+-- 'MonoMs' is a monotonic reading (e.g. 'GHC.Clock.getMonotonicTimeNSec'
+-- \/ 1e6, never subject to clock adjustment, safe to SUBTRACT for a
+-- duration), 'WallMs' is a wall-clock epoch reading (safe to DISPLAY or
+-- schedule against a real date, never safe to subtract against a
+-- 'MonoMs' reading). Deriving only 'Eq'\/'Show' -- no 'Num', no 'Ord' --
+-- is itself part of the safety property: there is no operator that lets
+-- one accidentally arithmetic-mix a 'MonoMs' and a 'WallMs' value.
+--------------------------------------------------------------------------
+
+newtype MonoMs = MonoMs { unMonoMs :: Integer }
+  deriving (Eq, Show)
+
+newtype WallMs = WallMs { unWallMs :: Integer }
+  deriving (Eq, Show)
+
+--------------------------------------------------------------------------
 -- State and actions
 --------------------------------------------------------------------------
 
@@ -68,31 +101,34 @@ data ExerciseState = ExerciseState
   , esAttempts  :: IntMap Int
   , esHints     :: IntMap Int
   , esRevealed  :: IntSet
-  , esStartedAt :: !Integer  -- ^ wall-clock epoch ms this attempt began
-  , esPromptAt  :: !Integer  -- ^ monotonic ms the CURRENT prompt was (re)shown
+  , esStartedAt :: !MonoMs  -- ^ monotonic ms this attempt began (H1: seeded from the MONOTONIC clock, never the wall one)
+  , esPromptAt  :: !MonoMs  -- ^ monotonic ms the CURRENT prompt was (re)shown -- what 'gradeStep' subtracts against
   , esDone      :: !Bool
   } deriving (Eq, Show)
 
--- | Every action carries its own clock reading(s) -- monotonic ms first,
--- then wall-clock epoch ms, matching 'ProgressEvent''s
--- @(peElapsed, peAt)@ pair -- wherever an outcome or timestamp could be
--- produced. 'Toggle', 'Reveal', 'EnterPage' and 'ShowHint' are pure UI
--- state changes that never grade a prompt or emit an event, so they
--- carry no clock. 'Begin' and 'Restart' start (or reset) a fresh
--- attempt and take one clock reading, used to seed both
--- 'esStartedAt' and the first prompt's 'esPromptAt' baseline.
+-- | Every action that can grade a prompt or begin\/reset an attempt
+-- carries BOTH clock readings -- a 'MonoMs' first, then a 'WallMs',
+-- matching 'ProgressEvent''s @(peElapsed, peAt)@ pair -- wherever an
+-- outcome or timestamp could be produced. 'Toggle', 'Reveal',
+-- 'EnterPage' and 'ShowHint' are pure UI state changes that never grade a
+-- prompt or emit an event, so they carry no clock. 'Begin' and 'Restart'
+-- start (or reset) a fresh attempt from the monotonic reading (H1: never
+-- the wall one -- see the module Haddock); 'Advance' RE-BASELINES
+-- 'esPromptAt' to the monotonic reading taken when the NEXT prompt is
+-- shown, so a prompt is timed from when the learner actually sees it,
+-- not from the previous prompt's submit.
 data ExerciseAction
-  = Begin Integer
+  = Begin MonoMs WallMs
   | Toggle Int Text
-  | Submit Int Integer Integer
+  | Submit Int MonoMs WallMs
   | Reveal Int
-  | SelfGrade_ Int SelfGrade Integer Integer
-  | ConfirmStep Int ConfirmSource Integer Integer
+  | SelfGrade_ Int SelfGrade MonoMs WallMs
+  | ConfirmStep Int ConfirmSource MonoMs WallMs
   | EnterPage Int Int
-  | SubmitPage Int Integer Integer
+  | SubmitPage Int MonoMs WallMs
   | ShowHint Int
-  | Advance Integer
-  | Restart Integer
+  | Advance MonoMs WallMs
+  | Restart MonoMs WallMs
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------
@@ -124,7 +160,7 @@ data ProgressSink = ProgressSink
 -- step
 --------------------------------------------------------------------------
 
-initialState :: ExId -> Integer -> ExerciseState
+initialState :: ExId -> MonoMs -> ExerciseState
 initialState exid t = ExerciseState
   { esExercise  = exid
   , esCursor    = 0
@@ -176,9 +212,14 @@ mkEvent ex mPid outcome attempt revealed hints elapsedMs wallMs = ProgressEvent
 -- shape -- e.g. 'Submit' against a 'Confirm' prompt), record the
 -- response, increment 'esAttempts', and emit exactly one
 -- 'ProgressEvent'. Out-of-range prompt indices and shape mismatches are
--- both silent no-ops -- 'step' is TOTAL, never throws.
+-- both silent no-ops -- 'step' is TOTAL, never throws. Elapsed time is
+-- always @monoMs - esPromptAt st@ -- BOTH monotonic (H1) -- and
+-- re-baselines 'esPromptAt' to this same 'MonoMs' reading, so a second
+-- grading attempt on the same prompt (a wrong-then-right retry) times
+-- itself from the previous attempt, not from when the prompt first
+-- appeared.
 gradeStep
-  :: Exercise -> ExerciseState -> Int -> Integer -> Integer
+  :: Exercise -> ExerciseState -> Int -> MonoMs -> WallMs
   -> (Prompt -> Maybe (Bool, Response))
   -> (ExerciseState, [ProgressEvent])
 gradeStep ex st i monoMs wallMs grader = case safeIndex (exPrompts ex) i of
@@ -190,20 +231,27 @@ gradeStep ex st i monoMs wallMs grader = case safeIndex (exPrompts ex) i of
           attemptN  = IntMap.findWithDefault 1 i attempts'
           revealed  = IntSet.member i (esRevealed st)
           hints     = IntMap.findWithDefault 0 i (esHints st)
-          elapsedMs = clampToInt (monoMs - esPromptAt st)
+          elapsedMs = clampToInt (unMonoMs monoMs - unMonoMs (esPromptAt st))
           outcome   = if correct then Correct else Incorrect
           st' = st
             { esResponses = IntMap.insert i resp (esResponses st)
             , esAttempts  = attempts'
             , esPromptAt  = monoMs
             }
-          event = mkEvent ex (Just (prId prompt)) outcome attemptN revealed hints elapsedMs wallMs
+          event = mkEvent ex (Just (prId prompt)) outcome attemptN revealed hints elapsedMs (unWallMs wallMs)
       in (st', [event])
 
 step :: Exercise -> ExerciseAction -> ExerciseState -> (ExerciseState, [ProgressEvent])
 step ex action st = case action of
-  Begin t   -> (initialState (exId ex) t, [])
-  Restart t -> (initialState (exId ex) t, [])
+  -- H1/H6: both clocks are taken, but only the MONOTONIC one seeds the
+  -- new attempt's 'esStartedAt'/'esPromptAt' -- see the module Haddock.
+  -- The 'WallMs' reading is still required at the call site (so every
+  -- fresh-attempt action is symmetric with the graded ones, and so
+  -- Main.hs always has a real wall reading on hand if a future M3 event
+  -- ever needs one), even though this state shape has no field for it
+  -- today.
+  Begin mono _wall   -> (initialState (exId ex) mono, [])
+  Restart mono _wall -> (initialState (exId ex) mono, [])
 
   -- Selection semantics (missing from the original manifest -- see
   -- briefs/M2-signoff-fixes.json, task "quiz-selection-semantics", FIX 1):
@@ -259,17 +307,23 @@ step ex action st = case action of
 
   ShowHint i -> (st { esHints = IntMap.insertWith (+) i 1 (esHints st) }, [])
 
-  Advance wallMs ->
+  -- H1: re-baseline 'esPromptAt' to THIS monotonic reading before moving
+  -- the cursor, so prompt n+1 is timed from when it is shown (here), not
+  -- from prompt n's last submit -- previously 'Advance' carried only a
+  -- wall-clock reading and never touched 'esPromptAt' at all.
+  Advance monoMs wallMs ->
     let i = esCursor st
         n = length (exPrompts ex)
         curResp = IntMap.findWithDefault RUnanswered i (esResponses st)
+        wallInt = unWallMs wallMs
         skipEvent
           | i >= 0 && i < n && isUnanswered curResp =
               [ mkEvent ex (fmap prId (safeIndex (exPrompts ex) i)) Skipped 0 False
-                  (IntMap.findWithDefault 0 i (esHints st)) 0 wallMs ]
+                  (IntMap.findWithDefault 0 i (esHints st)) 0 wallInt ]
           | otherwise = []
         nextCursor = i + 1
+        st' = st { esPromptAt = monoMs }
     in if nextCursor >= n
-         then ( st { esCursor = nextCursor, esDone = True }
-              , skipEvent ++ [ mkEvent ex Nothing Completed 0 False 0 0 wallMs ] )
-         else (st { esCursor = nextCursor }, skipEvent)
+         then ( st' { esCursor = nextCursor, esDone = True }
+              , skipEvent ++ [ mkEvent ex Nothing Completed 0 False 0 0 wallInt ] )
+         else (st' { esCursor = nextCursor }, skipEvent)

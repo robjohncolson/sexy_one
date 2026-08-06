@@ -26,6 +26,7 @@ module SXC1.Exercise.Verify
   , parseIdShape
   ) where
 
+import           Data.Char              (isAlpha)
 import           Data.List              (findIndex)
 import qualified Data.Map.Strict        as Map
 import           Data.Map.Strict        (Map)
@@ -34,9 +35,9 @@ import           Data.Set               (Set)
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 
-import           SXC1.Content.Markdown  (headingLineOf, pageCountOf, parseBlocksEngine, splitPageTexts)
+import           SXC1.Content.Markdown  (headingLineOf, pageCountOf, parseBlocksEngine, parseInline, splitPageTexts)
 import           SXC1.Content.Types     (Block (..), Inline)
-import           SXC1.Exercise.Lint     (inlinesText)
+import           SXC1.Exercise.Lint     (blocksText, inlinesText)
 import           SXC1.Exercise.Report
 import           SXC1.Exercise.Types    (Citation (..), ExId (..), Kind (..), VerifySpec (..))
 import           SXC1.Route             (parseDigits)
@@ -64,6 +65,32 @@ data ManualIndex = ManualIndex
 normalizeWs :: Text -> Text
 normalizeWs = T.unwords . T.words
 
+-- | (M2 gate H2): render a manual page's raw Markdown source down to its
+-- plain, syntax-free learner-facing text -- through the SAME block
+-- parser and flattener ("SXC1.Content.Markdown".'parseBlocksEngine' +
+-- 'blocksText') every OTHER learner-facing surface in this program goes
+-- through -- rather than matching against the raw Markdown source
+-- verbatim. Two consequences, both required by the gate finding: a
+-- syntax-only "anchor" (e.g. a raw table delimiter row @|---|---|---|@)
+-- can never match, because table syntax never becomes page CONTENT under
+-- this renderer; and an anchor that itself quotes markup (backtick code
+-- spans, @**bold**@) matches correctly as long as 'renderAnchor' (below)
+-- renders the anchor through the exact same pipeline.
+renderPlain :: Text -> Text
+renderPlain raw = normalizeWs (blocksText (fst (parseBlocksEngine 0 False [] (T.lines raw))))
+
+-- | (M2 gate H2): the anchor-side twin of 'renderPlain' -- an anchor
+-- phrase is inline prose (never a full block structure), so it goes
+-- through 'SXC1.Content.Markdown.parseInline' + 'inlinesText' instead,
+-- but is normalised the SAME way. Both sides of 'resolveCitation''s
+-- anchor check are ALWAYS the output of one of these two functions, never
+-- raw text, which is what keeps the 3 shipped anchors that themselves
+-- contain Markdown markers (e.g. a quoted @\`A\`@ button) matching: the
+-- page's own backticks are stripped by 'renderPlain' exactly as the
+-- anchor's are stripped here.
+renderAnchor :: Text -> Text
+renderAnchor raw = normalizeWs (inlinesText (parseInline 0 raw))
+
 knownSlugs :: [Text]
 knownSlugs = ["guide-book", "startup-guide", "midi", "oss"]
 
@@ -71,14 +98,15 @@ buildManualIndex :: [(Text, Text)] -> ManualIndex
 buildManualIndex sources = ManualIndex
   { miPageCount = Map.fromList [ (slug, pageCountOf raw) | (slug, raw) <- sources ]
   , miPageText  = Map.fromList
-      [ (slug, Map.fromList [ (n, normalizeWs (T.unlines ls)) | (n, ls) <- splitPageTexts raw ])
+      [ (slug, Map.fromList [ (n, renderPlain (T.unlines ls)) | (n, ls) <- splitPageTexts raw ])
       | (slug, raw) <- sources
       ]
   }
 
 -- | Content-verified citation resolution: slug membership, page range,
--- and (after whitespace normalisation, minimum 12 characters) that the
--- anchor phrase actually occurs on the cited page.
+-- and (measured on the NORMALISED, RENDERED anchor -- M2 gate H2 --
+-- minimum 12 characters, at least one letter) that the anchor phrase
+-- actually occurs in the cited page's RENDERED text.
 resolveCitation :: ManualIndex -> Loc -> Citation -> [Issue]
 resolveCitation idx loc c
   | citSlug c `notElem` knownSlugs =
@@ -93,11 +121,14 @@ resolveCitation idx loc c
         [ mkIssue E_CITE_PAGE loc
             ("page " <> showT (citPage c) <> " out of range 1.." <> showT pc <> " for " <> citSlug c) ]
       _ -> []
+    normAnchor = renderAnchor (citAnchor c)
     anchorIssues
-      | T.length (T.strip (citAnchor c)) < 12 =
-          [ mkIssue E_CITE_ANCHOR loc "anchor phrase must be at least 12 characters" ]
+      | T.length normAnchor < 12 =
+          [ mkIssue E_CITE_ANCHOR loc "anchor phrase must be at least 12 characters (measured after normalisation)" ]
+      | not (T.any isAlpha normAnchor) =
+          [ mkIssue E_CITE_ANCHOR loc "anchor phrase must contain at least one letter (syntax-only anchors are not content)" ]
       | otherwise = case Map.lookup (citSlug c) (miPageText idx) >>= Map.lookup (citPage c) of
-          Just pageTxt | normalizeWs (citAnchor c) `T.isInfixOf` pageTxt -> []
+          Just pageTxt | normAnchor `T.isInfixOf` pageTxt -> []
           _ -> [ mkIssue E_CITE_ANCHOR loc
                    ("anchor \"" <> citAnchor c <> "\" not found on " <> citSlug c <> " p." <> showT (citPage c)) ]
 

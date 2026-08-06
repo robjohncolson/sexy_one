@@ -669,8 +669,17 @@ function connectWebSocket(url) {
 
 const SELF_TEST_FIXTURE = {
   quiz: { deck: 'demo-deck', id: 'demo-quiz', correctOpt: 'opt-a', wrongOpt: 'opt-b', citeSlug: 'guide-book', citePage: 3 },
-  drill: { deck: 'demo-deck', id: 'demo-drill', steps: 2, hasVerify: true },
-  lookup: { deck: 'demo-deck', id: 'demo-lookup', targetPage: 7 },
+  // citeSlug/citePage here (H8 gate fix): the real --browser-fixture
+  // payload (site/test/CheckExercises.hs's DrillFixture/LookupFixture)
+  // carries no citation fields for drill/lookup -- only quiz does -- so
+  // this fixture's own drill/lookup citation hrefs are self-test-only
+  // constants, never compared against --exercise-fixture. The REAL run's
+  // drill assertion checks the href PATTERN only; its lookup assertion
+  // checks the page number against fixture.lookup.targetPage, which
+  // agrees BY CONSTRUCTION (site/test/CheckExercises.hs's findLookup
+  // sets lfTargetPage = citPage of the very find: target it cites).
+  drill: { deck: 'demo-deck', id: 'demo-drill', steps: 2, hasVerify: true, citeSlug: 'guide-book', citePage: 5 },
+  lookup: { deck: 'demo-deck', id: 'demo-lookup', targetPage: 7, citeSlug: 'guide-book', citePage: 7 },
 };
 
 // The #sxc1-exercise-stats payload the fixture below emits verbatim --
@@ -712,15 +721,28 @@ window.__SXC1_BOOTED = true;
   var quizSelected = Object.create(null);
   var quizAttempted = false;
   var lastQuizCorrect = false;
+  var quizPromptAt = 0;
   var drillCursor = 0;
+  var drillStepAt = 0;
   var lookupStartedAt = 0;
   var lookupResult = null;
 
   function root() { return document.getElementById('sxc1-root'); }
   function setEventLog() { document.getElementById('sxc1-event-log').textContent = JSON.stringify(eventLog); }
-  function pushEvent(exId, kind, outcome) {
+  // H1/M5: 'promptAt' is THIS attempt's own monotonic baseline (set when
+  // the prompt was FIRST shown -- quizPromptAt/drillStepAt/
+  // lookupStartedAt below, one per kind, all reset the same way Main.hs's
+  // Begin/Restart/Advance re-baseline esPromptAt). Under SABOTAGE,
+  // elapsedMs is forced to 0 regardless of the real wait -- the exact H1
+  // defect (a fresh attempt's clock seeded from the WALL epoch instead of
+  // the monotonic one gradeStep subtracts against, clamped hugely
+  // negative to 0) -- so a cold-load assertion that only checked the
+  // M:SS STRING (any value, including "0:00") would miss it; this is why
+  // the new cold-load assertion reads elapsedMs itself instead.
+  function pushEvent(exId, kind, outcome, promptAt) {
+    var elapsedMs = SABOTAGE ? 0 : Math.max(0, Date.now() - (promptAt || Date.now()));
     eventLog.push({ deck: FIXTURE.quiz.deck, exercise: exId, prompt: exId + '#1', kind: kind,
-      outcome: outcome, attempt: 1, revealed: false, hints: 0, elapsedMs: 1, at: Date.now() });
+      outcome: outcome, attempt: 1, revealed: false, hints: 0, elapsedMs: elapsedMs, at: Date.now() });
     setEventLog();
   }
 
@@ -742,15 +764,27 @@ window.__SXC1_BOOTED = true;
       '</ol></section>';
   }
 
-  function feedbackHtml(correct) {
+  // 'citesHtml' lets a caller supply its OWN citation markup (or ''),
+  // since H8's fix is kind-specific: quiz's citation was already correct
+  // pre-fix, so its own call site below leaves 'citesHtml' undefined and
+  // gets its unconditional default; the lookup call site (H8: citation
+  // only after grading, never before) passes one explicitly.
+  function feedbackHtml(correct, citesHtml) {
+    var cites = citesHtml === undefined
+      ? '<ul id="ex-cites"><li><a class="cite" href="#/m/' + FIXTURE.quiz.citeSlug + '/p/' + FIXTURE.quiz.citePage + '">cite</a></li></ul>'
+      : citesHtml;
     return '<p id="ex-feedback" class="' + (correct ? 'correct' : 'incorrect') + '" role="status">' +
       (correct ? 'Correct.' : 'Not quite. Try again.') + '</p>' +
-      (correct ? ('<div id="ex-note"><p>Why: demo note.</p></div>' +
-        '<ul id="ex-cites"><li><a class="cite" href="#/m/' + FIXTURE.quiz.citeSlug + '/p/' + FIXTURE.quiz.citePage + '">cite</a></li></ul>' +
+      (correct ? ('<div id="ex-note"><p>Why: demo note.</p></div>' + cites +
         '<button id="btn-ex-next">Next</button>') : '');
   }
 
   function renderQuiz() {
+    // H1/H6: lazily seeded, like esPromptAt from a real Begin -- the
+    // FIRST renderQuiz() after a fresh load or a Restart (which zeroes
+    // this back out below) re-baselines it, exactly once, before any
+    // click can occur.
+    if (quizPromptAt === 0) quizPromptAt = Date.now();
     var optsHtml =
       '<li><button id="' + FIXTURE.quiz.correctOpt + '" class="ex-option" aria-pressed="' + (quizSelected[FIXTURE.quiz.correctOpt] ? 'true' : 'false') + '">Correct option</button></li>' +
       '<li><button id="' + FIXTURE.quiz.wrongOpt + '" class="ex-option" aria-pressed="' + (quizSelected[FIXTURE.quiz.wrongOpt] ? 'true' : 'false') + '">Wrong option</button></li>';
@@ -759,7 +793,25 @@ window.__SXC1_BOOTED = true;
       '<ul id="ex-options">' + optsHtml + '</ul>' +
       '<button id="btn-ex-submit">Submit</button>' +
       (quizAttempted ? feedbackHtml(lastQuizCorrect) : '') +
+      '<button id="btn-ex-restart">Restart</button>' +
       '</article>';
+    // H7: Restart must yield a genuinely blank prompt -- clears this
+    // attempt's own result state and re-baselines the clock, mirroring
+    // Main.hs's applyExActions (Begin/Restart -> dropStale mExResults).
+    // SABOTAGE reproduces the pre-fix defect ON PURPOSE: it re-baselines
+    // the clock (an unrelated bug) but leaves quizAttempted/
+    // lastQuizCorrect/quizSelected exactly as they were, so the stale
+    // "Correct."/note/Next/pressed option all survive a restart -- the
+    // one thing this task's new Restart assertion exists to catch.
+    document.getElementById('btn-ex-restart').addEventListener('click', function () {
+      quizPromptAt = 0;
+      if (!SABOTAGE) {
+        quizAttempted = false;
+        lastQuizCorrect = false;
+        quizSelected = Object.create(null);
+      }
+      renderQuiz();
+    });
     Array.prototype.forEach.call(document.querySelectorAll('.ex-option'), function (btn) {
       btn.addEventListener('click', function () {
         // Single-answer replace (radio) semantics -- this fixture's quiz
@@ -785,18 +837,31 @@ window.__SXC1_BOOTED = true;
       var isCorrect = SABOTAGE ? true : (selectedIds.length === 1 && selectedIds[0] === FIXTURE.quiz.correctOpt);
       quizAttempted = true;
       lastQuizCorrect = isCorrect;
-      pushEvent(FIXTURE.quiz.id, 'quiz', isCorrect ? 'correct' : 'incorrect');
+      pushEvent(FIXTURE.quiz.id, 'quiz', isCorrect ? 'correct' : 'incorrect', quizPromptAt);
       renderQuiz();
     });
   }
 
   function renderDrill() {
+    if (drillStepAt === 0) drillStepAt = Date.now();
     var stepsHtml = '';
     for (var i = 1; i <= FIXTURE.drill.steps; i++) {
       var idx0 = i - 1;
+      var confirmed = idx0 < drillCursor;
+      // H8: a drill's own citations live per-step, rendered once (and
+      // only once) that step is confirmed -- and, unlike quiz/lookup,
+      // stay visible after the WHOLE drill completes (see
+      // site/app/View/Exercise.hs's citesEl/bodyEls comments). SABOTAGE
+      // omits this entirely, reproducing the pre-fix defect: a drill
+      // body never reached the only citation renderer that existed at
+      // the time, so a completed drill's citations were unreachable.
+      var citeHtml = (confirmed && !SABOTAGE)
+        ? ('<ul class="ex-step-cites" id="ex-step-' + i + '-cites"><li><a class="cite" href="#/m/' + FIXTURE.drill.citeSlug + '/p/' + FIXTURE.drill.citePage + '">cite</a></li></ul>')
+        : '';
       stepsHtml += '<li class="ex-step" id="ex-step-' + i + '"><div class="ex-step-instruction"><p>Step ' + i + '.</p></div>' +
         '<p class="ex-step-check" id="ex-step-' + i + '-check">Check ' + i + '.</p>' +
         ((FIXTURE.drill.hasVerify && i === 1) ? '<p class="ex-verify" id="ex-step-1-verify">Automatic device confirmation arrives with WebMIDI support in a future update; confirm manually for now.</p>' : '') +
+        citeHtml +
         (idx0 === drillCursor ? ('<button class="btn-ex-confirm" id="btn-ex-confirm-' + i + '">Confirm</button>') : '') +
         '</li>';
     }
@@ -805,8 +870,12 @@ window.__SXC1_BOOTED = true;
       '<div id="ex-stem"><p>Do the thing.</p></div><ol id="ex-steps">' + stepsHtml + '</ol></article>';
     var btn = document.getElementById('btn-ex-confirm-' + (drillCursor + 1));
     if (btn) btn.addEventListener('click', function () {
-      pushEvent(FIXTURE.drill.id, 'drill', 'correct');
+      pushEvent(FIXTURE.drill.id, 'drill', 'correct', drillStepAt);
       drillCursor += 1;
+      // H1: Advance re-baselines esPromptAt to the NEXT prompt's own
+      // monotonic reading -- mirrored here for the step about to become
+      // current.
+      drillStepAt = Date.now();
       renderDrill();
     });
   }
@@ -820,21 +889,31 @@ window.__SXC1_BOOTED = true;
   }
 
   function renderLookup() {
+    if (lookupStartedAt === 0) lookupStartedAt = Date.now();
+    // H8: a lookup's own citation is its find: TARGET page, rendered
+    // ONLY after grading (gated the same way the real app gates it --
+    // mAttempted -- never before, or the lookup spoils its own answer).
+    // SABOTAGE omits it even once graded, reproducing the pre-fix
+    // defect: a lookup's target lives only in its prompt's FindPage
+    // payload, which the only citation renderer at the time (keyed off
+    // exCites) never visited at all.
+    var lookupCiteHtml = SABOTAGE
+      ? ''
+      : ('<ul id="ex-cites"><li><a class="cite" href="#/m/' + FIXTURE.lookup.citeSlug + '/p/' + FIXTURE.lookup.citePage + '">cite</a></li></ul>');
     root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-lookup">' +
       '<h1 id="ex-title">Demo lookup</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Find the page.</p></div>' +
       '<p id="ex-find-task">Find it.</p>' +
       '<input id="ex-find-input" type="number" inputmode="numeric">' +
       '<button id="btn-ex-find-submit">Submit</button>' +
-      (lookupResult !== null ? (feedbackHtml(lookupResult) + (lookupResult ? ('<p id="ex-elapsed">' + elapsedStr() + '</p>') : '')) : '') +
+      (lookupResult !== null ? (feedbackHtml(lookupResult, lookupResult ? lookupCiteHtml : '') + (lookupResult ? ('<p id="ex-elapsed">' + elapsedStr() + '</p>') : '')) : '') +
       '</article>';
-    if (lookupStartedAt === 0) lookupStartedAt = Date.now();
     var input = document.getElementById('ex-find-input');
     var submitBtn = document.getElementById('btn-ex-find-submit');
     submitBtn.addEventListener('click', function () {
       var n = parseInt(input.value, 10);
       var isCorrect = SABOTAGE ? true : (n === FIXTURE.lookup.targetPage);
       lookupResult = isCorrect;
-      pushEvent(FIXTURE.lookup.id, 'lookup', isCorrect ? 'correct' : 'incorrect');
+      pushEvent(FIXTURE.lookup.id, 'lookup', isCorrect ? 'correct' : 'incorrect', lookupStartedAt);
       renderLookup();
     });
   }
@@ -864,14 +943,114 @@ window.__SXC1_BOOTED = true;
 </body></html>`;
 }
 
+// M2 gate fix (H1/H6/M5): fixed assertion NAME for the cold-load elapsed
+// check below, shared by both call sites (self-test's coldLoadFn and the
+// real run's) so --self-test-negative's expectedToFail list matches
+// whichever harness produced it.
+const COLD_ELAPSED_ASSERTION_NAME =
+  'cold-load quiz (fresh target, hash present at initial navigation): FIRST event elapsedMs >= known wait after a first-try correct answer (a false zero must fail)';
+
+// M2 gate fix (H1/M5): fixed name for the WARM companion to the above.
+// H6 (Begin never fires on a cold route) and H1 (Begin seeds the WRONG
+// clock) are two DIFFERENT defects that happened to overlap on the same
+// code path -- and H6's absence of Begin on a cold route means a cold
+// load can never actually exercise H1's "Begin . snd" swap in the
+// PRE-fix code (esPromptAt just stays at its compile-time 0 default,
+// which happens to read back as a plausible elapsed time for a
+// genuinely fresh page -- see this task's own report for the measured
+// number). A WARM navigation into a never-before-visited exercise fires
+// Begin via beginIfNeeded on EVERY SetRoute (Main.hs), pre-fix included,
+// so it is the one path that reliably exercises H1 on its own. This is
+// the other half of M5's finding ("quiz and drill FIRST-attempt events
+// are never checked for elapsedMs") that the cold-load assertion alone
+// cannot close.
+const WARM_FIRST_ELAPSED_ASSERTION_NAME =
+  'warm first-attempt quiz submit: FIRST event elapsedMs >= known wait after Begin fires via an ordinary SetRoute (a false zero must fail)';
+
+// M2 gate fix (H1/H6/M5): the behavioural core of "check 14 certifies
+// presence, not wiring" (M4) and "the browser elapsed path steps around
+// the defect" (M5). `coldH` is a harness ALREADY navigated to a
+// genuinely fresh target/page whose initial URL carried the quiz's own
+// deep link (never a warm hashchange -- see each caller's own
+// coldLoadFn for how that target was created), bundling just
+// evaluate/clickAssert/report for THAT target. Waits a KNOWN interval
+// with the prompt on screen, then answers CORRECTLY on the FIRST
+// attempt -- deliberately never a wrong answer first, which is exactly
+// what let the ONE pre-existing elapsed assertion (the lookup check
+// below) re-baseline esPromptAt to a real monotonic reading before ever
+// measuring anything (M5's own finding) -- then requires the FIRST
+// entry in #sxc1-event-log to report elapsedMs at least that interval.
+// Generous slack upward (real browsers are never exactly on time),
+// none downward: a false near-zero (H1's actual defect -- a fresh
+// attempt's clock seeded from the WALL epoch instead of the monotonic
+// one gradeStep subtracts against, clamped hugely negative to 0) must
+// fail this, which is precisely why this reads elapsedMs itself rather
+// than accepting any well-formed "M:SS" string the way the pre-existing
+// #ex-elapsed check does (and still does -- that assertion is untouched;
+// this is a new, independent one).
+async function assertColdFirstTryElapsed(coldH, fixture, waitMs) {
+  await sleep(waitMs);
+  const clickedCorrect = await coldH.clickAssert(
+    `#${fixture.quiz.correctOpt}`,
+    'cold-load quiz: click the correct option on the FIRST attempt (no wrong answer first)',
+  );
+  const clickedSubmit = clickedCorrect
+    ? await coldH.clickAssert('#btn-ex-submit', 'cold-load quiz: click #btn-ex-submit (first attempt, correct)')
+    : false;
+  if (!clickedSubmit) {
+    coldH.report(COLD_ELAPSED_ASSERTION_NAME, false, 'could not submit a first-try correct answer on the cold target');
+    return;
+  }
+  const info = await coldH.evaluate(`(async () => {
+    const start = Date.now();
+    let fb;
+    while (Date.now() - start < 5000) {
+      fb = document.querySelector('#ex-feedback');
+      if (fb && /^Correct/.test(fb.textContent)) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    let log = null;
+    try {
+      const el = document.querySelector('#sxc1-event-log');
+      log = JSON.parse(el ? el.textContent : 'null');
+    } catch { /* reported as null below */ }
+    return {
+      feedback: fb ? fb.textContent : null,
+      firstEvent: Array.isArray(log) && log.length > 0 ? log[0] : null,
+      logLength: Array.isArray(log) ? log.length : null,
+    };
+  })()`);
+  const first = info && info.firstEvent;
+  // Printed unconditionally (not just on failure) -- the actual elapsedMs
+  // this run observed is exactly the number the M5 gate finding asked for
+  // in a re-sign-off report, and report() below only echoes `observed` on
+  // FAIL.
+  console.log(`info - cold-load quiz: known wait=${waitMs}ms, observed elapsedMs=${first ? first.elapsedMs : '(no first event)'}`);
+  coldH.report(
+    COLD_ELAPSED_ASSERTION_NAME,
+    Boolean(
+      first
+      && typeof first.elapsedMs === 'number'
+      && first.elapsedMs >= waitMs
+      && first.elapsedMs < waitMs + 20000,
+    ),
+    { waitMs, info },
+  );
+}
+
 // The assertion routine shared between --self-test/--self-test-negative
 // and a real run driven with --exercise-fixture. `h` bundles everything
 // that differs between "a self-test fixture page" and "the real app" --
 // evaluate/report/goto/click/assertElement/typeText -- so this function
-// itself never knows which one it is talking to. Returns the list of
-// {name, ok} results (in order), so callers (both --self-test-negative
-// and a real run) can inspect individual outcomes, not just the total.
-async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
+// itself never knows which one it is talking to. `coldLoadFn(fixture,
+// report)`, supplied by the caller, is the ONE piece that genuinely
+// cannot be a fixed member of `h`: it must open (and clean up) its own
+// genuinely fresh target/navigation -- see runSelfTest's and main()'s
+// own versions, each built on the SAME technique NEW5's JA cold-load
+// assertion already uses. Returns the list of {name, ok} results (in
+// order), so callers (both --self-test-negative and a real run) can
+// inspect individual outcomes, not just the total.
+async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadFn) {
   const results = [];
   const report = (name, ok, observed) => {
     results.push({ name, ok });
@@ -906,6 +1085,19 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
     }
   }
 
+  // 2b (M2 gate fix H1/H6/M5). COLD LOAD + KNOWN WAIT + FIRST-TRY
+  // CORRECT ANSWER, on its OWN genuinely fresh target -- never the warm
+  // session the rest of this function drives (so it cannot leak state
+  // into, or inherit state from, any other assertion here). See
+  // assertColdFirstTryElapsed's own Haddock-style comment above for why
+  // first-try-correct (never wrong-then-right) and why elapsedMs itself,
+  // not the M:SS string.
+  if (typeof coldLoadFn === 'function') {
+    await coldLoadFn(fixture, report);
+  } else {
+    report(COLD_ELAPSED_ASSERTION_NAME, false, 'no coldLoadFn was wired for this harness');
+  }
+
   // 3. QUIZ ANSWER PATH. Ready selectors below are the KIND-specific
   // class (.kind-quiz/.kind-drill/.kind-lookup), never the shared
   // #sxc1-exercise id: that id persists across every exercise route (the
@@ -914,6 +1106,14 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
   // real run under load (the 108-route sweep just before this section):
   // it raced and read a stale drill/lookup page's content.
   await h.goto(`#/x/${fixture.quiz.deck}/${fixture.quiz.id}`, '.kind-quiz');
+  // M2 gate fix (H1/M5): a KNOWN wait with the prompt on screen before
+  // this exercise's very FIRST submit (see WARM_FIRST_ELAPSED_ASSERTION_NAME
+  // above for why this path, specifically, is the one that reliably
+  // exercises H1). The wrong-then-right sequence immediately below is
+  // otherwise untouched -- this only adds a wait and one new assertion,
+  // it changes no existing pass/fail outcome.
+  const warmFirstWaitMs = 900;
+  await sleep(warmFirstWaitMs);
   await h.clickAssert(`#${fixture.quiz.wrongOpt}`, `click the wrong quiz option (${fixture.quiz.wrongOpt})`);
   await h.clickAssert('#btn-ex-submit', 'click #btn-ex-submit (wrong answer)');
   // Submitting reads both clocks via an async IO round trip (real Main.hs:
@@ -935,6 +1135,29 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
     'wrong quiz answer: #ex-feedback starts with "Not quite" and carries class "incorrect"',
     Boolean(wrongFeedback && /^Not quite/.test(wrongFeedback.text) && wrongFeedback.cls.split(/\s+/).includes('incorrect')),
     wrongFeedback,
+  );
+  // M2 gate fix (H1/M5): this wrong-answer submit is the exercise's
+  // FIRST-EVER graded event this session (Begin just fired via the
+  // h.goto above), and gradeStep computes/re-baselines elapsedMs the
+  // same way regardless of whether the attempt was correct -- so it is
+  // exactly as diagnostic of H1 as a correct first try would be, without
+  // disturbing the existing wrong-then-right sequence at all.
+  const warmFirstEvent = await h.evaluate(`(() => {
+    const e = document.querySelector('#sxc1-event-log');
+    let log = null;
+    try { log = JSON.parse(e ? e.textContent : 'null'); } catch { /* reported as null below */ }
+    return Array.isArray(log) && log.length > 0 ? log[0] : null;
+  })()`);
+  console.log(`info - warm first-attempt quiz submit: known wait=${warmFirstWaitMs}ms, observed elapsedMs=${warmFirstEvent ? warmFirstEvent.elapsedMs : '(no first event)'}`);
+  report(
+    WARM_FIRST_ELAPSED_ASSERTION_NAME,
+    Boolean(
+      warmFirstEvent
+      && typeof warmFirstEvent.elapsedMs === 'number'
+      && warmFirstEvent.elapsedMs >= warmFirstWaitMs
+      && warmFirstEvent.elapsedMs < warmFirstWaitMs + 20000,
+    ),
+    warmFirstEvent,
   );
   // NO deselect step here (briefs/M2-signoff-fixes.json, task
   // "quiz-selection-semantics", FIX 2): the ordinary learner path is
@@ -1002,6 +1225,44 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
   })()`);
   report('going back preserves the quiz prompt with the previous selection still applied', backOk === true, backOk);
 
+  // 4b (M2 gate fix H7). RESTART IS A FRESH SCREEN. The quiz above is
+  // still sitting in its "answered correctly, previous selection
+  // restored" state from the back-navigation just above -- exactly the
+  // state a learner who wants to try again from scratch would be
+  // looking at when they click Restart. Requires the FRESH prompt to
+  // carry none of the previous attempt's grading: no #ex-feedback text,
+  // no #ex-note, no #btn-ex-next, and no option left aria-pressed=true.
+  await h.clickAssert('#btn-ex-restart', 'click #btn-ex-restart after a correct quiz answer');
+  const afterRestart = await h.evaluate(`(async () => {
+    const start = Date.now();
+    // Restart round-trips through the same async clock IO as a submit
+    // (see the #ex-feedback polls above) -- poll for the pressed option
+    // to actually clear rather than reading the instant click() returns.
+    while (Date.now() - start < 3000) {
+      const opt = document.querySelector(${JSON.stringify(`#${fixture.quiz.correctOpt}`)});
+      if (!opt || opt.getAttribute('aria-pressed') !== 'true') break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return {
+      feedbackPresent: document.querySelector('#ex-feedback') !== null,
+      notePresent: document.querySelector('#ex-note') !== null,
+      nextPresent: document.querySelector('#btn-ex-next') !== null,
+      anyPressed: Array.prototype.some.call(
+        document.querySelectorAll('.ex-option'),
+        (b) => b.getAttribute('aria-pressed') === 'true',
+      ),
+    };
+  })()`);
+  report(
+    'Restart yields a genuinely blank prompt: no #ex-feedback, no #ex-note, no #btn-ex-next, no option aria-pressed="true"',
+    Boolean(afterRestart)
+      && afterRestart.feedbackPresent === false
+      && afterRestart.notePresent === false
+      && afterRestart.nextPresent === false
+      && afterRestart.anyPressed === false,
+    afterRestart,
+  );
+
   // 5. DRILL.
   await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
   const stepCount = await h.evaluate('document.querySelectorAll("#ex-steps > li").length');
@@ -1034,8 +1295,53 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
     report('a drill step with a verify hook has a non-empty .ex-verify', Boolean(verifyText && verifyText.trim().length > 0), verifyText);
   }
 
+  // 5b (M2 gate fix H8). Confirm every REMAINING step (step 1 is already
+  // confirmed above) so the drill is COMPLETE -- citations must survive
+  // completion, not just the in-progress view (site/app/View/Exercise.hs
+  // keeps a drill's step list visible even once esDone, precisely so
+  // this stays true). Then require at least one confirmed step to carry
+  // a real citation link.
+  for (let stepN = 2; stepN <= fixture.drill.steps; stepN += 1) {
+    // Confirming a step is itself an async-clock round trip against the
+    // real app (same reasoning as the #ex-feedback polls elsewhere in
+    // this function) -- #btn-ex-confirm-N does not exist until the
+    // PREVIOUS confirm's state update has actually landed, so this polls
+    // for it rather than assuming the previous click() already settled.
+    await h.evaluate(`(async () => {
+      const start = Date.now();
+      while (Date.now() - start < 3000) {
+        if (document.querySelector(${JSON.stringify(`#btn-ex-confirm-${stepN}`)})) return true;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      return document.querySelector(${JSON.stringify(`#btn-ex-confirm-${stepN}`)}) !== null;
+    })()`);
+    await h.clickAssert(`#btn-ex-confirm-${stepN}`, `click #btn-ex-confirm-${stepN}`);
+  }
+  const drillCiteHrefs = await h.evaluate(`(async () => {
+    const start = Date.now();
+    let anchors = [];
+    while (Date.now() - start < 3000) {
+      anchors = Array.prototype.map.call(document.querySelectorAll('#ex-steps a.cite'), (a) => a.getAttribute('href'));
+      if (anchors.length > 0) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return anchors;
+  })()`);
+  report(
+    'a completed drill renders at least one a.cite whose href matches #/m/<slug>/p/<n>',
+    Array.isArray(drillCiteHrefs) && drillCiteHrefs.length > 0
+      && drillCiteHrefs.every((href) => /^#\/m\/[a-z0-9][a-z0-9-]*\/p\/[0-9]+$/.test(href)),
+    drillCiteHrefs,
+  );
+
   // 6. LOOKUP -- CDP Input.insertText, never a synthetic input event (P-D).
   await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
+
+  // 6a (M2 gate fix H8). UNGRADED: zero citations before any submission
+  // -- a lookup must not spoil its own answer.
+  const lookupCitesBefore = await h.evaluate("document.querySelectorAll('#sxc1-exercise a.cite').length");
+  report('an ungraded lookup renders zero a.cite (must not spoil its own answer)', lookupCitesBefore === 0, lookupCitesBefore);
+
   const wrongPage = fixture.lookup.targetPage > 1 ? fixture.lookup.targetPage - 1 : fixture.lookup.targetPage + 1;
   await h.typeText('#ex-find-input', String(wrongPage));
   await h.clickAssert('#btn-ex-find-submit', 'submit the wrong lookup page');
@@ -1068,6 +1374,24 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
     'lookup: correct page submits to "Correct" and #ex-elapsed matches ^[0-9]+:[0-9][0-9]$',
     Boolean(lookupRight.text && /^Correct/.test(lookupRight.text) && lookupRight.elapsed && /^[0-9]+:[0-9][0-9]$/.test(lookupRight.elapsed)),
     lookupRight,
+  );
+
+  // 6b (M2 gate fix H8). GRADED (correct): at least one a.cite whose
+  // page number agrees with the fixture -- fixture.lookup.targetPage is
+  // exactly the find: target's own page number BY CONSTRUCTION (a
+  // lookup's citation IS the thing it was asked to find; see
+  // site/test/CheckExercises.hs's findLookup / site/app/View/Exercise.hs's
+  // citesForFeedback), so this is a real agreement check, not merely a
+  // pattern match.
+  const lookupCiteAfter = await h.evaluate(`(() => {
+    const a = document.querySelector('#ex-cites a.cite');
+    return a ? { href: a.getAttribute('href') } : null;
+  })()`);
+  const lookupCiteHrefRe = new RegExp(`^#/m/[a-z0-9][a-z0-9-]*/p/${fixture.lookup.targetPage}$`);
+  report(
+    `a graded (correct) lookup renders at least one a.cite whose href matches #/m/<slug>/p/${fixture.lookup.targetPage}`,
+    Boolean(lookupCiteAfter && lookupCiteHrefRe.test(lookupCiteAfter.href)),
+    lookupCiteAfter,
   );
 
   // 7. #sxc1-event-log.
@@ -1351,10 +1675,66 @@ async function runSelfTest(opts, negative) {
   const clearViewport = () => cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
   const consoleHygiene = () => ({ ok: consoleErrors.length === 0 && exceptions.length === 0, consoleErrors, exceptions });
 
+  // M2 gate fix (H1/H6/M5): --self-test's own coldLoadFn. A SECOND,
+  // independent target attached to the SAME throwaway browser, whose
+  // INITIAL navigation URL already carries the quiz's own deep-link hash
+  // -- same technique as the real run's (below) and as NEW5's own JA
+  // cold-load assertion. Kept on a separate target (rather than
+  // Page.navigate-ing the primary session) so it can never leak state
+  // into, or read stale state left by, the rest of runExerciseAssertions.
+  const coldLoadFn = async (fx, report) => {
+    const waitMs = 1200;
+    const coldUrl = `file://${fixturePath}#/x/${fx.quiz.deck}/${fx.quiz.id}`;
+    let coldTargetId = null;
+    try {
+      const created = await cdp.send('Target.createTarget', { url: coldUrl });
+      coldTargetId = created.targetId;
+      const attached = await cdp.send('Target.attachToTarget', { targetId: coldTargetId, flatten: true });
+      const coldSessionId = attached.sessionId;
+      await cdp.send('Runtime.enable', {}, coldSessionId);
+      await cdp.send('Page.enable', {}, coldSessionId);
+      const coldEvaluate = async (expression) => {
+        const res = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, coldSessionId);
+        if (res.exceptionDetails) {
+          const d = res.exceptionDetails;
+          throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
+        }
+        return res.result ? res.result.value : undefined;
+      };
+      let booted = false;
+      const bootDeadline = Math.min(deadline, Date.now() + 20000);
+      while (Date.now() < bootDeadline) {
+        let b;
+        try { b = await coldEvaluate('window.__SXC1_BOOTED === true'); } catch { b = false; }
+        if (b === true) { booted = true; break; }
+        await sleep(50);
+      }
+      if (!booted) {
+        report(COLD_ELAPSED_ASSERTION_NAME, false, 'the self-test fixture never booted on the cold target');
+        return;
+      }
+      const coldClickAssert = async (selector, label) => {
+        const present = await coldEvaluate(`document.querySelector(${JSON.stringify(selector)}) !== null`);
+        if (!present) { report(label, false, `skipped: ${selector} not found`); return false; }
+        await coldEvaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+        report(label, true, null);
+        return true;
+      };
+      await assertColdFirstTryElapsed({ evaluate: coldEvaluate, clickAssert: coldClickAssert, report }, fx, waitMs);
+    } catch (err) {
+      report(COLD_ELAPSED_ASSERTION_NAME, false, `harness error: ${err && err.message ? err.message : String(err)}`);
+    } finally {
+      if (coldTargetId) {
+        try { await cdp.send('Target.closeTarget', { targetId: coldTargetId }); } catch { /* best effort */ }
+      }
+    }
+  };
+
   const results = await runExerciseAssertions(
     { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene },
     SELF_TEST_FIXTURE,
     negative ? null : expectedExJson,
+    coldLoadFn,
   );
 
   await runCleanup();
@@ -1367,6 +1747,15 @@ async function runSelfTest(opts, negative) {
     const expectedToFail = [
       'wrong quiz answer: #ex-feedback starts with "Not quite" and carries class "incorrect"',
       'lookup: wrong page submits to "Not quite"',
+      // M2 gate fix additions: SABOTAGE (selfTestFixtureHtml(true)) also
+      // forces elapsedMs to 0 (H1), skips clearing quiz result state on
+      // Restart (H7), and omits drill-step / graded-lookup citations
+      // (H8) -- see each's own comment in the fixture builder above.
+      COLD_ELAPSED_ASSERTION_NAME,
+      WARM_FIRST_ELAPSED_ASSERTION_NAME,
+      'Restart yields a genuinely blank prompt: no #ex-feedback, no #ex-note, no #btn-ex-next, no option aria-pressed="true"',
+      'a completed drill renders at least one a.cite whose href matches #/m/<slug>/p/<n>',
+      `a graded (correct) lookup renders at least one a.cite whose href matches #/m/<slug>/p/${SELF_TEST_FIXTURE.lookup.targetPage}`,
     ];
     const byName = new Map(results.map((r) => [r.name, r.ok]));
     const problems = [];
@@ -2298,10 +2687,74 @@ async function main() {
         const setMobileViewport = () => cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true }, sessionId);
         const clearViewport = () => cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
         const consoleHygiene = () => ({ ok: consoleErrors.length === 0 && exceptions.length === 0, consoleErrors, exceptions });
+
+        // M2 gate fix (H1/H6/M5): the real run's own coldLoadFn -- SAME
+        // technique as the JA cold-load assertion above (a fresh CDP
+        // target whose INITIAL navigation URL already carries the deep
+        // link, so this exercises whatever the app does with the
+        // startup hash / Miso's `mount` rather than an in-session
+        // hashchange -- exactly where H6 lived: a cold RExercise route
+        // used to reach viewModel without ever calling beginIfNeeded).
+        // Added to trackedSessions so its console errors/exceptions
+        // count toward the whole-run hygiene tracking too, same as the
+        // JA cold target.
+        const coldLoadFn = async (fx, cbReport) => {
+          const waitMs = 1200;
+          const coldBase = targetUrl.replace(/#.*$/, '');
+          const coldUrl = `${coldBase}#/x/${fx.quiz.deck}/${fx.quiz.id}`;
+          let coldTargetId = null;
+          try {
+            const created = await cdp.send('Target.createTarget', { url: coldUrl });
+            coldTargetId = created.targetId;
+            const attached = await cdp.send('Target.attachToTarget', { targetId: coldTargetId, flatten: true });
+            const coldSessionId = attached.sessionId;
+            trackedSessions.add(coldSessionId);
+            await cdp.send('Runtime.enable', {}, coldSessionId);
+            await cdp.send('Page.enable', {}, coldSessionId);
+
+            let booted = false;
+            const bootDeadline = Math.min(deadline, Date.now() + 20000);
+            while (Date.now() < bootDeadline) {
+              const state = await evaluate(`(() => {
+                if (typeof window.__SXC1_BOOT_ERROR === 'string') return { error: window.__SXC1_BOOT_ERROR };
+                if (window.__SXC1_BOOTED === true) return { booted: true };
+                return { pending: true };
+              })()`, coldSessionId);
+              if (state && typeof state.error === 'string') {
+                cbReport(COLD_ELAPSED_ASSERTION_NAME, false, { reason: 'cold target boot error', state });
+                return;
+              }
+              if (state && state.booted) { booted = true; break; }
+              await sleep(100);
+            }
+            if (!booted) {
+              cbReport(COLD_ELAPSED_ASSERTION_NAME, false, 'cold target failed to boot within 20s');
+              return;
+            }
+
+            const coldEvaluate = (expr) => evaluate(expr, coldSessionId);
+            const coldClickAssert = async (selector, label) => {
+              const present = await coldEvaluate(`document.querySelector(${JSON.stringify(selector)}) !== null`);
+              if (!present) { cbReport(label, false, `skipped: ${selector} not found`); return false; }
+              await coldEvaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+              cbReport(label, true, null);
+              return true;
+            };
+            await assertColdFirstTryElapsed({ evaluate: coldEvaluate, clickAssert: coldClickAssert, report: cbReport }, fx, waitMs);
+          } catch (err) {
+            cbReport(COLD_ELAPSED_ASSERTION_NAME, false, `harness error: ${err && err.message ? err.message : String(err)}`);
+          } finally {
+            if (coldTargetId) {
+              try { await cdp.send('Target.closeTarget', { targetId: coldTargetId }); } catch { /* best effort */ }
+            }
+          }
+        };
+
         await runExerciseAssertions(
           { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene },
           exerciseFixture,
           expectedExerciseJson,
+          coldLoadFn,
         );
       }
     }

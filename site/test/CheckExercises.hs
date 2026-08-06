@@ -270,21 +270,38 @@ collectFromDirs contentDir translationsDir = do
         }
 
 -- | E-ID-DUPLICATE: the same exercise id used by more than one exercise,
--- anywhere in the loaded content root. One issue per OCCURRENCE of a
--- duplicated id (fixture/report matching is over the SET of codes, so
--- the exact count does not matter, only that the code fires at all).
+-- OR the same deck slug declared by more than one deck (H4, M2 gate --
+-- EXERCISE-FORMAT.md:134 calls a deck slug "globally unique" just as
+-- plainly as it does an exercise id, but only the exercise-id half was
+-- ever checked; two decks sharing a slug validated clean, the report
+-- listed the slug twice, and @#/x/\<slug\>@ resolved to whichever deck
+-- happened to load last, silently shadowing the other), anywhere in the
+-- loaded content root. One issue per OCCURRENCE of a duplicate (of
+-- either kind) -- fixture/report matching is over the SET of codes, so
+-- the exact count does not matter, only that the code fires at all.
 globalIdDuplicateIssues :: [Deck] -> [Issue]
-globalIdDuplicateIssues decks =
-  [ mkIssue E_ID_DUPLICATE (Loc (unDeckId (dkId d)) 1)
-      ("id " <> idTxt <> " is used by more than one exercise (also in deck " <> unDeckId (dkId d) <> ")")
-  | d <- decks, e <- dkExercises d
-  , let ExId idTxt = exId e
-  , Map.findWithDefault 0 idTxt idCounts > 1
-  ]
+globalIdDuplicateIssues decks = exerciseIdDupIssues ++ deckSlugDupIssues
   where
+    exerciseIdDupIssues =
+      [ mkIssue E_ID_DUPLICATE (Loc (unDeckId (dkId d)) 1)
+          ("id " <> idTxt <> " is used by more than one exercise (also in deck " <> unDeckId (dkId d) <> ")")
+      | d <- decks, e <- dkExercises d
+      , let ExId idTxt = exId e
+      , Map.findWithDefault 0 idTxt idCounts > 1
+      ]
     idCounts :: Map Text Int
     idCounts = Map.fromListWith (+)
       [ (idTxt, 1 :: Int) | d <- decks, e <- dkExercises d, let ExId idTxt = exId e ]
+
+    deckSlugDupIssues =
+      [ mkIssue E_ID_DUPLICATE (Loc (unDeckId (dkId d)) 1)
+          ("deck slug " <> slugTxt <> " is used by more than one deck")
+      | d <- decks
+      , let DeckId slugTxt = dkId d
+      , Map.findWithDefault 0 slugTxt slugCounts > 1
+      ]
+    slugCounts :: Map Text Int
+    slugCounts = Map.fromListWith (+) [ (slugTxt, 1 :: Int) | d <- decks, let DeckId slugTxt = dkId d ]
 
 unDeckId :: DeckId -> Text
 unDeckId (DeckId t) = t
@@ -541,10 +558,12 @@ stLabel 11 = "11. route: CONSTRUCTOR assertions for the three new routes (round-
 stLabel 12 = "12. route: totality on malformed inputs"
 stLabel 13 = "13. seam: E-BLOCK-UNPARSED via parseBlocksEngineWith (the only way it is reachable)"
 stLabel 14 = "14. resolution: resolveCitation/resolveVerify/resolveChapter/resolveInventoryId on synthetic data"
+stLabel 15 = "15. clock: Begin/Restart seed esPromptAt from MonoMs (not WallMs); Advance re-baselines it (H1)"
+stLabel 16 = "16. route: empty interior/trailing segments and non-[a-z0-9-] ids are RNotFound (L3)"
 stLabel n  = show n ++ ". ?"
 
 stMaxGroup :: Int
-stMaxGroup = 14
+stMaxGroup = 16
 
 stGroupsAllOk :: Int -> [STCheck] -> Bool
 stGroupsAllOk maxG cs = all oneGroupOk [1 .. maxG]
@@ -557,6 +576,7 @@ runSelfTest = do
         [ grammarChecks, new12GuardSelfChecks, choiceChecks, recallChecks, confirmChecks
         , findPageChecks, retryChecks, hintChecks, progressEventChecks, promptIdChecks
         , routeConstructorChecks, routeTotalityChecks, blockUnparsedSeamChecks, resolutionChecks
+        , clockChecks, routeStrictnessChecks
         ]
   forM_ [1 .. stMaxGroup] $ \g -> do
     let inGroup = filter ((== g) . stGroup) allChecks
@@ -791,9 +811,13 @@ grammarChecks =
       validFp (joinL (quizChoiceLines ++ ["", "### Answer", "", "This should not be here alongside a choice list."]))
       ["E-QUIZ-MODE-AMBIGUOUS"]
 
-  , grammarCheck "E-DRILL-STEP-COUNT/one-step"
+  , -- Truncated to a single step whose field block (cite:/check:/verify:)
+    -- is also its LAST line -- honestly, that single step has no body
+    -- text of its own either, so H5's E-DRILL-STEP-EMPTY is a correct,
+    -- cascading second finding here, not a double-report of one problem.
+    grammarCheck "E-DRILL-STEP-COUNT/one-step"
       validFp (joinL (take 20 drillLines))
-      ["E-DRILL-STEP-COUNT"]
+      ["E-DRILL-STEP-COUNT", "E-DRILL-STEP-EMPTY"]
 
   , grammarCheck "E-DRILL-CHECK-MISSING/step-no-check"
       validFp (joinL (filter (not . ("check: The pad you tapped" `T.isPrefixOf`)) drillLines))
@@ -923,10 +947,10 @@ lookupExercise = Exercise
 
 choiceChecks :: [STCheck]
 choiceChecks =
-  let st0 = initialState (ExId "st-choice-ex") 1000
+  let st0 = initialState (ExId "st-choice-ex") (MonoMs 1000)
       (st1, ev1) = step choiceExercise (Toggle 0 "a") st0
       (st2, ev2) = step choiceExercise (Toggle 0 "c") st1
-      (st3, ev3) = step choiceExercise (Submit 0 1500 1000) st2
+      (st3, ev3) = step choiceExercise (Submit 0 (MonoMs 1500) (WallMs 1000)) st2
   in
   [ mkST 3 "choice/toggle-emits-no-event" (null ev1 && null ev2) ("ev1=" ++ show ev1 ++ " ev2=" ++ show ev2)
   , mkST 3 "choice/exact-set-match-is-correct"
@@ -935,7 +959,7 @@ choiceChecks =
       (case IntMap.lookup 0 (esResponses st3) of { Just (RChosen sel) -> sortT sel == ["a", "c"]; _ -> False })
       (show (esResponses st3))
   , mkST 3 "choice/wrong-set-is-incorrect"
-      (let (_, ev) = step choiceExercise (Submit 0 1500 1000) (fst (step choiceExercise (Toggle 0 "b") st0))
+      (let (_, ev) = step choiceExercise (Submit 0 (MonoMs 1500) (WallMs 1000)) (fst (step choiceExercise (Toggle 0 "b") st0))
        in case ev of { [e] -> peOutcome e == Incorrect; _ -> False })
       "selecting only b (missing a,c and including a non-correct option) must grade Incorrect"
   ] ++ singleAnswerReplaceChecks ++ multiSelectAdditiveChecks
@@ -948,12 +972,12 @@ choiceChecks =
 -- re-clicking an already-selected option must still clear it.
 singleAnswerReplaceChecks :: [STCheck]
 singleAnswerReplaceChecks =
-  let st0 = initialState (ExId "st-single-choice-ex") 1000
+  let st0 = initialState (ExId "st-single-choice-ex") (MonoMs 1000)
       -- wrong (b) then right (a), NO deselect in between -- the ordinary
       -- learner path this whole fix exists for.
       (st1, _)   = step singleChoiceExercise (Toggle 0 "b") st0
       (st2, _)   = step singleChoiceExercise (Toggle 0 "a") st1
-      (_, ev3)   = step singleChoiceExercise (Submit 0 1500 1000) st2
+      (_, ev3)   = step singleChoiceExercise (Submit 0 (MonoMs 1500) (WallMs 1000)) st2
       -- re-clicking the already-selected option clears it.
       (st1r, _)  = step singleChoiceExercise (Toggle 0 "a") st0
       (st2r, _)  = step singleChoiceExercise (Toggle 0 "a") st1r
@@ -976,12 +1000,12 @@ singleAnswerReplaceChecks =
 -- exercised here.
 multiSelectAdditiveChecks :: [STCheck]
 multiSelectAdditiveChecks =
-  let st0 = initialState (ExId "st-multi-choice-ex") 1000
+  let st0 = initialState (ExId "st-multi-choice-ex") (MonoMs 1000)
       (st1, _)  = step multiChoiceExercise (Toggle 0 "a") st0
       (st2, _)  = step multiChoiceExercise (Toggle 0 "b") st1
-      (_, evEx) = step multiChoiceExercise (Submit 0 1500 1000) st2
+      (_, evEx) = step multiChoiceExercise (Submit 0 (MonoMs 1500) (WallMs 1000)) st2
       (st1s, _) = step multiChoiceExercise (Toggle 0 "a") st0
-      (_, evSs) = step multiChoiceExercise (Submit 0 1500 1000) st1s
+      (_, evSs) = step multiChoiceExercise (Submit 0 (MonoMs 1500) (WallMs 1000)) st1s
   in
   [ mkST 3 "choice-arity/multi-select-toggle-stays-additive"
       (case IntMap.lookup 0 (esResponses st2) of { Just (RChosen sel) -> sortT sel == ["a", "b"]; _ -> False })
@@ -996,23 +1020,23 @@ multiSelectAdditiveChecks =
 
 recallChecks :: [STCheck]
 recallChecks =
-  let st0 = initialState (ExId "st-recall-ex") 1000
+  let st0 = initialState (ExId "st-recall-ex") (MonoMs 1000)
       (st1, ev1) = step recallExercise (Reveal 0) st0
-      (_, ev2) = step recallExercise (SelfGrade_ 0 Got 1500 2000) st1
+      (_, ev2) = step recallExercise (SelfGrade_ 0 Got (MonoMs 1500) (WallMs 2000)) st1
   in
   [ mkST 4 "recall/reveal-emits-no-event-but-marks-revealed" (null ev1 && IntSet.member 0 (esRevealed st1)) (show ev1)
   , mkST 4 "recall/self-grade-got-is-correct-and-revealed"
       (case ev2 of { [e] -> peOutcome e == Correct && peRevealed e; _ -> False }) (show ev2)
   , mkST 4 "recall/self-grade-missed-is-incorrect"
-      (let (_, ev) = step recallExercise (SelfGrade_ 0 Missed 1500 2000) st1
+      (let (_, ev) = step recallExercise (SelfGrade_ 0 Missed (MonoMs 1500) (WallMs 2000)) st1
        in case ev of { [e] -> peOutcome e == Incorrect; _ -> False }) "Missed must grade Incorrect"
   ]
 
 confirmChecks :: [STCheck]
 confirmChecks =
-  let st0 = initialState (ExId "st-drill-ex") 1000
-      (st1, ev1) = step drillExercise (ConfirmStep 0 ByLearner 1200 2000) st0
-      (_, ev2) = step drillExercise (ConfirmStep 1 ByDevice 1400 2200) st1
+  let st0 = initialState (ExId "st-drill-ex") (MonoMs 1000)
+      (st1, ev1) = step drillExercise (ConfirmStep 0 ByLearner (MonoMs 1200) (WallMs 2000)) st0
+      (_, ev2) = step drillExercise (ConfirmStep 1 ByDevice (MonoMs 1400) (WallMs 2200)) st1
   in
   [ mkST 5 "confirm/by-learner-is-correct"
       (case ev1 of { [e] -> peOutcome e == Correct; _ -> False }) (show ev1)
@@ -1025,18 +1049,18 @@ confirmChecks =
 
 findPageChecks :: [STCheck]
 findPageChecks =
-  let st0 = initialState (ExId "st-lookup-ex") 1000
+  let st0 = initialState (ExId "st-lookup-ex") (MonoMs 1000)
       (st1, _) = step lookupExercise (EnterPage 0 55) st0
-      (_, ev2) = step lookupExercise (SubmitPage 0 1500 2000) st1
+      (_, ev2) = step lookupExercise (SubmitPage 0 (MonoMs 1500) (WallMs 2000)) st1
       (st1w, _) = step lookupExercise (EnterPage 0 12) st0
-      (_, evw) = step lookupExercise (SubmitPage 0 1500 2000) st1w
+      (_, evw) = step lookupExercise (SubmitPage 0 (MonoMs 1500) (WallMs 2000)) st1w
   in
   [ mkST 6 "findpage/correct-page-is-correct"
       (case ev2 of { [e] -> peOutcome e == Correct; _ -> False }) (show ev2)
   , mkST 6 "findpage/wrong-page-is-incorrect"
       (case evw of { [e] -> peOutcome e == Incorrect; _ -> False }) (show evw)
   , mkST 6 "findpage/unanswered-submit-is-incorrect"
-      (case step lookupExercise (SubmitPage 0 1500 2000) st0 of { (_, [e]) -> peOutcome e == Incorrect; _ -> False })
+      (case step lookupExercise (SubmitPage 0 (MonoMs 1500) (WallMs 2000)) st0 of { (_, [e]) -> peOutcome e == Incorrect; _ -> False })
       "submitting with no EnterPage first must not crash and must grade Incorrect"
   ]
 
@@ -1046,13 +1070,13 @@ findPageChecks =
 
 retryChecks :: [STCheck]
 retryChecks =
-  let st0 = initialState (ExId "st-choice-ex") 1000
+  let st0 = initialState (ExId "st-choice-ex") (MonoMs 1000)
       (st1, _)   = step choiceExercise (Toggle 0 "b") st0                  -- wrong selection
-      (st2, ev2) = step choiceExercise (Submit 0 1200 1000) st1            -- attempt 1: wrong
+      (st2, ev2) = step choiceExercise (Submit 0 (MonoMs 1200) (WallMs 1000)) st1            -- attempt 1: wrong
       (st3, _)   = step choiceExercise (Toggle 0 "b") st2                  -- learner retries: deselect b
       (st4, _)   = step choiceExercise (Toggle 0 "a") st3
       (st5, _)   = step choiceExercise (Toggle 0 "c") st4
-      (st6, ev6) = step choiceExercise (Submit 0 1800 1600)                -- attempt 2: right
+      (st6, ev6) = step choiceExercise (Submit 0 (MonoMs 1800) (WallMs 1600))                -- attempt 2: right
                      st5
   in
   [ mkST 7 "retry/first-attempt-incorrect-does-not-lock"
@@ -1070,12 +1094,12 @@ retryChecks =
 
 hintChecks :: [STCheck]
 hintChecks =
-  let st0 = initialState (ExId "st-choice-ex") 1000
+  let st0 = initialState (ExId "st-choice-ex") (MonoMs 1000)
       (st1, ev1) = step choiceExercise (ShowHint 0) st0
       (st2, ev2) = step choiceExercise (ShowHint 0) st1
       (st3, _)   = step choiceExercise (Toggle 0 "a") st2
       (st4, _)   = step choiceExercise (Toggle 0 "c") st3
-      (_, ev5)   = step choiceExercise (Submit 0 2000 2000) st4
+      (_, ev5)   = step choiceExercise (Submit 0 (MonoMs 2000) (WallMs 2000)) st4
   in
   [ mkST 8 "hints/shown-emits-no-event" (null ev1 && null ev2) (show (ev1, ev2))
   , mkST 8 "hints/counter-is-2" (IntMap.lookup 0 (esHints st2) == Just 2) (show (esHints st2))
@@ -1089,11 +1113,11 @@ hintChecks =
 
 progressEventChecks :: [STCheck]
 progressEventChecks =
-  let st0 = initialState (ExId "st-drill-ex") 5000
-      (st1, _)  = step drillExercise (ConfirmStep 0 ByLearner 5200 6000) st0
-      (st2, ev2) = step drillExercise (Advance 6100) st1                  -- 1 of 2 prompts done -> not complete
-      (st3, _)  = step drillExercise (ConfirmStep 1 ByLearner 6300 6400) st2
-      (st4, ev4) = step drillExercise (Advance 6500) st3                  -- 2 of 2 -> exercise-completed
+  let st0 = initialState (ExId "st-drill-ex") (MonoMs 5000)
+      (st1, _)  = step drillExercise (ConfirmStep 0 ByLearner (MonoMs 5200) (WallMs 6000)) st0
+      (st2, ev2) = step drillExercise (Advance (MonoMs 6100) (WallMs 6100)) st1                  -- 1 of 2 prompts done -> not complete
+      (st3, _)  = step drillExercise (ConfirmStep 1 ByLearner (MonoMs 6300) (WallMs 6400)) st2
+      (st4, ev4) = step drillExercise (Advance (MonoMs 6500) (WallMs 6500)) st3                  -- 2 of 2 -> exercise-completed
   in
   [ mkST 9 "progress/deck-and-exercise-fields"
       (case ev4 of
@@ -1271,6 +1295,61 @@ resolutionChecks =
   , mkST 14 "resolve-inventory-id/parseIdShape"
       (parseIdShape "q-2-03" == Just ('q', 2) && parseIdShape "not-shaped" == Nothing)
       (show (parseIdShape "q-2-03", parseIdShape "not-shaped"))
+  ]
+
+--------------------------------------------------------------------------
+-- Group 15: the clock seam (H1, M2 gate). A deliberately DIVERGENT-epoch
+-- probe -- mono around 5,000, wall around 1,786,100,000,000 -- exactly
+-- like the gate's own reproduction. Demonstrated failing against the
+-- pre-fix engine (Begin/Restart seeded esPromptAt from the WALL epoch,
+-- Advance never touched esPromptAt at all) before this fix landed; see
+-- this task's final report for both outputs.
+--------------------------------------------------------------------------
+
+clockChecks :: [STCheck]
+clockChecks =
+  let mono0 = MonoMs 5000
+      wall0 = WallMs 1786100000000
+      st0   = fst (step choiceExercise (Begin mono0 wall0) (initialState (ExId "unused") (MonoMs 0)))
+      st1   = fst (step choiceExercise (Toggle 0 "a") st0)
+      st2   = fst (step choiceExercise (Toggle 0 "c") st1)
+      (_, ev3) = step choiceExercise (Submit 0 (MonoMs 13400) wall0) st2 -- mono0 + 8400
+
+      monoR = MonoMs 90000
+      wallR = WallMs 1786200000000
+      stR0  = fst (step choiceExercise (Restart monoR wallR) st2)
+      stR1  = fst (step choiceExercise (Toggle 0 "a") stR0)
+      stR2  = fst (step choiceExercise (Toggle 0 "c") stR1)
+      (_, evR3) = step choiceExercise (Submit 0 (MonoMs 105000) wallR) stR2 -- monoR + 15000
+
+      stC0 = initialState (ExId "st-drill-ex") (MonoMs 500)
+      (stC1, _) = step drillExercise (ConfirmStep 0 ByLearner (MonoMs 1000) (WallMs 1000)) stC0
+      (stC2, _) = step drillExercise (Advance (MonoMs 9000) (WallMs 9000)) stC1
+      (_, evC3) = step drillExercise (ConfirmStep 1 ByLearner (MonoMs 9700) (WallMs 9700)) stC2 -- 9000 + 700
+  in
+  [ mkST 15 "clock/begin-seeds-esPromptAt-from-monotonic-not-wall"
+      (case ev3 of { [e] -> peElapsed e == 8400; _ -> False })
+      ("first graded prompt after Begin must read peElapsed==8400 (mono-based), got " ++ show ev3)
+  , mkST 15 "clock/restart-rebaselines-esPromptAt-from-monotonic"
+      (case evR3 of { [e] -> peElapsed e == 15000; _ -> False })
+      ("first graded prompt after Restart must read peElapsed==15000 (mono-based), got " ++ show evR3)
+  , mkST 15 "clock/advance-rebaselines-esPromptAt-for-the-next-prompt"
+      (case evC3 of { [e] -> peElapsed e == 700; _ -> False })
+      ("second drill step must read peElapsed==700 (timed from Advance, not the first step's submit), got " ++ show evC3)
+  ]
+
+--------------------------------------------------------------------------
+-- Group 16: route strictness (L3, M2 gate) -- empty interior/trailing
+-- segments and non-[a-z0-9-] route ids must all classify as 'RNotFound',
+-- alongside the existing constructor/round-trip assertions (groups 11-12).
+--------------------------------------------------------------------------
+
+routeStrictnessChecks :: [STCheck]
+routeStrictnessChecks =
+  [ mkST 16 ("route-strict/" ++ T.unpack input ++ "-is-not-found")
+      (case parseRoute input of { RNotFound _ -> True; _ -> False })
+      ("expected RNotFound, got " ++ show (parseRoute input))
+  | input <- ["#/x//a/b", "#/x/a//b", "#/x/A B/c"]
   ]
 
 --------------------------------------------------------------------------

@@ -69,12 +69,20 @@ setHash h = do
 -- millisecond values as action arguments, exactly as specified.
 --------------------------------------------------------------------------
 
-readClocks :: IO (Integer, Integer)
+-- | H1: returns the DISTINCT 'MonoMs'\/'WallMs' newtypes (not a bare
+-- @(Integer, Integer)@ pair) precisely so a call site can no longer pick
+-- the wrong half by position -- @'Begin' . 'snd'@ (the exact H1 defect:
+-- seeding a fresh attempt's prompt clock from the WALL epoch instead of
+-- the monotonic one 'gradeStep' subtracts against) no longer typechecks,
+-- because 'snd' on this pair yields a 'WallMs' and every clock-consuming
+-- 'SXC1.Exercise.Engine.ExerciseAction' constructor wants its first
+-- clock argument as 'MonoMs'.
+readClocks :: IO (MonoMs, WallMs)
 readClocks = do
   monoNs <- getMonotonicTimeNSec
   d      <- Date.new
   wallMs <- Date.getTime d
-  pure (toInteger monoNs `div` 1000000, round wallMs)
+  pure (MonoMs (toInteger monoNs `div` 1000000), WallMs (round wallMs))
 
 --------------------------------------------------------------------------
 -- THE M4 FORWARD HOOK (briefs/M2-manifest.json). Parsed and validated in
@@ -161,7 +169,7 @@ data Action
   | ToggleJA
   | NoOp
   | ExBatch ExId [ExerciseAction]
-  | ExClocked ExId (Integer -> Integer -> [ExerciseAction])
+  | ExClocked ExId (MonoMs -> WallMs -> [ExerciseAction])
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
@@ -176,10 +184,25 @@ main = do
   _ <- dvAvailable noDeviceVerifier
   startApp defaultEvents (readerApp sink (parseRoute h))
 
+-- | H6: a cold @RExercise@ route (a deep link, or the very first paint --
+-- Miso's own \"hashchange\" DOM event never fires for the page's INITIAL
+-- hash, only for later navigation) used to reach 'viewModel' without ever
+-- calling 'beginIfNeeded', so its 'ExerciseState' came straight from
+-- @'initialState' exid 0@ -- a zero 'MonoMs' baseline dated from the UNIX
+-- epoch, not from display time. Miso's 'mount' field fires ONE action the
+-- moment the component mounts (the initial paint), before any DOM event
+-- can occur; dispatching the SAME 'SetRoute' the "hashchange" 'Sub' would
+-- have dispatched for this route re-runs 'beginIfNeeded' exactly once at
+-- startup, with a real 'readClocks' reading, closing the gap deliberately
+-- instead of "correctly by coincidence" (a cold load happening to measure
+-- runtime age as prompt age only because the browser's monotonic origin
+-- is page load -- see this task's final report).
 readerApp :: ProgressSink -> Route -> App Model Action
 readerApp sink r0 =
   (component (Model r0 Map.empty Map.empty []) (updateModel sink) viewModel)
-    { subs = [ windowSub "hashchange" emptyDecoder (const HashChanged) ] }
+    { subs  = [ windowSub "hashchange" emptyDecoder (const HashChanged) ]
+    , mount = Just (SetRoute r0)
+    }
 
 findExerciseById :: [Deck] -> ExId -> Maybe Exercise
 findExerciseById decks eid = find ((== eid) . exId) (concatMap dkExercises decks)
@@ -230,7 +253,9 @@ beginIfNeeded (RExercise _ exSlug) = do
     then pure ()
     else case findExerciseById exerciseCorpus exid of
       Nothing -> pure ()
-      Just _  -> io (ExBatch exid . (: []) . Begin . snd <$> readClocks)
+      Just _  -> io $ do
+        (mono, wall) <- readClocks
+        pure (ExBatch exid [Begin mono wall])
 beginIfNeeded _ = pure ()
 
 -- | Apply a list of pure engine steps IN ORDER against one pre-batch
@@ -238,18 +263,40 @@ beginIfNeeded _ = pure ()
 -- event's per-prompt outcome (for the runner's feedback), append the
 -- events to the capped log, and forward them to the M3 sink -- the ONE
 -- call site that ever touches 'sinkRecord'.
+--
+-- H7: 'Begin'\/'Restart' reset 'SXC1.Exercise.Engine.ExerciseState' but
+-- (correctly -- see "SXC1.Exercise.Engine"'s Haddock) emit no
+-- 'ProgressEvent', so 'mExResults' -- a flat, cross-exercise map keyed by
+-- 'PromptId' text, never cleared on its own -- used to keep the PREVIOUS
+-- attempt's outcome around: a learner who restarted saw a brand new,
+-- unselected prompt that was ALREADY reporting "Correct.", with the
+-- explanation and a working Next button, and could complete a "fresh"
+-- attempt without answering. Fixed by clearing exactly this exercise's
+-- prompt results (its 'PromptId's all share the @\<exercise-id\>#@
+-- prefix -- see 'SXC1.Exercise.Types.promptIdFor') whenever the batch
+-- contains a 'Begin' or 'Restart', rather than switching 'View.Exercise'
+-- to a second, attempt-scoped result shape: this keeps the fix entirely
+-- in the one place that already owns 'mExResults'' lifetime, and
+-- "View.Exercise" (already correct: it only ever renders whatever
+-- @mResult@ it is handed) needs no change at all.
 applyExActions :: ProgressSink -> ExId -> [ExerciseAction] -> Effect parent props Model Action
 applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
   Nothing -> pure ()
   Just ex -> do
     states <- gets mExStates
-    let key          = unExId exid
-        st0          = Map.findWithDefault (initialState exid 0) key states
-        (st1, evsAll) = foldl' applyOne (st0, []) acts
+    let key            = unExId exid
+        st0            = Map.findWithDefault (initialState exid (MonoMs 0)) key states
+        (st1, evsAll)   = foldl' applyOne (st0, []) acts
         applyOne (st, evs) act = let (st', ev') = step ex act st in (st', evs ++ ev')
+        startsFresh a = case a of { Begin _ _ -> True; Restart _ _ -> True; _ -> False }
+        thisExPromptPrefix = key <> "#"
+        clearStale = any startsFresh acts
+        dropStale rs
+          | clearStale = Map.filterWithKey (\k _ -> not (thisExPromptPrefix `T.isPrefixOf` k)) rs
+          | otherwise  = rs
     modify (\m -> m
       { mExStates  = Map.insert key st1 (mExStates m)
-      , mExResults = foldr recordResult (mExResults m) evsAll
+      , mExResults = foldr recordResult (dropStale (mExResults m)) evsAll
       , mEventLog  = capEvents (mEventLog m ++ evsAll)
       })
     io_ (mapM_ (sinkRecord sink) evsAll)
@@ -269,14 +316,14 @@ exHandlersFor exid = ExHandlers
   , exOnReveal     = \i -> ExBatch exid [Reveal i]
   , exOnGot        = \i -> ExClocked exid (\mono wall -> [SelfGrade_ i Got mono wall])
   , exOnMissed     = \i -> ExClocked exid (\mono wall -> [SelfGrade_ i Missed mono wall])
-  , exOnConfirm    = \i -> ExClocked exid (\mono wall -> [ConfirmStep i ByLearner mono wall, Advance wall])
+  , exOnConfirm    = \i -> ExClocked exid (\mono wall -> [ConfirmStep i ByLearner mono wall, Advance mono wall])
   , exOnFindInput  = \i txt -> case parseDigits (fromMisoString txt) of
       Just n  -> ExBatch exid [EnterPage i n]
       Nothing -> NoOp
   , exOnFindSubmit = \i -> ExClocked exid (\mono wall -> [SubmitPage i mono wall])
   , exOnShowHint   = \i -> ExBatch exid [ShowHint i]
-  , exOnNext       = ExClocked exid (\_ wall -> [Advance wall])
-  , exOnRestart    = ExClocked exid (\_ wall -> [Restart wall])
+  , exOnNext       = ExClocked exid (\mono wall -> [Advance mono wall])
+  , exOnRestart    = ExClocked exid (\mono wall -> [Restart mono wall])
   }
 
 -- | The current prompt's last graded result, if any -- looked up by
@@ -294,7 +341,7 @@ exerciseBodyView m route = case route of
   RDeck slug -> Just (Exercise.viewDeck exerciseCorpus slug)
   RExercise deckSlug exSlug ->
     let exid   = ExId exSlug
-        st     = Map.findWithDefault (initialState exid 0) (unExId exid) (mExStates m)
+        st     = Map.findWithDefault (initialState exid (MonoMs 0)) (unExId exid) (mExStates m)
         result = currentResult m exid st
     in Just (Exercise.viewExerciseRunner (exHandlersFor exid) exerciseCorpus deckSlug exSlug st result)
   _ -> Nothing

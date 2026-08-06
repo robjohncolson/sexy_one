@@ -5,17 +5,28 @@
 -- "SXC1.Content.Stats"), and this module REUSES that module's
 -- 'SXC1.Content.Stats.jsonEscape' rather than writing a second escaper.
 --
--- The closed code set is a real Haskell enumeration ('IssueCode',
--- 'allIssueCodes' via 'Bounded'\/'Enum'), not a hand-written string list
--- that can drift from what the validator actually emits -- see
--- 'listCodesLines', which @exercise-check --list-codes@ prints verbatim
--- (plus one dynamically-generated @E-TERM.\<rule_id\>@ line per loaded
--- terminology rule).
+-- The closed code set is a real Haskell 'IssueCode' enumeration --
+-- 'allIssueCodes' lists every STATIC (nullary) constructor by hand (see
+-- its own Haddock for why 'Bounded'\/'Enum' can no longer do this
+-- mechanically now that 'E_TERM' carries a field), plus the one DYNAMIC
+-- family member, 'E_TERM' -- and, critically, an 'Issue' can only ever be
+-- constructed via 'mkIssue' from a real 'IssueCode' value: the module
+-- does not export the raw 'Issue' data constructor. See 'listCodesLines',
+-- which @exercise-check --list-codes@ prints verbatim (one line per
+-- static code, plus one dynamically-generated @E-TERM.\<rule_id\>@ line
+-- per loaded terminology rule).
 module SXC1.Exercise.Report
   ( -- * Locations
     Loc (..)
-    -- * Issues
-  , Issue (..)
+    -- * Issues -- 'Issue' exports ACCESSORS ONLY (never the raw data
+    -- constructor -- see 'Issue''s own Haddock and 'mkIssue'), so every
+    -- 'Issue' anywhere in the program is guaranteed to have been built by
+    -- 'mkIssue' from a real 'IssueCode'.
+  , Issue
+  , isCode
+  , isFile
+  , isLine
+  , isDetail
   , mkIssue
   , renderIssue
     -- * The closed code set
@@ -59,13 +70,24 @@ data Loc = Loc
 -- Issues
 --------------------------------------------------------------------------
 
--- | One validator finding. 'isCode' is a raw code STRING -- for the 39
--- static codes it is always exactly 'codeText' of some 'IssueCode'
--- (built via 'mkIssue'); for terminology violations it is
--- @\"E-TERM.\" <> rule_id@ directly (there is no per-rule 'IssueCode'
--- constructor -- the rule set is data, loaded from
--- @content\/terminology-rules.tsv@, not fixed at compile time). Either
--- way, 'isCode' is what @--fixtures@' exact-code-set matching compares.
+-- | One validator finding. 'isCode' is a raw code STRING, always exactly
+-- 'codeText' of some 'IssueCode' -- for the closed, static family (built
+-- via 'mkIssue' from one of the nullary constructors below) and for
+-- terminology violations alike (@\"E-TERM.\" <> rule_id@, via 'mkIssue'
+-- and the 'E_TERM' constructor -- there is no per-rule static
+-- constructor, since the rule set is data loaded from
+-- @content\/terminology-rules.tsv@, not fixed at compile time, but it is
+-- still a real 'IssueCode' value, not a bare string smuggled in some
+-- other way). 'isCode' is what @--fixtures@' exact-code-set matching
+-- compares.
+--
+-- (M2 gate M2): the data CONSTRUCTOR 'Issue' is deliberately NOT
+-- exported (see the module export list -- only the field accessors are)
+-- so an 'Issue' can only ever be built by 'mkIssue', which only ever
+-- accepts a real 'IssueCode'. Before this, any module could construct
+-- @Issue \"whatever I like\" file line detail@ directly, a code invisible
+-- to both the coverage invariant and the one-seam cap this very type is
+-- supposed to make honest.
 data Issue = Issue
   { isCode   :: !Text
   , isFile   :: !Text
@@ -84,10 +106,19 @@ renderIssue i = isFile i <> ":" <> T.pack (show (isLine i)) <> ": " <> isCode i 
 -- The closed code set
 --------------------------------------------------------------------------
 
--- | Every code the validator can emit, EXCEPT the data-driven
--- @E-TERM.\<rule_id\>@ family (one per row of
--- @content\/terminology-rules.tsv@, handled separately -- see
--- 'listCodesLines').
+-- | Every code the validator can emit. The first 40 constructors are the
+-- CLOSED, static, nullary family; 'E_TERM' is the one DYNAMIC family
+-- member (M2 gate M2), carrying the @content\/terminology-rules.tsv@ row
+-- id its violation came from -- e.g. @E_TERM \"term-machine\"@ renders as
+-- @\"E-TERM.term-machine\"@ (see 'codeText'). Because 'E_TERM' carries a
+-- field, this type can no longer derive 'Bounded'\/'Enum' (both require
+-- every constructor to be nullary) the way it did when the dynamic
+-- family was smuggled in as a raw 'Text' code bypassing this type
+-- entirely -- 'allIssueCodes' below is therefore the static family
+-- listed by hand, exercised by both @--list-codes@ and the
+-- @--fixtures@ coverage invariant (@scripts\/check-site.sh@), so a
+-- constructor added here without being added there is caught
+-- immediately rather than silently under-enumerated.
 data IssueCode
   = E_FILE_TITLE | E_FILE_BAD_NAME | E_DECK_EMPTY
   | E_FIELD_UNKNOWN | E_FIELD_MISSING | E_FIELD_DUPLICATE | E_FIELD_EMPTY | E_FIELD_SYNTAX
@@ -97,14 +128,15 @@ data IssueCode
   | E_ROLE_UNKNOWN | E_ROLE_MISSING | E_ROLE_REPEATED
   | E_CHOICE_COUNT | E_CHOICE_NO_CORRECT | E_CHOICE_DUPLICATE
   | E_QUIZ_MODE_AMBIGUOUS
-  | E_DRILL_STEP_COUNT | E_DRILL_CHECK_MISSING
+  | E_DRILL_STEP_COUNT | E_DRILL_CHECK_MISSING | E_DRILL_STEP_EMPTY
   | E_VERIFY_SYNTAX | E_VERIFY_CC_UNKNOWN | E_VERIFY_NOTE_RANGE
   | E_LOOKUP_SPOILER | E_BODY_INDENTED_HEADING
   | E_INDEX_MISSING | E_INDEX_ORPHAN | E_INDEX_DANGLING | E_ID_DUPLICATE
   | E_RULE_UNGROUNDED
   | E_ID_NOT_IN_INVENTORY | E_ID_RETIRED | E_ID_TYPE_MISMATCH | E_ID_CHAPTER_MISMATCH
   | E_BLOCK_UNPARSED
-  deriving (Eq, Show, Enum, Bounded)
+  | E_TERM !Text
+  deriving (Eq, Show)
 
 -- | The three coverage classes -- see @briefs\/M2-manifest.json@'s
 -- \"COVERAGE CLASSES\" section. 'SeamClass' is capped at exactly one
@@ -112,12 +144,28 @@ data IssueCode
 data IssueClass = FileClass | DirClass | SeamClass
   deriving (Eq, Show)
 
--- | Every 'IssueCode', via 'Bounded'\/'Enum' -- this is what makes
--- 'listCodesLines' a real enumeration of the type rather than a
--- hand-written list that can silently stop matching what the validator
--- emits.
+-- | Every STATIC 'IssueCode' -- everything except the dynamic 'E_TERM'
+-- family, which @--list-codes@ enumerates separately from the loaded
+-- rule set (see 'listCodesLines'). See the 'IssueCode' Haddock for why
+-- this is a hand-written list rather than @[minBound .. maxBound]@.
 allIssueCodes :: [IssueCode]
-allIssueCodes = [minBound .. maxBound]
+allIssueCodes =
+  [ E_FILE_TITLE, E_FILE_BAD_NAME, E_DECK_EMPTY
+  , E_FIELD_UNKNOWN, E_FIELD_MISSING, E_FIELD_DUPLICATE, E_FIELD_EMPTY, E_FIELD_SYNTAX
+  , E_TYPE_UNKNOWN, E_ID_SYNTAX
+  , E_CITE_SYNTAX, E_CITE_SLUG, E_CITE_PAGE, E_CITE_ANCHOR
+  , E_CHAPTER_UNKNOWN
+  , E_ROLE_UNKNOWN, E_ROLE_MISSING, E_ROLE_REPEATED
+  , E_CHOICE_COUNT, E_CHOICE_NO_CORRECT, E_CHOICE_DUPLICATE
+  , E_QUIZ_MODE_AMBIGUOUS
+  , E_DRILL_STEP_COUNT, E_DRILL_CHECK_MISSING, E_DRILL_STEP_EMPTY
+  , E_VERIFY_SYNTAX, E_VERIFY_CC_UNKNOWN, E_VERIFY_NOTE_RANGE
+  , E_LOOKUP_SPOILER, E_BODY_INDENTED_HEADING
+  , E_INDEX_MISSING, E_INDEX_ORPHAN, E_INDEX_DANGLING, E_ID_DUPLICATE
+  , E_RULE_UNGROUNDED
+  , E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH
+  , E_BLOCK_UNPARSED
+  ]
 
 codeText :: IssueCode -> Text
 codeText c = case c of
@@ -145,6 +193,7 @@ codeText c = case c of
   E_QUIZ_MODE_AMBIGUOUS    -> "E-QUIZ-MODE-AMBIGUOUS"
   E_DRILL_STEP_COUNT       -> "E-DRILL-STEP-COUNT"
   E_DRILL_CHECK_MISSING    -> "E-DRILL-CHECK-MISSING"
+  E_DRILL_STEP_EMPTY       -> "E-DRILL-STEP-EMPTY"
   E_VERIFY_SYNTAX          -> "E-VERIFY-SYNTAX"
   E_VERIFY_CC_UNKNOWN      -> "E-VERIFY-CC-UNKNOWN"
   E_VERIFY_NOTE_RANGE      -> "E-VERIFY-NOTE-RANGE"
@@ -160,6 +209,7 @@ codeText c = case c of
   E_ID_TYPE_MISMATCH        -> "E-ID-TYPE-MISMATCH"
   E_ID_CHAPTER_MISMATCH     -> "E-ID-CHAPTER-MISMATCH"
   E_BLOCK_UNPARSED           -> "E-BLOCK-UNPARSED"
+  E_TERM rid                 -> "E-TERM." <> rid
 
 issueClassOf :: IssueCode -> IssueClass
 issueClassOf c = case c of
@@ -190,8 +240,9 @@ classText SeamClass = "seam"
 -- supplies them.
 listCodesLines :: [Text] -> [Text]
 listCodesLines ruleIds =
-  [ codeText c <> "\t" <> classText (issueClassOf c) | c <- allIssueCodes ]
-    ++ [ "E-TERM." <> rid <> "\tfile" | rid <- ruleIds ]
+  [ oneLine c | c <- allIssueCodes ] ++ [ oneLine (E_TERM rid) | rid <- ruleIds ]
+  where
+    oneLine c = codeText c <> "\t" <> classText (issueClassOf c)
 
 --------------------------------------------------------------------------
 -- The JSON report
@@ -224,6 +275,19 @@ unDeckId (DeckId t) = t
 unExId :: ExId -> Text
 unExId (ExId t) = t
 
+-- | (M2 gate M1, model half): 'totCitations' counts DECLARATIONS -- one
+-- per @cite:@\/@find:@ line on disk -- not resolved citation OBJECTS.
+-- Those are not the same count: a quiz\/lookup's single 'Prompt' is
+-- built with 'prCites' set to the SAME list as its 'Exercise''s 'exCites'
+-- (see "SXC1.Exercise.Parse"), so naively summing 'exCites' and
+-- 'prCites' everywhere double-counted every quiz\/lookup @cite:@ line; a
+-- lookup's @find:@ target, meanwhile, lives only in its prompt's
+-- 'FindPage' body and was never counted at all. Fixed by counting
+-- 'exCites' exactly once per exercise (correct for quiz, drill AND
+-- lookup -- a drill's OWN exercise-level @cite:@ is distinct from its
+-- per-step ones), adding each drill step's 'prCites' separately (those
+-- genuinely are distinct declarations from the exercise-level ones), and
+-- adding exactly one per lookup's @find:@ target.
 buildTotals :: [Deck] -> Totals
 buildTotals decks = Totals
   { totDecks       = length decks
@@ -232,14 +296,17 @@ buildTotals decks = Totals
   , totQuiz        = length [ () | e <- exs, exKind e == KQuiz ]
   , totDrill       = length [ () | e <- exs, exKind e == KDrill ]
   , totLookup      = length [ () | e <- exs, exKind e == KLookup ]
-  , totCitations   = sum (map (length . dkCites) decks) + sum (map (length . exCites) exs)
-                       + sum (map (length . prCites) prompts)
+  , totCitations   = sum (map (length . dkCites) decks)
+                       + sum (map (length . exCites) exs)
+                       + sum [ length (prCites p) | e <- exs, exKind e == KDrill, p <- exPrompts e ]
+                       + length [ () | e <- exs, exKind e == KLookup, p <- exPrompts e, isFindPage (prBody p) ]
   , totVerifyHooks = length [ () | Prompt { prBody = Confirm { pcVerify = Just _ } } <- prompts ]
   , totChapters    = nub (map dkChapter decks)
   }
   where
     exs     = concatMap dkExercises decks
     prompts = concatMap exPrompts exs
+    isFindPage b = case b of { FindPage _ _ -> True; _ -> False }
 
 buildDeckSummaries :: [Deck] -> [DeckSummary]
 buildDeckSummaries decks =

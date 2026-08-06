@@ -201,9 +201,17 @@ viewExerciseRunner h decks deckSlug exSlug st mResult =
 
         mAttempted = case mResult of { Just _ -> True; Nothing -> False }
 
+        -- H8: a drill's step list (with each confirmed step's own
+        -- citations -- see 'drillStepsEl') stays visible even once the
+        -- WHOLE drill is done, unlike quiz/lookup (which hide their
+        -- single prompt once 'esDone'): a completed drill is the one
+        -- kind whose in-progress view already doubles as its own log of
+        -- what was done, and hiding it at completion is exactly what
+        -- made a finished drill's citations unreachable (H8 gate
+        -- finding: "still 0 after all three steps are confirmed").
         bodyEls ex'
-          | esDone st            = []
           | exKind ex' == KDrill = [ drillStepsEl ex' ]
+          | esDone st            = []
           | otherwise            = case safeIndex (exPrompts ex') cursor of
               Nothing -> []
               Just prompt -> kindBodyEl cursor prompt ++ sharedFeedbackEls
@@ -220,12 +228,25 @@ viewExerciseRunner h decks deckSlug exSlug st mResult =
                    , H.button_ [ P.id_ "btn-ex-missed", E.onClick (exOnMissed h i) ] [ "I missed it" ]
                    ]
               else [ H.button_ [ P.id_ "btn-ex-reveal", E.onClick (exOnReveal h i) ] [ "Reveal answer" ] ]
+          -- M6: 'prStem' here is LITERALLY 'exIntro' (both are the same
+          -- 'exIntroBlocks' value out of "SXC1.Exercise.Parse" -- a
+          -- lookup has exactly one 'Prompt' and no separate task text of
+          -- its own), so re-rendering it a second time under
+          -- @#ex-find-task@ duplicated @#ex-stem@'s own text verbatim,
+          -- AND did so by handing block-level content (which can include
+          -- a @\<p\>@ of its own) to an outer @\<p\>@ -- invalid nesting.
+          -- Fixed by making @#ex-find-task@ (id kept, per the gate
+          -- finding) a plain, non-block wrapper around the genuinely
+          -- distinct content this screen actually adds: the page-number
+          -- input and its label.
           FindPage _target _limit ->
-            [ H.p_ [ P.id_ "ex-find-task" ] (Blocks.renderBlocks "" (prStem prompt))
-            , H.input_ [ P.id_ "ex-find-input", P.type_ "number", textProp "inputmode" "numeric"
-                       , E.onInput (exOnFindInput h i)
-                       ]
-            , H.button_ [ P.id_ "btn-ex-find-submit", E.onClick (exOnFindSubmit h i) ] [ "Submit" ]
+            [ H.div_ [ P.id_ "ex-find-task" ]
+                [ H.label_ [ textProp "for" "ex-find-input" ] [ "Page number:" ]
+                , H.input_ [ P.id_ "ex-find-input", P.type_ "number", textProp "inputmode" "numeric"
+                           , E.onInput (exOnFindInput h i)
+                           ]
+                , H.button_ [ P.id_ "btn-ex-find-submit", E.onClick (exOnFindSubmit h i) ] [ "Submit" ]
+                ]
             ] ++ elapsedEl
           Confirm _ _ -> []  -- drills never reach here; see drillStepsEl
 
@@ -244,10 +265,23 @@ viewExerciseRunner h decks deckSlug exSlug st mResult =
               Just (_, elapsedMs) -> [ H.p_ [ P.id_ "ex-elapsed" ] [ text (ms (formatElapsed elapsedMs)) ] ]
               Nothing              -> []
 
+        -- H8: a lookup's own citation is the @find:@ TARGET
+        -- ('fpTarget', embedded in its one prompt's 'PromptBody'), never
+        -- 'exCites' (which a lookup's optional @cite:@ field -- often
+        -- absent -- populates instead), so 'exCites' alone left a
+        -- lookup's @#ex-cites@ empty even after a correct answer. Folded
+        -- into the SAME list 'exCites' already renders through (keeping
+        -- one @#ex-cites@ container, per the gate finding), gated by the
+        -- SAME 'mAttempted' every other post-grading element already
+        -- uses -- AFTER GRADING ONLY, since the id under @#/m/<slug>/p/<n>@
+        -- would otherwise hand the learner the answer before they submit.
+        citesForFeedback = exCites ex ++
+          [ t | Just p <- [safeIndex (exPrompts ex) cursor], FindPage t _ <- [prBody p] ]
+
         sharedFeedbackEls =
           feedbackEl
             ++ [ H.div_ [ P.id_ "ex-note" ] (Blocks.renderBlocks "" (exNote ex)) | mAttempted, not (null (exNote ex)) ]
-            ++ [ H.ul_ [ P.id_ "ex-cites" ] (map renderCite (exCites ex)) | mAttempted, not (null (exCites ex)) ]
+            ++ [ H.ul_ [ P.id_ "ex-cites" ] (map renderCite citesForFeedback) | mAttempted, not (null citesForFeedback) ]
             ++ [ H.button_ [ P.id_ "btn-ex-next", E.onClick (exOnNext h) ] [ "Next" ] | mAttempted ]
 
         feedbackEl = case mResult of
@@ -275,9 +309,30 @@ viewExerciseRunner h decks deckSlug exSlug st mResult =
                           (Blocks.renderInlines "" checkInlines)
                       ]
                       ++ verifyEl stepN mVerify
+                      ++ citesEl stepN (stepN - 1) prompt
                       ++ confirmEl (stepN - 1)
                     _ -> []
               )
+
+            -- H8: a drill's own citations live per-step, in each
+            -- 'Prompt''s 'prCites' -- 'sharedFeedbackEls' (the only
+            -- citation renderer before this fix) is never reached by a
+            -- drill body at all. Rendered AT\/AFTER CONFIRMATION (once
+            -- the cursor has moved past this step -- confirming a step
+            -- and advancing past it are one undivided action from the
+            -- learner's perspective, see Main.hs's 'exOnConfirm'), never
+            -- before, and NOT under the shared @#ex-cites@ id (which is
+            -- unique per page and already spoken for by the quiz\/lookup
+            -- path): a drill can confirm several steps, each with its
+            -- own citation, so each gets its own per-step, class-based
+            -- list instead. Keeps the same @<a class="cite" ...>@ anchor
+            -- contract via 'renderCite'.
+            citesEl stepN idx0 prompt
+              | idx0 < esCursor st, not (null (prCites prompt)) =
+                  [ H.ul_ [ P.class_ "ex-step-cites", P.id_ (ms ("ex-step-" <> T.pack (show stepN) <> "-cites")) ]
+                      (map renderCite (prCites prompt))
+                  ]
+              | otherwise = []
 
             verifyEl _stepN Nothing = []
             verifyEl stepN (Just _v) =

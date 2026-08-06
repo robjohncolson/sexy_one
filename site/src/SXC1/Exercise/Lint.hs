@@ -153,8 +153,12 @@ wordBoundedHits needle haystack =
       | otherwise       = Just (T.index haystack i)
     boundaryOk = maybe True (not . isWordChar)
 
+-- | (M2 gate M2): built via 'mkIssue' -- not the raw 'Issue' constructor,
+-- which "SXC1.Exercise.Report" no longer exports -- so every @E-TERM.*@
+-- finding is a real 'E_TERM' 'IssueCode' value, not an arbitrary string
+-- smuggled past the closed code set.
 termIssue :: Rule -> Loc -> Text -> Issue
-termIssue r loc detail = Issue ("E-TERM." <> ruleId r) (locFile loc) (locLine loc) detail
+termIssue r loc detail = mkIssue (E_TERM (ruleId r)) loc detail
 
 forbidDetail :: Rule -> Text -> Text
 forbidDetail r p = "forbidden phrase \"" <> p <> "\" -- " <> ruleMessage r
@@ -209,8 +213,21 @@ lintBlocks rules loc blocks = lintText rules loc (blocksText blocks)
 -- text or a figure caption still might, so both are included for safety).
 --------------------------------------------------------------------------
 
+-- | (M2 gate H3, second half): CONCATENATED, not space-joined. Each
+-- 'Inline' node already carries its own literal whitespace (a plain
+-- 'Str' token includes any leading\/trailing space right up to the next
+-- markup marker -- see "SXC1.Content.Markdown"'s 'parseInline'), so
+-- @\"the \" : Strong [Str \"machine\"] : []@ (i.e. @the **machine**@)
+-- must concatenate back to exactly @\"the machine\"@, matching how it
+-- RENDERS. The previous @T.intercalate \" \"@ inserted an EXTRA space at
+-- every markup boundary, turning that into @\"the  machine\"@ (a double
+-- space) -- which silently defeated the terminology linter for any
+-- multi-word forbidden phrase (e.g. @\"the machine\"@) the moment an
+-- author wrapped so much as one word of it in @**...**@ or @\`...\`@,
+-- because 'findOccurrencesCI' is an exact (post-lowercasing) substring
+-- search. Rendering-equivalent prose must now lint identically.
 inlinesText :: [Inline] -> Text
-inlinesText = T.intercalate " " . map inlineText
+inlinesText = T.concat . map inlineText
 
 inlineText :: Inline -> Text
 inlineText i = case i of

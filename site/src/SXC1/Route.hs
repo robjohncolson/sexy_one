@@ -24,22 +24,67 @@ data Route
   | RNotFound !Text
   deriving (Eq, Show)
 
--- | Split on @\/@ after dropping a leading @#@, ignore empty segments,
--- accept only all-digit page numbers. Total: returns a value for any
--- input, never throws.
+-- | Split on @\/@ after dropping a leading @#@, and REJECT (as
+-- 'RNotFound', never by throwing) any input whose segments -- once the
+-- one leading empty component the leading @\/@ itself always produces is
+-- dropped -- still contain an empty component: @#\/x\/\/a@,
+-- @#\/x\/a\/\/b@ and any other doubled or trailing @\/@ all fail to
+-- classify, rather than silently collapsing (L3 gate finding: the OLD
+-- 'nonEmptySegments' filtered out EVERY empty component wherever it
+-- occurred, so @#\/x\/\/preparation-power\/q-1-03@ classified exactly
+-- like @#\/x\/preparation-power\/q-1-03@ and rendered the exercise
+-- instead of the not-found panel). Total: returns a value for any input,
+-- never throws, never calls 'read'.
 parseRoute :: Text -> Route
-parseRoute raw = classify (nonEmptySegments (fromMaybe raw (T.stripPrefix "#" raw)))
+parseRoute raw = case segmentsOf stripped of
+  Just segs -> classify segs
+  -- Path text carries no leading "/" (renderRoute's RNotFound case adds
+  -- exactly one), matching every other 'notFound' call in 'classify' --
+  -- this makes "#/x//a" round-trip back to itself via 'renderRoute'
+  -- instead of picking up a doubled leading slash.
+  Nothing   -> RNotFound (fromMaybe stripped (T.stripPrefix "/" stripped))
+  where
+    stripped = fromMaybe raw (T.stripPrefix "#" raw)
 
-nonEmptySegments :: Text -> [Text]
-nonEmptySegments = filter (not . T.null) . T.splitOn "/"
+-- | @Nothing@ if the text has a leading @\/@ but any segment after it is
+-- empty (a doubled or trailing @\/@); @Just@ the segments otherwise.
+-- Three "no real segments" shapes all give @Just []@ ('RHome', M1's
+-- original behaviour, kept exactly): a bare @\"\"@ or @\"#\"@ (no
+-- leading @\/@ at all -- 'T.stripPrefix' fails, and the text itself is
+-- empty), and the canonical bare root @\"#\/\"@ (stripping its one
+-- leading @\/@ leaves @\"\"@). This is deliberately NOT
+-- @'T.splitOn' \"\/\" t@'s naive leading-empty-then-null-check: for
+-- @t = \"\/\"@ that splits to @[\"\",\"\"]@, and a NAIVE check (drop the
+-- first \"\", then reject if any of the rest is null) wrongly rejects the
+-- bare root too, because its OWN trailing empty is indistinguishable
+-- from a genuine trailing-@\/@-after-content one under that scheme --
+-- exactly the H1-sibling regression this 'stripPrefix'-first version
+-- avoids.
+segmentsOf :: Text -> Maybe [Text]
+segmentsOf t = case T.stripPrefix "/" t of
+  Nothing              -> if T.null t then Just [] else Nothing
+  Just rest | T.null rest -> Just []
+            | otherwise    ->
+                let segs = T.splitOn "/" rest
+                in if any T.null segs then Nothing else Just segs
+
+-- | @[a-z0-9-]+@ -- the shape every real route id (manual slug, deck
+-- slug, exercise id) is already required to match at the CONTENT layer
+-- (see "SXC1.Exercise.Parse"'s @isSlugLike@); rejecting anything else
+-- here too (L3) means @#\/x\/A B\/c@ classifies as 'RNotFound' instead
+-- of silently accepting a segment no real content id could ever be.
+isRouteId :: Text -> Bool
+isRouteId t = not (T.null t) && T.all isRouteIdChar t
+  where
+    isRouteIdChar c = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-'
 
 classify :: [Text] -> Route
 classify [] = RHome
-classify ["m", slug] = RManual slug
-classify ["m", slug, "p", nTxt] = case parseDigits nTxt of
+classify ["m", slug] | isRouteId slug = RManual slug
+classify ["m", slug, "p", nTxt] | isRouteId slug = case parseDigits nTxt of
   Just n  -> RPage slug n False
   Nothing -> notFound ["m", slug, "p", nTxt]
-classify ["m", slug, "p", nTxt, "ja"] = case parseDigits nTxt of
+classify ["m", slug, "p", nTxt, "ja"] | isRouteId slug = case parseDigits nTxt of
   Just n  -> RPage slug n True
   Nothing -> notFound ["m", slug, "p", nTxt, "ja"]
 -- M2: the exercise engine's own three routes. NOTE (probe P-M): before
@@ -51,8 +96,8 @@ classify ["m", slug, "p", nTxt, "ja"] = case parseDigits nTxt of
 -- assert the CONSTRUCTOR (@parseRoute \"#/x\" == RExercises@) and carry a
 -- negative control that it is NOT 'RNotFound'.
 classify ["x"] = RExercises
-classify ["x", deck] = RDeck deck
-classify ["x", deck, ex] = RExercise deck ex
+classify ["x", deck] | isRouteId deck = RDeck deck
+classify ["x", deck, ex] | isRouteId deck, isRouteId ex = RExercise deck ex
 classify segs = notFound segs
 
 notFound :: [Text] -> Route

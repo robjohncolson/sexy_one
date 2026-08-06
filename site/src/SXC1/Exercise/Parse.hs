@@ -641,9 +641,15 @@ parseExercise file deckId deckChapterText (headLn, exTitleTxt, chunkLines) =
                          | n < 2 || n > 6 ]
             correctIssue = [ mkIssue E_CHOICE_NO_CORRECT exLoc "no option is marked [x]"
                             | not (any optCorrect opts) ]
-            labels = [ T.strip label | (_, _, label) <- items ]
-            dupIssue = [ mkIssue E_CHOICE_DUPLICATE exLoc "two or more option labels are identical"
-                       | length labels /= length (dedupText labels) ]
+            -- M3 (gate finding): compared on NORMALISED, RENDERED label
+            -- text (the same 'inlinesText' every learner-facing field is
+            -- linted through), not raw Markdown source -- "A" and "**A**"
+            -- are pairwise-distinct raw text but render identically, so a
+            -- learner faced two visually indistinguishable choices before
+            -- this fix.
+            renderedLabels = [ inlinesText (optLabel o) | o <- opts ]
+            dupIssue = [ mkIssue E_CHOICE_DUPLICATE exLoc "two or more option labels render identically"
+                       | length renderedLabels /= length (dedupText renderedLabels) ]
         in (countIssue ++ correctIssue ++ dupIssue, Just (Choice opts))
 
     recallRequired = mKind == Just KQuiz && not hasChoiceList
@@ -658,8 +664,8 @@ parseExercise file deckId deckChapterText (headLn, exTitleTxt, chunkLines) =
       [ mkIssue E_DRILL_STEP_COUNT exLoc ("drill has " <> T.pack (show (length stepChunks)) <> " ### Step roles (want >= 2)")
       | mKind == Just KDrill, length stepChunks < 2
       ]
-    (stepIssuesAll, stepPromptsAll, stepCitesAll, stepVerifiesAll) =
-      unzip4 (zipWith (parseStep file exid) [1 :: Int ..] stepChunks)
+    (stepIssuesAll, stepPromptsAll, stepCitesAll, stepVerifiesAll, stepLintTargetsAll) =
+      unzip5 (zipWith (parseStep file exid) [1 :: Int ..] stepChunks)
 
     -- Lookup.
     findMissingIssue = [ mkIssue E_FIELD_MISSING exLoc "lookup requires a find: field"
@@ -723,6 +729,7 @@ parseExercise file deckId deckChapterText (headLn, exTitleTxt, chunkLines) =
       , case mChoicePrompt of
           Just (Choice opts) -> [ (exLoc, inlinesText (optLabel o)) | o <- opts ]
           _                   -> []
+      , concat stepLintTargetsAll
       ]
 
 dedupText :: [Text] -> [Text]
@@ -731,8 +738,9 @@ dedupText = go []
     go seen [] = reverse seen
     go seen (x : xs) = if x `elem` seen then go seen xs else go (x : seen) xs
 
-unzip4 :: [(a, b, c, d)] -> ([a], [b], [c], [d])
-unzip4 = foldr (\(a, b, c, d) (as, bs, cs, ds) -> (a : as, b : bs, c : cs, d : ds)) ([], [], [], [])
+unzip5 :: [(a, b, c, d, e)] -> ([a], [b], [c], [d], [e])
+unzip5 = foldr (\(a, b, c, d, e) (as, bs, cs, ds, es) -> (a : as, b : bs, c : cs, d : ds, e : es))
+               ([], [], [], [], [])
 
 --------------------------------------------------------------------------
 -- One drill step (### Step)
@@ -740,8 +748,8 @@ unzip4 = foldr (\(a, b, c, d) (as, bs, cs, ds) -> (a : as, b : bs, c : cs, d : d
 
 parseStep
   :: Text -> ExId -> Int -> (Int, Text, [(Int, Text)])
-  -> ([Issue], Maybe Prompt, [(Loc, Citation)], [(Loc, VerifySpec)])
-parseStep file exid stepIndex (ln, _, rlines) = (allIssues, mPrompt, cites, verifies)
+  -> ([Issue], Maybe Prompt, [(Loc, Citation)], [(Loc, VerifySpec)], [(Loc, Text)])
+parseStep file exid stepIndex (ln, _, rlines) = (allIssues, mPrompt, cites, verifies, lintTargets)
   where
     stepLoc = Loc file ln
     (stepFields, afterStepFields) = scanFieldBlock rlines
@@ -773,6 +781,14 @@ parseStep file exid stepIndex (ln, _, rlines) = (allIssues, mPrompt, cites, veri
     stepBodyBlocks = fst (parseBlocksEngine 0 False [] (map snd afterStepFields))
     bodyIndentedIssues = indentedHeadingIssues file afterStepFields
 
+    -- H5 (gate finding): EXERCISE-FORMAT.md requires a step's own body
+    -- (after its field block) to be "the instruction text -- at least one
+    -- block". A step carrying only 'cite:'/'check:' fields and no body
+    -- text validated clean and rendered a Confirm button with nothing to
+    -- confirm.
+    bodyEmptyIssue = [ mkIssue E_DRILL_STEP_EMPTY stepLoc "### Step body must contain at least one block (instruction text)"
+                     | null stepBodyBlocks ]
+
     -- 'stepIndex' is this step's 1-based position among ALL ### Step
     -- chunks in the exercise (in source order), independent of whether
     -- any OTHER step failed to parse -- so a step's 'PromptId' does not
@@ -780,9 +796,19 @@ parseStep file exid stepIndex (ln, _, rlines) = (allIssues, mPrompt, cites, veri
     mPrompt = if isNothing checkFieldM then Nothing
               else Just (Prompt (promptIdFor exid stepIndex) stepBodyBlocks stepCites (Confirm checkInline mVerify))
 
-    allIssues = fieldIssues ++ citeIssues ++ checkMissingIssue ++ verifyIssues ++ bodyIndentedIssues
+    allIssues = fieldIssues ++ citeIssues ++ checkMissingIssue ++ verifyIssues ++ bodyIndentedIssues ++ bodyEmptyIssue
     cites = [ (stepLoc, c) | c <- stepCites ]
     verifies = [ (stepLoc, v) | Just v <- [mVerify] ]
+
+    -- H3 (gate finding, first half): a step's own body text and its
+    -- 'check:' sentence are both "learner-facing text" per
+    -- EXERCISE-FORMAT.md's own definition, but 'parseStep' never handed
+    -- either to the terminology linter at all -- a drill's entire step
+    -- prose was exempt from the binding glossary. Both are now real lint
+    -- targets, exactly like every other learner-facing field.
+    lintTargets =
+      [ (stepLoc, inlinesText checkInline) | not (null checkInline) ]
+        ++ [ (stepLoc, blocksText stepBodyBlocks) | not (null stepBodyBlocks) ]
 
 --------------------------------------------------------------------------
 -- Public projections
