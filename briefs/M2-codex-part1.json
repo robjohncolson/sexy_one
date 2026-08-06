@@ -1,0 +1,95 @@
+{
+  "task_type": "review",
+  "status": "completed",
+  "verdict": "PART1-BLOCKED",
+  "review_basis": "Read-only static review of git log m1..HEAD and the requested engine/content surfaces. Per subagent constraints, no build, test, lint, or runtime verification was run.",
+  "per_claim": [
+    {
+      "claim": "1. Citation content verification is non-vacuous",
+      "verdict": "FAIL",
+      "evidence": "The required-field plumbing is real: parseDeckFull requires deck cite fields (site/src/SXC1/Exercise/Parse.hs:398-416), quiz/drill exercise cites (517-523), drill-step cites (747-757), and lookup find (551-559,665-673); resolveDeckIssues resolves every collected citation (site/test/CheckExercises.hs:166-181). But resolveCitation measures T.length (T.strip citAnchor) before whitespace normalization, then searches normalizeWs citAnchor (site/src/SXC1/Exercise/Verify.hs:97-102). Thus guide-book p.15 anchor \"press          the\" has raw length >=12, normalizes to the 9-character \"press the\", and matches translations/guide-book.md:504. Worse, buildManualIndex indexes whitespace-normalized raw Markdown page lines, not visible/semantic text (Verify.hs:70-76; Content/Markdown.hs:97-108), so guide-book p.10 anchor \"|---|---|---|\" is 13 characters and matches the table delimiter at translations/guide-book.md:373. Both pass while carrying essentially no grounded proposition. The seed's 32 cite/find lines appear substantively phrased, but the claimed invariant is not enforced for future content."
+    },
+    {
+      "claim": "2. Fixture machinery covers every code and rejects wrong-code fixtures",
+      "verdict": "PASS for the current enumerated code set",
+      "evidence": "IssueCode is a Bounded/Enum list of 39 static codes and listCodesLines appends the nine loaded E-TERM codes (site/src/SXC1/Exercise/Report.hs:91-120,183-194). The corpus contains 42 file fixtures plus nine directory fixtures; four are OK controls, leaving 47 declared failing fixtures for all 48 current codes except the one seam code. runFixtures compares the de-duplicated actual code set to exactly [expected], or requires an empty set for OK (site/test/CheckExercises.hs:460-476). The d69f8ad fix removes only the unavoidable E-FILE-BAD-NAME artifact and only when another code/OK is expected (439-465); an absent or wrong expected code cannot pass that equality. The site gate derives coverage from --list-codes (scripts/check-site.sh:1821-1863) and independently reconciles every disk fixture name with JSON result/pass state (1881-1955). E-BLOCK-UNPARSED is deliberately covered by self-test rather than a file fixture (CheckExercises.hs:1173-1195). Caveat: claim 4 describes how a code can bypass enumeration entirely."
+    },
+    {
+      "claim": "3. Pure/total four-body engine, correct arity-derived quiz selection, caller-supplied clocks",
+      "verdict": "FAIL overall; grading/arity PASS, clock semantics FAIL",
+      "evidence": "step is pure by type and its grading paths use safeIndex plus total shape mismatch fallbacks (site/src/SXC1/Exercise/Engine.hs:140-154,180-203,235-258). Choice uses exact-set equality; fd1f21b correctly derives single-answer vs multi-answer from the number of optCorrect options, replacing selection for exactly one correct option and toggling additively otherwise (224-239). Self-tests pin wrong-then-right replacement, re-click clearing, multi additive selection, exact-set success, and strict-subset failure (site/test/CheckExercises.hs:949-995). Recall, Confirm, and FindPage also have direct grading tests (997-1041). However initialState takes one Integer and stores it simultaneously as wall-clock esStartedAt and monotonic esPromptAt (Engine.hs:127-137); Begin/Restart likewise take only that one value (84-96,203-206). These clocks have different epochs. The current caller supplies the wall value to Begin/Restart (site/app/Main.hs:225-233,278-279), so the first Submit computes monotonicMs - wallEpochMs, clamps the negative result to zero (Engine.hs:193), and every first-prompt ProgressEvent reports peElapsed=0. Single-prompt quizzes/lookups therefore always record zero elapsed time. Tests mask this by seeding both domains with the same small number and never asserting peElapsed (CheckExercises.hs:924-940,1026-1041). Also, no seed quiz is multi-correct; that branch has only hand-built self-test/probe coverage, as advised."
+    },
+    {
+      "claim": "4. Exactly one seam-class error code",
+      "verdict": "PASS in the current declaration, but the cap is evadable",
+      "evidence": "issueClassOf maps only E_BLOCK_UNPARSED to SeamClass (site/src/SXC1/Exercise/Report.hs:164-176), the shell gate requires the seam list to equal exactly that singleton (scripts/check-site.sh:1826-1875), and production classifyLine cannot produce DeclinedShape while the NEW11 progress guards terminate dishonest list classifiers (site/src/SXC1/Content/Markdown.hs:443-451,583-597). Yet Issue(..) is exported with isCode :: Text and can be constructed directly (Report.hs:18,69-77). Therefore a new unreachable check can emit Issue \"E-SECOND-SEAM\" without adding an IssueCode; --list-codes, fixture coverage, and the seam cap will never see it. The existing terminology family proves raw construction is already an intended path (site/src/SXC1/Exercise/Lint.hs:156-157), with separate bespoke enumeration only for that family. The cap checks the declared list, not all codes the validator can emit."
+    },
+    {
+      "claim": "5. Inventory binding is active only for content/exercises paths and observable as inventoryChecked == decks",
+      "verdict": "PASS for the shipped tree, with the stated brittleness",
+      "evidence": "The binding switch is the literal content/exercises/ substring (site/test/CheckExercises.hs:153-181). collectFromDirs records the switch per parsed deck and counts it as ldInventoryChecked (251-269), JSON injects totals.inventoryChecked (304-327), and check-site requires it to equal totals.decks (scripts/check-site.sh:1312-1328). The real INDEX names four decks (content/exercises/INDEX:3-6), whose paths all contain the literal and whose 16 ids are present under the matching Chapter 1/2 inventory sections. This yields the intended real-tree 4 == 4 observation. Advisories stand: moving/copying the root to a path without that substring silently disables binding until the outer equality gate runs; paths such as fakecontent/exercises activate it accidentally; and fixedInventoryPath = ../content/exercise-inventory.md makes the executable fail closed with exit 2 unless invoked from site/ (CheckExercises.hs:104-115)."
+    },
+    {
+      "claim": "M1 NEW11/NEW12 closures remain effective",
+      "verdict": "PASS by source inspection",
+      "evidence": "OrderedShape and BulletShape now detect empty parseList output and consume one line through emitUnparsed (site/src/SXC1/Content/Markdown.hs:576-623); CheckContent carries single/pair dishonest-classifier cases (site/test/CheckContent.hs:1188-1259). Its runner includes those checks and the NEW12 group, sets maxGroup=22, and folds groupsAllOk into the exit condition (1355-1413). No new finite-input nontermination path was found in the exercise line grammar."
+    }
+  ],
+  "new_findings": [
+    {
+      "severity": "HIGH",
+      "location": "site/src/SXC1/Exercise/Engine.hs:127",
+      "title": "Begin/Restart conflate wall and monotonic clock epochs",
+      "scenario": "Begin receives wall epoch milliseconds, writes that into esPromptAt, then a first Submit supplies monotonic milliseconds. The negative difference clamps to zero, so all first-prompt elapsed events are false zeroes. Use two clock arguments for initialization/restart and pin peElapsed with deliberately different clock epochs."
+    },
+    {
+      "severity": "HIGH",
+      "location": "site/src/SXC1/Exercise/Verify.hs:97",
+      "title": "Citation non-vacuity can be defeated by whitespace and Markdown syntax",
+      "scenario": "\"press          the\" passes the pre-normalization 12-character test but becomes \"press the\" for matching; \"|---|---|---|\" passes by matching a raw table delimiter. Measure the normalized anchor and index semantic/rendered page text or explicitly reject syntax-only anchors."
+    },
+    {
+      "severity": "HIGH",
+      "location": "site/src/SXC1/Exercise/Parse.hs:717",
+      "title": "Terminology lint omits all drill-step instructions and check fields",
+      "scenario": "parseExercise returns lint targets for the exercise intro, roles, and choices only; parseStep returns issues/prompt/cites/verifies but no lint targets (Parse.hs:741-785). A valid step containing body text \"Press the pad\" and check text \"This machine responds\" receives no E-TERM findings, directly contradicting content/EXERCISE-FORMAT.md:258-263. Additionally, inlinesText inserts spaces between Inline nodes (site/src/SXC1/Exercise/Lint.hs:212-223), so visually identical prose such as \"this **machine**\" bypasses the phrase matcher even in covered fields."
+    },
+    {
+      "severity": "HIGH",
+      "location": "site/test/CheckExercises.hs:272",
+      "title": "Globally unique deck ids are not validated",
+      "scenario": "The normative field reference says deck is globally unique (content/EXERCISE-FORMAT.md:134), but globalIdDuplicateIssues counts only exId values. Two indexed, otherwise-valid deck files can declare the same deck slug with distinct exercise ids and pass, leaving one route-shadowed/unreachable downstream."
+    },
+    {
+      "severity": "HIGH",
+      "location": "site/src/SXC1/Exercise/Parse.hs:773",
+      "title": "Required drill-step instruction bodies may be empty",
+      "scenario": "The format requires every step body to contain at least one block (content/EXERCISE-FORMAT.md:175-176), but parseStep builds a Prompt whenever check exists, regardless of null stepBodyBlocks (Parse.hs:773-781). A two-step drill containing only cite/check fields validates and renders confirmation controls with no action instructions."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "site/src/SXC1/Exercise/Report.hs:235",
+      "title": "Citation totals do not count citation declarations, and the supposed independent count copies the defect",
+      "scenario": "totCitations adds deck, exercise, and prompt citation lists. Quiz citations are stored in both exCites and prCites and count twice, while lookup find targets live only in FindPage and count zero. The seed has 27 cite lines plus five find lines (32 declarations), but the formula yields 34. scripts/check-site.sh:1559-1597 explicitly documents and reproduces this model bug instead of implementing its stated ^cite:/^find: count, so agreement is correlated and cannot catch it."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "site/src/SXC1/Exercise/Report.hs:69",
+      "title": "The seam-class cap is not closed over actual emitted codes",
+      "scenario": "Because Issue's constructor accepts raw Text, a second seam-only diagnostic can be emitted without entering IssueCode/allIssueCodes. All coverage and cap checks remain green. Make raw construction private or represent dynamic families with a typed, exhaustively enumerated source."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "site/src/SXC1/Exercise/Parse.hs:632",
+      "title": "Rendered-identical choice labels evade E-CHOICE-DUPLICATE",
+      "scenario": "Duplicate detection compares stripped raw Markdown labels (Parse.hs:644-646), although labels are parsed as inline Markdown (635-636). Options \"A\" and \"**A**\" therefore pass but render with the same visible label, making the learner's choice ambiguous. Compare normalized inlinesText instead."
+    },
+    {
+      "severity": "LOW",
+      "location": "content/fixtures/README.md:45",
+      "title": "Fixture documentation still says the now-fixed filename contamination makes the run fail",
+      "scenario": "README lines 45-109 describe the defect as current and say --fixtures exits non-zero, while CheckExercises.hs:439-465 implements its suggested filter. This can send maintainers chasing a resolved failure and should be rewritten as historical context."
+    }
+  ],
+  "final_line": "PART1-BLOCKED — first-prompt timing is invalid, citation anchors remain vacuously satisfiable, drill-step terminology is unchecked, and globally unique deck ids plus non-empty step bodies are not enforced."
+}
