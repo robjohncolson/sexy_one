@@ -36,8 +36,18 @@ Chain of authority for every code milestone:
    its own manifest; iterates with the swarm until it signs off.
 5. **Codex adversarial review** — signed-off milestone is dispatched through the
    cross-agent runner in `~/repos/Agent`. Findings return to Fable, which routes
-   fixes back through steps 2–4. Codex model slug: confirm with owner at first
-   dispatch ("codex 5.6 sol ultra").
+   fixes back through steps 2–4. Model: `gpt-5.6-sol` at `xhigh` reasoning
+   (owner-confirmed 2026-08-06). Verified invocation (dry-run tested):
+
+   ```bash
+   cd ~/repos/Agent && python3 runner/cross-agent.py \
+     --direction cc-to-codex --task-type review --read-only \
+     --working-dir /home/mrcolson/repos/casio-sxc1 \
+     --codex-bin 'codex -m gpt-5.6-sol -c model_reasoning_effort=xhigh' \
+     --prompt "…"
+   ```
+
+   Dispatch artifacts land in `state/cross-agent/` (gitignored).
 
 Content work (translation, exercise authoring) does not use the Opus→Sonnet chain —
 it's not code. Fable runs dedicated content workflows with QA stages instead.
@@ -108,5 +118,6 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
 ## Open questions for the owner
 
 1. GitHub repo: name and visibility? (GitHub Pages on a free account requires public.)
-2. Exact Codex model slug for the cross-agent runner.
-3. Site title — "SXC-1 Trainer" is a placeholder.
+2. Site title — "SXC-1 Trainer" is a placeholder.
+
+Resolved: Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).

@@ -3,6 +3,9 @@ manuals/pages/
 manuals/text/
 translations/work/
 
+# Cross-agent dispatch artifacts (runner writes result JSON here)
+state/cross-agent/
+
 # Haskell build outputs
 dist-newstyle/
 *.o
