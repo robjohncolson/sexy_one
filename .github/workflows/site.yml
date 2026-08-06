@@ -53,8 +53,8 @@ jobs:
 
       # ----------------------------------------------------------------
       # Cache the GHC WebAssembly toolchain. This tree is immutable, not
-      # incrementally reusable, so there are deliberately no restore-keys:
-      # a partial match (e.g. after a pin bump, or a runner image
+      # incrementally reusable, so there is deliberately no fallback
+      # restore-key: a partial match (e.g. after a pin bump, or a runner image
       # migration) is never desirable -- it would restore a toolchain that
       # does not match the pin and, worse, get re-saved under the new key,
       # poisoning the cache. The key covers OS, arch, the runner image
@@ -79,32 +79,42 @@ jobs:
 
       # ----------------------------------------------------------------
       # Cache cabal's incremental build directory so warm builds (e.g. a
-      # cache hit above, or repeated app-only changes) don't recompile
-      # miso and its dependency closure from scratch every run. Unlike the
-      # toolchain cache, this one IS genuinely incrementally reusable, so
-      # it keeps its restore-keys.
+      # cache hit above, or a re-run with nothing relevant changed) don't
+      # recompile miso and its dependency closure from scratch every run.
       #
-      # M1: the key now also hashes site/src/**, site/test/** (the new
-      # sxc1-content library and its exe:content-check test suite) and
-      # translations/*.md. That last one is load-bearing, not decorative:
-      # translations/*.md is embedded into the wasm at COMPILE TIME by
-      # Template Haskell (SXC1.Content.Embed, via `extra-source-files:
-      # ../translations/*.md` in site/sxc1-trainer.cabal) and reparsed at
-      # runtime from that embedded copy -- the app never fetches the
-      # markdown at runtime. If a translation edit didn't appear in this
-      # key, a restored dist-newstyle would report "up to date" and CI
-      # would happily build, verify and deploy wasm containing the OLD
-      # translation text. Hashing the sources is enough to invalidate on
-      # code changes; the content needs the same treatment because it also
-      # flows into the compiled artifact.
+      # M2: exact-key-only, no fallback restore-key -- a prior, looser
+      # revision of this step fell back to a same-OS partial match on any
+      # miss. That fallback is gone: a partial match would restore a
+      # dist-newstyle built from a DIFFERENT hashed input (an older
+      # site/src, an older translations/*.md, ...) than the commit under
+      # test, trading a faster warm build for exactly the kind of
+      # can't-tell-if-it-actually-checked-this-commit ambiguity check 15-17
+      # (see scripts/check-site.sh) exists to rule out on the content side
+      # -- the same reasoning the toolchain cache above already applies.
+      # cabal's own component-level staleness check still recompiles
+      # anything genuinely stale on a hit; the exact key just makes a MISS
+      # (full rebuild -- slower, never wrong) the only alternative to a hit
+      # that is provably for this exact input.
+      #
+      # The key hashes site/cabal.project, site/sxc1-trainer.cabal,
+      # site/app/**, site/src/**, site/test/** and translations/*.md. That
+      # last one is load-bearing, not decorative: translations/*.md is
+      # embedded into the wasm at COMPILE TIME by Template Haskell
+      # (SXC1.Content.Embed, via `extra-source-files: ../translations/*.md`
+      # in site/sxc1-trainer.cabal) and reparsed at runtime from that
+      # embedded copy -- the app never fetches the markdown at runtime. If
+      # a translation edit didn't appear in this key, a restored
+      # dist-newstyle would report "up to date" and CI would happily
+      # build, verify and deploy wasm containing the OLD translation text.
+      # Hashing the sources is enough to invalidate on code changes; the
+      # content needs the same treatment because it also flows into the
+      # compiled artifact.
       # ----------------------------------------------------------------
       - name: Cache cabal build directory
         uses: actions/cache@v6
         with:
           path: site/dist-newstyle
           key: dist-newstyle-${{ runner.os }}-${{ hashFiles('site/cabal.project', 'site/sxc1-trainer.cabal', 'site/app/**', 'site/src/**', 'site/test/**', 'translations/*.md') }}
-          restore-keys: |
-            dist-newstyle-${{ runner.os }}-
 
       # ----------------------------------------------------------------
       # No separate image-rendering step: the 108 WebP page images the
@@ -126,6 +136,41 @@ jobs:
       - name: Build site
         timeout-minutes: 30
         run: ./scripts/build-site.sh
+
+      # ----------------------------------------------------------------
+      # M2: run the exercise-content validator directly, as its own named,
+      # timed step, BEFORE the full check-site.sh verification below. This
+      # is deliberately redundant with check-site.sh (which runs
+      # exe:exercise-check itself as part of its own content-axis checks
+      # 15-17 -- see scripts/check-site.sh) -- the unskippable gate stays
+      # check-site.sh's `result=complete` assertion two steps down, this
+      # step does not replace or loosen it. The point of running it again
+      # here, explicitly and first, is readability and speed: a content-only
+      # pull request (a typo'd citation, a bad field, a missing fixture)
+      # fails in seconds against a short, exercise-shaped error message,
+      # instead of only surfacing after a full build + the ~1-minute
+      # headless-browser sweep two steps below has already run.
+      #
+      # exe:exercise-check is built above by build-site.sh (it now builds
+      # exe:app, exe:content-check AND exe:exercise-check), so this step
+      # only needs to resolve and run the already-built binary -- same
+      # `wasm32-wasi-cabal list-bin` / wasm-run.mjs convention used
+      # throughout scripts/check-site.sh for exe:content-check and
+      # exe:exercise-check alike. Every mode is required to exit 0:
+      # --content-dir/--translations-dir against the real working tree,
+      # --fixtures against the falsifiability corpus (content/fixtures),
+      # and --self-test (the validator's own internal test suite).
+      # ----------------------------------------------------------------
+      - name: Validate exercise content
+        timeout-minutes: 10
+        run: |
+          . "$HOME/.ghc-wasm/env"
+          cd site
+          BIN="$(wasm32-wasi-cabal list-bin exe:exercise-check | tail -n1)"
+          echo "exercise-check binary: $BIN"
+          wasm-run.mjs "$BIN" --content-dir "$GITHUB_WORKSPACE/content" --translations-dir "$GITHUB_WORKSPACE/translations"
+          wasm-run.mjs "$BIN" --fixtures "$GITHUB_WORKSPACE/content/fixtures"
+          wasm-run.mjs "$BIN" --self-test
 
       # check-site.sh needs no new CI step for M1: the content checker
       # (exe:content-check under wasm-run.mjs), the three-way content

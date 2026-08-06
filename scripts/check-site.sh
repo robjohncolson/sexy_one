@@ -65,17 +65,25 @@ Options:
                    result=complete -- this is a local escape hatch only;
                    CI asserts result=complete AND zero skipped checks.
   --skip-content   SKIPPED (conspicuously, never silently) the exe:content-check
-                   run, the three-way content agreement check, and the
-                   exact-bytes source-integrity check (also honoured via
-                   SXC1_SKIP_CONTENT=1). Local-iteration escape hatch only --
-                   never the default, and CI must not pass it. Like
-                   --skip-browser, this also flips the final marker to
-                   result=structural-only (NEW7: both skippable axes now
-                   drive the same marker, via the SKIPPED counter, so
-                   neither can silently report result=complete). When
-                   skipped, checks 7/8's browser run falls back to
-                   scripts/browser-check.mjs's own built-in golden numbers
-                   instead of --expect-json.
+                   run, the three-way content agreement check, the
+                   exact-bytes source-integrity check, AND (M2) the
+                   exe:exercise-check gate, the independent Python
+                   re-derivation of exercise stats/citations, and the
+                   fixture run + coverage invariant (also honoured via
+                   SXC1_SKIP_CONTENT=1). M2's exercise checks live on this
+                   SAME content axis -- no new skip flag was added; see
+                   "Checks performed, in order" below (14-17). Local-
+                   iteration escape hatch only -- never the default, and CI
+                   must not pass it. Like --skip-browser, this also flips
+                   the final marker to result=structural-only (NEW7: both
+                   skippable axes now drive the same marker, via the
+                   SKIPPED counter, so neither can silently report
+                   result=complete). When skipped, checks 7/8's browser run
+                   falls back to scripts/browser-check.mjs's own built-in
+                   golden numbers instead of --expect-json, and runs
+                   without --expect-exercise-json/--exercise-fixture (the
+                   M2 exercise-engine browser assertions simply do not run
+                   in that case -- see check 17 below).
   --port N         TCP port to try first for the dev server used by the
                    browser checks (default: 8123, env SXC1_PORT). If busy,
                    the next free port is used instead.
@@ -155,6 +163,61 @@ Checks performed, in order:
      today -- it exists so the bundle roughly doubling before it is caught
      some other way still fails loudly here. The current value and
      headroom are printed on every run, skip or no skip.
+  14. THE CLOCK/M4-STUB INVARIANT (unconditional, not on the content axis):
+     site/app must use the real wall-clock and monotonic-clock mechanisms
+     (GHC.Clock.getMonotonicTimeNSec and JS Date.getTime -- NOT
+     Data.Time.Clock.POSIX, which does not build for this target) and
+     must wire the M4 DeviceVerifier stub (noDeviceVerifier), all THREE
+     on lines that are not Haskell comments. This replaces a vacuous
+     sibling check (task "exercise-ui"'s own
+     `grep -RqE "getPOSIXTime|POSIX"`, which only ever matches the
+     Haddock comment explaining why POSIX is NOT used -- the M0-n2
+     pattern) with one anchored to the real, non-comment code.
+  15. EXERCISE VALIDATOR GATE (content axis): exe:exercise-check, resolved
+     and run exactly like exe:content-check (checks 10-12) -- same
+     toolchain env, same `wasm32-wasi-cabal list-bin` / wasm-run.mjs
+     convention -- against the REAL content/translations roots with
+     --content-dir/--translations-dir/--json, requiring the run to exit 0
+     AND the captured JSON's "ok" field to be true (issues, if any, are
+     printed). Unless --skip-content.
+  16. INDEPENDENT PYTHON RE-DERIVATION (content axis): a from-scratch
+     Python re-implementation recomputes, straight from
+     content/exercises/*.ex.md and content/exercises/INDEX (never from
+     the Haskell): the deck list (both directions against the directory),
+     exercise/prompt/per-kind/citation counts, and per-deck chars/lines/
+     FNV-1a-32 -- pinned against the published FNV-1a test vectors before
+     trusting anything else -- and diffs all of it against check 15's
+     captured JSON. It then RE-RESOLVES EVERY CITATION INDEPENDENTLY
+     straight from translations/*.md (split on <!-- page N --> markers,
+     page-range check, whitespace-collapsed anchor substring check) --
+     two independent implementations of the citation check, because that
+     check is the claim the whole content model rests on. Unless
+     --skip-content.
+  17. FIXTURE RUN, COVERAGE INVARIANT, AND STALE-BUILD DETECTION (content
+     axis): exe:exercise-check --fixtures content/fixtures must exit 0;
+     every code exe:exercise-check --list-codes prints (file/dir class)
+     must have >=1 matching fixture under fixtures/files or fixtures/dirs
+     (a validation rule with no fixture turns this red), the seam class
+     is asserted to contain EXACTLY ONE code (E-BLOCK-UNPARSED -- the one
+     code provably unreachable from any real file, demonstrated instead
+     by exe:exercise-check --self-test), and the fixtures' own
+     filename-declared verdicts are independently re-derived in Python
+     and diffed against --fixtures --json. Finally, the SAME disk-derived
+     stats from check 16 are handed to checks 7/8's
+     scripts/browser-check.mjs as --expect-exercise-json, and
+     exe:exercise-check --browser-fixture's output as --exercise-fixture
+     -- comparing what is ACTUALLY EMBEDDED in the running app.wasm
+     (#sxc1-exercise-stats) against what is on disk right now. This is
+     M2's equivalent of check 12's `content-check --dump-source`
+     exact-bytes comparison, but that trick cannot be reused here:
+     --dump-source reads bytes the Haskell compiler already embedded,
+     whereas exe:exercise-check only ever reads content/exercises/ off
+     DISK (it has no view into what site/app/Exercises/Embed.hs's
+     hand-written, per-file TH splices actually shipped) -- so a
+     forgotten rebuild, OR a new deck added on disk but never given its
+     own named splice in Embed.hs, shows up as a RED check instead of a
+     silently stale site. The per-deck FNV-1a is what makes this
+     byte-sensitive, not merely length-sensitive. Unless --skip-content.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -536,6 +599,86 @@ check_no_root_absolute "$DIR/index.js" "index.js"
 check_no_external_origin "$DIR/index.js" "index.js"
 
 # ===========================================================================
+# Check 14 (M2, task "verification", designer size-budget ruling condition
+# A): THE CLOCK/M4-STUB INVARIANT, unconditional -- not on the content axis,
+# never skipped, because it is a pure source-tree scan with no toolchain
+# dependency.
+#
+# task "exercise-ui" ships its own verify command:
+#   grep -RqE "getMonotonicTimeNSec" site/app \
+#     && grep -RqE "getPOSIXTime|POSIX" site/app \
+#     && grep -RqE "noDeviceVerifier" site/app
+# The middle clause is VACUOUS: site/app/Main.hs does NOT use
+# Data.Time.Clock.POSIX at all (it cannot -- that module does not build
+# for wasm32-wasi here) and says so in a Haddock comment ("Wall-clock
+# epoch: NOT 'Data.Time.Clock.POSIX' -- ... 'Date.getTime' gives the same
+# ... value 'Data.Time.Clock.POSIX.getPOSIXTime' would have"). That
+# comment is exactly what the grep matches -- the real wall-clock
+# mechanism, JS's Date.getTime via the app's own FFI, is never actually
+# required to be present. This is the M0-n2 pattern: a grep satisfied by
+# a comment describing what ISN'T used, not by the code that IS.
+#
+# This check requires all three of getMonotonicTimeNSec, Date.getTime and
+# noDeviceVerifier on lines that are NOT Haskell comments, using a small
+# python3 pass (naive "split each line on its first '--'" line-comment
+# strip -- sufficient here because none of these three identifiers ever
+# appears after a literal '--' inside a string literal in this codebase;
+# a block ({- -}) comment is not specially handled either, for the same
+# reason: none of the three occurs inside one).
+# ===========================================================================
+CLOCK_STUB_PY="$(mktemp -t sxc1-check-site-clockstub.XXXXXX.py)"
+register_temp_file "$CLOCK_STUB_PY"
+cat > "$CLOCK_STUB_PY" <<'PYEOF'
+import os
+import sys
+
+TARGETS = ["getMonotonicTimeNSec", "Date.getTime", "noDeviceVerifier"]
+ROOT = sys.argv[1]
+
+found = {t: False for t in TARGETS}
+for dirpath, _dirnames, filenames in os.walk(ROOT):
+    for fn in filenames:
+        if not fn.endswith(".hs"):
+            continue
+        path = os.path.join(dirpath, fn)
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                code_part = line.split("--", 1)[0]
+                if not code_part.strip():
+                    continue
+                for t in TARGETS:
+                    if t in code_part:
+                        found[t] = True
+
+missing = [t for t in TARGETS if not found[t]]
+if missing:
+    print("FAIL missing on non-comment lines under %s: %s" % (ROOT, ", ".join(missing)))
+    sys.exit(1)
+print("OK all three real mechanisms present on non-comment .hs lines under %s: %s" % (ROOT, ", ".join(TARGETS)))
+sys.exit(0)
+PYEOF
+
+if command -v python3 >/dev/null 2>&1; then
+  # DIR is the built site/public directory (or whatever --dir names),
+  # which is not the source tree -- the real target is the checked-out
+  # site/app directory, addressed via REPO_ROOT so this works regardless
+  # of --dir. `|| true`: a FAIL exits 1, which must not trip `set -e`
+  # here -- the case dispatch below is what decides ok()/fail().
+  CLOCK_STUB_OUT="$(python3 "$CLOCK_STUB_PY" "$REPO_ROOT/site/app" 2>&1)" || true
+  case "$CLOCK_STUB_OUT" in
+    "OK "*)
+      ok "clocks and the M4 stub are wired on non-comment lines (getMonotonicTimeNSec, Date.getTime, noDeviceVerifier) (${CLOCK_STUB_OUT#OK })"
+      ;;
+    *)
+      fail "clocks and the M4 stub are wired on non-comment lines (getMonotonicTimeNSec, Date.getTime, noDeviceVerifier) (observed: ${CLOCK_STUB_OUT#FAIL })"
+      ;;
+  esac
+else
+  fail "clocks and the M4 stub are wired on non-comment lines (getMonotonicTimeNSec, Date.getTime, noDeviceVerifier) (observed: python3 not found on PATH)"
+fi
+rm -f "$CLOCK_STUB_PY"
+
+# ===========================================================================
 # Check 6: byte sizes, raw and gzipped -- informational, never a failure.
 # ===========================================================================
 report_size() {
@@ -811,6 +954,25 @@ if [ "$SKIP_CONTENT" -eq 1 ]; then
   skip "exact-bytes source integrity/midi (content-check --dump-source vs translations/midi.md)"
   skip "exact-bytes source integrity/oss (content-check --dump-source vs translations/oss.md)"
   skip "exact-bytes source integrity/glossary (content-check --dump-source vs translations/glossary.md)"
+  # M2 (task "verification"): the exercise-validator gate, its
+  # independent Python re-derivation, and the fixture/coverage invariant
+  # all live on this SAME content axis -- no new skip flag (see the
+  # module comment above checks 15-17 in usage()).
+  skip "exe:exercise-check binary resolved"
+  skip "exercise-check runs under wasm-run.mjs and exits 0 (--content-dir/--translations-dir --json)"
+  skip "exercise validator reports zero issues over real content (exercise-check --json ok:true)"
+  skip "exercise-stats/fnv1a-vectors (FNV-1a/32 pinned against published test vectors)"
+  skip "exercise-stats/index-directory-agreement (content/exercises/INDEX vs directory, both directions)"
+  skip "exercise-stats/totals-agreement (python re-derivation vs exercise-check --json totals)"
+  skip "exercise-stats/per-deck-agreement (chapter/title/exercises/prompts/sourceChars)"
+  skip "exercise-stats/citation-count-agreement (^cite:/^find: line count vs exercise-check --json)"
+  skip "exercise-stats/citation-independent-resolution (page range + anchor re-checked from translations/*.md)"
+  skip "disk-derived exercise stats computed for browser-check.mjs --expect-exercise-json (python re-derivation from content/exercises/, never from the app payload)"
+  skip "exercise-check --browser-fixture produced JSON for browser-check.mjs --exercise-fixture"
+  skip "exercise-check --fixtures content/fixtures exits 0 (the falsifiability corpus)"
+  skip "fixture coverage invariant: every file/dir code from --list-codes has >=1 fixture"
+  skip "seam-class coverage cap: exactly one seam-class code, E-BLOCK-UNPARSED"
+  skip "independent verdict re-derivation from fixture filenames matches --fixtures --json"
 else
   TOOLCHAIN_ENV_FILE="${GHC_WASM_PREFIX:-$HOME/.ghc-wasm}/env"
   if [ -f "$TOOLCHAIN_ENV_FILE" ]; then
@@ -1046,6 +1208,714 @@ PYEOF
       fail "exact-bytes source integrity/$slug (observed: toolchain env or exe:content-check binary unavailable -- see checks above)"
     done
   fi
+
+  # =========================================================================
+  # Checks 15-17 (M2, task "verification"): the exercise validator gate,
+  # its independent Python re-derivation, the fixture run + coverage
+  # invariant, and the stale-build/browser handoff. See usage() above for
+  # the full description. Same content axis, same toolchain-env/
+  # wasm-run.mjs convention as checks 10-12 above; --content-dir and
+  # --translations-dir are always passed ABSOLUTE (never the binary's own
+  # relative defaults, which assume a `site/` cwd) because
+  # content/exercise-inventory.md is read from a FIXED, non-overridable
+  # path ("../content/exercise-inventory.md", see
+  # site/test/CheckExercises.hs's Haddock) -- every invocation below is
+  # therefore wrapped in a subshell `cd`d to site/ so that fixed path
+  # still resolves correctly regardless of check-site.sh's own cwd.
+  # =========================================================================
+  EXERCISE_CHECK_BIN=""
+  if command -v wasm32-wasi-cabal >/dev/null 2>&1; then
+    EXERCISE_CHECK_BIN="$(cd "$REPO_ROOT/site" && wasm32-wasi-cabal list-bin exe:exercise-check 2>/dev/null | tail -n1 || true)"
+  fi
+
+  if [ -n "$EXERCISE_CHECK_BIN" ] && [ -f "$EXERCISE_CHECK_BIN" ]; then
+    ok "exe:exercise-check binary resolved (observed: $EXERCISE_CHECK_BIN)"
+  else
+    fail "exe:exercise-check binary resolved (observed: missing -- run ./scripts/build-site.sh first; fallback runner: wasmtime run --dir=/ <binary>)"
+    EXERCISE_CHECK_BIN=""
+  fi
+
+  # terminology-rules.tsv (content/terminology-rules.tsv) is loaded by
+  # exercise-check itself from --content-dir on every mode below -- this
+  # is what grounds every E-TERM.<rule_id> code checks 15-17 exercise.
+  EXERCISE_CHECK_ARGS=(--content-dir "$REPO_ROOT/content" --translations-dir "$REPO_ROOT/translations")
+  run_exercise_check() {
+    ( cd "$REPO_ROOT/site" && wasm-run.mjs "$EXERCISE_CHECK_BIN" "$@" )
+  }
+
+  # -------------------------------------------------------------------------
+  # Check 15: EXERCISE VALIDATOR GATE. Run under wasm-run.mjs with --json
+  # against the REAL content/translations roots; --json mode's own process
+  # exit code is always 0 by design (it is meant for machine consumption,
+  # see runJsonMode in site/test/CheckExercises.hs), so the actual gate is
+  # the captured JSON's "ok" field, not the process exit code alone -- a
+  # dangling/out-of-range citation appended to a real deck (this task's
+  # negative control (a)) trips THIS check.
+  # -------------------------------------------------------------------------
+  EXERCISE_JSON_FILE=""
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    CANDIDATE_EX_JSON="$(mktemp -t sxc1-check-site-exstats.XXXXXX.json)"
+    register_temp_file "$CANDIDATE_EX_JSON"
+    if run_exercise_check "${EXERCISE_CHECK_ARGS[@]}" --json >"$CANDIDATE_EX_JSON" 2>/dev/null && [ -s "$CANDIDATE_EX_JSON" ]; then
+      ok "exercise-check runs under wasm-run.mjs and exits 0 (--content-dir/--translations-dir --json)"
+      EXERCISE_JSON_FILE="$CANDIDATE_EX_JSON"
+    else
+      fail "exercise-check runs under wasm-run.mjs and exits 0 (--content-dir/--translations-dir --json) (observed: non-zero exit or empty output)"
+    fi
+  else
+    fail "exercise-check runs under wasm-run.mjs and exits 0 (--content-dir/--translations-dir --json) (observed: toolchain env or binary unavailable -- see checks above; fallback runner: wasmtime run --dir=/ <binary>)"
+  fi
+
+  if [ -n "$EXERCISE_JSON_FILE" ] && command -v python3 >/dev/null 2>&1; then
+    EX_OK_OUT="$(python3 -c '
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    data = json.load(fh)
+if data.get("ok") is True and not data.get("issues"):
+    print("OK exercise-check --json ok:true, 0 issues")
+else:
+    issues = data.get("issues", [])
+    lines = ["%s:%s: %s  %s" % (i.get("file"), i.get("line"), i.get("code"), i.get("detail")) for i in issues]
+    print("FAIL " + ("; ".join(lines) if lines else "\"ok\" field was not true"))
+' "$EXERCISE_JSON_FILE" 2>&1)" || true
+    case "$EX_OK_OUT" in
+      "OK "*) ok "exercise validator reports zero issues over real content (exercise-check --json ok:true) (${EX_OK_OUT#OK })" ;;
+      *)      fail "exercise validator reports zero issues over real content (exercise-check --json ok:true) (observed: ${EX_OK_OUT#FAIL })" ;;
+    esac
+  else
+    fail "exercise validator reports zero issues over real content (exercise-check --json ok:true) (observed: no JSON capture available or python3 missing)"
+  fi
+
+  # -------------------------------------------------------------------------
+  # Check 16: INDEPENDENT PYTHON RE-DERIVATION. One script, two modes:
+  # "diff" recomputes everything straight from content/exercises/ and
+  # translations/ and diffs it against check 15's captured JSON (item B);
+  # "emit" prints the same disk-derived numbers as the exact JSON shape
+  # scripts/browser-check.mjs's --expect-exercise-json expects (item D,
+  # below) -- ONE implementation shared by both uses, so item D's
+  # "the expected deck list comes from disk, never from the app payload"
+  # property and item B's independent re-derivation are the same code
+  # path, not two that could quietly drift apart.
+  # -------------------------------------------------------------------------
+  EXERCISE_STATS_PY="$(mktemp -t sxc1-check-site-exstats.XXXXXX.py)"
+  register_temp_file "$EXERCISE_STATS_PY"
+  cat > "$EXERCISE_STATS_PY" <<'PYEOF'
+import json
+import os
+import re
+import sys
+
+MODE = sys.argv[1]
+CONTENT_DIR = sys.argv[2]
+TRANSLATIONS_DIR = sys.argv[3]
+
+FNV_OFFSET = 2166136261
+FNV_PRIME = 16777619
+MASK32 = 0xFFFFFFFF
+
+
+def fnv1a32(data):
+    h = FNV_OFFSET
+    for b in data:
+        h ^= b
+        h = (h * FNV_PRIME) & MASK32
+    return h
+
+
+# Pinned against the published test vectors (briefs/M2-plan-amendments.md
+# sec. 4) BEFORE trusting any comparison that depends on this function --
+# the last vector proves this operates on UTF-8 BYTES, not code points.
+VECTORS = [
+    (b"", 2166136261),
+    (b"hello", 1335831723),
+    (b"SELECT BANK 1", 1835518890),
+    ("⊕⊖".encode("utf-8"), 3369799694),
+]
+
+
+def check_vectors():
+    for data, want in VECTORS:
+        got = fnv1a32(data)
+        if got != want:
+            return "FNV-1a(%r) = %d, want %d" % (data, got, want)
+    return None
+
+
+def heading_of(line):
+    # Mirrors SXC1.Content.Markdown.headingLineOf exactly: 1-6 leading
+    # '#', then a single space, then non-empty (after stripping) text.
+    i = 0
+    n = len(line)
+    while i < n and line[i] == "#":
+        i += 1
+    if i < 1 or i > 6:
+        return None
+    rest = line[i:]
+    if not rest.startswith(" "):
+        return None
+    txt = rest.strip()
+    if not txt:
+        return None
+    return i, txt
+
+
+def heading_level(line):
+    h = heading_of(line)
+    return h[0] if h else None
+
+
+def field_kv(line):
+    # Mirrors SXC1.Exercise.Parse.fieldKeyValueOf: key is
+    # [a-z][a-z0-9-]*, value is the text after ':' with AT MOST ONE
+    # leading space dropped (not fully stripped -- dkChapter keeps
+    # whatever is left, exactly like the real flValue).
+    m = re.match(r"^([a-z][a-z0-9-]*):(.*)$", line)
+    if not m:
+        return None
+    key, rest = m.group(1), m.group(2)
+    if rest.startswith(" "):
+        rest = rest[1:]
+    return key, rest
+
+
+EXERCISES_DIR = os.path.join(CONTENT_DIR, "exercises")
+INDEX_PATH = os.path.join(EXERCISES_DIR, "INDEX")
+
+
+def parse_index(path):
+    out = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            out.append(s)
+    return out
+
+
+TRANSLATION_FILES = {
+    "guide-book": "guide-book.md",
+    "startup-guide": "startup-guide.md",
+    "midi": "midi.md",
+    "oss": "oss.md",
+}
+
+_page_cache = {}
+
+
+def pages_for(slug):
+    # Independent re-implementation of splitPageTexts + normalizeWs
+    # (SXC1.Content.Markdown / SXC1.Exercise.Verify): split on
+    # "<!-- page N -->" marker lines, collapse whitespace runs to one
+    # space per page body -- straight from translations/*.md, no
+    # reference to the Haskell.
+    if slug in _page_cache:
+        return _page_cache[slug]
+    fn = TRANSLATION_FILES.get(slug)
+    if fn is None:
+        _page_cache[slug] = None
+        return None
+    path = os.path.join(TRANSLATIONS_DIR, fn)
+    if not os.path.isfile(path):
+        _page_cache[slug] = None
+        return None
+    text = open(path, encoding="utf-8").read()
+    lines = text.split("\n")
+    markers = []
+    for i, l in enumerate(lines):
+        m = re.match(r"^<!-- page (\d+) -->$", l)
+        if m:
+            markers.append((i, int(m.group(1))))
+    pages = {}
+    for idx, (i, num) in enumerate(markers):
+        j = markers[idx + 1][0] if idx + 1 < len(markers) else len(lines)
+        body = "\n".join(lines[i + 1:j])
+        pages[num] = " ".join(body.split())
+    _page_cache[slug] = pages
+    return pages
+
+
+# Deliberately NOT anchored to "immediately after a heading" (unlike the
+# real grammar's scanFieldBlock) -- this is a blunter, broader net over
+# every line in the file that LOOKS like a citation, on purpose: it is
+# what catches a stray cite:/find: line appended anywhere in a file
+# (this task's negative control (a)), which the real parser would not
+# even attempt to resolve as a field outside a field block.
+CITE_RE = re.compile(r'^(cite|find): (\S+) (\d+) "(.*)"\s*$')
+
+
+def load_decks():
+    index_entries = parse_index(INDEX_PATH)
+    on_disk = set(f for f in os.listdir(EXERCISES_DIR) if f.endswith(".ex.md"))
+    index_set = set(index_entries)
+    orphan = sorted(on_disk - index_set)
+    dangling = sorted(index_set - on_disk)
+
+    deck_files = [f for f in index_entries if f in on_disk]
+
+    decks = []
+    totals = {"exercises": 0, "prompts": 0, "quiz": 0, "drill": 0, "lookup": 0}
+    citation_total = 0
+    citation_failures = []
+    resolved_count = 0
+
+    for fname in deck_files:
+        path = os.path.join(EXERCISES_DIR, fname)
+        text = open(path, encoding="utf-8").read()
+        raw_bytes = open(path, "rb").read()
+        chars = len(text)
+        lines_list = text.split("\n")
+        n_lines = len(lines_list)
+        fnv = fnv1a32(raw_bytes)
+
+        title = ""
+        for l in lines_list:
+            if l.strip() == "":
+                continue
+            h = heading_of(l)
+            if h and h[0] == 1:
+                title = h[1]
+            break
+
+        deck_name = ""
+        chapter = ""
+        for l in lines_list:
+            kv = field_kv(l)
+            if not kv:
+                continue
+            k, v = kv
+            if k == "deck" and not deck_name:
+                deck_name = v.strip()
+            elif k == "chapter" and not chapter:
+                chapter = v
+
+        ex_idx = [i for i, l in enumerate(lines_list) if heading_level(l) == 2]
+        ex_count = len(ex_idx)
+        quiz_count = sum(1 for l in lines_list if l == "type: quiz")
+        drill_count = sum(1 for l in lines_list if l == "type: drill")
+        lookup_count = sum(1 for l in lines_list if l == "type: lookup")
+
+        # The deck's OWN cite: line(s) (dkCites -- required, repeatable),
+        # in its field block before the first "## " exercise heading.
+        # Counted once each toward citation_total, same as exCites below.
+        deck_preamble = lines_list[:ex_idx[0]] if ex_idx else lines_list
+        citation_total += sum(1 for l in deck_preamble if l.startswith("cite: "))
+
+        prompts = 0
+        for k, start in enumerate(ex_idx):
+            end = ex_idx[k + 1] if k + 1 < len(ex_idx) else len(lines_list)
+            span = lines_list[start:end]
+            kind = None
+            for l in span:
+                kv = field_kv(l)
+                if kv and kv[0] == "type":
+                    kind = kv[1].strip()
+                    break
+
+            # Split the span on its own level-3 (### role) headings, so an
+            # exercise-level cite: (in the preamble, before any role) can be
+            # told apart from a drill step's OWN cite: (inside its "### Step"
+            # chunk). Mirrors SXC1.Exercise.Report.buildTotals's real
+            # formula (verified empirically against exercise-check --json
+            # on the real seed content, briefs/M2-plan-amendments.md-style):
+            # a quiz/lookup's single Prompt carries the SAME Citation list
+            # as its Exercise (site/src/SXC1/Exercise/Parse.hs's
+            # `theExCites`, at both `exCites` and, for quiz/lookup,
+            # `prCites`) -- so totCitations counts a quiz's own cite: line
+            # TWICE (once as exCites, once via its prompt's prCites) and a
+            # lookup's find: line ZERO times (it lives only in the prompt's
+            # FindPage payload, which totCitations never visits at all) --
+            # while a drill's exercise-level cite: is counted once (exCites)
+            # and each step's own cite: is counted once per step (prCites),
+            # with no duplication. This is what agreement with A actually
+            # requires; the raw ^cite:/^find: LINE SCAN just below (used for
+            # independent citation RESOLUTION, not this count) stays
+            # deliberately blind to this scoping -- see its own comment.
+            role_idx = [i for i, l in enumerate(span) if heading_level(l) == 3]
+            preamble = span[:role_idx[0]] if role_idx else span
+            ex_cite_count = sum(1 for l in preamble if l.startswith("cite: "))
+            step_cite_counts = []
+            for ri, rstart in enumerate(role_idx):
+                rend = role_idx[ri + 1] if ri + 1 < len(role_idx) else len(span)
+                rh = heading_of(span[rstart])
+                if rh and rh[1] == "Step":
+                    step_cite_counts.append(sum(1 for l in span[rstart:rend] if l.startswith("cite: ")))
+
+            if kind == "drill":
+                prompts += len(step_cite_counts)
+                citation_total += ex_cite_count + sum(step_cite_counts)
+            else:
+                prompts += 1
+                # quiz: exCites + prCites duplicate = 2x. lookup: same
+                # formula, but ex_cite_count is normally 0 (lookups use
+                # find:, not cite:, at exercise level) and find: itself is
+                # never counted (see the comment above).
+                citation_total += 2 * ex_cite_count
+
+        for l in lines_list:
+            if not (l.startswith("cite: ") or l.startswith("find: ")):
+                continue
+            resolved_count += 1
+            m = CITE_RE.match(l)
+            if not m:
+                citation_failures.append("%s: malformed cite/find line: %r" % (fname, l))
+                continue
+            _kind_word, slug, page_s, anchor = m.groups()
+            page = int(page_s)
+            pages = pages_for(slug)
+            if pages is None:
+                citation_failures.append("%s: unknown slug %r (%r)" % (fname, slug, l))
+                continue
+            if page not in pages:
+                citation_failures.append("%s: page %d out of range for %s (%r)" % (fname, page, slug, l))
+                continue
+            if len(anchor.strip()) < 12:
+                citation_failures.append("%s: anchor under 12 chars (%r)" % (fname, l))
+                continue
+            anchor_norm = " ".join(anchor.split())
+            if anchor_norm not in pages[page]:
+                citation_failures.append("%s: anchor not found on %s p.%d (%r)" % (fname, slug, page, anchor))
+
+        totals["exercises"] += ex_count
+        totals["prompts"] += prompts
+        totals["quiz"] += quiz_count
+        totals["drill"] += drill_count
+        totals["lookup"] += lookup_count
+
+        decks.append({
+            "file": fname, "deck": deck_name, "chapter": chapter, "title": title,
+            "exercises": ex_count, "prompts": prompts,
+            "chars": chars, "lines": n_lines, "fnv1a": fnv,
+        })
+
+    totals["decks"] = len(decks)
+    return {
+        "orphan": orphan, "dangling": dangling,
+        "decks": decks, "totals": totals,
+        "citation_total": citation_total, "citation_failures": citation_failures,
+        "resolved_count": resolved_count,
+    }
+
+
+def main():
+    # "emit" mode's stdout IS the --expect-exercise-json payload
+    # (check-site.sh writes it verbatim to a file) -- it must be the JSON
+    # and NOTHING ELSE, so the diagnostic OK/FAIL lines below are only
+    # printed in "diff" mode. A vector or index/directory failure in
+    # "emit" mode goes to stderr and exits 1 (empty/no valid stdout),
+    # which check 17's D1 dispatches as a FAIL on its own.
+    vec_err = check_vectors()
+    if vec_err is not None:
+        print(("FNV1A FAIL " if MODE == "diff" else "") + vec_err, file=(sys.stdout if MODE == "diff" else sys.stderr))
+        sys.exit(1)
+    if MODE == "diff":
+        print("FNV1A OK all 4 published FNV-1a/32 test vectors match")
+
+    data = load_decks()
+
+    if MODE == "diff":
+        if data["orphan"] or data["dangling"]:
+            print("INDEXDIR FAIL orphan=%s dangling=%s" % (data["orphan"], data["dangling"]))
+        else:
+            print("INDEXDIR OK %d files, INDEX and content/exercises/ directory agree in both directions" % len(data["decks"]))
+
+    if MODE == "emit":
+        print(json.dumps({"totals": data["totals"], "decks": data["decks"]}))
+        return
+
+    ex_json_path = sys.argv[4]
+    try:
+        with open(ex_json_path, encoding="utf-8") as fh:
+            a = json.load(fh)
+    except Exception as e:
+        msg = "could not read exercise-check --json capture: %s" % e
+        print("TOTALS FAIL " + msg)
+        print("PERDECK FAIL " + msg)
+        print("CITECOUNT FAIL " + msg)
+        print("CITERESOLVE FAIL " + msg)
+        sys.exit(1)
+
+    a_totals = a.get("totals", {})
+    tdiffs = []
+    for f in ["decks", "exercises", "prompts", "quiz", "drill", "lookup"]:
+        if a_totals.get(f) != data["totals"].get(f):
+            tdiffs.append("%s: exercise-check=%r python=%r" % (f, a_totals.get(f), data["totals"].get(f)))
+    if tdiffs:
+        print("TOTALS FAIL " + "; ".join(tdiffs))
+    else:
+        print("TOTALS OK " + " ".join("%s=%s" % (f, data["totals"][f]) for f in ["decks", "exercises", "prompts", "quiz", "drill", "lookup"]))
+
+    a_decks_by_name = {d.get("deck"): d for d in a.get("decks", [])}
+    a_source_chars = {name: n for name, n in a.get("sourceChars", [])}
+    pdiffs = []
+    for pd in data["decks"]:
+        ad = a_decks_by_name.get(pd["deck"])
+        if ad is None:
+            pdiffs.append("%s (deck %s): missing from exercise-check --json decks[]" % (pd["file"], pd["deck"]))
+            continue
+        for f in ["chapter", "title", "exercises", "prompts"]:
+            if ad.get(f) != pd.get(f):
+                pdiffs.append("%s.%s: exercise-check=%r python=%r" % (pd["file"], f, ad.get(f), pd.get(f)))
+        n = a_source_chars.get(pd["file"])
+        if n != pd["chars"]:
+            pdiffs.append("%s.sourceChars: exercise-check=%r python=%r" % (pd["file"], n, pd["chars"]))
+    if pdiffs:
+        print("PERDECK FAIL " + "; ".join(pdiffs))
+    else:
+        print("PERDECK OK %d decks agree on chapter/title/exercises/prompts/sourceChars" % len(data["decks"]))
+
+    if a_totals.get("citations") != data["citation_total"]:
+        print("CITECOUNT FAIL exercise-check=%r python=%r" % (a_totals.get("citations"), data["citation_total"]))
+    else:
+        print("CITECOUNT OK %d citations (^cite:/^find: lines) agree" % data["citation_total"])
+
+    if data["citation_failures"]:
+        print("CITERESOLVE FAIL " + "; ".join(data["citation_failures"]))
+    else:
+        print("CITERESOLVE OK all %d citations independently re-resolved (page in range, anchor found after whitespace collapse)" % data["resolved_count"])
+
+
+main()
+PYEOF
+
+  exstats_label() {
+    case "$1" in
+      FNV1A)       echo "exercise-stats/fnv1a-vectors (FNV-1a/32 pinned against published test vectors)" ;;
+      INDEXDIR)    echo "exercise-stats/index-directory-agreement (content/exercises/INDEX vs directory, both directions)" ;;
+      TOTALS)      echo "exercise-stats/totals-agreement (python re-derivation vs exercise-check --json totals)" ;;
+      PERDECK)     echo "exercise-stats/per-deck-agreement (chapter/title/exercises/prompts/sourceChars)" ;;
+      CITECOUNT)   echo "exercise-stats/citation-count-agreement (^cite:/^find: line count vs exercise-check --json)" ;;
+      CITERESOLVE) echo "exercise-stats/citation-independent-resolution (page range + anchor re-checked from translations/*.md)" ;;
+      *)           echo "exercise-stats/$1" ;;
+    esac
+  }
+
+  if command -v python3 >/dev/null 2>&1; then
+    if [ -n "$EXERCISE_JSON_FILE" ]; then
+      EXSTATS_OUT="$(cd "$REPO_ROOT" && python3 "$EXERCISE_STATS_PY" diff "$REPO_ROOT/content" "$REPO_ROOT/translations" "$EXERCISE_JSON_FILE" 2>&1)" || true
+    else
+      EXSTATS_OUT="$(printf 'FNV1A FAIL no exercise-check --json capture available (see checks above)\nINDEXDIR FAIL no exercise-check --json capture available (see checks above)\nTOTALS FAIL no exercise-check --json capture available (see checks above)\nPERDECK FAIL no exercise-check --json capture available (see checks above)\nCITECOUNT FAIL no exercise-check --json capture available (see checks above)\nCITERESOLVE FAIL no exercise-check --json capture available (see checks above)\n')"
+    fi
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      tag="${line%% *}"
+      rest="${line#* }"
+      status="${rest%% *}"
+      detail="${rest#* }"
+      label="$(exstats_label "$tag")"
+      case "$status" in
+        OK)   ok "$label ($detail)" ;;
+        FAIL) fail "$label (observed: $detail)" ;;
+        *)    fail "$label (unexpected output: $line)" ;;
+      esac
+    done <<< "$EXSTATS_OUT"
+  else
+    for tag in FNV1A INDEXDIR TOTALS PERDECK CITECOUNT CITERESOLVE; do
+      fail "$(exstats_label "$tag") (observed: python3 not found on PATH)"
+    done
+  fi
+
+  # -------------------------------------------------------------------------
+  # Check 17, part D: STALE-BUILD DETECTION / BROWSER HANDOFF. Generate
+  # the disk-derived --expect-exercise-json (via EXERCISE_STATS_PY's
+  # "emit" mode -- the SAME code that just ran the check-16 diff above,
+  # so item B's "every disagreement with A is caught" and item D's
+  # "the expected deck list comes from disk" are one code path) and
+  # exercise-check --browser-fixture's --exercise-fixture payload. Both
+  # are handed to checks 7/8's scripts/browser-check.mjs below, which
+  # compares them against #sxc1-exercise-stats -- what the RUNNING app
+  # actually has embedded. See usage() check 17 for why
+  # `content-check --dump-source`'s exact-bytes trick (M1's stale-build
+  # detector) cannot be reused for the exercise corpus.
+  # -------------------------------------------------------------------------
+  EXPECT_EXERCISE_JSON_FILE=""
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v python3 >/dev/null 2>&1; then
+    CANDIDATE_EXPECT="$(mktemp -t sxc1-check-site-expect-ex.XXXXXX.json)"
+    register_temp_file "$CANDIDATE_EXPECT"
+    (cd "$REPO_ROOT" && python3 "$EXERCISE_STATS_PY" emit "$REPO_ROOT/content" "$REPO_ROOT/translations" >"$CANDIDATE_EXPECT" 2>/dev/null) || true
+    if [ -s "$CANDIDATE_EXPECT" ] && python3 -c "import json,sys; json.load(open(sys.argv[1], encoding='utf-8'))" "$CANDIDATE_EXPECT" >/dev/null 2>&1; then
+      ok "disk-derived exercise stats computed for browser-check.mjs --expect-exercise-json (python re-derivation from content/exercises/, never from the app payload)"
+      EXPECT_EXERCISE_JSON_FILE="$CANDIDATE_EXPECT"
+    else
+      fail "disk-derived exercise stats computed for browser-check.mjs --expect-exercise-json (observed: python re-derivation failed or produced invalid JSON)"
+    fi
+  else
+    fail "disk-derived exercise stats computed for browser-check.mjs --expect-exercise-json (observed: exe:exercise-check binary or python3 unavailable -- see checks above)"
+  fi
+
+  EXERCISE_FIXTURE_FILE=""
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    CANDIDATE_FIXTURE="$(mktemp -t sxc1-check-site-exfixture.XXXXXX.json)"
+    register_temp_file "$CANDIDATE_FIXTURE"
+    run_exercise_check "${EXERCISE_CHECK_ARGS[@]}" --browser-fixture >"$CANDIDATE_FIXTURE" 2>/dev/null || true
+    if [ -s "$CANDIDATE_FIXTURE" ]; then
+      ok "exercise-check --browser-fixture produced JSON for browser-check.mjs --exercise-fixture"
+      EXERCISE_FIXTURE_FILE="$CANDIDATE_FIXTURE"
+    else
+      fail "exercise-check --browser-fixture produced JSON for browser-check.mjs --exercise-fixture (observed: empty output -- real content may lack one of each exercise kind)"
+    fi
+  else
+    fail "exercise-check --browser-fixture produced JSON for browser-check.mjs --exercise-fixture (observed: toolchain env or binary unavailable -- see checks above)"
+  fi
+
+  # -------------------------------------------------------------------------
+  # Check 17, parts A/C (continued): FIXTURE RUN, COVERAGE INVARIANT, AND
+  # THE SEAM-CLASS CAP.
+  # -------------------------------------------------------------------------
+  EXERCISE_FIXTURES_DIR="$REPO_ROOT/content/fixtures"
+
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    if run_exercise_check "${EXERCISE_CHECK_ARGS[@]}" --fixtures "$EXERCISE_FIXTURES_DIR" >/dev/null 2>&1; then
+      ok "exercise-check --fixtures content/fixtures exits 0 (the falsifiability corpus)"
+    else
+      fail "exercise-check --fixtures content/fixtures exits 0 (observed: non-zero exit -- a fixture disagrees with its own filename-declared verdict)"
+    fi
+  else
+    fail "exercise-check --fixtures content/fixtures exits 0 (observed: toolchain env or binary unavailable -- see checks above)"
+  fi
+
+  LIST_CODES_OUT=""
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    LIST_CODES_OUT="$(run_exercise_check "${EXERCISE_CHECK_ARGS[@]}" --list-codes 2>/dev/null)" || LIST_CODES_OUT=""
+  fi
+
+  if [ -n "$LIST_CODES_OUT" ]; then
+    MISSING_CODES=()
+    SEAM_CODES=()
+    while IFS=$'\t' read -r code cls; do
+      [ -n "$code" ] || continue
+      case "$cls" in
+        file)
+          found=0
+          for f in "$REPO_ROOT/content/fixtures/files"/*; do
+            [ -e "$f" ] || continue
+            bn="$(basename "$f")"
+            case "$bn" in "$code--"*) found=1; break ;; esac
+          done
+          [ "$found" -eq 1 ] || MISSING_CODES+=("$code (file)")
+          ;;
+        dir)
+          found=0
+          for d in "$REPO_ROOT/content/fixtures/dirs"/*/; do
+            [ -e "$d" ] || continue
+            bn="$(basename "$d")"
+            case "$bn" in "$code--"*) found=1; break ;; esac
+          done
+          [ "$found" -eq 1 ] || MISSING_CODES+=("$code (dir)")
+          ;;
+        seam)
+          SEAM_CODES+=("$code")
+          ;;
+        *)
+          MISSING_CODES+=("$code (unknown class '$cls')")
+          ;;
+      esac
+    done <<< "$LIST_CODES_OUT"
+
+    if [ "${#MISSING_CODES[@]}" -eq 0 ]; then
+      ok "fixture coverage invariant: every file/dir code from --list-codes has >=1 fixture (checked every code exercise-check --list-codes prints)"
+    else
+      fail "fixture coverage invariant: every file/dir code from --list-codes has >=1 fixture (observed: missing for ${MISSING_CODES[*]})"
+    fi
+
+    # E-BLOCK-UNPARSED is provably unreachable from any real file (see
+    # content/EXERCISE-FORMAT.md sec. 7 and content/fixtures/README.md) --
+    # it CANNOT have a fixture, so the coverage invariant above exempts
+    # the "seam" class and this asserts its cap instead: exactly one seam
+    # code, and it must be E-BLOCK-UNPARSED. This is this task's negative
+    # control (c2)'s target.
+    if [ "${#SEAM_CODES[@]}" -eq 1 ] && [ "${SEAM_CODES[0]}" = "E-BLOCK-UNPARSED" ]; then
+      ok "seam-class coverage cap: exactly one seam-class code, E-BLOCK-UNPARSED (observed: ${SEAM_CODES[*]})"
+    else
+      fail "seam-class coverage cap: exactly one seam-class code, E-BLOCK-UNPARSED (observed: ${SEAM_CODES[*]:-<none>})"
+    fi
+  else
+    fail "fixture coverage invariant: every file/dir code from --list-codes has >=1 fixture (observed: --list-codes produced no output -- see checks above)"
+    fail "seam-class coverage cap: exactly one seam-class code, E-BLOCK-UNPARSED (observed: --list-codes produced no output -- see checks above)"
+  fi
+
+  FIXTURES_PY="$(mktemp -t sxc1-check-site-fxverdict.XXXXXX.py)"
+  register_temp_file "$FIXTURES_PY"
+  cat > "$FIXTURES_PY" <<'PYEOF'
+import json
+import os
+import sys
+
+FIXTURES_DIR = sys.argv[1]
+JSON_PATH = sys.argv[2]
+
+files_dir = os.path.join(FIXTURES_DIR, "files")
+dirs_dir = os.path.join(FIXTURES_DIR, "dirs")
+
+
+def expected_code_of(name):
+    return name.split("--", 1)[0]
+
+
+disk_names = set()
+if os.path.isdir(files_dir):
+    for f in os.listdir(files_dir):
+        if f.endswith(".ex.md"):
+            disk_names.add(f)
+if os.path.isdir(dirs_dir):
+    for d in os.listdir(dirs_dir):
+        if os.path.isdir(os.path.join(dirs_dir, d)):
+            disk_names.add(d)
+
+expected_map = {n: expected_code_of(n) for n in disk_names}
+
+try:
+    with open(JSON_PATH, encoding="utf-8") as fh:
+        data = json.load(fh)
+except Exception as e:
+    print("FAIL could not read --fixtures --json capture: %s" % e)
+    sys.exit(1)
+
+json_names = set()
+diffs = []
+for f in data.get("fixtures", []):
+    name = f.get("name")
+    json_names.add(name)
+    want = expected_map.get(name)
+    if want is not None and want != f.get("expected"):
+        diffs.append("%s: filename says expected=%s but JSON expected=%s" % (name, want, f.get("expected")))
+    if not f.get("pass"):
+        diffs.append("%s: pass=false (want=%s got=%s)" % (name, f.get("expected"), f.get("got")))
+
+only_disk = sorted(disk_names - json_names)
+only_json = sorted(json_names - disk_names)
+if only_disk:
+    diffs.append("fixtures on disk but missing from --fixtures --json output: %s" % only_disk)
+if only_json:
+    diffs.append("fixtures in --fixtures --json output but not found on disk: %s" % only_json)
+
+if not data.get("ok", False):
+    diffs.append("--fixtures --json overall ok=false")
+
+if diffs:
+    print("FAIL " + "; ".join(diffs))
+    sys.exit(1)
+print("OK %d fixtures (filename-declared verdicts independently re-derived and matched)" % len(disk_names))
+sys.exit(0)
+PYEOF
+
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    CANDIDATE_FIXTURES_JSON="$(mktemp -t sxc1-check-site-fxjson.XXXXXX.json)"
+    register_temp_file "$CANDIDATE_FIXTURES_JSON"
+    run_exercise_check "${EXERCISE_CHECK_ARGS[@]}" --fixtures "$EXERCISE_FIXTURES_DIR" --json >"$CANDIDATE_FIXTURES_JSON" 2>/dev/null || true
+    if [ -s "$CANDIDATE_FIXTURES_JSON" ]; then
+      FX_VERDICT_OUT="$(python3 "$FIXTURES_PY" "$EXERCISE_FIXTURES_DIR" "$CANDIDATE_FIXTURES_JSON" 2>&1)" || true
+      case "$FX_VERDICT_OUT" in
+        "OK "*) ok "independent verdict re-derivation from fixture filenames matches --fixtures --json (${FX_VERDICT_OUT#OK })" ;;
+        *)      fail "independent verdict re-derivation from fixture filenames matches --fixtures --json (observed: ${FX_VERDICT_OUT#FAIL })" ;;
+      esac
+    else
+      fail "independent verdict re-derivation from fixture filenames matches --fixtures --json (observed: could not capture --fixtures --json output)"
+    fi
+  else
+    fail "independent verdict re-derivation from fixture filenames matches --fixtures --json (observed: toolchain env, binary, or python3 unavailable -- see checks above)"
+  fi
+  rm -f "$FIXTURES_PY"
 fi
 
 # ===========================================================================
@@ -1203,6 +2073,19 @@ run_browser_stage() {
   local -a browser_cmd=("$REPO_ROOT/scripts/browser-check.mjs" --url "$run_url" --timeout 120000)
   if [ -n "${CONTENT_JSON_FILE:-}" ] && [ -s "$CONTENT_JSON_FILE" ]; then
     browser_cmd+=(--expect-json "$CONTENT_JSON_FILE")
+  fi
+  # M2 (task "verification", item D): the disk-derived exercise stats and
+  # exercise-check --browser-fixture payload, so #sxc1-exercise-stats (what
+  # app.wasm actually has embedded) is compared against what is on disk
+  # right now -- see checks 16/17 above for how these two files are built.
+  # Falls back to no exercise-engine browser assertions at all when either
+  # is unavailable (--skip-content, or checks 16/17 could not produce a
+  # capture) -- mirroring --expect-json's own fallback immediately above.
+  if [ -n "${EXPECT_EXERCISE_JSON_FILE:-}" ] && [ -s "$EXPECT_EXERCISE_JSON_FILE" ]; then
+    browser_cmd+=(--expect-exercise-json "$EXPECT_EXERCISE_JSON_FILE")
+  fi
+  if [ -n "${EXERCISE_FIXTURE_FILE:-}" ] && [ -s "$EXERCISE_FIXTURE_FILE" ]; then
+    browser_cmd+=(--exercise-fixture "$EXERCISE_FIXTURE_FILE")
   fi
   echo "check-site: serving '$serve_dir' at $run_url (browser: $browser_path)"
   set +e

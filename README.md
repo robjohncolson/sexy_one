@@ -7,12 +7,41 @@ This is an unofficial fan project and is **not affiliated with Casio**.
 
 ## Status
 
-**M1 (manual reader).** All four translated manuals — the guide book, the startup guide,
-the MIDI implementation notes and the OSS/licence notes — are browsable end to end: a
-home page listing all four, grouped chapter/section navigation into each one, page-by-page
-reading of the translated text, and a per-page toggle that reveals the original Japanese
-page as a scanned image. See [`PLAN.md`](PLAN.md) for the full milestone roadmap and
-[`briefs/M1-plan.md`](briefs/M1-plan.md) for the design this milestone implements.
+**M2 (exercise engine).** The site is now a reader *and* a trainer. M1's manual reader
+is unchanged and fully intact (see below); layered on top of it, chapters can now carry
+`.ex.md` exercise decks in three kinds: **quiz/flashcard** (choice or free-recall
+prompts, graded in the browser), **guided device drill** (a numbered sequence of
+on-device steps ending in a self-check), and **timed reference lookup** (find the answer
+on a manual page against the clock, without the page number given away up front). The
+seed content set — 4 decks, 16 exercises, 24 prompts (7 quiz / 4 drill / 5 lookup),
+drawn from `content/exercise-inventory.md`'s Preparation and Pad-play chapters —
+exercises every part of the engine end to end. See [`PLAN.md`](PLAN.md) for the full
+milestone roadmap, and [`briefs/M2-plan.md`](briefs/M2-plan.md) with
+[`briefs/M2-plan-amendments.md`](briefs/M2-plan-amendments.md) for the design this
+milestone implements — the amendments correct the original plan's parser-reuse
+assumptions against the real, already-committed M1 code, and win wherever the two
+disagree.
+
+Two things this milestone deliberately leaves undone, both already seamed for later
+milestones rather than left as open design questions: **progress is not persisted** —
+an exercise result lives only in the running page's in-memory state and is gone on
+reload (M3 binds a `ProgressSink` to `localStorage` with spaced repetition); and
+**device verification is not implemented** — a drill's self-check is confirmed by the
+learner clicking a button, not by reading the SXC-1 itself over WebMIDI (M4).
+`site/app/Main.hs` already wires an explicit no-op `DeviceVerifier` (`noDeviceVerifier`)
+so M4 has a seam to fill rather than a design to invent; no WebMIDI call and no device
+permission request exists anywhere in this milestone's code.
+
+`app.wasm` measures **978,969 bytes gzipped** (4,694,642 bytes raw) against the
+`check-site.sh`-enforced, unchanged 1,000,000-byte ceiling — about 21 KB of headroom,
+and that headroom is deliberately thin. It is a considered trade, not an oversight: the
+validating parser (`SXC1.Exercise.Parse`/`SXC1.Exercise.Lint`) that `exe:app` currently
+links to run the exercise engine costs roughly 95 KB of that gzipped total on its own,
+and most of what it validates only `exe:exercise-check` actually needs at CI/build time,
+not in the browser. Before any change to the 1,000,000-byte ceiling itself is
+considered, M3 opens with a size-reduction task: split `parseDeck` (a pure structural
+reader) from `validateDeck` (linting, citations, inventory binding) so `exe:app` links
+only the reader.
 
 ## Prerequisites
 
@@ -100,6 +129,86 @@ a tarball with 'sdist'.
 refuses to reach outside the package directory (`site/`) while doing it. This project
 never runs `cabal sdist` — there is nothing to publish to Hackage — so the warning is
 inert; it is not worked around.
+
+## Course content
+
+`translations/*.md` remain the single source of truth for everything the app says —
+exercises don't restate manual text, they point at it. An exercise deck is one
+`.ex.md` file under `content/exercises/`, and every file there must be listed in
+`content/exercises/INDEX` (a plain filename-per-line list that controls reading order —
+this is *not* just "sorted by filename"; both directions are checked, so a file missing
+from `INDEX`, or an `INDEX` entry with no matching file, is a validation error). See
+[`content/EXERCISE-FORMAT.md`](content/EXERCISE-FORMAT.md) for the full grammar — it is
+the only document a content author needs, written to assume no Haskell knowledge and no
+access to the validator's source.
+
+Every exercise cites at least one manual page **by number and by a verbatim anchor
+phrase**, e.g. `cite: guide-book 15 "First, select BANK 1"` — the validator checks that
+the phrase actually occurs (whitespace-collapsed) on that numbered page of the named
+translation, not just that the page number is in range. An exercise's `id` must also be
+one of the ids in [`content/exercise-inventory.md`](content/exercise-inventory.md), the
+committed 440-id master plan every exercise id is drawn from (`q-`/`d-`/`l-` prefixed for
+quiz/drill/lookup, chapter-numbered, sequenced). Ids in that inventory are permanent —
+never renumbered, only retired-with-a-tombstone — because M3 keys a learner's persisted
+progress to them; an id that moved out from under a learner's history would silently
+orphan it.
+
+Exercise decks are embedded into the wasm **at compile time**, the same way the manuals
+are (`site/app/Exercises/Embed.hs`, one Template-Haskell splice per deck file, filtered
+and ordered by the compiled-in `INDEX`), so — exactly as with a translation — the whole
+content-editing workflow is: edit a `.ex.md` file (or `INDEX`), re-run
+`./scripts/build-site.sh`.
+
+## Validating exercise content
+
+`exe:exercise-check` is `site/test/CheckExercises.hs`, built and run exactly like
+`exe:content-check` above: a wasm32-wasi *command* module, resolved with
+`wasm32-wasi-cabal list-bin` and run on the host by `wasm-run.mjs`. From the repository
+root:
+
+```sh
+. "$HOME/.ghc-wasm/env"
+cd site
+wasm32-wasi-cabal build exe:exercise-check
+BIN="$(wasm32-wasi-cabal list-bin exe:exercise-check | tail -1)"
+
+wasm-run.mjs "$BIN" --content-dir ../content --translations-dir ../translations
+                                        # validates the real, working-tree content
+wasm-run.mjs "$BIN" --self-test        # the validator's own internal test suite
+wasm-run.mjs "$BIN" --fixtures ../content/fixtures
+                                        # runs it against the falsifiability corpus below
+wasm-run.mjs "$BIN" --list-codes       # every issue code the validator can raise, tab-
+                                        # separated with its class (file/dir/seam)
+```
+
+Every one of those has been run, in this order, from this repository's root, on this
+machine: the real-content run and `--self-test` (101/101 checks) both exit 0 with zero
+issues, `--fixtures` reports `51/51 fixtures passed`, and `--list-codes` prints 48 codes.
+`./scripts/check-site.sh` runs the same validator (plus everything below) as part of its
+own gate — this is the escape hatch for checking content alone, without a full build and
+browser sweep, while iterating on a deck.
+
+**Why this gate cannot pass vacuously.** A validator that never fires its own checks, or
+that a fixture-free corpus quietly "validates" by never actually exercising a rule, is
+worse than no validator — it would pass while checking nothing. Three things close that
+gap:
+
+1. **The fixture corpus** (`content/fixtures/`) — one small file or content-root per
+   issue code, named for the exact one defect it contains (`E-CITE-PAGE--out-of-range.ex.md`,
+   …), plus `OK--*` fixtures that must be *accepted* (the control proving the validator
+   hasn't degenerated into rejecting everything).
+2. **The coverage invariant** — every issue code `exercise-check --list-codes` can print
+   must have at least one matching fixture; a validation rule with no fixture demonstrating
+   it fail is itself a failing check. The one code that cannot occur from any real file on
+   disk, `E-BLOCK-UNPARSED` (the markdown-parser seam), is instead proven live by
+   `--self-test`, and `check-site.sh` asserts it is the *only* code in that "seam" class —
+   so nothing can quietly hide behind that exemption.
+3. **Three-way agreement**, mirroring the manual reader's own check above: the real
+   Haskell validator (`exe:exercise-check --json`), an independent `python3`
+   re-derivation of the same deck/exercise/citation counts straight from
+   `content/exercises/*.ex.md` (never from the Haskell side), and the running app's
+   embedded copy read out of `#sxc1-exercise-stats` in the live DOM must all agree, or
+   `check-site.sh` fails red instead of silently shipping a stale or miscounted build.
 
 ## Verification
 
@@ -246,16 +355,26 @@ casio-sxc1/
 │   ├── extract-pages.sh         manual PDF -> page image/text extraction (scratch)
 │   └── render-page-images.sh    manual PDF -> committed site/static/pages/*.webp
 ├── site/
-│   ├── sxc1-trainer.cabal       lib:sxc1-trainer + exe:app + exe:content-check
+│   ├── sxc1-trainer.cabal       lib:sxc1-trainer + exe:app + exe:content-check +
+│   │                             exe:exercise-check
 │   ├── cabal.project            index-state pin, boot-library constraints
-│   ├── src/                     SXC1.* -- the miso-free content/route library
-│   ├── app/                     the Miso app (Main.hs, View/) -- depends on the library
-│   ├── test/                    CheckContent.hs -- exe:content-check's corpus validator
+│   ├── src/                     SXC1.* -- the miso-free content/route/exercise library
+│   ├── app/                     the Miso app (Main.hs, View/, Exercises/) -- depends
+│   │                             on the library
+│   ├── test/                    CheckContent.hs, CheckExercises.hs -- the two
+│   │                             corpus validators (exe:content-check, exe:exercise-check)
 │   ├── static/                  HTML shell, boot loader, vendored WASI shim,
 │   │                             pages/<slug>/page-NN.webp (committed JA page images)
 │   └── public/                  build output (gitignored, never committed)
 ├── manuals/                     original Japanese Casio PDFs (source material)
 ├── translations/                English translations of the manuals (embedded at build time)
+├── content/
+│   ├── EXERCISE-FORMAT.md       the .ex.md authoring guide -- the only doc a content
+│   │                             author needs
+│   ├── exercise-inventory.md    the committed 440-id master exercise plan
+│   ├── terminology-rules.tsv    house style rules exercise-check enforces
+│   ├── exercises/                .ex.md decks + INDEX (embedded at compile time)
+│   └── fixtures/                 the validator's falsifiability corpus (files/, dirs/)
 └── .github/workflows/           CI: build, check, and (once enabled) deploy to Pages
 ```
 
@@ -280,20 +399,27 @@ a domain root, or offline when served locally (`./scripts/serve-site.sh`).
 copies the built bundle under a non-root prefix, serves it there, and requires the full
 headless-browser check to pass against that sub-path — a bundle that only works from the
 origin root now fails this check even if it slips past the (advisory) grep for absolute
-URLs. The bundle does **not** work opened directly as a `file://` URL, though:
-`index.js` is an ES module that imports sibling modules and `fetch`es `app.wasm`, and
-browsers give `file://` pages an opaque origin that blocks both.
+URLs. The bundle does **not** work opened directly from local disk with a bare `file:`
+URL, though: `index.js` is an ES module that imports sibling modules and `fetch`es
+`app.wasm`, and browsers give a page opened straight off disk that way an opaque origin
+that blocks both — it must be served (offline is fine; `./scripts/serve-site.sh` serves
+`site/public/` over plain local HTTP), not just opened.
 
-`exe:content-check` is built alongside `exe:app` but is a separate, ordinary wasm32-wasi
-*command* executable (no reactor model, no JS at all) — it links against the
-`sxc1-content` library only, not Miso, and is run directly on the host by `wasm-run.mjs`
-as part of `check-site.sh`. It never ships to the browser.
+`exe:content-check` and `exe:exercise-check` are both built alongside `exe:app` but are
+separate, ordinary wasm32-wasi *command* executables (no reactor model, no JS at all) —
+they link against the `sxc1-content` library only, not Miso, and are run directly on the
+host by `wasm-run.mjs` as part of `check-site.sh`. Neither ever ships to the browser.
 
 ## Deployment
 
-`.github/workflows/site.yml` builds the site and runs `check-site.sh` on every push and
-pull request, then uploads `site/public/` as a GitHub Pages artifact — nothing built is
-ever committed to the repository. `check-site.sh` prints a final machine-readable marker,
+`.github/workflows/site.yml` builds the site, runs the exercise validator (`exe:exercise-check
+--content-dir/--translations-dir`, `--fixtures`, `--self-test`) as its own early, timed
+step so a content-only typo in a `.ex.md` file fails in seconds rather than after a full
+browser sweep, then runs `check-site.sh` (which re-runs that same validator as one of its
+own checks — the workflow step above is a fast, readable front door onto the same
+unskippable gate, not a separate or looser one) on every push and pull request, then
+uploads `site/public/` as a GitHub Pages artifact — nothing built is ever committed to
+the repository. `check-site.sh` prints a final machine-readable marker,
 `check-site: result=complete` when every check (including both browser runs — root and
 sub-path) actually executed, or `check-site: result=structural-only` if the browser axis
 was skipped (`--skip-browser` / `SXC1_SKIP_BROWSER=1`); CI fails the build unless it sees
@@ -370,6 +496,12 @@ affiliated with, endorsed by, or sponsored by Casio.
 
 See [`briefs/M0-plan.md`](briefs/M0-plan.md) for the toolchain design rationale, the
 risks considered, and the fallback plan (Miso on GHC's JavaScript backend) if the
-WebAssembly backend ever proves unworkable, and [`briefs/M1-plan.md`](briefs/M1-plan.md)
-for the manual-reader design this milestone implements: the content model, the parser
-strategy, the routing scheme, and the page-image delivery decision.
+WebAssembly backend ever proves unworkable; [`briefs/M1-plan.md`](briefs/M1-plan.md) for
+the manual-reader design that milestone implements: the content model, the parser
+strategy, the routing scheme, and the page-image delivery decision; and
+[`briefs/M2-plan.md`](briefs/M2-plan.md) together with
+[`briefs/M2-plan-amendments.md`](briefs/M2-plan-amendments.md) for the exercise-engine
+design this milestone implements: the `.ex.md` grammar, the engine's state machine, and
+the validator's three-way-agreement verification strategy — the amendments correct the
+original plan's parser-reuse assumptions against the real, already-committed M1 code and
+win wherever the two disagree.
