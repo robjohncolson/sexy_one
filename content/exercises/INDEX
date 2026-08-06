@@ -1,0 +1,6 @@
+# Reading order for the M2 seed exercise set.
+# Chapter 1 (Part: Preparation), then Chapter 2 (Part: Pad play).
+00-preparation-power.ex.md
+10-pad-play-banks.ex.md
+20-pad-play-sounds.ex.md
+30-pad-play-performance.ex.md
