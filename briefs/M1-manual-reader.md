@@ -1,6 +1,8 @@
 # M1 Brief — Manual reader
 
-**From:** Fable (planning tier) · **To:** Opus 5 design agent · **Status:** draft, dispatch after M0 gate closes
+**From:** Fable (planning tier) · **To:** Opus 5 design agent · **Status:** design
+dispatched 2026-08-06 in parallel with M0's Codex review (M0 sign-off granted);
+M1 *implementation* stays blocked until the M0 gate fully closes
 
 ## Goal
 
