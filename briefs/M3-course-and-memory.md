@@ -18,8 +18,10 @@ dependency graph).
 
 ## Size mandate (from the M2 designer's budget ruling, 2026-08-07)
 
-M2 ships at 978,969 B gzip against the 1,000,000 ceiling — ~21 KB headroom,
-deliberately not raised at the M2 gate. **M3's first implementation task is
+M2 ships at ~984-986 KB gzip against the 1,000,000 ceiling — under ~16 KB
+headroom (the gate-fix round added rendering/validation code; per-build
+variance ~±1.5 KB, so quote ranges, not points), deliberately not raised at
+the M2 gate. **M3's first implementation task is
 size reduction, before any feature work**: split `parseDeck` (pure structural
 reader) from `validateDeck` (lint + citations + inventory binding) so
 `exe:app` links only the reader — the validating parser's measured browser

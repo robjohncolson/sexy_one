@@ -367,8 +367,19 @@ runBrowserFixture opts = do
       exitWith (ExitFailure 1)
 
 data QuizFixture = QuizFixture { qfDeck, qfId, qfCorrectOpt, qfWrongOpt, qfCiteSlug :: Text, qfCitePage :: Int }
-data DrillFixture = DrillFixture { dfDeck, dfId :: Text, dfSteps :: Int, dfHasVerify :: Bool }
-data LookupFixture = LookupFixture { lfDeck, lfId :: Text, lfTargetPage :: Int }
+data DrillFixture = DrillFixture
+  { dfDeck, dfId :: Text, dfSteps :: Int, dfHasVerify :: Bool
+    -- M2 re-gate LOW fix: the first step's declared citation, so the
+    -- browser assertion can require the RENDERED href to equal the
+    -- DECLARED target rather than merely look like a manual URL.
+  , dfCiteSlug :: Text, dfCitePage :: Int
+  }
+data LookupFixture = LookupFixture
+  { lfDeck, lfId :: Text
+    -- M2 re-gate LOW fix: slug included alongside the page for the same
+    -- declared-vs-rendered equality reason as 'dfCiteSlug'.
+  , lfTargetSlug :: Text, lfTargetPage :: Int
+  }
 
 findQuiz :: Loaded -> Maybe QuizFixture
 findQuiz loaded = firstJust
@@ -386,8 +397,10 @@ findQuiz loaded = firstJust
 
 findDrill :: Loaded -> Maybe DrillFixture
 findDrill loaded = firstJust
-  [ DrillFixture (unDeckId (dkId d)) i (length (exPrompts e)) hasV
+  [ DrillFixture (unDeckId (dkId d)) i (length (exPrompts e)) hasV (citSlug c) (citPage c)
   | d <- ldDecks loaded, e <- dkExercises d, exKind e == KDrill
+  , (p0 : _) <- [exPrompts e]
+  , (c : _) <- [prCites p0]
   , let ExId i = exId e
         hasV = any promptHasVerify (exPrompts e)
         promptHasVerify p = case prBody p of { Confirm _ (Just _) -> True; _ -> False }
@@ -395,7 +408,7 @@ findDrill loaded = firstJust
 
 findLookup :: Loaded -> Maybe LookupFixture
 findLookup loaded = firstJust
-  [ LookupFixture (unDeckId (dkId d)) i (citPage target)
+  [ LookupFixture (unDeckId (dkId d)) i (citSlug target) (citPage target)
   | d <- ldDecks loaded, e <- dkExercises d, exKind e == KLookup
   , (p : _) <- [exPrompts e]
   , FindPage target _ <- [prBody p]
@@ -417,9 +430,11 @@ browserFixtureJson qz dr lk =
     , "\"drill\":" <> obj
         [ kv "deck" (str (dfDeck dr)), kv "id" (str (dfId dr))
         , kv "steps" (T.pack (show (dfSteps dr))), kv "hasVerify" (if dfHasVerify dr then "true" else "false")
+        , kv "citeSlug" (str (dfCiteSlug dr)), kv "citePage" (T.pack (show (dfCitePage dr)))
         ]
     , "\"lookup\":" <> obj
-        [ kv "deck" (str (lfDeck lk)), kv "id" (str (lfId lk)), kv "targetPage" (T.pack (show (lfTargetPage lk))) ]
+        [ kv "deck" (str (lfDeck lk)), kv "id" (str (lfId lk))
+        , kv "targetSlug" (str (lfTargetSlug lk)), kv "targetPage" (T.pack (show (lfTargetPage lk))) ]
     ] <> "}"
   where
     obj kvs = "{" <> T.intercalate "," kvs <> "}"

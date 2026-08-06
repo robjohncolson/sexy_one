@@ -44,14 +44,16 @@ viewRoute
   :: action
   -> T.Text                     -- ^ #sxc1-exercise-stats JSON
   -> T.Text                     -- ^ #sxc1-event-log JSON
+  -> T.Text                     -- ^ #sxc1-prompt-baseline JSON (M2 re-gate: see Main.promptBaselineJson)
   -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
   -> Route
   -> View model action
-viewRoute toggleAction exStatsJson eventLogJson mExerciseBody route = H.main_ [ P.id_ "app" ]
+viewRoute toggleAction exStatsJson eventLogJson baselineJson mExerciseBody route = H.main_ [ P.id_ "app" ]
   [ headerView route
   , statsView
   , exerciseStatsView exStatsJson
   , eventLogView eventLogJson
+  , promptBaselineView baselineJson
   , routeBody toggleAction mExerciseBody route
   , footerView
   ]
@@ -192,6 +194,15 @@ exerciseStatsView t = H.div_ [ P.id_ "sxc1-exercise-stats", P.hidden_ True ] [ t
 
 eventLogView :: T.Text -> View model action
 eventLogView t = H.div_ [ P.id_ "sxc1-event-log", P.hidden_ True ] [ text (ms t) ]
+
+-- | M2 re-gate fix (cold-route observability): the CURRENT exercise
+-- route's monotonic prompt baseline ('esPromptAt'), or @null@ when no
+-- 'ExerciseState' exists -- i.e. when 'Begin' has not run. A cold deep
+-- link whose mount-time 'Begin' was lost renders @null@ here, so the
+-- harness asserts this directly instead of inferring from elapsed-time
+-- windows that page uptime can satisfy accidentally.
+promptBaselineView :: T.Text -> View model action
+promptBaselineView t = H.div_ [ P.id_ "sxc1-prompt-baseline", P.hidden_ True ] [ text (ms t) ]
 
 --------------------------------------------------------------------------
 -- Home ("#/"): project blurb + one card per manual.

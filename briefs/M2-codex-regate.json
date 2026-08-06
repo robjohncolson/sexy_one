@@ -1,0 +1,145 @@
+{
+  "task_type": "review",
+  "status": "completed",
+  "scope": "Focused read-only re-review of commit 43a9df1 against the 16 grouped M2 gate findings. No build, test, lint, install, or runtime command was run; the coordinator-supplied run results were treated as reported evidence and the commit was reviewed statically.",
+  "summary": "All eight HIGH production defects are fixed in the committed code. M1, M3, M6, L1, L2, and L3 are also fixed. M2 is only partially fixed because the raw Issue constructor is hidden but actual-code enumeration is again hand-maintained and E_TERM remains an open Text-bearing escape. The combined M4/M5 harness finding is only partially fixed because the warm elapsed assertion catches H1, but the fresh-target cold assertion cannot detect H6's missing Begin. Those two residual integrity defects prevent gate clearance.",
+  "per_finding": [
+    {
+      "id": "H1",
+      "title": "clock seam",
+      "verdict": "FIXED",
+      "evidence": "MonoMs and WallMs are distinct non-Num newtypes and every clock-bearing ExerciseAction uses them (site/src/SXC1/Exercise/Engine.hs:75-136). Begin/Restart seed initialState from MonoMs, gradeStep subtracts MonoMs from esPromptAt, and Advance re-baselines esPromptAt from MonoMs (Engine.hs:224-333). Main.readClocks returns (MonoMs, WallMs), beginIfNeeded passes Begin mono wall, and all UI handlers preserve that order (site/app/Main.hs:72-85,248-258,312-326). Consequently the old `Begin . snd` expression is ill-typed. The divergent-epoch self-test also directly pins Begin, Restart, and Advance elapsed values (site/test/CheckExercises.hs:1300-1345)."
+    },
+    {
+      "id": "H2",
+      "title": "citation anchor vacuity",
+      "verdict": "FIXED",
+      "evidence": "Manual pages are flattened through the block parser and learner-text flattener, anchors through the corresponding inline parser/flattener, and both are whitespace-normalized (site/src/SXC1/Exercise/Verify.hs:65-102). resolveCitation measures the normalized rendered anchor, requires at least 12 characters and a letter, and searches the rendered page text (Verify.hs:110-133). This closes both `press          the` and table-delimiter defeats. Caveat: the independent shell/Python resolver was not tightened; see remaining_checks."
+    },
+    {
+      "id": "H3",
+      "title": "drill-step terminology lint and markup-split defeat",
+      "verdict": "FIXED",
+      "evidence": "parseStep now returns lint targets for both check text and parsed step-body text, parseExercise includes all step targets, and inlinesText concatenates the parser's whitespace-bearing Inline nodes rather than inserting separators (site/src/SXC1/Exercise/Parse.hs:667-668,723-733,749-811; site/src/SXC1/Exercise/Lint.hs:216-239). Thus step/check prose is covered and `the **machine**` reconstructs as `the machine`."
+    },
+    {
+      "id": "H4",
+      "title": "global deck-slug uniqueness",
+      "verdict": "FIXED",
+      "evidence": "globalIdDuplicateIssues now combines exercise-id duplicates with deck-slug counts over all loaded decks and emits E-ID-DUPLICATE for every repeated slug (site/test/CheckExercises.hs:270-304)."
+    },
+    {
+      "id": "H5",
+      "title": "empty drill-step bodies",
+      "verdict": "FIXED",
+      "evidence": "E_DRILL_STEP_EMPTY is declared, enumerated, rendered, and classified as a file code (site/src/SXC1/Exercise/Report.hs:128-167,193-226). parseStep emits it when stepBodyBlocks is empty (site/src/SXC1/Exercise/Parse.hs:781-800), and commit 43a9df1 adds content/fixtures/files/E-DRILL-STEP-EMPTY--empty-step-body.ex.md."
+    },
+    {
+      "id": "H6",
+      "title": "cold exercise route initialization",
+      "verdict": "FIXED",
+      "evidence": "readerApp mounts with `Just (SetRoute r0)`, and SetRoute calls beginIfNeeded, which samples both clocks and dispatches Begin when the exercise has no state (site/app/Main.hs:187-205,215-225,248-259). This closes the production cold-route zero-baseline defect. The new browser check does not independently prove this closure; see M4/M5."
+    },
+    {
+      "id": "H7",
+      "title": "stale Restart feedback/results",
+      "verdict": "FIXED",
+      "evidence": "applyExActions detects Begin/Restart and filters only PromptId keys with this exercise's exact `<exid>#` prefix before recording any new events (site/app/Main.hs:282-306). Restart also resets the engine state through the typed clock path (Main.hs:326; Engine.hs:253-254). The prefix delimiter prevents exercise-id prefix collisions."
+    },
+    {
+      "id": "H8",
+      "title": "unrendered drill and lookup citations",
+      "verdict": "FIXED",
+      "evidence": "Drill bodies remain visible after completion, and each confirmed step renders prCites as `.ex-step-cites` via the existing renderCite contract (site/app/View/Exercise.hs:204-217,298-338). Lookup FindPage targets are added to the shared #ex-cites list and remain gated on mAttempted, so they are absent before grading and present afterward (View/Exercise.hs:268-292)."
+    },
+    {
+      "id": "M1",
+      "title": "citation declaration totals and independent recount",
+      "verdict": "FIXED",
+      "evidence": "buildTotals counts deck cites, each exercise cite once, drill prompt cites, and lookup FindPage declarations, matching source declarations rather than duplicated model storage (site/src/SXC1/Exercise/Report.hs:278-311). scripts/recount-citations.py:84-103 independently scans start-anchored cite/find lines without model-kind knowledge, then compares to report totals at lines 106-167; check-site invokes this separate script at scripts/check-site.sh:1766-1794. The doctored-report control described by the coordinator is materially capable of failing."
+    },
+    {
+      "id": "M2",
+      "title": "closed issue-code set and seam cap",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "The immediate raw escape is closed: Report exports Issue accessors but not the Issue constructor, and terminology issues go through mkIssue (E_TERM ruleId) (site/src/SXC1/Exercise/Report.hs:19-39,70-104,128-145; site/src/SXC1/Exercise/Lint.hs:153-161). However, adding the field-bearing E_TERM forced removal of Enum/Bounded, and allIssueCodes is now a hand-written list (Report.hs:147-168). listCodesLines enumerates that list plus only rule ids supplied from the loaded TSV (Report.hs:233-245). An omitted new static constructor, or `mkIssue (E_TERM \"unlisted\")`, can therefore emit a code absent from --list-codes; a new seam constructor can be mapped SeamClass yet omitted from allIssueCodes, leaving the cap green. The original guarantee that the cap is closed over all emit-able codes is not restored."
+    },
+    {
+      "id": "M3",
+      "title": "rendered-identical choice labels",
+      "verdict": "FIXED",
+      "evidence": "Choice duplicate detection now parses options first and compares inlinesText of optLabel, so raw-distinct `A` and `**A**` collide as intended (site/src/SXC1/Exercise/Parse.hs:632-653)."
+    },
+    {
+      "id": "M6",
+      "title": "lookup prose double rendering",
+      "verdict": "FIXED",
+      "evidence": "The duplicate prStem rendering was removed. #ex-find-task is now a div containing only the distinct page-number label/input/submit controls, while the task prose remains in #ex-stem (site/app/View/Exercise.hs:231-250)."
+    },
+    {
+      "id": "L1",
+      "title": "fixture README accuracy",
+      "verdict": "FIXED",
+      "evidence": "content/fixtures/README.md:45-64 now marks filename contamination as historical, explains the scoped comparison filter, and states the current passing contract."
+    },
+    {
+      "id": "L2",
+      "title": "skip accounting",
+      "verdict": "FIXED",
+      "evidence": "The skip-content branch now counts the previously omitted toolchain-env and content-check-binary checks before the remaining content-axis skips (scripts/check-site.sh:970-1008), keeping the total membership aligned while still forcing structural-only."
+    },
+    {
+      "id": "L3",
+      "title": "route empty-segment and charset strictness",
+      "verdict": "FIXED",
+      "evidence": "segmentsOf rejects doubled/interior/trailing empty segments except the canonical root, isRouteId enforces nonempty [a-z0-9-]+ identifiers, and classify applies it to manual/deck/exercise routes without using read (site/src/SXC1/Route.hs:27-101)."
+    },
+    {
+      "id": "M4/M5",
+      "title": "harness honesty for clock wiring and learner paths",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "Check 14 is explicitly labeled subordinate and points to browser behavior as the gate (scripts/check-site.sh:601-695). The warm first-attempt assertion waits 900 ms, inspects event-log entry zero, and catches H1 before any re-baselining retry (scripts/browser-check.mjs:1098-1161). Restart freshness, completed-drill cite, ungraded/graded lookup cite, and a seven-exact-fail negative suite are real assertions (browser-check.mjs:1228-1395,1742-1771). But the cold check creates a brand-new target directly at the exercise URL and accepts elapsed in [wait, wait+20s] (browser-check.mjs:997-1035,2701-2743). If Main's mount/SetRoute is removed, initialState MonoMs 0 produces elapsed equal to that fresh target's page uptime, which still falls in the accepted window. The negative fixture forces elapsed to zero; it never models missing Begin. Thus the exact H6 regression still passes the purported cold behavioral gate."
+    }
+  ],
+  "rulings": {
+    "size": {
+      "verdict": "SHIP-SOUND-WITH-RISK",
+      "analysis": "984,239 B gzip is 15,761 B (1.5761%) below the unchanged 1,000,000-byte hard ceiling. That is thin but sufficient for a frozen M2: the gate fails closed, and M3 explicitly makes size reduction the first implementation task before content, persistence, or scheduler growth (briefs/M3-course-and-memory.md:19-30). The measured ~95 KB validator/parser opportunity is an upper bound rather than a guaranteed saving, but the reader/validator split plus pre-parsed-model fallback is a credible reduction plan. M2 size alone should not block, provided M3 treats reduction as an entry gate and no more M2 feature growth is accepted. The M3 brief's recorded 978,969 B/~21 KB baseline is now stale and should be updated to 984,239 B/15,761 B before M3 work starts."
+    },
+    "new_defects_via_43a9df1": {
+      "verdict": "YES",
+      "analysis": "No new learner-facing engine/view defect was found in the changed production paths. Two integrity/documentation regressions entered as effects of this commit: (1) Report's former Enum/Bounded enumeration was replaced by a driftable hand list/open E_TERM constructor, so M2's closed-code guarantee remains escapable; (2) the M3 size brief is now stale by 5,270 B and overstates headroom by the same amount. The H6 browser blind spot is a new test defect in the added assertion."
+    },
+    "remaining_cannot_fail_checks": {
+      "verdict": "YES",
+      "analysis": "The cold elapsed assertion is falsifiable for a forced-zero H1 sabotage but cannot fail for the exact missing-Begin H6 regression, because a fresh target makes MonoMs 0 approximately page-load time and the +20s upper slack admits the full boot interval. The warm assertion is non-vacuous for H1, and Restart/citation absence assertions are non-vacuous under the seven-failure sabotage. Two weaker residual checks are also worth recording: completed-drill cites are checked only for URL shape, not against declared step targets, and lookup cites check the target page but not the target slug (browser-check.mjs:1320-1334,1386-1394); additionally, check-site's independent citation resolver still measures raw stripped anchors and searches whitespace-collapsed raw Markdown, with no post-normalization length/letter/rendered-text rule (scripts/check-site.sh:1482-1510,1626-1631), so it cannot catch a future reintroduction of H2's whitespace/table defeats."
+    }
+  },
+  "new_findings": [
+    {
+      "severity": "MEDIUM",
+      "location": "site/src/SXC1/Exercise/Report.hs:128-168,233-245",
+      "title": "The closed issue-code/seam guarantee remains escapable through manual enumeration",
+      "scenario": "Add E_SECOND_SEAM to IssueCode, codeText, and issueClassOf, emit it via mkIssue, but omit it from the hand-written allIssueCodes list. The program compiles, --list-codes omits it, fixture coverage never asks for it, and the seam cap still sees only E-BLOCK-UNPARSED. Even without a new constructor, E_TERM accepts arbitrary Text while listCodesLines lists only TSV rule ids. Preserve an Enum/Bounded static subtype or make the exhaustive enumeration construction impossible to omit from."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "scripts/browser-check.mjs:997-1035,2701-2743",
+      "title": "The cold-route assertion cannot detect removal of mount-time Begin",
+      "scenario": "Delete `mount = Just (SetRoute r0)` while leaving startup route parsing intact. On the new target, esPromptAt remains MonoMs 0; first elapsed becomes Chrome page uptime, approximately boot time plus the known 1.2 s wait, and therefore satisfies both >= wait and < wait+20 s. The negative self-test's forced zero does not model this. Pre-age the target before initial navigation and use a separating upper bound, or expose/assert an observable Begin baseline."
+    },
+    {
+      "severity": "LOW",
+      "location": "scripts/browser-check.mjs:1320-1334,1386-1394; site/test/CheckExercises.hs:370-422",
+      "title": "New drill/lookup citation assertions do not verify the full declared target",
+      "scenario": "A completed drill can render any syntactically valid internal manual URL and pass because DrillFixture carries no cite data. A lookup can render the right page under the wrong manual slug and pass because LookupFixture carries only targetPage. Extend the browser fixture with exact drill step citations and lookup slug/page, then compare full hrefs."
+    },
+    {
+      "severity": "LOW",
+      "location": "briefs/M3-course-and-memory.md:21",
+      "title": "The committed M3 size baseline overstates current headroom",
+      "scenario": "The brief still says 978,969 B and ~21 KB headroom, while the reviewed artifact is 984,239 B and 15,761 B headroom. An M3 implementer using the brief begins with 5,270 B less room than documented. Update the baseline before M3 implementation; the reduce-first mandate itself remains sound."
+    }
+  ],
+  "final_line": "GATE-BLOCKED — all HIGH production defects are fixed and size is acceptable, but M2's code/seam enumeration is still escapable and the new cold behavioral assertion cannot catch the exact H6 missing-Begin regression it is meant to gate."
+}

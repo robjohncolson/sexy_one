@@ -376,5 +376,16 @@ outcomeText Incorrect = "incorrect"
 outcomeText Skipped   = "skipped"
 outcomeText Completed = "completed"
 
+-- | M2 re-gate fix: the current exercise route's monotonic prompt
+-- baseline, "null" when 'Begin' has never run for it (no state entry) --
+-- rendered into @#sxc1-prompt-baseline@ so the harness can detect a lost
+-- mount-time 'Begin' deterministically. See 'View.Pages.promptBaselineView'.
+promptBaselineJson :: Model -> Text
+promptBaselineJson m = case mRoute m of
+  RExercise _ exSlug -> case Map.lookup exSlug (mExStates m) of
+    Just st -> jInteger (unMonoMs (esPromptAt st))
+    Nothing -> "null"
+  _ -> "null"
+
 viewModel :: props -> Model -> View Model Action
-viewModel _ m = viewRoute ToggleJA exerciseStatsJson (eventLogJson (mEventLog m)) (exerciseBodyView m (mRoute m)) (mRoute m)
+viewModel _ m = viewRoute ToggleJA exerciseStatsJson (eventLogJson (mEventLog m)) (promptBaselineJson m) (exerciseBodyView m (mRoute m)) (mRoute m)

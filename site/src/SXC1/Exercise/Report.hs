@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms   #-}
 
 -- | 'Issue', the CLOSED set of exercise-content issue codes, and the
 -- hand-rolled JSON report encoder -- there is no aeson (see
@@ -30,7 +31,31 @@ module SXC1.Exercise.Report
   , mkIssue
   , renderIssue
     -- * The closed code set
-  , IssueCode (..)
+    --
+    -- 'IssueCode''s static family is a separate nullary 'StaticCode'
+    -- enumeration wrapped by 'Static', with pattern synonyms preserving
+    -- the flat @E_*@ names at every use site -- so 'allIssueCodes' is
+    -- @map Static [minBound .. maxBound]@ and CANNOT under-enumerate
+    -- (M2 re-gate finding: the previous hand-written list was driftable).
+  , IssueCode
+      ( Static, E_TERM
+      , E_FILE_TITLE, E_FILE_BAD_NAME, E_DECK_EMPTY
+      , E_FIELD_UNKNOWN, E_FIELD_MISSING, E_FIELD_DUPLICATE, E_FIELD_EMPTY, E_FIELD_SYNTAX
+      , E_TYPE_UNKNOWN, E_ID_SYNTAX
+      , E_CITE_SYNTAX, E_CITE_SLUG, E_CITE_PAGE, E_CITE_ANCHOR
+      , E_CHAPTER_UNKNOWN
+      , E_ROLE_UNKNOWN, E_ROLE_MISSING, E_ROLE_REPEATED
+      , E_CHOICE_COUNT, E_CHOICE_NO_CORRECT, E_CHOICE_DUPLICATE
+      , E_QUIZ_MODE_AMBIGUOUS
+      , E_DRILL_STEP_COUNT, E_DRILL_CHECK_MISSING, E_DRILL_STEP_EMPTY
+      , E_VERIFY_SYNTAX, E_VERIFY_CC_UNKNOWN, E_VERIFY_NOTE_RANGE
+      , E_LOOKUP_SPOILER, E_BODY_INDENTED_HEADING
+      , E_INDEX_MISSING, E_INDEX_ORPHAN, E_INDEX_DANGLING, E_ID_DUPLICATE
+      , E_RULE_UNGROUNDED
+      , E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH
+      , E_BLOCK_UNPARSED
+      )
+  , StaticCode
   , IssueClass (..)
   , allIssueCodes
   , codeText
@@ -107,36 +132,115 @@ renderIssue i = isFile i <> ":" <> T.pack (show (isLine i)) <> ": " <> isCode i 
 --------------------------------------------------------------------------
 
 -- | Every code the validator can emit. The first 40 constructors are the
--- CLOSED, static, nullary family; 'E_TERM' is the one DYNAMIC family
--- member (M2 gate M2), carrying the @content\/terminology-rules.tsv@ row
--- id its violation came from -- e.g. @E_TERM \"term-machine\"@ renders as
--- @\"E-TERM.term-machine\"@ (see 'codeText'). Because 'E_TERM' carries a
--- field, this type can no longer derive 'Bounded'\/'Enum' (both require
--- every constructor to be nullary) the way it did when the dynamic
--- family was smuggled in as a raw 'Text' code bypassing this type
--- entirely -- 'allIssueCodes' below is therefore the static family
--- listed by hand, exercised by both @--list-codes@ and the
--- @--fixtures@ coverage invariant (@scripts\/check-site.sh@), so a
--- constructor added here without being added there is caught
--- immediately rather than silently under-enumerated.
+-- CLOSED, static, nullary family ('StaticCode', wrapped by 'Static');
+-- 'E_TERM' is the one DYNAMIC family member (M2 gate M2), carrying the
+-- @content\/terminology-rules.tsv@ row id its violation came from --
+-- e.g. @E_TERM \"term-machine\"@ renders as @\"E-TERM.term-machine\"@
+-- (see 'codeText').
+--
+-- M2 RE-GATE FIX: the static family lives in its own nullary type so it
+-- derives 'Enum'\/'Bounded' again, and 'allIssueCodes' is DERIVED as
+-- @map Static [minBound .. maxBound]@ -- adding a constructor without it
+-- appearing there is now impossible, closing the hand-list drift escape.
+-- The @E_*@ pattern synonyms below keep every existing use site (Parse\/
+-- Lint\/Verify\/CheckExercises) source-compatible, and the COMPLETE
+-- pragma keeps their case matches exhaustiveness-checked under -Wall.
+data StaticCode
+  = E_FILE_TITLE_ | E_FILE_BAD_NAME_ | E_DECK_EMPTY_
+  | E_FIELD_UNKNOWN_ | E_FIELD_MISSING_ | E_FIELD_DUPLICATE_ | E_FIELD_EMPTY_ | E_FIELD_SYNTAX_
+  | E_TYPE_UNKNOWN_ | E_ID_SYNTAX_
+  | E_CITE_SYNTAX_ | E_CITE_SLUG_ | E_CITE_PAGE_ | E_CITE_ANCHOR_
+  | E_CHAPTER_UNKNOWN_
+  | E_ROLE_UNKNOWN_ | E_ROLE_MISSING_ | E_ROLE_REPEATED_
+  | E_CHOICE_COUNT_ | E_CHOICE_NO_CORRECT_ | E_CHOICE_DUPLICATE_
+  | E_QUIZ_MODE_AMBIGUOUS_
+  | E_DRILL_STEP_COUNT_ | E_DRILL_CHECK_MISSING_ | E_DRILL_STEP_EMPTY_
+  | E_VERIFY_SYNTAX_ | E_VERIFY_CC_UNKNOWN_ | E_VERIFY_NOTE_RANGE_
+  | E_LOOKUP_SPOILER_ | E_BODY_INDENTED_HEADING_
+  | E_INDEX_MISSING_ | E_INDEX_ORPHAN_ | E_INDEX_DANGLING_ | E_ID_DUPLICATE_
+  | E_RULE_UNGROUNDED_
+  | E_ID_NOT_IN_INVENTORY_ | E_ID_RETIRED_ | E_ID_TYPE_MISMATCH_ | E_ID_CHAPTER_MISMATCH_
+  | E_BLOCK_UNPARSED_
+  deriving (Eq, Show, Enum, Bounded)
+
 data IssueCode
-  = E_FILE_TITLE | E_FILE_BAD_NAME | E_DECK_EMPTY
-  | E_FIELD_UNKNOWN | E_FIELD_MISSING | E_FIELD_DUPLICATE | E_FIELD_EMPTY | E_FIELD_SYNTAX
-  | E_TYPE_UNKNOWN | E_ID_SYNTAX
-  | E_CITE_SYNTAX | E_CITE_SLUG | E_CITE_PAGE | E_CITE_ANCHOR
-  | E_CHAPTER_UNKNOWN
-  | E_ROLE_UNKNOWN | E_ROLE_MISSING | E_ROLE_REPEATED
-  | E_CHOICE_COUNT | E_CHOICE_NO_CORRECT | E_CHOICE_DUPLICATE
-  | E_QUIZ_MODE_AMBIGUOUS
-  | E_DRILL_STEP_COUNT | E_DRILL_CHECK_MISSING | E_DRILL_STEP_EMPTY
-  | E_VERIFY_SYNTAX | E_VERIFY_CC_UNKNOWN | E_VERIFY_NOTE_RANGE
-  | E_LOOKUP_SPOILER | E_BODY_INDENTED_HEADING
-  | E_INDEX_MISSING | E_INDEX_ORPHAN | E_INDEX_DANGLING | E_ID_DUPLICATE
-  | E_RULE_UNGROUNDED
-  | E_ID_NOT_IN_INVENTORY | E_ID_RETIRED | E_ID_TYPE_MISMATCH | E_ID_CHAPTER_MISMATCH
-  | E_BLOCK_UNPARSED
+  = Static !StaticCode
   | E_TERM !Text
   deriving (Eq, Show)
+
+pattern E_FILE_TITLE, E_FILE_BAD_NAME, E_DECK_EMPTY :: IssueCode
+pattern E_FILE_TITLE  = Static E_FILE_TITLE_
+pattern E_FILE_BAD_NAME = Static E_FILE_BAD_NAME_
+pattern E_DECK_EMPTY  = Static E_DECK_EMPTY_
+pattern E_FIELD_UNKNOWN, E_FIELD_MISSING, E_FIELD_DUPLICATE, E_FIELD_EMPTY, E_FIELD_SYNTAX :: IssueCode
+pattern E_FIELD_UNKNOWN   = Static E_FIELD_UNKNOWN_
+pattern E_FIELD_MISSING   = Static E_FIELD_MISSING_
+pattern E_FIELD_DUPLICATE = Static E_FIELD_DUPLICATE_
+pattern E_FIELD_EMPTY     = Static E_FIELD_EMPTY_
+pattern E_FIELD_SYNTAX    = Static E_FIELD_SYNTAX_
+pattern E_TYPE_UNKNOWN, E_ID_SYNTAX :: IssueCode
+pattern E_TYPE_UNKNOWN = Static E_TYPE_UNKNOWN_
+pattern E_ID_SYNTAX    = Static E_ID_SYNTAX_
+pattern E_CITE_SYNTAX, E_CITE_SLUG, E_CITE_PAGE, E_CITE_ANCHOR :: IssueCode
+pattern E_CITE_SYNTAX = Static E_CITE_SYNTAX_
+pattern E_CITE_SLUG   = Static E_CITE_SLUG_
+pattern E_CITE_PAGE   = Static E_CITE_PAGE_
+pattern E_CITE_ANCHOR = Static E_CITE_ANCHOR_
+pattern E_CHAPTER_UNKNOWN :: IssueCode
+pattern E_CHAPTER_UNKNOWN = Static E_CHAPTER_UNKNOWN_
+pattern E_ROLE_UNKNOWN, E_ROLE_MISSING, E_ROLE_REPEATED :: IssueCode
+pattern E_ROLE_UNKNOWN  = Static E_ROLE_UNKNOWN_
+pattern E_ROLE_MISSING  = Static E_ROLE_MISSING_
+pattern E_ROLE_REPEATED = Static E_ROLE_REPEATED_
+pattern E_CHOICE_COUNT, E_CHOICE_NO_CORRECT, E_CHOICE_DUPLICATE :: IssueCode
+pattern E_CHOICE_COUNT      = Static E_CHOICE_COUNT_
+pattern E_CHOICE_NO_CORRECT = Static E_CHOICE_NO_CORRECT_
+pattern E_CHOICE_DUPLICATE  = Static E_CHOICE_DUPLICATE_
+pattern E_QUIZ_MODE_AMBIGUOUS :: IssueCode
+pattern E_QUIZ_MODE_AMBIGUOUS = Static E_QUIZ_MODE_AMBIGUOUS_
+pattern E_DRILL_STEP_COUNT, E_DRILL_CHECK_MISSING, E_DRILL_STEP_EMPTY :: IssueCode
+pattern E_DRILL_STEP_COUNT    = Static E_DRILL_STEP_COUNT_
+pattern E_DRILL_CHECK_MISSING = Static E_DRILL_CHECK_MISSING_
+pattern E_DRILL_STEP_EMPTY    = Static E_DRILL_STEP_EMPTY_
+pattern E_VERIFY_SYNTAX, E_VERIFY_CC_UNKNOWN, E_VERIFY_NOTE_RANGE :: IssueCode
+pattern E_VERIFY_SYNTAX     = Static E_VERIFY_SYNTAX_
+pattern E_VERIFY_CC_UNKNOWN = Static E_VERIFY_CC_UNKNOWN_
+pattern E_VERIFY_NOTE_RANGE = Static E_VERIFY_NOTE_RANGE_
+pattern E_LOOKUP_SPOILER, E_BODY_INDENTED_HEADING :: IssueCode
+pattern E_LOOKUP_SPOILER        = Static E_LOOKUP_SPOILER_
+pattern E_BODY_INDENTED_HEADING = Static E_BODY_INDENTED_HEADING_
+pattern E_INDEX_MISSING, E_INDEX_ORPHAN, E_INDEX_DANGLING, E_ID_DUPLICATE :: IssueCode
+pattern E_INDEX_MISSING  = Static E_INDEX_MISSING_
+pattern E_INDEX_ORPHAN   = Static E_INDEX_ORPHAN_
+pattern E_INDEX_DANGLING = Static E_INDEX_DANGLING_
+pattern E_ID_DUPLICATE   = Static E_ID_DUPLICATE_
+pattern E_RULE_UNGROUNDED :: IssueCode
+pattern E_RULE_UNGROUNDED = Static E_RULE_UNGROUNDED_
+pattern E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH :: IssueCode
+pattern E_ID_NOT_IN_INVENTORY = Static E_ID_NOT_IN_INVENTORY_
+pattern E_ID_RETIRED          = Static E_ID_RETIRED_
+pattern E_ID_TYPE_MISMATCH    = Static E_ID_TYPE_MISMATCH_
+pattern E_ID_CHAPTER_MISMATCH = Static E_ID_CHAPTER_MISMATCH_
+pattern E_BLOCK_UNPARSED :: IssueCode
+pattern E_BLOCK_UNPARSED = Static E_BLOCK_UNPARSED_
+
+{-# COMPLETE
+      E_FILE_TITLE, E_FILE_BAD_NAME, E_DECK_EMPTY
+    , E_FIELD_UNKNOWN, E_FIELD_MISSING, E_FIELD_DUPLICATE, E_FIELD_EMPTY, E_FIELD_SYNTAX
+    , E_TYPE_UNKNOWN, E_ID_SYNTAX
+    , E_CITE_SYNTAX, E_CITE_SLUG, E_CITE_PAGE, E_CITE_ANCHOR
+    , E_CHAPTER_UNKNOWN
+    , E_ROLE_UNKNOWN, E_ROLE_MISSING, E_ROLE_REPEATED
+    , E_CHOICE_COUNT, E_CHOICE_NO_CORRECT, E_CHOICE_DUPLICATE
+    , E_QUIZ_MODE_AMBIGUOUS
+    , E_DRILL_STEP_COUNT, E_DRILL_CHECK_MISSING, E_DRILL_STEP_EMPTY
+    , E_VERIFY_SYNTAX, E_VERIFY_CC_UNKNOWN, E_VERIFY_NOTE_RANGE
+    , E_LOOKUP_SPOILER, E_BODY_INDENTED_HEADING
+    , E_INDEX_MISSING, E_INDEX_ORPHAN, E_INDEX_DANGLING, E_ID_DUPLICATE
+    , E_RULE_UNGROUNDED
+    , E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH
+    , E_BLOCK_UNPARSED
+    , E_TERM #-}
 
 -- | The three coverage classes -- see @briefs\/M2-manifest.json@'s
 -- \"COVERAGE CLASSES\" section. 'SeamClass' is capped at exactly one
@@ -146,26 +250,11 @@ data IssueClass = FileClass | DirClass | SeamClass
 
 -- | Every STATIC 'IssueCode' -- everything except the dynamic 'E_TERM'
 -- family, which @--list-codes@ enumerates separately from the loaded
--- rule set (see 'listCodesLines'). See the 'IssueCode' Haddock for why
--- this is a hand-written list rather than @[minBound .. maxBound]@.
+-- rule set (see 'listCodesLines'). DERIVED from 'StaticCode''s
+-- 'Bounded'\/'Enum' instances (M2 re-gate fix), so it is total by
+-- construction -- a new static constructor appears here automatically.
 allIssueCodes :: [IssueCode]
-allIssueCodes =
-  [ E_FILE_TITLE, E_FILE_BAD_NAME, E_DECK_EMPTY
-  , E_FIELD_UNKNOWN, E_FIELD_MISSING, E_FIELD_DUPLICATE, E_FIELD_EMPTY, E_FIELD_SYNTAX
-  , E_TYPE_UNKNOWN, E_ID_SYNTAX
-  , E_CITE_SYNTAX, E_CITE_SLUG, E_CITE_PAGE, E_CITE_ANCHOR
-  , E_CHAPTER_UNKNOWN
-  , E_ROLE_UNKNOWN, E_ROLE_MISSING, E_ROLE_REPEATED
-  , E_CHOICE_COUNT, E_CHOICE_NO_CORRECT, E_CHOICE_DUPLICATE
-  , E_QUIZ_MODE_AMBIGUOUS
-  , E_DRILL_STEP_COUNT, E_DRILL_CHECK_MISSING, E_DRILL_STEP_EMPTY
-  , E_VERIFY_SYNTAX, E_VERIFY_CC_UNKNOWN, E_VERIFY_NOTE_RANGE
-  , E_LOOKUP_SPOILER, E_BODY_INDENTED_HEADING
-  , E_INDEX_MISSING, E_INDEX_ORPHAN, E_INDEX_DANGLING, E_ID_DUPLICATE
-  , E_RULE_UNGROUNDED
-  , E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH
-  , E_BLOCK_UNPARSED
-  ]
+allIssueCodes = map Static [minBound .. maxBound]
 
 codeText :: IssueCode -> Text
 codeText c = case c of

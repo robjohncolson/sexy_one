@@ -679,7 +679,7 @@ const SELF_TEST_FIXTURE = {
   // agrees BY CONSTRUCTION (site/test/CheckExercises.hs's findLookup
   // sets lfTargetPage = citPage of the very find: target it cites).
   drill: { deck: 'demo-deck', id: 'demo-drill', steps: 2, hasVerify: true, citeSlug: 'guide-book', citePage: 5 },
-  lookup: { deck: 'demo-deck', id: 'demo-lookup', targetPage: 7, citeSlug: 'guide-book', citePage: 7 },
+  lookup: { deck: 'demo-deck', id: 'demo-lookup', targetSlug: 'guide-book', targetPage: 7, citeSlug: 'guide-book', citePage: 7 },
 };
 
 // The #sxc1-exercise-stats payload the fixture below emits verbatim --
@@ -710,6 +710,7 @@ function selfTestFixtureHtml(sabotage) {
 <div id="app">
   <div id="sxc1-exercise-stats" hidden>${statsJson}</div>
   <div id="sxc1-event-log" hidden>[]</div>
+  <div id="sxc1-prompt-baseline" hidden>null</div>
   <div id="sxc1-root"></div>
 </div>
 <script>
@@ -717,6 +718,13 @@ window.__SXC1_BOOTED = true;
 (function () {
   var SABOTAGE = ${sabotage ? 'true' : 'false'};
   var FIXTURE = ${fixtureJson};
+  // Mirrors Main.hs's promptBaselineJson contract: a POSITIVE monotonic
+  // reading once Begin has run at mount; stays "null" under SABOTAGE --
+  // the lost-mount-Begin scenario --self-test-negative must catch.
+  if (!SABOTAGE) {
+    document.getElementById('sxc1-prompt-baseline').textContent =
+      String(Math.max(1, Math.floor(performance.now())));
+  }
   var eventLog = [];
   var quizSelected = Object.create(null);
   var quizAttempted = false;
@@ -988,7 +996,29 @@ const WARM_FIRST_ELAPSED_ASSERTION_NAME =
 // than accepting any well-formed "M:SS" string the way the pre-existing
 // #ex-elapsed check does (and still does -- that assertion is untouched;
 // this is a new, independent one).
+// M2 re-gate fix (cold-route observability): the app renders the CURRENT
+// exercise route's monotonic prompt baseline into #sxc1-prompt-baseline --
+// "null" when Begin has never run. Deleting the mount-time Begin
+// (readerApp's `mount = Just (SetRoute r0)`) makes this "null" on a cold
+// deep link, which THIS assertion catches deterministically -- unlike the
+// elapsed-time window below, which page uptime can satisfy accidentally
+// (the re-gate's exact scenario: boot time + wait falls inside the
+// window). The self-test fixture mirrors the contract, and SABOTAGE mode
+// renders "null" so --self-test-negative proves this can fail.
+const COLD_BASELINE_ASSERTION_NAME =
+  'cold-load quiz: #sxc1-prompt-baseline is a positive number (Begin ran at mount; "null" means the mount-time Begin was lost)';
+
 async function assertColdFirstTryElapsed(coldH, fixture, waitMs) {
+  const baselineRaw = await coldH.evaluate(`(() => {
+    const el = document.querySelector('#sxc1-prompt-baseline');
+    return el ? el.textContent.trim() : null;
+  })()`);
+  const baselineNum = baselineRaw === null ? NaN : Number(baselineRaw);
+  coldH.report(
+    COLD_BASELINE_ASSERTION_NAME,
+    Number.isFinite(baselineNum) && baselineNum > 0,
+    { baselineRaw },
+  );
   await sleep(waitMs);
   const clickedCorrect = await coldH.clickAssert(
     `#${fixture.quiz.correctOpt}`,
@@ -1327,11 +1357,16 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     }
     return anchors;
   })()`);
+  // M2 re-gate LOW fix: beyond well-formedness, at least one rendered
+  // href must EQUAL the fixture's DECLARED citation target -- a drill
+  // rendering some other (valid-looking) manual URL must fail.
+  const declaredDrillHref = `#/m/${fixture.drill.citeSlug}/p/${fixture.drill.citePage}`;
   report(
-    'a completed drill renders at least one a.cite whose href matches #/m/<slug>/p/<n>',
+    `a completed drill renders a.cite hrefs that are well-formed AND include the declared ${declaredDrillHref}`,
     Array.isArray(drillCiteHrefs) && drillCiteHrefs.length > 0
-      && drillCiteHrefs.every((href) => /^#\/m\/[a-z0-9][a-z0-9-]*\/p\/[0-9]+$/.test(href)),
-    drillCiteHrefs,
+      && drillCiteHrefs.every((href) => /^#\/m\/[a-z0-9][a-z0-9-]*\/p\/[0-9]+$/.test(href))
+      && drillCiteHrefs.includes(declaredDrillHref),
+    { drillCiteHrefs, declaredDrillHref },
   );
 
   // 6. LOOKUP -- CDP Input.insertText, never a synthetic input event (P-D).
@@ -1387,11 +1422,14 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     const a = document.querySelector('#ex-cites a.cite');
     return a ? { href: a.getAttribute('href') } : null;
   })()`);
-  const lookupCiteHrefRe = new RegExp(`^#/m/[a-z0-9][a-z0-9-]*/p/${fixture.lookup.targetPage}$`);
+  // M2 re-gate LOW fix: the slug must agree too -- the right page under
+  // the wrong manual must fail. targetSlug is emitted by
+  // browserFixtureJson (real runs) and set in SELF_TEST_FIXTURE.
+  const declaredLookupHref = `#/m/${fixture.lookup.targetSlug}/p/${fixture.lookup.targetPage}`;
   report(
-    `a graded (correct) lookup renders at least one a.cite whose href matches #/m/<slug>/p/${fixture.lookup.targetPage}`,
-    Boolean(lookupCiteAfter && lookupCiteHrefRe.test(lookupCiteAfter.href)),
-    lookupCiteAfter,
+    `a graded (correct) lookup renders an a.cite whose href equals the declared ${declaredLookupHref}`,
+    Boolean(lookupCiteAfter && lookupCiteAfter.href === declaredLookupHref),
+    { lookupCiteAfter, declaredLookupHref },
   );
 
   // 7. #sxc1-event-log.
@@ -1752,10 +1790,14 @@ async function runSelfTest(opts, negative) {
       // Restart (H7), and omits drill-step / graded-lookup citations
       // (H8) -- see each's own comment in the fixture builder above.
       COLD_ELAPSED_ASSERTION_NAME,
+      // M2 re-gate addition: SABOTAGE leaves #sxc1-prompt-baseline "null"
+      // (the lost-mount-Begin scenario), so the baseline assertion must
+      // fail on cue too.
+      COLD_BASELINE_ASSERTION_NAME,
       WARM_FIRST_ELAPSED_ASSERTION_NAME,
       'Restart yields a genuinely blank prompt: no #ex-feedback, no #ex-note, no #btn-ex-next, no option aria-pressed="true"',
-      'a completed drill renders at least one a.cite whose href matches #/m/<slug>/p/<n>',
-      `a graded (correct) lookup renders at least one a.cite whose href matches #/m/<slug>/p/${SELF_TEST_FIXTURE.lookup.targetPage}`,
+      `a completed drill renders a.cite hrefs that are well-formed AND include the declared #/m/${SELF_TEST_FIXTURE.drill.citeSlug}/p/${SELF_TEST_FIXTURE.drill.citePage}`,
+      `a graded (correct) lookup renders an a.cite whose href equals the declared #/m/${SELF_TEST_FIXTURE.lookup.targetSlug}/p/${SELF_TEST_FIXTURE.lookup.targetPage}`,
     ];
     const byName = new Map(results.map((r) => [r.name, r.ok]));
     const problems = [];
