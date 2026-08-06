@@ -1,0 +1,14 @@
+# Derived extraction artifacts — regenerate with scripts/extract-pages.sh
+manuals/pages/
+manuals/text/
+translations/work/
+
+# Haskell build outputs
+dist-newstyle/
+*.o
+*.hi
+result
+
+# Editor/OS noise
+.DS_Store
+*.swp
