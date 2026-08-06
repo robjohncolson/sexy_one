@@ -1,0 +1,98 @@
+name: site
+
+# Build and verify the SXC-1 Trainer static site on every push/PR, and
+# publish it to GitHub Pages on pushes to main. See scripts/build-site.sh
+# and scripts/check-site.sh for the underlying build/verify story - this
+# workflow only calls them, it does not reimplement them.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # ----------------------------------------------------------------
+      # Cache the GHC WebAssembly toolchain. The installer script embeds
+      # the pinned ghc-wasm-meta commit, so hashing it is a correct cache
+      # key: any change to the pinned commit/flavour invalidates the cache.
+      # ----------------------------------------------------------------
+      - name: Cache GHC WebAssembly toolchain
+        id: toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.ghc-wasm
+          key: ghc-wasm-${{ runner.os }}-${{ hashFiles('scripts/install-toolchain.sh') }}
+          restore-keys: |
+            ghc-wasm-${{ runner.os }}-
+
+      - name: Install GHC WebAssembly toolchain
+        if: steps.toolchain.outputs.cache-hit != 'true'
+        timeout-minutes: 60
+        run: ./scripts/install-toolchain.sh
+
+      # ----------------------------------------------------------------
+      # Cache cabal's incremental build directory so warm builds (e.g. a
+      # cache hit above, or repeated app-only changes) don't recompile
+      # miso and its dependency closure from scratch every run.
+      # ----------------------------------------------------------------
+      - name: Cache cabal build directory
+        uses: actions/cache@v6
+        with:
+          path: site/dist-newstyle
+          key: dist-newstyle-${{ runner.os }}-${{ hashFiles('site/cabal.project', 'site/sxc1-trainer.cabal', 'site/app/**') }}
+          restore-keys: |
+            dist-newstyle-${{ runner.os }}-
+
+      - name: Build site
+        run: ./scripts/build-site.sh
+
+      - name: Verify site
+        run: ./scripts/check-site.sh
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/public
+
+      - name: Upload debug artifact on failure
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-debug
+          path: |
+            site/public
+            site/dist-newstyle/**/*.log
+
+  # ----------------------------------------------------------------------
+  # This job stays inert until GitHub Pages is enabled for the repository
+  # (PLAN.md open question 1: Pages has not yet been enabled by the owner).
+  # Once enabled, pushes to main will deploy the artifact built above.
+  # ----------------------------------------------------------------------
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

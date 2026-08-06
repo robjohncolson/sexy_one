@@ -1,0 +1,6 @@
+package: @bjorn3/browser_wasi_shim
+version: 0.3.0
+url: https://registry.npmjs.org/@bjorn3/browser_wasi_shim/-/browser_wasi_shim-0.3.0.tgz
+sha256: 241c96716da84579e1045446f4f76faf637b97b1983ed7e9e590b71667a6c1b7
+licence: MIT OR Apache-2.0
+vendored_date: 2026-08-06

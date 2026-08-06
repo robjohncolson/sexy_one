@@ -1,0 +1,21 @@
+cabal-version:      3.0
+name:               sxc1-trainer
+version:            0.1.0.0
+synopsis:           SXC-1 Trainer - M0 toolchain spike
+build-type:         Simple
+
+common app-options
+  if arch(wasm32)
+    ghc-options: -no-hs-main -optl-mexec-model=reactor "-optl-Wl,--export=hs_start"
+    cpp-options: -DWASM
+  if arch(javascript)
+    ld-options:  -sEXPORTED_RUNTIME_METHODS=HEAP8
+    cpp-options: -DJS
+
+executable app
+  import:           app-options
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  build-depends:    base < 5, miso == 1.12.0.0
+  default-language: Haskell2010
+  ghc-options:      -O1 -Wall -ferror-spans

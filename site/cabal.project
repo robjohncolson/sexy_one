@@ -1,0 +1,25 @@
+packages: .
+
+index-state: 2026-08-01T00:00:00Z
+
+-- Use the boot libraries shipped inside the wasm32-wasi GHC bindist instead of letting
+-- the solver rebuild newer copies from Hackage for wasm32.
+constraints:
+  base installed,
+  ghc-prim installed,
+  ghc-bignum installed,
+  ghc-internal installed,
+  ghc-experimental installed,
+  ghc-boot-th installed,
+  template-haskell installed,
+  array installed,
+  deepseq installed,
+  bytestring installed,
+  containers installed,
+  text installed,
+  mtl installed,
+  transformers installed
+
+allow-newer:
+  all:base,
+  all:template-haskell

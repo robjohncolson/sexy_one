@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SXC-1 Trainer</title>
+<style>
+  /*
+   * All visual styling for the SXC-1 Trainer lives here. The Haskell/Miso
+   * application (compiled to WebAssembly) contributes markup only and is
+   * mounted into <body> at runtime, using these ids/classes:
+   *   #app                 the root element rendered by Miso
+   *   #counter-value        the <output> holding the model integer
+   *   .buttons              wrapper around the three buttons
+   *   #btn-increment         "+" button
+   *   #btn-decrement         "-" button
+   *   #btn-reset             "reset" button
+   *   .subtitle              the descriptive line under the title
+   * Before boot completes, #boot-status (below) is the only visible content.
+   */
+
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --text: #1b1e24;
+    --muted: #5b6270;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c94b4b;
+    --border: #d9dce2;
+    --shadow: 0 10px 30px rgba(20, 24, 34, 0.08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161b;
+      --card-bg: #1d2027;
+      --text: #eef0f4;
+      --muted: #a2a9b6;
+      --accent: #6f9bff;
+      --accent-contrast: #0c0f14;
+      --danger: #ff8383;
+      --border: #30343d;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 2rem 1rem;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    line-height: 1.5;
+  }
+
+  #boot-status {
+    max-width: 32rem;
+    width: 100%;
+    text-align: center;
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    box-shadow: var(--shadow);
+  }
+
+  #boot-status.boot-error {
+    color: var(--danger);
+    border-color: var(--danger);
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 26rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    box-shadow: var(--shadow);
+    padding: 2rem 1.75rem 1.75rem;
+    text-align: center;
+  }
+
+  #app h1 {
+    margin: 0 0 0.35rem;
+    font-size: 1.5rem;
+    letter-spacing: -0.01em;
+  }
+
+  #app .subtitle {
+    margin: 0 0 1.5rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  #counter-value {
+    display: block;
+    font-size: 3.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin: 0.5rem 0 1.75rem;
+  }
+
+  .buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .buttons button {
+    appearance: none;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 0.65rem 1.4rem;
+    min-width: 3.5rem;
+    cursor: pointer;
+    transition: transform 0.08s ease, filter 0.15s ease;
+  }
+
+  .buttons button#btn-reset {
+    background: transparent;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  .buttons button:hover {
+    filter: brightness(1.08);
+  }
+
+  .buttons button:active {
+    transform: translateY(1px) scale(0.98);
+  }
+
+  .buttons button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .buttons button#btn-reset:focus-visible {
+    outline-color: var(--muted);
+  }
+
+  noscript {
+    max-width: 26rem;
+    text-align: center;
+    color: var(--danger);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    box-shadow: var(--shadow);
+  }
+
+  footer {
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+    max-width: 26rem;
+  }
+
+  @media (max-width: 30rem) {
+    #app {
+      padding: 1.5rem 1.25rem 1.25rem;
+    }
+
+    #counter-value {
+      font-size: 2.75rem;
+    }
+
+    .buttons button {
+      flex: 1 1 6rem;
+    }
+  }
+</style>
+</head>
+<body>
+  <div id="boot-status">Loading the WebAssembly application...</div>
+
+  <noscript>
+    This application requires JavaScript to run (it boots a WebAssembly
+    module compiled from Haskell). Please enable JavaScript and reload.
+  </noscript>
+
+  <footer>SXC-1 Trainer - unofficial fan project. Not affiliated with Casio.</footer>
+
+  <script type="module" src="./index.js"></script>
+</body>
+</html>
