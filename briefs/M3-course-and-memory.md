@@ -16,6 +16,19 @@ Read `PLAN.md`, `briefs/M2-plan.md` (especially the ProgressEvent / ProgressSink
 `content/exercise-inventory.md` (440 candidate ids, page-cited, with the drill
 dependency graph).
 
+## Size mandate (from the M2 designer's budget ruling, 2026-08-07)
+
+M2 ships at 978,969 B gzip against the 1,000,000 ceiling — ~21 KB headroom,
+deliberately not raised at the M2 gate. **M3's first implementation task is
+size reduction, before any feature work**: split `parseDeck` (pure structural
+reader) from `validateDeck` (lint + citations + inventory binding) so
+`exe:app` links only the reader — the validating parser's measured browser
+cost is 95,358 B gzip and linting is a CI concern. Second lever if needed:
+compile-time lifting of a pre-parsed compact exercise model (~16 KB corpus,
+unlike the manuals' 191 KB, so the M1-era rejection doesn't apply). Order of
+operations: reduce first, measure, and only then raise the ceiling
+deliberately at a gate with Codex's eyes on it.
+
 ## Two workstreams, one milestone
 
 ### A. Bulk content (Fable-tier authoring, NOT the Sonnet swarm)
