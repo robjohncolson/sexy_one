@@ -1,0 +1,94 @@
+{
+  "task_type": "review",
+  "reviewed_head": "c575ae60acd2231a3a56a740edab4d1adea54852",
+  "scope": "M1 parser and content core, Part 1 of 2",
+  "verdict": "PART1-BLOCKED",
+  "summary": "A1 is confirmed as a contract and verification failure, with an important reachability qualification: HEAD terminates for every finite Text because the paragraph predicate is currently the exact complement of the preceding guards, so no translation or future exercise syntax alone can trigger the reported hang without a parser-code regression. The design nevertheless has no Unparsed fallback, all three advertised Unparsed checks are incapable of observing a nonzero value, and a one-sided classifier edit turns the final branch into non-progressing recursion. In addition, the outline currently loses within-page heading order and demonstrably misassigns Startup Guide page-10 subsections. The three-way stats path has no parsed-block side at all, so multiple rendering regressions can pass. No eager full-corpus block parse at browser boot and no missing TH dependent-file registration were found.",
+  "advisories": [
+    {
+      "id": "A1",
+      "severity": "blocker",
+      "verdict": "CONFIRMED-WITH-REACHABILITY-QUALIFICATION",
+      "evidence": "briefs/M1-plan.md:247-263 specifies a final Unparsed fallback, and lines 533-580 call zero Unparsed the strongest parser check and require a negative control. Types.hs:47 declares the constructor, but Markdown.hs:356-400 never constructs it: the final branch always builds Para. Stats.hs:74-80 hard-codes stUnparsed = 0, goldenChecks merely compares that literal at CheckContent.hs:132-133, and group 3 at CheckContent.hs:150-159 searches for a constructor the producer cannot emit. The negative control in the plan therefore cannot be demonstrated.",
+      "reachability": "At current HEAD, no finite embedded input can hang in this branch. Reaching Markdown.hs:386 means the current line failed isBlankLine, headingLineOf, isTableRowLine, quoteLineContent, orderedItemOf, and bulletItemOf; isParaLine at lines 394-400 is exactly the conjunction of those negations, so span must consume at least that line. The >10-minute probe necessarily changed this code relationship. However, if a future block rule is added to isParaLine's exclusions without a consuming guard (or vice versa in an equivalent refactor), span returns ([], originalInput), a Para [] is prepended, and go recurses on the identical list forever. Any newly recognized M2 marker can then make the problem data-reachable.",
+      "manifestation": "Compilation/TH embedding does not force pageBlocks, so it does not hang the build. Normal content-check traverses every page in group 3 and other checks, so verification stalls on the first affected page; the --json path remains raw-text-only and does not stall. Browser home/TOC boot only performs raw scans, so it remains responsive; opening or cold-deep-linking the affected page forces pageBlocks and stalls rendering/boot for that route. An affected preamble stalls any consumer that forces docPreamble and the normal content checker.",
+      "required_direction": "Make the final branch explicitly progress-safe: if span consumes no line, emit Unparsed l and recurse on ls. Derive the verification count from a real classifier/parser traversal (or a matching cheap classifier if boot laziness must be preserved), and add the promised scratch negative control."
+    },
+    {
+      "id": "A2",
+      "severity": "major",
+      "verdict": "CONFIRMED-AND-DEEPENED",
+      "evidence": "Stats.hs:13-24 and 70 intentionally use countLooseTableLines over raw text; Markdown.hs:228-236 counts separator-shaped lines, including blank header rows, rather than Table blocks. The independent Python side uses the same raw regex, and the DOM repeats the Haskell JSON. CheckContent.hs:323-334 only asserts a property of emitted tables; if the parser emits no Table at all, the comprehension produces zero checks and passes. For example, making isTableRowLine always false turns table source into paragraphs while the golden tables metric and three-way agreement remain unchanged and tableBodyChecks becomes vacuous. This is not parser agreement for the table field."
+    },
+    {
+      "id": "A3",
+      "severity": "minor",
+      "verdict": "CONFIRMED-CONTENT-CORE-ROOT",
+      "evidence": "Outline.hs:153-159 names each part Group with the PART section's secTitle and also includes that same section at the head of grpSections via takeRange pi_. Any consumer that renders group plus current section receives identical adjacent labels; the breadcrumb duplication is therefore rooted in the outline shape, not solely in the view. A de-duplicating presentation rule or an outline representation that distinguishes the part divider is needed."
+    },
+    {
+      "id": "A4",
+      "severity": "minor",
+      "verdict": "CONFIRMED-CONTENT-CORE-RELEVANT",
+      "evidence": "Markdown.hs:577-608 creates PageRef only for text beginning p. or pp. The guide-book Index cells contain bare values such as 13, 52-53, and comma-separated ranges, so they remain Str inside Table cells. This directly contradicts briefs/M1-plan.md:279-281's statement that the rule makes the Index navigable. There is no content-core test for Index links."
+    },
+    {
+      "id": "A5",
+      "severity": "advisory",
+      "verdict": "DEFER-GLOBAL; NO EXTRA CORE DEFECT",
+      "evidence": "Embed.hs:28-32 lifts raw UTF-8 Text and Corpus.hs:22-44 splices each of four manuals and the glossary once. That predictably contributes to module size, but this review did not build or measure the 3.74 MB artifact. No duplicate splice or eager parsed-corpus materialization was found in the core; each source binding is shared. Size policy belongs to Part 2."
+    },
+    {
+      "id": "A6",
+      "severity": "major",
+      "verdict": "CONFIRMED-TEST-GAP; HEAD-IMPLEMENTATION-CORRECT",
+      "evidence": "HEAD correctly isolates nested parses: quote and list children recurse with consumesSlugs=False and an empty supply at Markdown.hs:375 and 465, while same-line titled-step headings are constructed directly with anchor \"\" at lines 484-486. The tests do not prove the invariant. CheckContent.hs:460-475 pins only existing page anchors, and current nested headings occur after the top-level headings whose anchors are pinned; surplus/incorrect consumption at the tail is observationally invisible. The reported sabotage passing 247/247 is consistent with this ordering. Add a synthetic mkDoc case with a nested heading before a later top-level duplicate and assert the exact later slug and total top-level slug sequence."
+    },
+    {
+      "id": "A7",
+      "severity": "minor",
+      "verdict": "CONFIRMED",
+      "evidence": "gatherChildren at Markdown.hs:436-443 returns pending blank lines before a following same-indent item. collect at lines 459-492 sees that blank rather than the next marker and ends the list; the outer parser skips the blank and starts a new Numbered block. This explains the reported 29 singleton fragments among 43 ordered lists (for example, each blank-separated MIDI step becomes its own list), while lines 488-497 preserve the printed start number so visual numbering is currently correct. Screen-reader list boundaries are wrong today. If source authors use repeated 1. markers expecting automatic continuation, every fragment renders as 1, making it visible correctness loss. No test asserts list count, item grouping, or continuation across blank lines."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "NEW1",
+      "severity": "major",
+      "title": "Outline drops within-page order and attaches real subsections to the wrong section",
+      "location": "site/src/SXC1/Content/Outline.hs:54-77,95-101; site/test/CheckContent.hs:221-238",
+      "scenario": "headsByPage retains only page number, level, and text. attachSubs ends each section at nextSectionPage - 1. When two section-level headings share a page, the earlier section gets secEndPage < secPage and can never own a page or subsection; all same-page subsections fall into the later section. The embedded Startup Guide page 10 has '## Try applying an effect', several effect-related ### headings, then '## Try sampling' and '### Sampling' (translations/startup-guide.md:332-361). The effect section therefore ends at page 9 and its subsections are shown under Try sampling. Pages 1, 3, 4, and 14 have the same co-location shape. Golden tests assert only aggregate section/subsection counts for flat documents, so the totals remain green while navigation is wrong.",
+      "recommendation": "Preserve source order/line position in outline events and attach each subsection to the preceding section event, not to a page-only range. Define breadcrumb behavior for multiple sections on one page, and assert every secEndPage >= secPage plus exact representative subsection ownership."
+    },
+    {
+      "id": "NEW2",
+      "severity": "major",
+      "title": "The advertised Haskell side of three-way agreement never inspects parsed blocks",
+      "location": "site/src/SXC1/Content/Stats.hs:55-90; site/test/CheckContent.hs:114-144,323-334",
+      "scenario": "Every DocStats field is derived from raw Text or the raw heading outline; content-check --json calls renderStatsJson corpusSources. Thus Haskell JSON versus Python is two implementations of raw scanning, and the DOM is a second copy of Haskell's raw JSON, not a parsed-model third side. A concrete all-green rendering regression is deleting Markdown.hs:405's promotion from Para [Placeholder] to Figure: stFigures remains at its raw golden value, no test counts parsed Figure blocks, every page remains nonempty, and placeholder text can still render without the required figure block semantics. The same vacuity exists for Table presence (A2), and anchorChecks at CheckContent.hs:273-282 also accepts an empty top-level-heading list because all [] and nub [] satisfy its predicates.",
+      "recommendation": "Add parsed-block census checks for top-level headings, Figures, Tables, lists/items, and PageRefs, with nonzero expected counts where applicable; compare raw/golden counts against those model counts only where their semantics truly match."
+    },
+    {
+      "id": "NEW3",
+      "severity": "minor",
+      "title": "Slug de-duplication can itself create duplicate anchors",
+      "location": "site/src/SXC1/Content/Markdown.hs:245-261; site/test/CheckContent.hs:273-282",
+      "scenario": "dedupeSlugs counts occurrences per original base but never reserves emitted names. Inputs [\"x\", \"x\", \"x-2\"] produce [\"x\", \"x-2\", \"x-2\"]; likewise headings Foo, Foo, and Foo 2 collide. The current corpus does not hit this and its corpus-only uniqueness test passes, but the exported algorithm violates the plan's document-wide uniqueness guarantee for valid future embedded content.",
+      "recommendation": "Track all emitted slugs and advance a candidate suffix until unused; add direct adversarial unit cases for natural numeric suffix collisions."
+    },
+    {
+      "id": "NEW4",
+      "severity": "minor",
+      "title": "Equal-metric translation edits evade the stale-embed detector",
+      "location": "site/src/SXC1/Content/Embed.hs:28-32; site/src/SXC1/Content/Stats.hs:55-84; briefs/M1-plan.md:522-525,591-592",
+      "scenario": "addDependentFile correctly registers all five splice inputs, and the CI cache key hashes translations, so ordinary CI edits rebuild. But the claimed check-site stale-build guarantee is only a structural-stat fingerprint. If an existing artifact is checked after an equal-length prose replacement on an otherwise unasserted page (for example replacing one five-character word with another while preserving lines, markers, headings, placeholders, and table separators), live Python metrics equal the stale embedded Haskell/DOM metrics and all content checks pass. The same scenario can arise after a build tool misses a dependency because timestamps were preserved. The served prose is stale despite three-way agreement.",
+      "recommendation": "Expose and compare a cryptographic digest of each exact embedded source against the live translation files, or compare exact embedded source bytes in the host checker. Keep addDependentFile and the CI content hash as preventive layers."
+    }
+  ],
+  "lazy_parse_and_th_assessment": {
+    "lazy_contract": "No violation found. Types.hs leaves docPreamble, docPages, and pageBlocks non-strict; Markdown.hs:47-72 eagerly performs page/title/top-level-heading scans but leaves each block parse in pageBlocks. Stats and Outline use raw line scans only. The normal content-check intentionally forces the whole corpus, but browser home/TOC boot does not. The implementation performs several raw passes rather than the plan's colloquial 'single pass', but it does not force full block parsing.",
+    "template_haskell": "Embed.hs calls addDependentFile before reading and decodes UTF-8 explicitly; Corpus.hs has one splice for each manual plus glossary, and the cabal file includes translations/*.md. Invalid UTF-8 or a missing file fails compilation. No missing dependency or duplicate core embedding was found. The residual staleness weakness is the verification fingerprint in NEW4, not absent TH registration."
+  },
+  "method": "Read-only inspection of all scoped files, the three requested commits, relevant embedded translation shapes, and read-only references needed to trace boot/verification forcing. No builds, installs, tests, lint, edits to product files, or commits were performed; only this required result JSON was written.",
+  "final_line": "PART1-BLOCKED — A1 leaves the promised fallback and its three gates impossible and retains a maintenance-triggered nontermination hazard; NEW1 is a current user-visible outline misattachment; NEW2 shows the core three-way claim does not validate parsed rendering."
+}
