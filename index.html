@@ -737,6 +737,651 @@
       flex-direction: column;
     }
   }
+
+  /* =====================================================================
+     M2 exercise engine. Purely additive below this line -- nothing above
+     is restructured or reinterpreted. #boot-status, the <noscript>
+     block, the not affiliated with Casio disclaimer text (#sxc1-footer >
+     #sxc1-disclaimer, owned by site/app/View/Pages.hs) and the
+     ./index.js module script tag are all exactly as M0/M1 left them.
+     The Haskell contributes markup only; this is the DOM/CSS contract it
+     targets (identical on every route beside M1's own
+     #sxc1-content-stats):
+
+       #app > #sxc1-exercise-stats  always [hidden]; machine-readable JSON
+       #app > #sxc1-event-log       always [hidden]; machine-readable JSON
+
+       "#/x"              #sxc1-exercise-index
+                             section.ex-chapter > h2.ex-chapter-title
+                               ul.ex-deck-list > li > a.ex-deck-card
+                                 span.ex-deck-title, span.ex-deck-count
+
+       "#/x/<deck>"       #sxc1-deck
+                             h1#ex-deck-title, p#ex-deck-summary
+                             ol.ex-list > li > a.ex-link
+                               span.ex-kind.kind-quiz|kind-drill|kind-lookup
+                               span.ex-title
+
+       "#/x/<deck>/<ex>"  article#sxc1-exercise.exercise.kind-<kind>
+                             h1#ex-title, p#ex-progress ("N / M"), #ex-stem
+                             quiz choice: ul#ex-options > li > button.ex-option
+                                          (id="opt-a"/"opt-b"/... positional,
+                                          aria-pressed) + button#btn-ex-submit
+                             quiz recall: button#btn-ex-reveal, #ex-answer,
+                                          button#btn-ex-got,
+                                          button#btn-ex-missed
+                             drill:       ol#ex-steps > li.ex-step
+                                            div.ex-step-instruction
+                                            p.ex-step-check
+                                            p.ex-verify (muted, secondary --
+                                            a not-yet-active device check,
+                                            never an error or a CTA)
+                                            button.btn-ex-confirm
+                             lookup:      p#ex-find-task, input#ex-find-input,
+                                          button#btn-ex-find-submit,
+                                          p#ex-elapsed ("M:SS", monospace)
+                             shared:      button#btn-ex-hint,
+                                          ul#ex-hints > li.ex-hint
+                                          p#ex-feedback.correct|.incorrect
+                                            (role="status")
+                                          #ex-note
+                                          ul#ex-cites > li > a.cite
+                                          button#btn-ex-next,
+                                          button#btn-ex-restart
+                                          section#ex-summary
+     ===================================================================== */
+
+  :root {
+    --success: #1f9d55;
+    --success-contrast: #ffffff;
+    --success-bg: rgba(31, 157, 85, 0.12);
+    --incorrect-bg: rgba(201, 75, 75, 0.12);
+    --kind-quiz: #6f52d8;
+    --kind-quiz-bg: rgba(111, 82, 216, 0.14);
+    --kind-drill: #1f8f6f;
+    --kind-drill-bg: rgba(31, 143, 111, 0.14);
+    --kind-lookup: #a8720f;
+    --kind-lookup-bg: rgba(168, 114, 15, 0.16);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --success: #4ade80;
+      --success-contrast: #0c0f14;
+      --success-bg: rgba(74, 222, 128, 0.16);
+      --incorrect-bg: rgba(255, 131, 131, 0.14);
+      --kind-quiz: #b9a4ff;
+      --kind-quiz-bg: rgba(185, 164, 255, 0.16);
+      --kind-drill: #5eead4;
+      --kind-drill-bg: rgba(94, 234, 212, 0.14);
+      --kind-lookup: #ffcf6e;
+      --kind-lookup-bg: rgba(255, 207, 110, 0.16);
+    }
+  }
+
+  /* Belt-and-suspenders: the two machine-readable JSON carriers must
+     never be revealable even if something targets them specifically
+     rather than relying only on the generic [hidden] rule above. */
+  #sxc1-exercise-stats,
+  #sxc1-event-log {
+    display: none !important;
+  }
+
+  /* -------------------------------------------------------------------
+     Exercise index ("#/x"): chapters of deck cards. Long titles/labels
+     anywhere in this section wrap instead of widening the page.
+     ------------------------------------------------------------------- */
+
+  #sxc1-exercise-index,
+  #sxc1-deck,
+  #sxc1-exercise {
+    overflow-wrap: anywhere;
+  }
+
+  #sxc1-exercise-index {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 1.75rem clamp(1rem, 4vw, 2rem) 3rem;
+  }
+
+  .ex-chapter {
+    margin: 0 0 2.5rem;
+  }
+
+  .ex-chapter-title {
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.9rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 2px solid var(--accent);
+    color: var(--text);
+  }
+
+  .ex-deck-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  @media (min-width: 34rem) {
+    .ex-deck-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 54rem) {
+    .ex-deck-list {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .ex-deck-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 44px;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    color: var(--text);
+    text-decoration: none;
+    box-shadow: var(--shadow);
+    transition: transform 0.1s ease, box-shadow 0.15s ease;
+  }
+
+  .ex-deck-card:hover,
+  .ex-deck-card:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(20, 24, 34, 0.14);
+  }
+
+  .ex-deck-title {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .ex-deck-count {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  /* -------------------------------------------------------------------
+     Deck page ("#/x/<deck>"): the ordered exercise list.
+     ------------------------------------------------------------------- */
+
+  #sxc1-deck {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 1.75rem clamp(1rem, 4vw, 2rem) 3rem;
+  }
+
+  #ex-deck-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  #ex-deck-summary {
+    margin: 0 0 1.5rem;
+    color: var(--muted);
+  }
+
+  .ex-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .ex-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 44px;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--card-bg);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .ex-link:hover,
+  .ex-link:focus-visible {
+    background: var(--hover-bg);
+    border-color: var(--accent);
+  }
+
+  .ex-kind {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.5rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .ex-kind.kind-quiz {
+    background: var(--kind-quiz-bg);
+    color: var(--kind-quiz);
+  }
+
+  .ex-kind.kind-drill {
+    background: var(--kind-drill-bg);
+    color: var(--kind-drill);
+  }
+
+  .ex-kind.kind-lookup {
+    background: var(--kind-lookup-bg);
+    color: var(--kind-lookup);
+  }
+
+  .ex-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 600;
+  }
+
+  /* -------------------------------------------------------------------
+     Runner ("#/x/<deck>/<ex>"): stem, progress, and per-kind body.
+     ------------------------------------------------------------------- */
+
+  #sxc1-exercise {
+    max-width: 38rem;
+    margin: 0 auto;
+    padding: 1.75rem clamp(1rem, 4vw, 2rem) 4rem;
+  }
+
+  /* Block flow, not a flex column: #ex-find-input and #btn-ex-find-submit
+     are flat siblings in the DOM contract (no wrapper element) and must
+     sit beside each other as ordinary inline-level boxes, which a
+     column flex container's implicit one-child-per-row layout would
+     prevent regardless of either element's own width. */
+  #sxc1-exercise > * {
+    margin: 0 0 1.25rem;
+  }
+
+  #sxc1-exercise > *:first-child {
+    margin-top: 0;
+  }
+
+  #sxc1-exercise > *:last-child {
+    margin-bottom: 0;
+  }
+
+  #ex-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  #ex-progress {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  #ex-stem {
+    font-size: 1.05rem;
+    line-height: 1.75;
+    color: var(--text);
+  }
+
+  #ex-stem > *:first-child {
+    margin-top: 0;
+  }
+
+  #ex-stem > *:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Quiz choice mode: full-width tappable options. */
+
+  #ex-options {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .ex-option {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--card-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.98rem;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+
+  .ex-option:hover {
+    background: var(--hover-bg);
+  }
+
+  /* Selection is never colour-only: the border switches to the accent
+     colour AND a check mark appears, on top of the colour change. */
+  .ex-option[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--hover-bg);
+    font-weight: 700;
+  }
+
+  .ex-option[aria-pressed="true"]::after {
+    content: "\2713";
+    margin-left: auto;
+    flex: 0 0 auto;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* Shared action buttons. Primary (filled) by default; the quieter
+     follow-up actions (hint, missed, restart) are outlined so they never
+     compete with the one action that moves the learner forward. */
+  #btn-ex-submit,
+  #btn-ex-reveal,
+  #btn-ex-got,
+  #btn-ex-missed,
+  #btn-ex-next,
+  #btn-ex-restart,
+  #btn-ex-hint,
+  #btn-ex-find-submit,
+  .btn-ex-confirm {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.7rem 1.3rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.6rem;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.12s ease, background 0.12s ease;
+  }
+
+  #btn-ex-submit:hover,
+  #btn-ex-reveal:hover,
+  #btn-ex-got:hover,
+  #btn-ex-next:hover,
+  #btn-ex-find-submit:hover,
+  .btn-ex-confirm:hover {
+    filter: brightness(1.08);
+  }
+
+  /* These are each the one standalone call to action on their own line,
+     so (unlike #btn-ex-find-submit, which sits beside #ex-find-input)
+     they run the full measure for an easy, unambiguous tap target. */
+  #btn-ex-submit,
+  #btn-ex-reveal,
+  #btn-ex-got,
+  #btn-ex-missed,
+  #btn-ex-next,
+  #btn-ex-restart,
+  #btn-ex-hint,
+  .btn-ex-confirm {
+    display: flex;
+    width: 100%;
+  }
+
+  #btn-ex-missed,
+  #btn-ex-restart,
+  #btn-ex-hint {
+    background: transparent;
+    color: var(--accent);
+  }
+
+  #btn-ex-missed:hover,
+  #btn-ex-restart:hover,
+  #btn-ex-hint:hover {
+    background: var(--hover-bg);
+  }
+
+  #ex-answer {
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+
+  /* Drill steps: numbered by the browser's own <ol> markers. */
+
+  #ex-steps {
+    padding-left: 1.4rem;
+  }
+
+  #ex-steps > .ex-step::marker {
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .ex-step {
+    padding-left: 0.3rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .ex-step:last-child {
+    margin-bottom: 0;
+  }
+
+  .ex-step-instruction {
+    margin: 0 0 0.4rem;
+    color: var(--text);
+  }
+
+  /* Visually distinct from the instruction above it: a small labelled
+     card rather than a plain paragraph, so "how you know it worked"
+     reads as a separate, checkable claim. */
+  .ex-step-check {
+    margin: 0 0 0.4rem;
+    padding: 0.55rem 0.8rem;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 0.4rem 0.4rem 0;
+    background: var(--note-bg);
+    color: var(--text);
+    font-size: 0.92rem;
+  }
+
+  /* A not-yet-active device check (M4 wires it up later). Muted and
+     secondary on purpose -- it must never read as an error or a call to
+     action, so no accent colour and no background tint. */
+  .ex-verify {
+    margin: 0;
+    padding: 0.4rem 0.8rem;
+    border-left: 3px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+
+  /* Lookup. */
+
+  #ex-find-task {
+    margin: 0 0 0.75rem;
+    color: var(--text);
+  }
+
+  #ex-find-input {
+    display: inline-block;
+    width: 8rem;
+    max-width: 100%;
+    min-height: 44px;
+    margin: 0 0.6rem 0.6rem 0;
+    padding: 0.6rem 0.8rem;
+    vertical-align: middle;
+    border: 2px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 1.1rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #ex-find-input:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-color: var(--accent);
+  }
+
+  #btn-ex-find-submit {
+    vertical-align: middle;
+  }
+
+  #ex-elapsed {
+    margin: 0.6rem 0 0;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Hints: de-emphasised, progressively revealed. */
+
+  #ex-hints {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .ex-hint {
+    padding: 0.55rem 0.8rem;
+    border: 1px dashed var(--border);
+    border-radius: 0.5rem;
+    background: var(--note-bg);
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-style: italic;
+  }
+
+  /* Feedback: never colour-only -- a symbol precedes the text and the
+     weight is already bold. */
+
+  #ex-feedback {
+    padding: 0.75rem 1rem;
+    border-radius: 0.6rem;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  #ex-feedback::before {
+    margin-right: 0.4rem;
+    font-weight: 700;
+  }
+
+  #ex-feedback.correct {
+    background: var(--success-bg);
+    color: var(--success);
+  }
+
+  #ex-feedback.correct::before {
+    content: "\2713";
+  }
+
+  #ex-feedback.incorrect {
+    background: var(--incorrect-bg);
+    color: var(--danger);
+  }
+
+  #ex-feedback.incorrect::before {
+    content: "\2715";
+  }
+
+  #ex-note {
+    padding: 0.9rem 1.1rem;
+    border-left: 4px solid var(--accent);
+    border-radius: 0 0.6rem 0.6rem 0;
+    background: var(--note-bg);
+    color: var(--text);
+  }
+
+  #ex-note > *:first-child {
+    margin-top: 0;
+  }
+
+  #ex-note > *:last-child {
+    margin-bottom: 0;
+  }
+
+  #ex-cites {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  /* Visually distinct from ordinary body links: a leading arrow glyph
+     (matching figure.md-figure figcaption's existing hex-escape-glyph
+     convention) as well as the bold weight, so a citation reads at a
+     glance as a jump into the manual rather than a same-page link. */
+  a.cite {
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
+  }
+
+  a.cite::before {
+    content: "\2192\0020";
+    font-weight: 700;
+  }
+
+  a.cite:hover {
+    filter: brightness(1.15);
+  }
+
+  #ex-summary {
+    margin-top: 0.5rem;
+    padding: 1.25rem 1.4rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+    color: var(--text);
+  }
+
+  #ex-summary > *:first-child {
+    margin-top: 0;
+  }
+
+  #ex-summary > *:last-child {
+    margin-bottom: 0;
+  }
 </style>
 </head>
 <body>

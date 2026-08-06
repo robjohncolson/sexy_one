@@ -102,6 +102,7 @@ ZC8ZCmisozm1zi12zi0zi0zmcc51a42218eb21299ee98ee16a6ef06094e62533c4dfdfcfb3513b20
 ZC9ZCmisozm1zi12zi0zi0zmcc51a42218eb21299ee98ee16a6ef06094e62533c4dfdfcfb3513b20117b7862ZCMisoziDSLziFFIZC: ($1) => {return $1},
 ZC11ZCmisozm1zi12zi0zi0zmcc51a42218eb21299ee98ee16a6ef06094e62533c4dfdfcfb3513b20117b7862ZCMisoziDSLziFFIZC: ($1,$2) => {return $2[$1]},
 ZC12ZCmisozm1zi12zi0zi0zmcc51a42218eb21299ee98ee16a6ef06094e62533c4dfdfcfb3513b20117b7862ZCMisoziDSLziFFIZC: () => {return {}},
+ZC13ZCmisozm1zi12zi0zi0zmcc51a42218eb21299ee98ee16a6ef06094e62533c4dfdfcfb3513b20117b7862ZCMisoziDSLziFFIZC: ($1,$2) => {return new $1(...$2)},
 ZC14ZCmisozm1zi12zi0zi0zmcc51a42218eb21299ee98ee16a6ef06094e62533c4dfdfcfb3513b20117b7862ZCMisoziDSLziFFIZC: ($1,$2,$3) => ($3[$1]=$2),
 ZC16ZCmisozm1zi12zi0zi0zmcc51a42218eb21299ee98ee16a6ef06094e62533c4dfdfcfb3513b20117b7862ZCMisoziDSLziFFIZC: ($1,$2,$3) => {return $1.apply($2, $3);},
 ZC17ZCmisozm1zi12zi0zi0zmcc51a42218eb21299ee98ee16a6ef06094e62533c4dfdfcfb3513b20117b7862ZCMisoziDSLziFFIZC: ($1) => {return Object.keys($1);},
