@@ -140,6 +140,18 @@ Verified 70/70 by browser-check against production; correct
 108-image sweep warms after one pass. Audience note: the site will be shared
 with a Japanese speaker — M3 adds a persistent JA-first reading mode.
 
+Size ruling (coordinator, 2026-08-07, for explicit Codex scrutiny at the M3
+gate): **wasm-opt is adopted into the default build** (M3 design §5.2 lever 1).
+Grounds: the full 435-id course cannot fit under the 1,000,000 ceiling
+unoptimized (measured ~1,100K; corpus bytes are the binding constraint at
+0.3456 gzip B/raw B); wasm-opt ships the full course at ~920K — smaller than
+M2 today; the M0-era miscompile concern was attacked empirically (could not
+be made to miscompile; byte-identical self-tests; six clean 70/70 browser
+runs) and the behavioral suite runs against the OPTIMIZED artifact every
+build, so any future binaryen defect hits the same net everything else does.
+The 1,000,000 tripwire stays. The alternatives (raise ceiling / stop
+embedding corpus) were rejected while a smaller-than-today option existed.
+
 Resolved:
 - Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).
 - GitHub repo (2026-08-06, owner-confirmed): **public**, `robjohncolson/sexy_one`.
