@@ -366,11 +366,24 @@ class CDPClient {
   }
 }
 
+// Format a WebSocket 'error' event for a diagnostic message. Node's
+// WebSocket ErrorEvent commonly stringifies to the unhelpful
+// "[object ErrorEvent]"; the actual cause (a plain Error, when present)
+// lives on `ev.error`, so prefer its stack, then its message, then the
+// event's own `message`, and only fall back to stringifying the event
+// itself.
+function formatWsErrorEvent(ev) {
+  return (ev && ev.error && ev.error.stack)
+    || (ev && ev.error && ev.error.message)
+    || (ev && ev.message)
+    || String(ev);
+}
+
 function connectWebSocket(url) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     const onOpen = () => { cleanup(); resolve(ws); };
-    const onError = (ev) => { cleanup(); reject(new Error(`WebSocket connect failed: ${ev.message || ev}`)); };
+    const onError = (ev) => { cleanup(); reject(new Error(`WebSocket connect failed: ${formatWsErrorEvent(ev)}`)); };
     const cleanup = () => {
       ws.removeEventListener('open', onOpen);
       ws.removeEventListener('error', onError);
@@ -622,7 +635,7 @@ async function main() {
       cdp.failFatally(new Error('CDP WebSocket closed unexpectedly'));
     });
     ws.addEventListener('error', (ev) => {
-      cdp.failFatally(new Error(`CDP WebSocket error: ${ev && ev.message ? ev.message : ev}`));
+      cdp.failFatally(new Error(`CDP WebSocket error: ${formatWsErrorEvent(ev)}`));
     });
 
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });

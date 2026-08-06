@@ -232,6 +232,12 @@ info() {
 # ---------------------------------------------------------------------------
 SERVER_PIDS=()
 SERVER_LOGS=()
+# NEW1 fix: any temp DIRECTORY (as opposed to the log FILES above) that a
+# check creates -- e.g. the sub-path bundle copy below -- is registered here
+# so cleanup() (which already runs on EXIT/INT/TERM) removes it on every
+# exit path, not just the happy one. Initialised before the traps are
+# installed so cleanup can never reference it unset.
+TEMP_DIRS=()
 
 cleanup() {
   local pid
@@ -253,10 +259,34 @@ cleanup() {
     rm -f "$log"
   done
   SERVER_LOGS=()
+
+  local dir
+  for dir in "${TEMP_DIRS[@]+"${TEMP_DIRS[@]}"}"; do
+    [ -n "$dir" ] || continue
+    rm -rf "$dir"
+  done
+  TEMP_DIRS=()
 }
 trap cleanup EXIT
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM
+
+# register_temp_dir/unregister_temp_dir: bookkeeping for TEMP_DIRS above.
+# register immediately after every `mktemp -d` (never later -- see NEW1);
+# unregister only once a caller has already removed the path itself on the
+# happy path, so cleanup() cannot later try to remove a path some other
+# process has since reused.
+register_temp_dir() {
+  TEMP_DIRS+=("$1")
+}
+
+unregister_temp_dir() {
+  local target="$1" d filtered=()
+  for d in "${TEMP_DIRS[@]+"${TEMP_DIRS[@]}"}"; do
+    [ "$d" = "$target" ] || filtered+=("$d")
+  done
+  TEMP_DIRS=("${filtered[@]+"${filtered[@]}"}")
+}
 
 echo "check-site: checking '$DIR'"
 
@@ -597,11 +627,13 @@ else
     # new URL('/...') or protocol-relative //host -- it actually loads the
     # bundle from a path where a hardcoded "/app.wasm" resolves to nothing.
     SUBPATH_TMP="$(mktemp -d -t sxc1-check-site-subpath.XXXXXX)"
+    register_temp_dir "$SUBPATH_TMP"
     SUBPATH_DIR="$SUBPATH_TMP/sub/path"
     mkdir -p "$SUBPATH_DIR"
     cp -R "$DIR"/. "$SUBPATH_DIR"/
     run_browser_stage "$SUBPATH_TMP" "$SUBPATH_DIR/index.html" "/sub/path/" "$SUBPATH_HEALTH_LABEL" "$SUBPATH_BROWSER_LABEL" "$BROWSER_PATH"
     rm -rf "$SUBPATH_TMP"
+    unregister_temp_dir "$SUBPATH_TMP"
   fi
 fi
 

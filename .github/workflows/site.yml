@@ -37,25 +37,41 @@ jobs:
         with:
           persist-credentials: false
 
+      # The env context does not expose runner-process variables like
+      # ImageOS/ImageVersion -- only variables explicitly set in this
+      # workflow/job/step or written to $GITHUB_ENV. See:
+      # https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#env-context
+      # So the runner image identity has to be composed from the process
+      # environment in a run step and published as a step output, which the
+      # expression context CAN read.
+      - name: Identify runner image
+        id: runner-image
+        run: |
+          id="${ImageOS:-unknown}-${ImageVersion:-unknown}"
+          echo "Runner image identity: $id"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
       # ----------------------------------------------------------------
       # Cache the GHC WebAssembly toolchain. This tree is immutable, not
       # incrementally reusable, so there are deliberately no restore-keys:
       # a partial match (e.g. after a pin bump, or a runner image
       # migration) is never desirable -- it would restore a toolchain that
       # does not match the pin and, worse, get re-saved under the new key,
-      # poisoning the cache. The key covers OS, arch, the runner image and
-      # the installer script itself, so any of those changing forces a
-      # fresh install. install-toolchain.sh runs unconditionally below (no
-      # `if: cache-hit != 'true'`): it is idempotent and now self-heals a
-      # stale/mismatched restore via a strict stamp check instead of
-      # trusting cache-hit.
+      # poisoning the cache. The key covers OS, arch, the runner image
+      # (from the `runner-image` step output above -- see the comment on
+      # that step for why the env context cannot be used here) and the
+      # installer script itself, so any of those changing forces a fresh
+      # install. install-toolchain.sh runs unconditionally below (no
+      # `if: cache-hit != 'true'`): it is
+      # idempotent and now self-heals a stale/mismatched restore via a
+      # strict stamp check instead of trusting cache-hit.
       # ----------------------------------------------------------------
       - name: Cache GHC WebAssembly toolchain
         id: toolchain
         uses: actions/cache@v6
         with:
           path: ~/.ghc-wasm
-          key: ghc-wasm-${{ runner.os }}-${{ runner.arch }}-${{ env.ImageOS }}-${{ hashFiles('scripts/install-toolchain.sh') }}
+          key: ghc-wasm-${{ runner.os }}-${{ runner.arch }}-${{ steps.runner-image.outputs.id }}-${{ hashFiles('scripts/install-toolchain.sh') }}
 
       - name: Install GHC WebAssembly toolchain
         timeout-minutes: 60

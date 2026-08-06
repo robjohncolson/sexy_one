@@ -31,6 +31,12 @@ GHC_WASM_META_COMMIT="c75985a1b58fb0376eea9149ba5c7b933b3c7455"
 # bytestring 0.12.2.0, containers 0.8, mtl 2.3.1, transformers 0.6.1.2,
 # ghc-experimental 9.1401.0).
 FLAVOUR=9.14
+# Number of `-o` downloads the pinned setup.sh performs (wasi-sdk, libffi,
+# Node, binaryen, wasmtime, GHC, cabal), each of which the curl shim below
+# (M1) SRI-verifies. Used both to fail a fresh install if fewer downloads
+# were actually verified, and by health_check to reject a stamp recorded by
+# an installer that predates the SRI-verifying shim (M1 residual).
+EXPECTED_SRI_DOWNLOADS=7
 # Toolchain install root. Override with GHC_WASM_PREFIX for testing.
 PREFIX="${GHC_WASM_PREFIX:-$HOME/.ghc-wasm}"
 
@@ -115,9 +121,15 @@ Environment:
   GHC_WASM_PREFIX   Override the install prefix (default: \$HOME/.ghc-wasm).
                      Rejected outright if it is empty, "/", exactly \$HOME,
                      the repository root (or inside it), an ancestor of
-                     either, contains "..", or already exists as a non-empty
-                     directory that is not a recognized toolchain install.
-                     There is no override for any of these checks.
+                     either, or contains "..": no override for any of these.
+                     An existing non-empty directory is classified before
+                     anything destructive happens: a VALIDATED toolchain
+                     stamp is always accepted; a directory that merely
+                     LOOKS like an interrupted install (an 'env' file plus
+                     a 'wasm32-wasi-ghc/' directory, no valid stamp) is
+                     accepted only with --force, which prints what it is
+                     about to replace; anything else is refused always,
+                     with no --force override.
 
 After install, activate the toolchain in any shell with:
   . "${PREFIX}/env"
@@ -277,9 +289,21 @@ fi
 # B1: prefix safety guard. Runs before anything else that touches $PREFIX --
 # in particular strictly before any preflight check and strictly before the
 # git clone, so a refusal never touches the network or the filesystem
-# destructively. There is NO --force override for anything in this
-# function: --force only ever means "reinstall over an existing toolchain",
-# never "wipe whatever happens to be at this path".
+# destructively.
+#
+# The sentinel is CONTENT-validated, not name-validated (round-2 residual):
+# an existing non-empty directory is classified as one of three kinds (see
+# classify_prefix / stamp_is_class_a below), and --force means different
+# things for each:
+#   CLASS A (validated toolchain, any pin): always accepted, --force or not.
+#   CLASS B (plausible but unvalidated: 'env' + 'wasm32-wasi-ghc/' present,
+#     no valid stamp -- e.g. an install interrupted before the stamp was
+#     written): refused UNLESS --force, which prints exactly what will be
+#     removed and proceeds. This is the "explicit replacement" property.
+#   CLASS C (anything else non-empty, including a forged marker that merely
+#     has the right NAME): refused ALWAYS. --force never overrides this --
+#     it only ever means "reinstall over a validated or plausible toolchain
+#     directory", never "wipe whatever happens to be at this path".
 #
 # Deliberately NOT implemented: installing into a fresh staging directory
 # and renaming it into place. That is unsafe for this toolchain specifically
@@ -310,6 +334,88 @@ path_is_ancestor_or_self() {
       ;;
   esac
   return 1
+}
+
+# is_nonneg_int <value>
+#   True iff <value> is one or more ASCII digits (no sign, no decimal point,
+#   not empty). Used to validate integer-looking stamp fields before doing
+#   arithmetic comparison on them.
+is_nonneg_int() {
+  case "$1" in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+# stamp_is_class_a <stamp-file>
+#   CLASS A recognition check (B1): true iff the file exists, every
+#   non-empty line parses as key=value, it carries a well-formed 40-hex-
+#   character ghc_wasm_meta_commit= and a non-empty flavour=. Deliberately
+#   does NOT require these to match the CURRENTLY PINNED commit/flavour --
+#   a differently-pinned install is still recognized as ours, so pin
+#   upgrades remain reinstallable. This is a *recognition* check (is this
+#   ours?), independent of health_check's stricter *is this healthy right
+#   now?* check further down.
+stamp_is_class_a() {
+  local file="$1"
+  [ -f "$file" ] && [ -r "$file" ] || return 1
+
+  local line key value commit="" flavour_val=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "$line" ] && continue
+    case "$line" in
+      *=*)
+        key="${line%%=*}"
+        value="${line#*=}"
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+    case "$key" in
+      ghc_wasm_meta_commit) commit="$value" ;;
+      flavour) flavour_val="$value" ;;
+    esac
+  done < "$file"
+
+  [[ "$commit" =~ ^[0-9a-fA-F]{40}$ ]] || return 1
+  [ -n "$flavour_val" ] || return 1
+  return 0
+}
+
+# classify_prefix <dir>
+#   Sets PREFIX_CLASS to one of:
+#     EMPTY -- absent, or an existing empty directory
+#     A     -- validated toolchain (stamp_is_class_a)
+#     B     -- plausible but unvalidated: 'env' + 'wasm32-wasi-ghc/' present,
+#               but no CLASS A stamp (e.g. an install interrupted before the
+#               stamp was written)
+#     C     -- anything else non-empty, including a forged marker that has
+#               the right NAME but does not validate as CLASS A
+#   Assumes <dir> has already cleared the unsafe-path checks above (never
+#   called on '/', $HOME, the repo root, etc).
+classify_prefix() {
+  local dir="$1"
+  PREFIX_CLASS="EMPTY"
+
+  [ -e "$dir" ] || return 0
+  if [ ! -d "$dir" ]; then
+    PREFIX_CLASS="C"
+    return 0
+  fi
+  if [ -z "$(ls -A -- "$dir" 2>/dev/null)" ]; then
+    PREFIX_CLASS="EMPTY"
+    return 0
+  fi
+
+  if stamp_is_class_a "$dir/.sxc1-toolchain-stamp"; then
+    PREFIX_CLASS="A"
+  elif [ -f "$dir/env" ] && [ -d "$dir/wasm32-wasi-ghc" ]; then
+    PREFIX_CLASS="B"
+  else
+    PREFIX_CLASS="C"
+  fi
+  return 0
 }
 
 # validate_prefix <raw-prefix>
@@ -370,20 +476,38 @@ validate_prefix() {
       echo "install-toolchain.sh: refusing prefix that exists and is not a directory: $resolved" >&2
       return 1
     fi
-    if [ -n "$(ls -A -- "$resolved" 2>/dev/null)" ]; then
-      if [ -f "$resolved/.sxc1-toolchain-stamp" ]; then
-        : # recognized as one of our toolchain installs
-      elif [ -f "$resolved/env" ] && [ -d "$resolved/wasm32-wasi-ghc" ]; then
-        : # recognized as one of our toolchain installs
-      else
+
+    classify_prefix "$resolved"
+    case "$PREFIX_CLASS" in
+      EMPTY|A)
+        : # absent/empty, or a validated toolchain install (any pin) -- proceed
+        ;;
+      B)
+        if [ "$FORCE" = "1" ]; then
+          echo "install-toolchain.sh: --force given for a directory that looks like an" >&2
+          echo "  interrupted install (has an 'env' file and a 'wasm32-wasi-ghc/'" >&2
+          echo "  directory, but no valid .sxc1-toolchain-stamp): $resolved" >&2
+          echo "  About to recursively remove the following top-level entries and reinstall:" >&2
+          ls -A -- "$resolved" | sed 's/^/    /' >&2
+        else
+          echo "install-toolchain.sh: refusing existing directory that looks like an" >&2
+          echo "  interrupted install (has an 'env' file and a 'wasm32-wasi-ghc/'" >&2
+          echo "  directory, but no valid .sxc1-toolchain-stamp), without --force:" >&2
+          echo "  $resolved" >&2
+          echo "  Re-run with --force to explicitly replace it, or pick an empty or new" >&2
+          echo "  directory for GHC_WASM_PREFIX." >&2
+          return 1
+        fi
+        ;;
+      *)
         echo "install-toolchain.sh: refusing existing non-empty directory that is not a" >&2
         echo "  recognized toolchain install: $resolved" >&2
-        echo "  (looked for .sxc1-toolchain-stamp, or both an 'env' file and a" >&2
+        echo "  (looked for a validated .sxc1-toolchain-stamp, or both an 'env' file and a" >&2
         echo "  'wasm32-wasi-ghc/' directory). Pick an empty or new directory for" >&2
         echo "  GHC_WASM_PREFIX. --force does not override this." >&2
         return 1
-      fi
-    fi
+        ;;
+    esac
   fi
 
   RESOLVED_PREFIX="$resolved"
@@ -453,7 +577,7 @@ preflight_install() {
 health_check() {
   local quiet="${1:-0}"
   local reason=""
-  local st_commit="" st_flavour="" st_ghc_version=""
+  local st_commit="" st_flavour="" st_ghc_version="" st_sri=""
 
   if [ ! -f "$STAMP_FILE" ] || [ ! -r "$STAMP_FILE" ]; then
     reason="stamp file missing or unreadable: $STAMP_FILE"
@@ -475,6 +599,7 @@ health_check() {
         ghc_wasm_meta_commit) st_commit="$value" ;;
         flavour) st_flavour="$value" ;;
         ghc_version) st_ghc_version="$value" ;;
+        sri_verified_downloads) st_sri="$value" ;;
       esac
     done < "$STAMP_FILE"
 
@@ -484,6 +609,12 @@ health_check() {
       reason="stamp ghc_wasm_meta_commit ('$st_commit') != pinned commit ($GHC_WASM_META_COMMIT)"
     elif [ "$st_flavour" != "$FLAVOUR" ]; then
       reason="stamp flavour ('$st_flavour') != pinned flavour ($FLAVOUR)"
+    elif [ -z "$st_sri" ]; then
+      reason="stamp has no sri_verified_downloads (installed before the SRI-verifying curl shim existed -- M1 residual; reinstall required so downloads are actually verified)"
+    elif ! is_nonneg_int "$st_sri"; then
+      reason="stamp sri_verified_downloads ('$st_sri') is not a valid non-negative integer"
+    elif [ "$st_sri" -lt "$EXPECTED_SRI_DOWNLOADS" ]; then
+      reason="stamp sri_verified_downloads ($st_sri) < required $EXPECTED_SRI_DOWNLOADS (incomplete SRI verification)"
     else
       local ghc_bin="$PREFIX/wasm32-wasi-ghc/bin/wasm32-wasi-ghc"
       local cabal_bin="$PREFIX/wasm32-wasi-cabal/bin/wasm32-wasi-cabal"
@@ -674,6 +805,40 @@ for v in "${UPSTREAM_CONTROL_VARS[@]}"; do
   env_unset_args+=(-u "$v")
 done
 
+# ---------------------------------------------------------------------------
+# B1 SECOND GATE, deliberately redundant with validate_prefix above. That
+# earlier gate is what keeps a refusal network-free (it runs before the git
+# clone); it does not protect against a *future* control-flow edit that
+# reaches this line -- the actual `rm -rf "$PREFIX"` sink -- by some path
+# other than validate_prefix. Re-classifying $PREFIX right here, immediately
+# before running setup.sh, makes "never destroy an unvalidated directory" a
+# property of this line, not an invariant that has to be maintained by
+# reading 150 lines of control flow above it. Do not remove this even if it
+# looks redundant with validate_prefix: that is the point.
+# ---------------------------------------------------------------------------
+classify_prefix "$PREFIX"
+case "$PREFIX_CLASS" in
+  EMPTY|A)
+    : # absent/empty, or a validated toolchain -- safe to proceed
+    ;;
+  B)
+    if [ "$FORCE" != "1" ]; then
+      echo "install-toolchain.sh: internal error: reached the setup.sh sink (which begins" >&2
+      echo "  with rm -rf \"$PREFIX\") with an unvalidated (class B) prefix and no --force." >&2
+      echo "  Refusing. This should be unreachable -- validate_prefix should already have" >&2
+      echo "  refused. Aborting rather than trusting stale state." >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "install-toolchain.sh: internal error: reached the setup.sh sink (which begins" >&2
+    echo "  with rm -rf \"$PREFIX\") with an unrecognized (class C) prefix: $PREFIX." >&2
+    echo "  Refusing. This should be unreachable -- validate_prefix should already have" >&2
+    echo "  refused. Aborting rather than trusting stale state." >&2
+    exit 1
+    ;;
+esac
+
 echo "install-toolchain.sh: running setup.sh (FLAVOUR=$FLAVOUR PREFIX=$PREFIX)"
 echo "install-toolchain.sh: all curl downloads are SRI-verified against the pinned autogen.json"
 env "${env_unset_args[@]}" \
@@ -684,6 +849,19 @@ env "${env_unset_args[@]}" \
 
 sri_verified_downloads="$(wc -l < "$sri_count_file" | tr -d ' ')"
 echo "install-toolchain.sh: SRI-verified $sri_verified_downloads download(s)"
+
+# M1 residual: assert the shim actually verified at least EXPECTED_SRI_DOWNLOADS
+# downloads before trusting this install. Without this, a curl invocation the
+# shim's URL/outfile parsing silently failed to match would still let setup.sh
+# succeed, and the stamp below would then record a real (if too-low) count that
+# a later --check would happily accept.
+if ! is_nonneg_int "$sri_verified_downloads" || [ "$sri_verified_downloads" -lt "$EXPECTED_SRI_DOWNLOADS" ]; then
+  echo "install-toolchain.sh: only $sri_verified_downloads download(s) were SRI-verified;" >&2
+  echo "  expected at least $EXPECTED_SRI_DOWNLOADS (wasi-sdk, libffi, Node, binaryen," >&2
+  echo "  wasmtime, GHC, cabal). Aborting rather than recording an incomplete" >&2
+  echo "  sri_verified_downloads count that a later --check would trust." >&2
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Post-install verification.
