@@ -1,0 +1,137 @@
+{
+  "task_type": "review",
+  "status": "completed",
+  "scope": "Milestone M2 gate review part 2 of 2: site/app, exercise CSS, browser harness, check-site, CI, README, and global verdict",
+  "review_basis": "Read-only static review of the requested files and their relevant engine, route, validator, manifest, and M3-brief dependencies. Per subagent constraints, no builds, tests, lint, self-tests, or runtime probes were run. Part 1 was read from briefs/M2-codex-part1.json and is incorporated into the global verdict.",
+  "part1_input": {
+    "verdict": "PART1-BLOCKED",
+    "blocking_findings": [
+      "Begin/Restart conflate wall-clock and monotonic epochs, invalidating first-prompt elapsed time",
+      "citation-anchor non-vacuity is bypassable with whitespace and Markdown syntax",
+      "terminology lint omits drill-step instructions and check fields",
+      "deck ids are not checked for global uniqueness",
+      "required drill-step instruction bodies may be empty"
+    ],
+    "other_findings": "3 medium and 1 low, as recorded in briefs/M2-codex-part1.json"
+  },
+  "per_advisory": [
+    {
+      "advisory": "1. app.wasm at roughly 977-979 KB gzip under the unchanged 1,000,000-byte ceiling; reduce first in M3",
+      "verdict": "PASS-WITH-RISK",
+      "evidence": "The committed measurement is 978,969 bytes, leaving 21,031 bytes (about 2.1%); the hard check remains WASM_GZIP_CEILING_BYTES=1000000 at scripts/check-site.sh:724-735. Against the stated +/-1.5 KB measurement spread, this is thin but not immediately unsound: the spread is far smaller than the remaining margin, the ceiling fails CI, and M3 explicitly schedules reduction before feature growth (briefs/M3-course-and-memory.md:19-30). The M3 direction is credible but its 95,358-byte figure is an upper bound, not a guaranteed saving: current parseDeck interleaves structural parsing with issue construction and imports both Lint and Report (site/src/SXC1/Exercise/Parse.hs:25-30), so extracting a small successful-path reader is real refactoring. The documented compile-time pre-parsed-model fallback makes the overall reduce-first plan credible. Size alone need not block M2, but M3 must make reduction its first gated task before adding content or persistence code."
+    },
+    {
+      "advisory": "2. Miso.Date.getTime wall clock and getMonotonicTimeNSec monotonic clock are wired to the correct Engine actions",
+      "verdict": "FAIL",
+      "evidence": "readClocks itself returns (monotonicMs, wallMs) correctly (site/app/Main.hs:72-77), and Submit/SelfGrade_/ConfirmStep/SubmitPage receive them in that order (Main.hs:268-276). Initialization does not: beginIfNeeded discards monotonic and sends Begin wallMs (Main.hs:225-233), Restart likewise discards monotonic (279), matching the Part 1 epoch-conflation defect. A cold initial RExercise route is placed directly in Model without calling beginIfNeeded (170-181); until a later hash change, the view and first action use initialState exid 0 (247,297), so elapsed time is measured from the monotonic clock's arbitrary zero rather than prompt display. Check 14 merely finds the three identifiers somewhere on non-comment lines and therefore passes this broken wiring (scripts/check-site.sh:629-658)."
+    },
+    {
+      "advisory": "3. Hand-written per-deck embed splices are guarded by a disk-derived census negative control",
+      "verdict": "PASS",
+      "evidence": "Exercises.Embed embeds INDEX and the four known files, orders/filters knownDecks from INDEX, and silently omits an unspliced future entry (site/app/Exercises/Embed.hs:54-97). That gap is closed at the shipping gate: check-site derives the expected deck set and FNV values from disk (scripts/check-site.sh:1763-1785), passes them to both browser runs (2121-2133), and browser-check compares every expected deck and rejects extra/duplicate actual filenames (scripts/browser-check.mjs:225-256). Adding an INDEX entry without a splice therefore produces an app-vs-disk mismatch; skipping the content axis increments SKIPPED and CI rejects the structural-only result."
+    },
+    {
+      "advisory": "4. No multi-correct quiz exists in the seed corpus; additive selection has self-test coverage only",
+      "verdict": "ACCEPTED-COVERAGE-RISK",
+      "evidence": "The engine self-tests pin additive multi-selection, exact-set success, and strict-subset failure (site/test/CheckExercises.hs:974-995), so the branch is not untested. It has no seed/browser exercise, and the browser-fixture generator accepts any Choice while the browser path assumes one correct option (site/test/CheckExercises.hs:356-368; scripts/browser-check.mjs:916-970). A multi-correct quiz becoming the first eligible fixture would make the harness's wrong-then-one-correct path fail even when the engine behaves correctly. This is not by itself an M2 blocker, but a real multi-correct seed and arity-aware browser path should precede reliance on that branch."
+    },
+    {
+      "advisory": "5. exercise-check --json exit 0 is gated through the JSON ok field without vacuity",
+      "verdict": "PASS-FOR-THE-FULL-CI-CHAIN",
+      "evidence": "runJsonMode derives ok directly from null ldIssues and serializes the same issue list (site/test/CheckExercises.hs:304-308); check-site requires both ok === true and an empty issues array, failing invalid JSON or missing capture (scripts/check-site.sh:1256-1288). Missing INDEX becomes E-INDEX-MISSING rather than ok:true (CheckExercises.hs:222-231). Locally, an intentionally empty INDEX/directory can still report ok:true and inventoryChecked=0 == decks=0, but it cannot pass the full gate: --browser-fixture requires one quiz, drill, and lookup and exits nonzero otherwise (CheckExercises.hs:343-350), which check-site records as a failure at 1790-1802. The indirection is therefore non-vacuous at the global CI level, though check 15 is not a standalone non-empty-corpus proof."
+    }
+  ],
+  "surface_assessments": [
+    {
+      "surface": "Learner-content XSS and attribute passthrough",
+      "verdict": "PASS by source inspection",
+      "evidence": "Learner prose is converted to text nodes through View.Blocks; no raw HTML renderer exists (site/app/View/Blocks.hs:29-86). Exercise titles/chapter/labels likewise use text, option DOM ids are parser-generated positional a..f values, and citation hrefs are constructed through renderRoute (site/app/View/Exercise.hs:130-161,211-265). No content-controlled event handler, raw attribute fragment, external URL, or HTML injection path was found."
+    },
+    {
+      "surface": "Hidden exercise stats and event log",
+      "verdict": "PASS",
+      "evidence": "Both elements carry hidden=True in View.Pages (site/app/View/Pages.hs:181-194); generic [hidden] is display:none!important and both ids receive a second explicit display:none!important rule (site/static/index.html:214-219,822-828). They do not leak into visible layout."
+    },
+    {
+      "surface": "check-site skip-axis honesty",
+      "verdict": "PASS for every new M2 exercise check, with one low accounting defect",
+      "evidence": "The skip-content branch has counterparts for exercise binary resolution, JSON execution/ok/inventory, six independent-stat checks, browser handoff files, fixture execution, code coverage, seam cap, and filename-verdict rederivation (scripts/check-site.sh:961-976). Any skip drives SKIPPED and result=structural-only (2211-2221), and CI separately rejects a skipped suffix (.github/workflows/site.yml:229-238). See the low finding below for two older content-axis checks omitted from the skipped total."
+    },
+    {
+      "surface": "CI cache restoration",
+      "verdict": "PASS",
+      "evidence": "The toolchain cache has only its exact key and no restore-keys (.github/workflows/site.yml:79-88). The dist-newstyle cache alone has the intended OS-prefix restore-keys fallback (144-150). The cabal key omits content/**, but site/sxc1-trainer.cabal declares the exercise files/INDEX as extra-source-files and the TH splices add dependencies; post-build disk-vs-embedded FNV/browser checks provide an independent correctness backstop. The omission can reduce cache freshness/efficiency on content-only changes, but no stale artifact can pass the full gate."
+    },
+    {
+      "surface": "Exercise route handling",
+      "verdict": "PARTIAL",
+      "evidence": "Unknown decks, unknown exercises, and an exercise id paired with the wrong existing deck render the visible exercise not-found view because lookup is deck-scoped in View.Exercise (site/app/View/Exercise.hs:147-183). The parser does not validate route-id syntax and collapses empty path segments globally (site/src/SXC1/Route.hs:30-55), so redundant/empty exercise segments can canonicalize to a valid route; see the low finding below."
+    },
+    {
+      "surface": "M1 manual-reader guarantees",
+      "verdict": "PASS by static inspection",
+      "evidence": "The original stats exactness checks, warm and genuinely cold JA deep links, previous/next boundary checks, all-108-route /ja decode sweep, two mobile overflow probes, disclaimer, and console hygiene remain in the real browser path (scripts/browser-check.mjs:1877-2279). View.Pages retains range-checked manual routing and JA image paths (site/app/View/Pages.hs:269-328). No M2 change removes the manual experience or JA decoding guarantees."
+    }
+  ],
+  "new_findings": [
+    {
+      "severity": "HIGH",
+      "location": "site/app/Main.hs:170",
+      "title": "Cold exercise deep links never initialize the prompt clock",
+      "scenario": "readerApp constructs Model with the startup route but runs beginIfNeeded only from the later SetRoute action (Main.hs:179-202). Loading directly at #/x/preparation-power/q-1-03 therefore renders from initialState exid 0; the first Toggle/Submit persists and grades that zero-baseline state. Its elapsed time measures from the monotonic clock's arbitrary origin/runtime age, not from when the prompt appeared. Add an initial Begin using both clock domains (after fixing the Engine action shape) and add a genuinely cold exercise-target browser assertion."
+    },
+    {
+      "severity": "HIGH",
+      "location": "site/app/Main.hs:241",
+      "title": "Restart preserves the previous prompt result and exposes a false fresh-attempt UI",
+      "scenario": "Restart resets ExerciseState but emits no event; applyExActions therefore leaves mExResults unchanged (Main.hs:241-259,279). After answering q-1-03 correctly and clicking Restart, currentResult immediately finds the old prompt outcome (285-299), so the reset screen still shows Correct, the explanation/citation, and Next even though no option is selected. Clicking Next can complete the supposedly fresh attempt without answering. Clear this exercise's prompt results on Begin/Restart or derive displayed feedback from attempt-scoped state, and pin it in the browser harness."
+    },
+    {
+      "severity": "HIGH",
+      "location": "site/app/View/Exercise.hs:247",
+      "title": "Drill-step and lookup-target citations are never rendered",
+      "scenario": "The only citation renderer consumes exCites inside sharedFeedbackEls (View/Exercise.hs:247-266), which is used only by non-drill prompt bodies. Drill sources live in each Prompt.prCites and drillStepsEl never renders them (268-298). Lookup truth lives in FindPage's target; lookup exCites is normally empty, so even a correct l-1-04 answer has no source link. This contradicts the M2 requirement that every citation render as an internal manual link and removes the grounding path from two of three exercise kinds. Render prompt/step citations at the appropriate post-answer/post-confirmation point, without revealing a lookup's page before grading."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "scripts/check-site.sh:629",
+      "title": "The clock/stub invariant certifies identifier presence, not clock wiring",
+      "scenario": "Check 14 marks success once getMonotonicTimeNSec, Date.getTime, and noDeviceVerifier occur anywhere on non-comment lines (scripts/check-site.sh:635-658). The current app passes while Begin/Restart receive the wrong clock domain and cold routes receive no Begin at all. Replace or supplement the source scan with an engine/app test using deliberately different clock epochs and a cold-route browser assertion over elapsedMs."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "scripts/browser-check.mjs:1037",
+      "title": "The browser elapsed-time path systematically steps around the first-prompt defect",
+      "scenario": "The lookup assertion first submits a wrong answer, which updates esPromptAt to a real monotonic reading, and only then checks the correct attempt's elapsed display (browser-check.mjs:1037-1070). It accepts any M:SS string, including 0:00. Quiz and drill first-attempt events are never checked for elapsedMs, and the suite has no cold exercise or Restart path. Thus both the Part 1 wall/monotonic bug and the new cold/restart defects satisfy the live browser gate. Inspect the first event after a deliberate delay with distinct epochs, then exercise cold load and restart."
+    },
+    {
+      "severity": "MEDIUM",
+      "location": "site/app/View/Exercise.hs:186",
+      "title": "Lookup task prose is rendered twice and once inside an invalid paragraph container",
+      "scenario": "Every runner renders exIntro in #ex-stem (View/Exercise.hs:186-190). For a FindPage prompt, prStem is that same exIntroBlocks value, but kindBodyEl renders it again inside H.p_#ex-find-task using renderBlocks (223-229). Opening l-1-04 therefore repeats the full task paragraph, and the second copy creates a p containing block-level p/heading/list views. Render the stem once, or make #ex-find-task a div and give it genuinely distinct data."
+    },
+    {
+      "severity": "LOW",
+      "location": "scripts/check-site.sh:945",
+      "title": "--skip-content drops two counted checks instead of counting them as skipped",
+      "scenario": "A normal content-axis run increments TOTAL for sourcing the toolchain env and resolving exe:content-check (scripts/check-site.sh:978-996), but the skip branch has no corresponding skip() calls before its listed checks (945-977). The final marker remains safely structural-only because many other skips are counted, so CI cannot pass, but the summary total is two lower than the full run and contradicts the promise that skipped checks remain members of the total. Add explicit skip entries for those two checks."
+    },
+    {
+      "severity": "LOW",
+      "location": "site/src/SXC1/Route.hs:31",
+      "title": "Exercise routes accept empty segments by collapsing them",
+      "scenario": "nonEmptySegments removes every empty component before classification. A malformed deep link such as #/x//preparation-power/q-1-03 is therefore classified as the valid RExercise preparation-power q-1-03 and renders the exercise instead of the not-found panel. Unknown and cross-deck ids fail visibly, so impact is limited, but strict deep-link handling should reject empty interior segments and invalid [a-z0-9-]+ route ids."
+    }
+  ],
+  "global_verdict": "GATE-BLOCKED",
+  "consolidated_blocking_list": [
+    "First-prompt timing is invalid: Engine Begin/Restart conflate clock epochs; the app discards monotonic initialization time; cold exercise deep links do not Begin at all.",
+    "Citation anchors remain vacuously satisfiable through whitespace collapse and raw Markdown syntax.",
+    "Drill-step instructions/checks remain outside terminology lint.",
+    "Deck ids are not enforced globally unique.",
+    "Drill steps with empty instruction bodies validate.",
+    "Restart leaves old prompt outcomes visible and permits a fresh attempt to advance/complete without answering.",
+    "Drill-step citations and lookup find-target citations never render in the learner UI."
+  ],
+  "final_line": "GLOBAL VERDICT: GATE-BLOCKED — M2 cannot clear with invalid prompt timing, vacuous citation anchors, unlinted/empty drill steps, non-unique deck ids, stale feedback after Restart, and missing drill/lookup source links."
+}
