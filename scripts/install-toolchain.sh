@@ -105,9 +105,12 @@ Options:
       specific mismatch.
   --force
       Reinstall even if --check would already succeed. WARNING: the
-      upstream setup.sh begins with 'rm -rf "\$PREFIX"'. This never
-      overrides the prefix safety checks below -- it only permits
-      reinstalling over what is already a recognized toolchain install.
+      upstream setup.sh begins with 'rm -rf "\$PREFIX"'. Never overrides
+      the unsafe-path refusals below. For an existing directory, see
+      GHC_WASM_PREFIX below: this is a no-op on an already-recognized
+      toolchain install, is REQUIRED to replace one that merely looks
+      like an interrupted install, and is never honored for anything
+      else.
   --verify-sri-selftest
       Regression-test the SRI digest comparator (sha256 and sha512, one
       known-good and one known-bad value each) against an in-memory fixture

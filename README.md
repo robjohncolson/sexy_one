@@ -34,11 +34,13 @@ installs lands under `$HOME/.ghc-wasm` by default. That default is overridable w
 `GHC_WASM_PREFIX`, and a careless value there would be genuinely dangerous: upstream's
 `setup.sh` begins with `rm -rf "$PREFIX"`. `install-toolchain.sh` refuses unsafe values
 of `GHC_WASM_PREFIX` **before touching the network** — empty, `/`, exactly `$HOME`, the
-repository root or anything inside it, an ancestor of either, a path containing `..`, or
-an *existing* non-empty directory that is not already one of its own toolchain installs
-(recognised by its stamp file, or by having both an `env` file and a `wasm32-wasi-ghc/`
-directory). None of these refusals has a `--force` override — `--force` only ever means
-"reinstall over an existing toolchain," never "wipe whatever happens to be at this path."
+repository root or anything inside it, an ancestor of either, or a path containing `..`;
+none of these has a `--force` override. An *existing* non-empty directory is then
+classified: a validated toolchain install (recognised by its stamp file) is always
+accepted; a directory that merely looks like an interrupted install (an `env` file plus
+a `wasm32-wasi-ghc/` directory, but no valid stamp) is refused unless `--force`, which
+prints exactly what it is about to remove; anything else is refused always, with no
+`--force` override.
 
 ## Build
 
