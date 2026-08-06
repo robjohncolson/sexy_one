@@ -30,6 +30,12 @@ Verification/maintenance:
 7. Inventory id-binding is a path-substring switch — brittle to content-root
    moves (M2 advisory; observable via inventoryChecked, but make it structural).
 
+Content:
+10. `d-2-09` step 1's `verify: cc 16 0,127` is unreachable — CC 16 is the
+    continuous FX1 dial (±1 per detent, never 0/127), and the verify grammar
+    has no "any value" form; fix needs a grammar extension or re-pointing the
+    hook (M4 design finding M4-F1; the device protocol pre-warns the owner).
+
 Ops:
 8. Revert to workflow Pages deploys when GitHub's deployment queue recovers —
    set ENABLE_PAGES=true, PUT build_type=workflow, retire the manual gh-pages
