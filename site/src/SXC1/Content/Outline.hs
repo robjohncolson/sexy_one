@@ -57,6 +57,12 @@ buildOutline raw = Outline secLevel sections groups partTitles
     runningHeaderByPage :: Map.Map Int (Maybe Text)
     runningHeaderByPage = Map.fromList [ (n, fst (extractRunningHeader ls)) | (n, ls) <- pages ]
 
+    -- | Every heading line in the document, in SOURCE ORDER: 'pages' is
+    -- already page-ascending ('splitPageTexts' walks the markers in
+    -- file order), and within each page 'mapMaybe' over that page's own
+    -- lines preserves line order -- so this flat list is exactly the
+    -- document's front-to-back heading sequence. NEW1's fix rests
+    -- entirely on this already being true; see 'attachSubsInOrder'.
     allHeads :: [(Int, Int, Text)]
     allHeads = [ (n, lvl, txt) | (n, hs) <- headsByPage, (lvl, txt) <- hs ]
 
@@ -70,11 +76,14 @@ buildOutline raw = Outline secLevel sections groups partTitles
                     (l : _) -> l
                     []      -> 1
 
-    sections0    = [ (n, txt) | (n, lvl, txt) <- allHeads, lvl == secLevel ]
-    subsections0 = [ (n, txt) | (n, lvl, txt) <- allHeads, lvl == secLevel + 1 ]
+    -- | Section- and subsection-level heading events only, STILL in
+    -- source order ('filter' preserves order) -- what
+    -- 'attachSubsInOrder' walks.
+    relevantHeads :: [(Int, Int, Text)]
+    relevantHeads = [ h | h@(_, lvl, _) <- allHeads, lvl == secLevel || lvl == secLevel + 1 ]
 
     sections :: [Section]
-    sections = attachSubs pageCount sections0 subsections0
+    sections = attachSubsInOrder pageCount secLevel relevantHeads
 
     partIdxs :: [Int]
     partIdxs = [ i | (i, s) <- zip [0 ..] sections, isPartTitle (secTitle s) ]
@@ -92,13 +101,56 @@ nth i xs
       (x : _) -> Just x
       []      -> Nothing
 
-attachSubs :: Int -> [(Int, Text)] -> [(Int, Text)] -> [Section]
-attachSubs pageCount = go
+-- | NEW1's fix. The OLD 'attachSubs' (page-range based: a subsection
+-- belonged to section @s@ iff its page fell in @[secPage s .. secEndPage
+-- s]@, and @secEndPage@ was always @nextSectionPage - 1@) silently broke
+-- whenever two section-level headings shared a page: the EARLIER one's
+-- @secEndPage@ became @secPage - 1@ (an empty, descending range), so it
+-- owned no page at all and every same-page subsection fell through to
+-- the LATER section instead -- reproduced live on startup-guide p.10/14,
+-- midi p.2 and oss p.11 (guide-book has no such page, which is why every
+-- guide-book golden stayed green throughout). Aggregate section\/
+-- subsection COUNTS were unaffected either way, because the page ranges
+-- still partitioned every subsection into exactly one (just sometimes
+-- the wrong) section -- which is exactly why a golden-count assertion
+-- alone could never have caught it.
+--
+-- The fix: walk the section\/subsection heading events IN SOURCE ORDER
+-- (not by page membership) and attach each subsection to the last
+-- section event that precedes it in the text -- 'buildRaw' below does
+-- exactly that with a single left-to-right pass, via 'span' peeling off
+-- the run of subsection events up to the next section event. 'secEndPage' is
+-- then set to the next section's page minus one only when that next
+-- section is on a STRICTLY LATER page; when two (or more) sections share
+-- a page, each keeps its OWN page as its end page instead of a bogus
+-- negative-length range. That makes @secEndPage >= secPage@ an
+-- invariant of every 'Section' this function can produce, rather than an
+-- accident that only held as long as no two sections ever shared a page
+-- (see group 14's invariant check in @test\/CheckContent.hs@).
+attachSubsInOrder :: Int -> Int -> [(Int, Int, Text)] -> [Section]
+attachSubsInOrder pageCount secLevel heads = setEndPages (buildRaw heads)
   where
-    go []            _    = []
-    go [(p, t)]      subs = [mk p t pageCount subs]
-    go ((p, t) : rest@((p2, _) : _)) subs = mk p t (p2 - 1) subs : go rest subs
-    mk p t endP subs = Section p t endP [ (sp, st) | (sp, st) <- subs, sp >= p, sp <= endP ]
+    -- | (page, title, subs), subs not yet page-ranged -- 'setEndPages'
+    -- fills in 'secEndPage' in a second left-to-right pass once every
+    -- section's own page and its immediate successor's page are both
+    -- known.
+    buildRaw :: [(Int, Int, Text)] -> [(Int, Text, [(Int, Text)])]
+    buildRaw [] = []
+    buildRaw ((p, lvl, txt) : rest)
+      | lvl == secLevel =
+          let (subs, rest') = span (\(_, l, _) -> l /= secLevel) rest
+          in (p, txt, [ (sp, st) | (sp, _, st) <- subs ]) : buildRaw rest'
+      -- A subsection-level event before any section-level event has no
+      -- section to attach to. Does not occur in the corpus (every
+      -- document's first relevant heading is section-level), but drop
+      -- it rather than crash if it ever did.
+      | otherwise = buildRaw rest
+
+    setEndPages :: [(Int, Text, [(Int, Text)])] -> [Section]
+    setEndPages []                     = []
+    setEndPages [(p, t, subs)]         = [Section p t pageCount subs]
+    setEndPages ((p, t, subs) : rest@((p2, _, _) : _)) =
+      Section p t (if p2 > p then p2 - 1 else p) subs : setEndPages rest
 
 -- | @^PART\\s+\\d+\\b@.
 isPartTitle :: Text -> Bool

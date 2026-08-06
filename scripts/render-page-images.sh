@@ -26,8 +26,20 @@
 #   --keep-png    do not delete the manuals/pages/<slug>/*.png intermediates afterwards
 #   --help        show this message and exit 0
 #
-# Idempotent: without --force, a document whose .webp files all already exist and are newer
-# than its source PDF is skipped entirely (no pdftoppm invocation, no re-encoding).
+# Idempotent: without --force, a document whose .webp files all already exist AND whose recorded
+# source-PDF digest (see "Source integrity" below) matches the current PDF is skipped entirely
+# (no pdftoppm invocation, no re-encoding). --slug is validated against the known slug set before
+# any work happens; an unknown slug is a hard error, not a silent zero-document success.
+#
+# Source integrity: staleness is decided by a SHA-256 digest of the source PDF, not by mtime -- a
+# changed PDF with a preserved or older timestamp used to be (wrongly) treated as up to date. Each
+# successful render writes the digest of the PDF it rendered from to
+# manuals/.digests/<slug>.sha256; a document is re-rendered whenever that sidecar is missing or
+# disagrees with the current PDF's digest, in addition to the existing missing-webp check. That
+# sidecar directory lives under manuals/, never under site/static/pages/, so it can never perturb
+# the 108 committed, byte-reviewed page images. --force still overrides unconditionally. If a
+# SHA-256 digest cannot be computed (missing tool, unreadable file), the script fails loudly
+# instead of silently falling back to mtime comparison.
 
 set -euo pipefail
 
@@ -40,6 +52,14 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
 MANUALS_DIR="$REPO_ROOT/manuals"
 PAGES_SCRATCH_DIR="$REPO_ROOT/manuals/pages"
 OUT_DIR="$REPO_ROOT/site/static/pages"
+# Per-document source-PDF digest sidecars. Deliberately NOT under site/static/pages/ (the 108
+# committed WebP files there are byte-reviewed release content and must not gain neighbours);
+# deliberately NOT under manuals/pages/ (that scratch dir is gitignored and rm -rf'd between runs
+# unless --keep-png, so anything recorded there would not survive to the next invocation).
+DIGESTS_DIR="$REPO_ROOT/manuals/.digests"
+
+# Slugs render-page-images.sh knows how to produce. Keep in sync with slug_for() below.
+KNOWN_SLUGS="guide-book startup-guide midi oss"
 
 # ---------------------------------------------------------------------------
 # Argument parsing.
@@ -92,6 +112,26 @@ while [ $# -gt 0 ]; do
 done
 
 # ---------------------------------------------------------------------------
+# Validate --slug BEFORE any work happens. An unrecognised slug used to silently filter out
+# every document -- TOTAL 0 pages, exit 0 -- which an operator could easily misread as "already
+# up to date". Reject it up front instead, naming the valid slugs.
+# ---------------------------------------------------------------------------
+if [ -n "$ONLY_SLUG" ]; then
+  slug_known=0
+  for known in $KNOWN_SLUGS; do
+    if [ "$known" = "$ONLY_SLUG" ]; then
+      slug_known=1
+      break
+    fi
+  done
+  if [ "$slug_known" -eq 0 ]; then
+    echo "ERROR: unknown --slug '$ONLY_SLUG'" >&2
+    echo "       valid slugs are: $KNOWN_SLUGS" >&2
+    exit 1
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Preflight: everything required, reported as ONE message if anything is missing.
 # ---------------------------------------------------------------------------
 missing=()
@@ -109,6 +149,16 @@ fi
 
 if [ "$HAVE_CWEBP" -eq 0 ] && [ "$HAVE_PIL" -eq 0 ]; then
   missing+=("a WebP encoder (cwebp, or python3 with a working 'from PIL import Image')")
+fi
+
+HAVE_SHA256SUM=0
+command -v sha256sum >/dev/null 2>&1 && HAVE_SHA256SUM=1
+
+HAVE_SHASUM=0
+command -v shasum >/dev/null 2>&1 && HAVE_SHASUM=1
+
+if [ "$HAVE_SHA256SUM" -eq 0 ] && [ "$HAVE_SHASUM" -eq 0 ]; then
+  missing+=("a SHA-256 tool (sha256sum, or shasum -a 256)")
 fi
 
 if [ "${#missing[@]}" -gt 0 ]; then
@@ -171,20 +221,71 @@ PYEOF
 }
 
 # ---------------------------------------------------------------------------
-# Does document $slug (source $pdf, $pages pages) have any page whose WebP is
-# missing, stale, or being forced? Returns 0 (true) if there is work to do.
+# Path to the digest sidecar for $1 (a slug). Not under site/static/pages/ or manuals/pages/ --
+# see the DIGESTS_DIR comment near the top of the file.
+# ---------------------------------------------------------------------------
+digest_file_for() {
+  printf '%s/%s.sha256' "$DIGESTS_DIR" "$1"
+}
+
+# ---------------------------------------------------------------------------
+# SHA-256 hex digest of file $1, on stdout. Fails LOUDLY (message to stderr, exit 1) rather than
+# returning a value that could be silently treated as "no digest available, fall back to mtime" --
+# there is no mtime fallback left in this script, so a digest that cannot be computed must stop
+# the run, not degrade it.
+# ---------------------------------------------------------------------------
+sha256_of() {
+  local f="$1" out=""
+  if [ "$HAVE_SHA256SUM" -eq 1 ]; then
+    out=$(sha256sum -- "$f" 2>/dev/null | awk '{print $1}') || out=""
+  elif [ "$HAVE_SHASUM" -eq 1 ]; then
+    out=$(shasum -a 256 -- "$f" 2>/dev/null | awk '{print $1}') || out=""
+  fi
+  if [ -z "$out" ]; then
+    echo "ERROR: failed to compute a SHA-256 digest of $f" >&2
+    exit 1
+  fi
+  printf '%s' "$out"
+}
+
+# ---------------------------------------------------------------------------
+# Does document $slug (source-PDF digest $2, $3 pages) have any page whose WebP is missing, or
+# whose source integrity cannot be confirmed, or is being forced? Returns 0 (true) if there is
+# work to do.
+#
+# Staleness is decided by comparing $2 (the CURRENT source PDF's digest, computed by the caller)
+# against the digest recorded the last time this document was successfully rendered. mtime plays
+# no part: a PDF whose bytes changed but whose timestamp was preserved (or is merely older than
+# the WebP's) must not be mistaken for "up to date". A missing or unreadable sidecar is treated
+# the same as a mismatch -- integrity absent is integrity unconfirmed, not integrity assumed.
 # ---------------------------------------------------------------------------
 doc_needs_work() {
-  local slug="$1" pdf="$2" pages="$3" i nn webp
+  local slug="$1" pdf_digest="$2" pages="$3" i nn webp digest_file recorded
   [ "$FORCE" -eq 1 ] && return 0
+
+  digest_file="$(digest_file_for "$slug")"
+  [ -e "$digest_file" ] || return 0
+  recorded="$(cat -- "$digest_file" 2>/dev/null || true)"
+  [ "$recorded" = "$pdf_digest" ] || return 0
+
   for i in $(seq 1 "$pages"); do
     nn=$(printf '%02d' "$i")
     webp="$OUT_DIR/$slug/page-$nn.webp"
-    if [ ! -e "$webp" ] || [ "$pdf" -nt "$webp" ]; then
-      return 0
-    fi
+    [ -e "$webp" ] || return 0
   done
   return 1
+}
+
+# ---------------------------------------------------------------------------
+# Record that $slug was successfully rendered from a PDF whose digest is $2. Written atomically
+# (temp file + mv) so a killed run never leaves a sidecar claiming success for a partial render.
+# ---------------------------------------------------------------------------
+record_digest() {
+  local slug="$1" pdf_digest="$2" tmp
+  mkdir -p "$DIGESTS_DIR"
+  tmp="$(mktemp -- "$DIGESTS_DIR/.${slug}.XXXXXX")"
+  printf '%s\n' "$pdf_digest" > "$tmp"
+  mv -f "$tmp" "$(digest_file_for "$slug")"
 }
 
 human_mb() {
@@ -203,6 +304,7 @@ grand_png_bytes=0
 grand_pages=0
 grand_max_bytes=0
 grand_max_desc=""
+docs_seen=0
 
 for pdf in "$MANUALS_DIR"/*.pdf; do
   base=$(basename "$pdf" .pdf)
@@ -212,12 +314,15 @@ for pdf in "$MANUALS_DIR"/*.pdf; do
     continue
   fi
 
+  docs_seen=$((docs_seen + 1))
+
+  pdf_digest=$(sha256_of "$pdf")
   pages=$(pdfinfo "$pdf" | awk '/^Pages:/{print $2}')
   out_dir="$OUT_DIR/$slug"
   png_dir="$PAGES_SCRATCH_DIR/$slug"
   mkdir -p "$out_dir"
 
-  if ! doc_needs_work "$slug" "$pdf" "$pages"; then
+  if ! doc_needs_work "$slug" "$pdf_digest" "$pages"; then
     webp_bytes=0
     max_bytes=0
     max_page=""
@@ -252,6 +357,11 @@ for pdf in "$MANUALS_DIR"/*.pdf; do
     [ "$f" = "$target" ] || mv "$f" "$target"
   done
 
+  # Every page is (re-)encoded once doc_needs_work has said this document needs work: the trigger
+  # was a digest mismatch (or missing sidecar/webp), and a per-page "already exists" shortcut based
+  # on mtime is exactly the untrustworthy signal this fix removes -- with a preserved mtime (the
+  # NEGATIVE CONTROL scenario) it would have skipped re-encoding every page, silently undoing the
+  # digest check one line below it.
   n_lossy=0
   n_lossless=0
   pages_encoded=0
@@ -259,10 +369,6 @@ for pdf in "$MANUALS_DIR"/*.pdf; do
     nn=$(printf '%02d' "$i")
     png="$png_dir/page-$nn.png"
     webp="$out_dir/page-$nn.webp"
-
-    if [ "$FORCE" -eq 0 ] && [ -e "$webp" ] && [ ! "$pdf" -nt "$webp" ]; then
-      continue
-    fi
 
     winner=$(encode_page "$png" "$webp")
     if [ "$winner" = "lossy" ]; then
@@ -296,6 +402,11 @@ for pdf in "$MANUALS_DIR"/*.pdf; do
     rm -rf "$png_dir"
   fi
 
+  # Only record success once every page for this document has actually been (re-)encoded above --
+  # record_digest runs after the encode loop completes, so a failure partway through (script exits
+  # under set -e) never records a digest for a document that was not fully rendered.
+  record_digest "$slug" "$pdf_digest"
+
   status="encoded $pages_encoded/$pages"
   printf '%-14s %6s %-16s %11s %11s %6s %9s %10s\n' \
     "$slug" "$pages" "$status" "$(human_mb "$png_bytes")" "$(human_mb "$webp_bytes")" \
@@ -309,6 +420,15 @@ for pdf in "$MANUALS_DIR"/*.pdf; do
     grand_max_desc="$slug/$max_page"
   fi
 done
+
+# An unvalidated --slug used to be the only way to reach zero processed documents, and that is now
+# rejected up front. Keep this as a general safety net for any other way $MANUALS_DIR could end up
+# contributing no documents (e.g. an empty or misconfigured manuals/ directory): a silent
+# TOTAL-0-pages EXIT=0 must never again read as "nothing to do".
+if [ "$docs_seen" -eq 0 ]; then
+  echo "ERROR: no documents were processed (manuals/*.pdf empty, or --slug matched nothing)" >&2
+  exit 1
+fi
 
 printf -- '-------------- ------ ---------------- ----------- ----------- ------ --------- ----------\n'
 printf 'TOTAL          %6s %-16s %11s %11s %6s %9s %10s\n' \

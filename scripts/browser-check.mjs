@@ -30,6 +30,41 @@
 // #sxc1-page / #sxc1-footer markup this script asserts on. M0's counter
 // assertions (#counter-value, #btn-increment/-decrement/-reset) are gone;
 // this drives the manual reader instead.
+//
+// --- M1 round-3 gate fixes (NEW5 / NEW6 / NEW9) --------------------------
+//
+// NEW5 (cold deep-link): in addition to the warm in-app hash-change check
+// (assertion 6, unchanged), a SEPARATE assertion opens a genuinely fresh
+// CDP target whose INITIAL navigation URL already carries
+// '#/m/guide-book/p/17/ja' -- i.e. the hash is present before the app ever
+// boots, not assigned into an already-booted page. Boot and image decode
+// are awaited independently on that fresh target, which is then closed.
+// This is the only way to exercise whatever Main.hs does with the startup
+// hash, as opposed to its hashchange subscription.
+//
+// NEW6 (image decode, browser half): the default (non---quick) 108-route
+// sweep now visits every route in its '/ja' form and awaits a REAL decode
+// (img.decode(), raced against a per-image timeout so a hung fetch cannot
+// silently stall the whole run) against the expected 'pages/<slug>/page-
+// NN.webp' src, with CDP Network-domain failure listeners armed so a
+// failed fetch is named rather than just timing out. --quick keeps doing
+// the same decode assertion over its small first/mid/last sample instead
+// of all 108 -- it stays a fast local-iteration mode, never the default.
+// No new CLI flag was added for this: check-site.sh already invokes this
+// script without --quick, so the exhaustive decode sweep is already the
+// default it gets for free.
+//
+// NEW9 (--expect-json vacuity): a supplied --expect-json file is now
+// schema-validated BEFORE any comparison happens: it must name exactly
+// the four documents {guide-book, startup-guide, midi, oss} (no fewer, no
+// extra, no duplicates), and every one of them must carry the full
+// required stats field set. A malformed or vacuous file exits 2 with a
+// readable message instead of silently producing a vacuous pass. The
+// comparison itself is now bidirectional: an extra document present in
+// the app's #sxc1-content-stats but absent from --expect-json is also a
+// mismatch, not just the reverse. The built-in golden path (no
+// --expect-json) is unaffected -- GOLDEN_DOCS already satisfies the same
+// schema.
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -72,6 +107,59 @@ const GUIDE_BOOK_PART_TITLES = [
   'PART 3 — Part: Sequencer',
   'PART 4 — Part: Leveling up',
 ];
+
+// ---------------------------------------------------------------------------
+// NEW9: --expect-json schema validation.
+//
+// A supplied --expect-json file must describe exactly the four documents
+// content-check tracks (REQUIRED_DOC_SLUGS), no more, no fewer, no
+// duplicates, and every one of them must carry every field the comparison
+// below can possibly check (REQUIRED_STATS_FIELDS -- the same numeric
+// fields GOLDEN_FIELDS lists for the built-in path, plus 'unparsed', which
+// the built-in path does not compare but a real content-check --json
+// capture always includes). This is deliberately a field ALLOWLIST check
+// against a REQUIRED set, not a strict key-set check: a doc may carry
+// extra fields (title, partTitles, ...) and every field actually present
+// still gets compared field-for-field further down, unchanged.
+// ---------------------------------------------------------------------------
+
+const REQUIRED_DOC_SLUGS = ['guide-book', 'startup-guide', 'midi', 'oss'];
+const REQUIRED_STATS_FIELDS = [...GOLDEN_FIELDS, 'unparsed'];
+
+// Returns null when `parsed` is an acceptable --expect-json payload,
+// otherwise a human-readable string explaining exactly what is wrong.
+function validateExpectJson(parsed, filePath) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return `--expect-json file '${filePath}' must be a JSON object with a top-level "docs" array`;
+  }
+  if (!Array.isArray(parsed.docs)) {
+    return `--expect-json file '${filePath}' has no top-level "docs" array`;
+  }
+  const seenSlugs = new Set();
+  for (let i = 0; i < parsed.docs.length; i++) {
+    const edoc = parsed.docs[i];
+    if (!edoc || typeof edoc !== 'object' || Array.isArray(edoc) || typeof edoc.slug !== 'string' || edoc.slug === '') {
+      return `--expect-json file '${filePath}': docs[${i}] is missing a non-empty string "slug" field`;
+    }
+    if (seenSlugs.has(edoc.slug)) {
+      return `--expect-json file '${filePath}': duplicate slug "${edoc.slug}" in docs[]`;
+    }
+    seenSlugs.add(edoc.slug);
+    const missing = REQUIRED_STATS_FIELDS.filter((f) => !(f in edoc));
+    if (missing.length > 0) {
+      return `--expect-json file '${filePath}': docs[${i}] (slug "${edoc.slug}") is missing required field(s): ${missing.join(', ')} -- an expectation must supply every stats field it wants compared, not a partial subset`;
+    }
+  }
+  const missingSlugs = REQUIRED_DOC_SLUGS.filter((s) => !seenSlugs.has(s));
+  const extraSlugs = [...seenSlugs].filter((s) => !REQUIRED_DOC_SLUGS.includes(s));
+  if (missingSlugs.length > 0 || extraSlugs.length > 0) {
+    const parts = [`--expect-json file '${filePath}' must name exactly the four documents {${REQUIRED_DOC_SLUGS.join(', ')}}`];
+    if (missingSlugs.length > 0) parts.push(`missing: ${missingSlugs.join(', ')}`);
+    if (extraSlugs.length > 0) parts.push(`unexpected: ${extraSlugs.join(', ')}`);
+    return parts.join('; ');
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Argument parsing
@@ -132,11 +220,17 @@ Options:
   --url <url>         Page to check (default: http://127.0.0.1:8123/)
   --expect-json <file> JSON produced by 'content-check --json'. When given,
                        the running app's #sxc1-content-stats is compared
-                       against it field-for-field. When absent, it is
-                       compared against the golden numbers table baked
-                       into this script.
+                       against it field-for-field, in both directions. When
+                       absent, it is compared against the golden numbers
+                       table baked into this script. The file must name
+                       exactly the four documents {guide-book, startup-
+                       guide, midi, oss}, each with every required stats
+                       field and no duplicate slugs, or the run exits 2
+                       before a browser is even launched.
   --quick              Sweep a small sample of pages (first/middle/last of
-                       each manual) instead of all 108 routes.
+                       each manual) instead of all 108 routes. The sample
+                       still visits each page's '/ja' form and decodes its
+                       original-page image, same as the default sweep.
   --browser <path>     Browser executable (default: $SXC1_BROWSER, else the
                        first of google-chrome, google-chrome-stable, chromium,
                        chromium-browser found on PATH)
@@ -144,7 +238,14 @@ Options:
                        Bounds the WebSocket connect, every CDP command and
                        every polling loop -- not just the polling loops.
   --keep-open          Do not kill the browser on exit (debugging)
-  --help               Show this help and exit`);
+  --help               Show this help and exit
+
+By default (no --quick) the page-route sweep visits all 108 routes in
+their '/ja' form and awaits a real image decode for every one -- this is
+the authoritative decoder for the project's page images (see NEW6). A
+separate assertion also opens a genuinely fresh browser target whose
+initial URL already carries a JA deep-link hash, to catch a cold-load
+regression that a warm hashchange-only check cannot see (see NEW5).`);
 }
 
 // ---------------------------------------------------------------------------
@@ -535,8 +636,13 @@ async function main() {
       process.exit(2);
       return;
     }
-    if (!parsed || !Array.isArray(parsed.docs)) {
-      console.error(`error: --expect-json file '${opts.expectJson}' has no top-level "docs" array`);
+    // NEW9 fix: reject a malformed or vacuous expectation (wrong document
+    // set, missing fields, duplicate slugs) here, before a browser is even
+    // launched, rather than silently comparing against whatever subset was
+    // supplied and reporting a hollow pass.
+    const schemaError = validateExpectJson(parsed, opts.expectJson);
+    if (schemaError) {
+      console.error(`error: ${schemaError}`);
       process.exit(2);
       return;
     }
@@ -664,26 +770,57 @@ async function main() {
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
 
-    // 5. Enable Runtime/Page and record console errors + uncaught exceptions
-    // for the ENTIRE run (every navigation below shares this one page
-    // target, so this one listener pair covers the whole sweep).
+    // NEW5: the cold-load assertion below attaches a SECOND, independent
+    // target/session. trackedSessions is every session whose console
+    // errors / uncaught exceptions / network failures should count toward
+    // this run, so that a fresh target is covered by the same hygiene
+    // checks as the primary one instead of flying under the radar.
+    const trackedSessions = new Set([sessionId]);
+
+    // 5. Enable Runtime/Page/Network and record console errors + uncaught
+    // exceptions + failed resource loads for the ENTIRE run (every
+    // navigation below shares this one page target, so this one listener
+    // set covers the whole sweep; the cold-load target adds its own
+    // session id to trackedSessions when it is created).
     const consoleErrors = [];
     const exceptions = [];
     cdp.on('Runtime.consoleAPICalled', (params, sid) => {
-      if (sid !== sessionId) return;
+      if (!trackedSessions.has(sid)) return;
       if (params.type === 'error') {
         const text = (params.args || []).map((a) => a.description ?? a.value ?? String(a.type)).join(' ');
         consoleErrors.push(text);
       }
     });
     cdp.on('Runtime.exceptionThrown', (params, sid) => {
-      if (sid !== sessionId) return;
+      if (!trackedSessions.has(sid)) return;
       const detail = params.exceptionDetails;
       exceptions.push(detail?.exception?.description || detail?.text || JSON.stringify(detail));
     });
 
+    // NEW6: Network-domain failure listeners, armed for the whole run, so
+    // a failed fetch (connection refused, aborted, DNS, ...) is reported
+    // by URL rather than only ever surfacing as a silent per-route
+    // timeout. requestUrls maps requestId -> URL (populated from
+    // requestWillBeSent) so a later loadingFailed event can name what
+    // failed; imageResourceFailures collects the subset that looks like a
+    // page image.
+    const requestUrls = new Map();
+    const imageResourceFailures = [];
+    cdp.on('Network.requestWillBeSent', (params, sid) => {
+      if (!trackedSessions.has(sid)) return;
+      requestUrls.set(params.requestId, params.request && params.request.url);
+    });
+    cdp.on('Network.loadingFailed', (params, sid) => {
+      if (!trackedSessions.has(sid)) return;
+      const url = requestUrls.get(params.requestId) || '(unknown url)';
+      if (params.type === 'Image' || /\/pages\/.*\.webp(\?|$)/.test(url)) {
+        imageResourceFailures.push({ url, errorText: params.errorText, canceled: Boolean(params.canceled) });
+      }
+    });
+
     await cdp.send('Runtime.enable', {}, sessionId);
     await cdp.send('Page.enable', {}, sessionId);
+    await cdp.send('Network.enable', {}, sessionId);
 
     // Evaluate an expression in the page and return its value, throwing on
     // a JS-level exception (as opposed to a CDP transport error). Routed
@@ -691,13 +828,14 @@ async function main() {
     // failFatally() the same way every other command is. awaitPromise:true
     // lets a single evaluate() run an internal poll loop (used throughout
     // below to wait for a settled render without round-tripping to Node
-    // for every tick).
-    const evaluate = async (expression) => {
+    // for every tick). Defaults to the primary session; the cold-load
+    // assertion passes its own fresh session id.
+    const evaluate = async (expression, sid = sessionId) => {
       const res = await cdp.send('Runtime.evaluate', {
         expression,
         returnByValue: true,
         awaitPromise: true,
-      }, sessionId);
+      }, sid);
       if (res.exceptionDetails) {
         const d = res.exceptionDetails;
         throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
@@ -803,11 +941,12 @@ async function main() {
         '#/m/guide-book/p/17 renders the expected text',
         'JA toggle shows a decoded original-page image',
         'JA toggle hides the panel again',
-        '#/m/guide-book/p/17/ja deep-links into the JA-visible state',
+        '#/m/guide-book/p/17/ja deep-links into the JA-visible state (warm)',
+        '#/m/guide-book/p/17/ja deep-links into the JA-visible state on a genuinely cold load',
         'next/prev navigation',
         'page 1 has no enabled prev / last page has no enabled next',
         'guide-book p.15 has a p.17 cross-reference link',
-        '108-route sweep',
+        '108-route sweep with JA image decode',
         'mobile viewport has no horizontal overflow',
         '#sxc1-disclaimer names CASIO and non-affiliation',
         'no console errors or uncaught exceptions',
@@ -839,6 +978,7 @@ async function main() {
       if (statsParsed) {
         const mismatches = [];
         const actualDocs = Array.isArray(statsParsed.docs) ? statsParsed.docs : [];
+        const expectedSlugs = new Set(expected.docs.map((d) => d.slug));
         for (const edoc of expected.docs) {
           const adoc = actualDocs.find((d) => d.slug === edoc.slug);
           if (!adoc) { mismatches.push(`${edoc.slug}: missing from app stats`); continue; }
@@ -847,6 +987,16 @@ async function main() {
             if (JSON.stringify(adoc[f]) !== JSON.stringify(edoc[f])) {
               mismatches.push(`${edoc.slug}.${f}: got ${JSON.stringify(adoc[f])} want ${JSON.stringify(edoc[f])}`);
             }
+          }
+        }
+        // NEW9 fix: compare in the OTHER direction too, so a document the
+        // running app reports that --expect-json never mentioned is a
+        // mismatch rather than silently ignored (an expectation could
+        // otherwise be trivially satisfied by naming a strict subset of
+        // what the app actually serves).
+        for (const adoc of actualDocs) {
+          if (adoc && typeof adoc.slug === 'string' && !expectedSlugs.has(adoc.slug)) {
+            mismatches.push(`${adoc.slug}: present in app stats but not named in the expected document set`);
           }
         }
         report(
@@ -914,7 +1064,10 @@ async function main() {
       })()`);
       report('JA toggle hides the panel again', jaHidden === true, jaHidden);
 
-      // -- 6. .../p/17/ja deep-links straight into the JA-visible state ----------
+      // -- 6. .../p/17/ja deep-links into the JA-visible state via an in-app
+      // hash change on the already-booted page ("warm": this exercises the
+      // hashchange subscription, not the startup-hash handling -- see the
+      // genuinely cold assertion right after it for that). -----------------
       await goto('#/m/guide-book/p/17/ja', '#ja-panel');
       const deepLinked = await evaluate(`(() => {
         const article = document.querySelector('#sxc1-page');
@@ -926,9 +1079,106 @@ async function main() {
         };
       })()`);
       report(
-        '#/m/guide-book/p/17/ja deep-links into the JA-visible state on a cold load',
+        '#/m/guide-book/p/17/ja deep-links into the JA-visible state via an in-app hash change (warm)',
         Boolean(deepLinked && deepLinked.hasJaClass && deepLinked.panelExists && deepLinked.imgOk),
         deepLinked,
+      );
+
+      // -- 6b (NEW5 fix). GENUINELY cold load: a fresh CDP target whose
+      // INITIAL navigation URL already carries '#/m/guide-book/p/17/ja',
+      // so the assertion exercises whatever the app does with the startup
+      // hash rather than an in-session hashchange. Boot and image decode
+      // are awaited independently on this fresh target; it never inherits
+      // any state (DOM, cache warmth, decoded-image state) from the
+      // primary target above. Closed again once the assertion is done.
+      const coldBase = targetUrl.replace(/#.*$/, '');
+      const coldUrl = `${coldBase}#/m/guide-book/p/17/ja`;
+      let coldTargetId = null;
+      let coldResult = { ok: false, reason: 'cold-load assertion did not run' };
+      try {
+        const createdCold = await cdp.send('Target.createTarget', { url: coldUrl });
+        coldTargetId = createdCold.targetId;
+        const attachedCold = await cdp.send('Target.attachToTarget', { targetId: coldTargetId, flatten: true });
+        const coldSessionId = attachedCold.sessionId;
+        trackedSessions.add(coldSessionId);
+        await cdp.send('Runtime.enable', {}, coldSessionId);
+        await cdp.send('Page.enable', {}, coldSessionId);
+
+        // Poll for boot independently on the cold target -- it must not
+        // inherit bootOutcome from the primary target above.
+        let coldBoot = null;
+        const coldBootDeadline = Math.min(deadline, Date.now() + 20000);
+        while (Date.now() < coldBootDeadline) {
+          const state = await evaluate(`(() => {
+            if (typeof window.__SXC1_BOOT_ERROR === 'string') return { error: window.__SXC1_BOOT_ERROR };
+            if (window.__SXC1_BOOTED === true) return { booted: true };
+            return { pending: true };
+          })()`, coldSessionId);
+          if (state && typeof state.error === 'string') { coldBoot = { ok: false, error: state.error }; break; }
+          if (state && state.booted) { coldBoot = { ok: true }; break; }
+          await sleep(100);
+        }
+
+        if (!coldBoot || !coldBoot.ok) {
+          coldResult = { ok: false, reason: 'cold target failed to boot', coldBoot };
+        } else {
+          coldResult = await evaluate(`(async () => {
+            const start = Date.now();
+            while (Date.now() - start < 5000) {
+              if (document.querySelector('#page-17') && document.querySelector('#ja-panel')) break;
+              await new Promise((r) => setTimeout(r, 20));
+            }
+            const article = document.querySelector('#sxc1-page');
+            const panel = document.querySelector('#ja-panel');
+            const img = document.querySelector('#ja-image');
+            const hasPage17 = document.querySelector('#page-17') !== null;
+            const hash = window.location.hash;
+            if (!hasPage17 || !panel || !img) {
+              return { ok: false, hash, hasPage17, panelExists: !!panel, hasImg: !!img };
+            }
+            const src = img.getAttribute('src');
+            if (!src || !src.endsWith('pages/guide-book/page-17.webp')) {
+              return { ok: false, hash, reason: 'unexpected #ja-image src', src };
+            }
+            // See the sweep below for why this is needed: <img loading=
+            // "lazy"> can defer the fetch by a variable amount in a
+            // headless tab even though the fetch itself is instant.
+            img.loading = 'eager';
+            try {
+              await Promise.race([
+                img.decode(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('decode timed out')), 5000)),
+              ]);
+            } catch (e) {
+              return { ok: false, hash, reason: 'decode failed: ' + (e && e.message ? e.message : String(e)) };
+            }
+            return {
+              ok: true,
+              hash,
+              hasJaClass: !!(article && article.classList.contains('ja-visible')),
+              panelExists: true,
+              src,
+              naturalWidth: img.naturalWidth,
+            };
+          })()`, coldSessionId);
+        }
+      } catch (err) {
+        coldResult = { ok: false, reason: `cold-load harness error: ${err && err.message ? err.message : String(err)}` };
+      } finally {
+        if (coldTargetId) {
+          try { await cdp.send('Target.closeTarget', { targetId: coldTargetId }); } catch { /* best effort */ }
+        }
+      }
+      report(
+        "#/m/guide-book/p/17/ja deep-links into the JA-visible state on a genuinely cold load (fresh target, hash present on the initial navigation)",
+        Boolean(
+          coldResult && coldResult.ok
+          && coldResult.hash === '#/m/guide-book/p/17/ja'
+          && coldResult.hasJaClass === true
+          && coldResult.panelExists === true
+          && typeof coldResult.src === 'string' && coldResult.src.endsWith('pages/guide-book/page-17.webp'),
+        ),
+        coldResult,
       );
 
       // -- 7. prev/next navigation + disabled ends --------------------------------
@@ -994,34 +1244,82 @@ async function main() {
       })()`);
       report('guide-book p.15 has a p.17 cross-reference link', crossRef === true, crossRef);
 
-      // -- 9. FULL SWEEP: every page route renders a non-empty #sxc1-page --------
+      // -- 9. FULL SWEEP (NEW6 browser half): every page route is visited in
+      // its '/ja' form -- rendering #sxc1-page exactly as before AND
+      // genuinely decoding that page's original-page image (img.decode(),
+      // raced against a per-image timeout so one hung fetch cannot stall
+      // the whole sweep) against the expected 'pages/<slug>/page-NN.webp'
+      // src. This makes every one of the 108 images the authoritative
+      // decoder (Chrome) actually decodes, not just guide-book page 17.
+      // --quick keeps this to the small first/mid/last sample; the DEFAULT
+      // (no --quick) sweeps all 108, unchanged from before this fix.
       const routes = opts.quick ? quickRouteList() : fullRouteList();
       const sweepStart = Date.now();
       const sweepFailures = [];
       for (const { slug, n } of routes) {
-        const hash = `#/m/${slug}/p/${n}`;
+        const hash = `#/m/${slug}/p/${n}/ja`;
+        const expectedSrcSuffix = `pages/${slug}/page-${String(n).padStart(2, '0')}.webp`;
         const result = await evaluate(`(async () => {
           window.location.hash = ${JSON.stringify(hash)};
+          const pageSelector = ${JSON.stringify(`#page-${n}`)};
           const start = Date.now();
+          let el = null;
+          let img = null;
           while (Date.now() - start < 4000) {
-            const el = document.querySelector('#sxc1-page');
-            if (el && el.textContent.trim().length > 0 && document.querySelector(${JSON.stringify(`#page-${n}`)})) {
-              return { ok: true };
-            }
+            el = document.querySelector('#sxc1-page');
+            img = document.querySelector('#ja-image');
+            if (el && el.textContent.trim().length > 0 && document.querySelector(pageSelector) && img) break;
             await new Promise((r) => setTimeout(r, 15));
           }
-          const el = document.querySelector('#sxc1-page');
-          return { ok: false, textLen: el ? el.textContent.trim().length : -1 };
+          if (!el || el.textContent.trim().length === 0 || !document.querySelector(pageSelector)) {
+            return { ok: false, reason: 'page did not render', textLen: el ? el.textContent.trim().length : -1 };
+          }
+          if (!img) {
+            return { ok: false, reason: 'no #ja-image element found' };
+          }
+          const src = img.getAttribute('src');
+          if (!src || !src.endsWith(${JSON.stringify(expectedSrcSuffix)})) {
+            return { ok: false, reason: 'unexpected #ja-image src', src };
+          }
+          // The markup marks this <img loading="lazy">; in a headless tab
+          // the IntersectionObserver-driven lazy-load heuristic can defer
+          // starting the fetch for a variable, occasionally multi-second
+          // window even though the underlying request itself is a
+          // millisecond-scale localhost fetch. Flipping to 'eager' forces
+          // an immediate fetch so decode() below measures real decode
+          // latency, not lazy-load scheduling jitter.
+          img.loading = 'eager';
+          try {
+            await Promise.race([
+              img.decode(),
+              new Promise((_, rej) => setTimeout(() => rej(new Error('decode timed out')), 4000)),
+            ]);
+          } catch (e) {
+            return { ok: false, reason: 'decode failed: ' + (e && e.message ? e.message : String(e)), src };
+          }
+          if (!(img.naturalWidth > 0 && img.naturalHeight > 0)) {
+            return { ok: false, reason: 'decoded with zero natural size', naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, src };
+          }
+          return { ok: true, src };
         })()`);
         if (!result || result.ok !== true) sweepFailures.push({ hash, result });
       }
+      // Cross-check the CDP-level Network failure listeners armed in step 5:
+      // a failure that somehow did not surface through img.decode() itself
+      // still fails the sweep, named by URL.
+      if (imageResourceFailures.length > 0) {
+        sweepFailures.push({
+          hash: '(network layer, whole run)',
+          result: { ok: false, reason: 'resource failures observed on the Network domain', imageResourceFailures: imageResourceFailures.slice(0, 10) },
+        });
+      }
       const sweepMs = Date.now() - sweepStart;
       report(
-        `all ${routes.length} page routes render a non-empty #sxc1-page${opts.quick ? ' (--quick sample)' : ''}`,
+        `all ${routes.length} page routes render #sxc1-page and their original-page image genuinely decodes${opts.quick ? ' (--quick sample)' : ''}`,
         sweepFailures.length === 0,
         { count: routes.length, ms: sweepMs, failures: sweepFailures.slice(0, 5) },
       );
-      console.log(`[sweep] ${routes.length} routes in ${sweepMs}ms`);
+      console.log(`[sweep] ${routes.length} routes with JA image decode in ${sweepMs}ms`);
 
       // -- 10. Mobile viewport: no horizontal overflow ----------------------------
       await cdp.send('Emulation.setDeviceMetricsOverride', {
