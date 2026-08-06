@@ -90,23 +90,65 @@ pageBreadcrumb slug st outline n =
   H.nav_ [] ( manualCrumb : groupCrumb ++ sectionCrumb ++ pageCrumb )
   where
     manualCrumb = H.a_ [ P.href_ (ms (renderRoute (RManual slug))) ] [ text (ms (stTitle st)) ]
-    msec        = find (\s -> secPage s <= n && n <= secEndPage s) (outSections outline)
 
-    groupCrumb = case (outGroups outline, msec) of
-      (Just groups, Just sec) -> case find (elem sec . grpSections) groups of
-        Just g  -> [ crumbSep, text (ms (grpTitle g)) ]
-        Nothing -> []
-      _ -> []
+    -- | The section considered "current" for page @n@. NEW1's fix made
+    -- @secEndPage >= secPage@ an invariant of 'SXC1.Content.Outline', which
+    -- means a page carrying two-or-more section-level headings
+    -- (startup-guide pp. 1\/2\/3\/4\/10\/14, midi p.2, oss p.11 -- see
+    -- @briefs\/M1-fixes-3-triage.md@'s NEW1 writeup; guide-book has none)
+    -- is now genuinely ambiguous for "the current section" rather than
+    -- accidentally resolving one way. The rule: the LAST section (in
+    -- source order) whose heading is on page @n@ or earlier -- i.e. the
+    -- most recently opened section governs its own page and every page up
+    -- to the next section change. This is deterministic, total (front
+    -- matter before the first section resolves to 'Nothing' without
+    -- crashing), and it reproduces exactly what the app already showed
+    -- before this round's outline fix (startup-guide p.10 -> "Try
+    -- sampling", p.14 -> "Trademarks") -- we are formalising the existing
+    -- observable behaviour, not changing it.
+    msec :: Maybe Section
+    msec = lastSectionAtOrBefore n (outSections outline)
 
+    mgroup :: Maybe Group
+    mgroup = case (outGroups outline, msec) of
+      (Just groups, Just sec) -> find (elem sec . grpSections) groups
+      _                       -> Nothing
+
+    groupCrumb = case mgroup of
+      Just g  -> [ crumbSep, text (ms (grpTitle g)) ]
+      Nothing -> []
+
+    -- | A3: a PART heading is simultaneously a Group's title and the
+    -- first Section of that group -- 'SXC1.Content.Outline.buildGroups'
+    -- names the group after the PART section's own 'secTitle' and
+    -- deliberately keeps that section at the head of 'grpSections' (it is
+    -- a real section with a real page, and the TOC must keep listing it).
+    -- So on a PART page the group crumb and the section crumb are the
+    -- same string; suppress the section crumb in that one case rather
+    -- than dropping the section from the outline. Every other page keeps
+    -- three distinct crumbs (manual \/ group \/ section).
     sectionCrumb = case msec of
-      Just sec -> [ crumbSep, text (ms (secTitle sec)) ]
       Nothing  -> []
+      Just sec
+        | Just (secTitle sec) == fmap grpTitle mgroup -> []
+        | otherwise -> [ crumbSep, text (ms (secTitle sec)) ]
 
     pageCrumb = [ crumbSep
                 , text (ms ("page " <> T.pack (show n) <> " of " <> T.pack (show (stPages st))))
                 ]
 
     crumbSep = text " / "
+
+-- | See 'pageBreadcrumb''s @msec@ for the rule this implements: the last
+-- section (by source order, which 'outSections' is always in) whose
+-- 'secPage' does not exceed @n@. A single left-to-right fold, so it is
+-- total over the empty list and never inspects 'secEndPage'.
+lastSectionAtOrBefore :: Int -> [Section] -> Maybe Section
+lastSectionAtOrBefore n = foldl' step Nothing
+  where
+    step acc s
+      | secPage s <= n = Just s
+      | otherwise      = acc
 
 --------------------------------------------------------------------------
 -- #sxc1-content-stats: always [hidden]; never rendered visibly.

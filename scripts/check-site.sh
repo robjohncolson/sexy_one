@@ -10,14 +10,21 @@
 # regardless of earlier failures (a full report is more useful than bailing
 # on the first FAIL); the summary line at the end says how many passed.
 #
-# Final machine-readable marker (last line before the exit code, see check
-# 8 below):
-#   check-site: result=complete         every axis (including the browser
-#                                        axis) actually ran.
-#   check-site: result=structural-only  the browser axis was skipped via
-#                                        --skip-browser / SXC1_SKIP_BROWSER=1.
-# CI must assert result=complete so a silently skipped browser axis cannot
-# masquerade as a full gate.
+# Final machine-readable marker (last line before the exit code, see the
+# "Final: summary + machine-readable result marker" section near the bottom
+# of this script):
+#   check-site: result=complete         every check actually ran: SKIPPED
+#                                        is exactly 0, on every axis.
+#   check-site: result=structural-only  one or more checks were SKIPPED --
+#                                        currently via --skip-browser /
+#                                        SXC1_SKIP_BROWSER=1 and/or
+#                                        --skip-content / SXC1_SKIP_CONTENT=1.
+# CI must assert BOTH result=complete AND zero skipped checks (see
+# .github/workflows/site.yml) so a silently skipped axis -- on either flag,
+# or any future third one -- cannot masquerade as a full gate. (NEW7, M1
+# gate round 3: this marker used to key off --skip-browser alone, which
+# silently stopped being the whole truth the day --skip-content was added;
+# see the final-marker section below for the fix.)
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
@@ -56,12 +63,17 @@ Options:
                    checks are counted as SKIPPED members of the total and
                    the final marker reads result=structural-only instead of
                    result=complete -- this is a local escape hatch only;
-                   CI asserts result=complete.
+                   CI asserts result=complete AND zero skipped checks.
   --skip-content   SKIPPED (conspicuously, never silently) the exe:content-check
-                   run and the three-way content agreement check (also
-                   honoured via SXC1_SKIP_CONTENT=1). Local-iteration escape
-                   hatch only -- never the default, and CI must not pass it.
-                   When skipped, checks 7/8's browser run falls back to
+                   run, the three-way content agreement check, and the
+                   exact-bytes source-integrity check (also honoured via
+                   SXC1_SKIP_CONTENT=1). Local-iteration escape hatch only --
+                   never the default, and CI must not pass it. Like
+                   --skip-browser, this also flips the final marker to
+                   result=structural-only (NEW7: both skippable axes now
+                   drive the same marker, via the SKIPPED counter, so
+                   neither can silently report result=complete). When
+                   skipped, checks 7/8's browser run falls back to
                    scripts/browser-check.mjs's own built-in golden numbers
                    instead of --expect-json.
   --port N         TCP port to try first for the dev server used by the
@@ -104,9 +116,15 @@ Checks performed, in order:
      fails this check even when check 5's syntactic scan misses it.
   9. PAGE IMAGES: every site/public/pages/<slug>/page-NN.webp exists for
      guide-book (1-71), startup-guide (1-15), midi (1-6) and oss (1-16) --
-     108 files, two-digit zero padding -- each begins with the "RIFF"..
-     "WEBP" magic at offsets 0 and 8, none exceeds 300 KB, and the total is
-     under 12 MB (reported as info).
+     108 files, two-digit zero padding. Each is validated as a REAL WebP,
+     not just a 12-byte magic prefix (NEW6, host half): the RIFF chunk-size
+     field must match the file's actual size, the chunk immediately after
+     "WEBP" must be one of the three real WebP payload types (VP8 /VP8L/
+     VP8X), and the pixel dimensions parsed from that chunk must be
+     plausible. None exceeds 300 KB, and the total is under 12 MB (info).
+     This is a fast, dependency-free, non-authoritative check; the
+     AUTHORITATIVE decoder is checks 7/8's real headless-Chrome image
+     decode (see NEW6, browser half, below).
   10. CONTENT CHECKER: sources $HOME/.ghc-wasm/env (actionable failure, not
      a silent skip, if missing), resolves exe:content-check via
      `wasm32-wasi-cabal list-bin`, and runs it under wasm-run.mjs -- must
@@ -117,13 +135,26 @@ Checks performed, in order:
      diffed field-by-field (chars, lines, pages, headings, tables, figures,
      sections, subsections, parts, per document) against numbers an
      embedded python3 snippet recomputes INDEPENDENTLY, straight from
-     translations/*.md by regex. This is what catches a STALE BUILD -- a
-     translation edited without rebuilding makes `chars` diverge and this
-     check goes red instead of silently serving old content. Unless
-     --skip-content. The same JSON is also passed to checks 7/8's
-     scripts/browser-check.mjs via --expect-json, so the running app is
-     compared against numbers derived from the source of truth rather than
-     constants baked into the harness.
+     translations/*.md by regex. This is a STRUCTURAL fingerprint -- it
+     catches a translation edited without rebuilding IF the edit changes
+     any counted field. Unless --skip-content. The same JSON is also passed
+     to checks 7/8's scripts/browser-check.mjs via --expect-json, so the
+     running app is compared against numbers derived from the source of
+     truth rather than constants baked into the harness.
+  12. EXACT-BYTES SOURCE INTEGRITY (NEW4): unlike check 11's structural
+     fingerprint, this compares actual bytes -- `exe:content-check
+     --dump-source <slug>` (stdout: the exact embedded UTF-8 bytes, no
+     banner, no added trailing newline) diffed byte-for-byte against
+     translations/<slug>.md, for all five embedded documents (guide-book,
+     startup-guide, midi, oss, glossary). Catches an equal-length,
+     line-count-preserving prose edit that check 11 cannot. Unless
+     --skip-content.
+  13. APP.WASM SIZE TRIPWIRE (A5): app.wasm's gzip size must stay under a
+     hard, deliberately generous ceiling (see the check itself for the
+     current value and rationale). Never a diet, never expected to fire
+     today -- it exists so the bundle roughly doubling before it is caught
+     some other way still fails loudly here. The current value and
+     headroom are printed on every run, skip or no skip.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -523,23 +554,134 @@ report_size "$WASM_FILE" "app.wasm"
 report_size "$JSFFI_FILE" "ghc_wasm_jsffi.js"
 
 # ===========================================================================
+# Check 13 (A5 size tripwire, M1 gate round 3): hard gzip ceiling on
+# app.wasm.
+#
+# Check 6 above reports raw/gzip sizes purely as info and never fails --
+# deliberately, ordinary size drift shouldn't break the gate. But Codex's
+# A5 finding was that NOTHING anywhere fails on size, so the bundle could
+# double before M2 lands and nobody would notice from CI. This adds
+# exactly one hard, DELIBERATELY GENEROUS ceiling on the gzip size of
+# app.wasm (the artifact that actually has to travel over the network).
+#
+# Sizing rationale (read this before ever moving the constant): at the
+# time this check was written, gzip(app.wasm) measured ~827,602 bytes --
+# already +27.8% over the M0-era design probe after M1's manual-reader
+# content/parser work, per Codex's own measurement of ~823,588 bytes a
+# round earlier. The ceiling below is set at 1,000,000 bytes: comfortable
+# headroom over today's value (not a diet), but well short of "the app
+# doubled and nobody noticed." A tripwire nobody trips is the point one
+# is added now, before M2, rather than after the bundle has already grown
+# past a budget added in hindsight. The current value and headroom are
+# printed on every run (regardless of pass/fail) so growth is visible in
+# CI logs long before the ceiling is ever approached. If this constant
+# ever needs to move, that must be a deliberate, explained change -- not
+# a silent bump to make a red build green.
+# ===========================================================================
+WASM_GZIP_CEILING_BYTES=1000000
+if [ -f "$WASM_FILE" ]; then
+  WASM_GZIP_BYTES="$(gzip -c "$WASM_FILE" | wc -c | tr -d ' ')"
+  WASM_GZIP_HEADROOM=$((WASM_GZIP_CEILING_BYTES - WASM_GZIP_BYTES))
+  info "app.wasm gzip size = $WASM_GZIP_BYTES bytes; ceiling = $WASM_GZIP_CEILING_BYTES bytes; headroom = $WASM_GZIP_HEADROOM bytes"
+  if [ "$WASM_GZIP_BYTES" -lt "$WASM_GZIP_CEILING_BYTES" ]; then
+    ok "app.wasm gzip size is under the $WASM_GZIP_CEILING_BYTES byte ceiling (observed: $WASM_GZIP_BYTES bytes, headroom $WASM_GZIP_HEADROOM bytes)"
+  else
+    fail "app.wasm gzip size is under the $WASM_GZIP_CEILING_BYTES byte ceiling (observed: $WASM_GZIP_BYTES bytes, OVER by $((WASM_GZIP_BYTES - WASM_GZIP_CEILING_BYTES)) bytes -- A5 size tripwire tripped)"
+  fi
+else
+  fail "app.wasm gzip size is under the $WASM_GZIP_CEILING_BYTES byte ceiling (observed: app.wasm missing)"
+fi
+
+# ===========================================================================
 # Check 9: PAGE IMAGES. site/public/pages/<slug>/page-NN.webp exists for
 # guide-book 1-71, startup-guide 1-15, midi 1-6, oss 1-16 (108 files,
-# two-digit zero padding); each begins with the RIFF/WEBP magic at offsets 0
-# and 8; none exceeds 300 KB; the total is under 12 MB (reported as info).
-# A single python3 pass (not 108 shell/dd invocations) does the byte-level
-# work and prints OK/FAIL/INFO lines that this script just dispatches.
+# two-digit zero padding); none exceeds 300 KB; the total is under 12 MB
+# (reported as info). A single python3 pass (not 108 shell/dd invocations)
+# does the byte-level work and prints OK/FAIL/INFO lines that this script
+# just dispatches (any "OK <label> ..." / "FAIL <label> ..." line becomes
+# an ok()/fail() call automatically -- the dispatch loop below does not
+# hardcode label text).
+#
+# NEW6 (host half, M1 gate round 3): the original version of this check
+# validated only a 12-byte magic prefix ("RIFF"...."WEBP" at offsets 0/8).
+# Codex demonstrated that a copy of midi/page-03.webp corrupted from byte
+# 12 onward -- while preserving that prefix AND the RIFF length field --
+# sailed straight through: PIL could not decode it, but this gate reported
+# all-OK. This check now also, still with no third-party library (no
+# Pillow, no cwebp) so CI stays dependency-free: (a) validates the RIFF
+# chunk-size field against the file's actual size, (b) requires the chunk
+# immediately after "WEBP" to be one of the three real WebP payload types
+# (VP8 /VP8L/VP8X -- Codex's corruption turns this into "AAAA", which is
+# exactly what this catches), and (c) parses and sanity-checks the pixel
+# dimensions carried in that chunk against a generous range (real files
+# here are 875x1241 or 1241x1755). This is a minimal, purpose-built
+# reimplementation of the RIFF/WebP container header, not a general
+# decoder -- it is fast (no full pixel decode) but still NOT authoritative:
+# the AUTHORITATIVE decoder is checks 7/8's real headless-Chrome run of
+# scripts/browser-check.mjs, which really calls img.decode() on every one
+# of the 108 images (see NEW6, browser half). This host-side check exists
+# so a corrupted committed file is still caught locally even when
+# --skip-browser is used.
 # ===========================================================================
 PAGE_IMAGES_PY="$(mktemp -t sxc1-check-site-pages.XXXXXX.py)"
 register_temp_file "$PAGE_IMAGES_PY"
 cat > "$PAGE_IMAGES_PY" <<'PYEOF'
 import os
+import struct
 import sys
 
 BASE = sys.argv[1]
 DOCS = [("guide-book", 71), ("startup-guide", 15), ("midi", 6), ("oss", 16)]
 MAX_BYTES = 300 * 1024
 TOTAL_MAX_BYTES = 12 * 1024 * 1024
+
+# Generous sanity range for pixel dimensions -- real renders here are
+# 875x1241 (most pages) or 1241x1755 (midi's landscape-source pages); this
+# is deliberately wide so a legitimate future re-render at a different DPI
+# does not need this constant touched, while still catching "the chunk
+# parsed to 0x0" or similarly nonsensical values a corrupted payload
+# produces.
+DIM_MIN = 200
+DIM_MAX = 3000
+
+
+def parse_dims(head):
+    """head: at least the first 30 bytes of a .webp file (offset 12 is
+    already known to be the 4-byte chunk FourCC immediately after "WEBP").
+    Returns (width, height); raises ValueError with a human-readable reason
+    if the chunk type is unrecognised or its payload is truncated/malformed."""
+    fourcc = head[12:16]
+    if fourcc == b"VP8 ":
+        # Lossy: payload = 3-byte frame tag, 3-byte start code
+        # (0x9d 0x01 0x2a), then 14-bit width and 14-bit height, both LE
+        # with 2 high bits reserved for a scale factor we ignore here.
+        payload = head[20:30]
+        if len(payload) < 10 or payload[3:6] != b"\x9d\x01\x2a":
+            raise ValueError("VP8 chunk missing its 0x9d 0x01 0x2a start code")
+        w = payload[6] | ((payload[7] & 0x3F) << 8)
+        h = payload[8] | ((payload[9] & 0x3F) << 8)
+        return w, h
+    if fourcc == b"VP8L":
+        # Lossless: payload = 1-byte signature (0x2f), then a 32-bit LE
+        # bitfield packing (width-1):14, (height-1):14, alpha:1, version:3.
+        payload = head[20:26]
+        if len(payload) < 5 or payload[0] != 0x2F:
+            raise ValueError("VP8L chunk missing its 0x2f signature byte")
+        bits = payload[1] | (payload[2] << 8) | (payload[3] << 16) | (payload[4] << 24)
+        w = (bits & 0x3FFF) + 1
+        h = ((bits >> 14) & 0x3FFF) + 1
+        return w, h
+    if fourcc == b"VP8X":
+        # Extended: payload = 1 byte flags, 3 bytes reserved, then 24-bit
+        # LE (canvas width-1) and 24-bit LE (canvas height-1).
+        payload = head[20:30]
+        if len(payload) < 10:
+            raise ValueError("VP8X chunk truncated")
+        w = (payload[4] | (payload[5] << 8) | (payload[6] << 16)) + 1
+        h = (payload[7] | (payload[8] << 8) | (payload[9] << 16)) + 1
+        return w, h
+    raise ValueError("chunk after 'WEBP' is %r, not one of VP8 /VP8L/VP8X" % (fourcc,))
+
 
 total_bytes = 0
 overall_ok = True
@@ -548,6 +690,9 @@ oversize_details = []
 for slug, count in DOCS:
     missing = []
     bad_magic = []
+    bad_riff_len = []
+    bad_chunk = []
+    bad_dims = []
     slug_total = 0
     for n in range(1, count + 1):
         fname = "page-%02d.webp" % n
@@ -560,9 +705,21 @@ for slug, count in DOCS:
         if size > MAX_BYTES:
             oversize_details.append("%s/%s=%d bytes" % (slug, fname, size))
         with open(path, "rb") as fh:
-            head = fh.read(12)
+            head = fh.read(30)
         if len(head) < 12 or head[0:4] != b"RIFF" or head[8:12] != b"WEBP":
             bad_magic.append(fname)
+            continue  # nothing past a broken 12-byte header is meaningful
+
+        riff_len = struct.unpack("<I", head[4:8])[0]
+        if riff_len + 8 != size:
+            bad_riff_len.append("%s(riff_len+8=%d,actual=%d)" % (fname, riff_len + 8, size))
+
+        try:
+            w, h = parse_dims(head)
+            if not (DIM_MIN <= w <= DIM_MAX and DIM_MIN <= h <= DIM_MAX):
+                bad_dims.append("%s(%dx%d outside [%d,%d])" % (fname, w, h, DIM_MIN, DIM_MAX))
+        except ValueError as e:
+            bad_chunk.append("%s(%s)" % (fname, e))
 
     total_bytes += slug_total
 
@@ -577,6 +734,24 @@ for slug, count in DOCS:
         overall_ok = False
     else:
         print("OK magic %s all %d files begin RIFF..WEBP" % (slug, count))
+
+    if bad_riff_len:
+        print("FAIL rifflen %s files whose RIFF length field does not match their actual size=%s" % (slug, ",".join(bad_riff_len)))
+        overall_ok = False
+    else:
+        print("OK rifflen %s all %d files' RIFF length field matches their actual size" % (slug, count))
+
+    if bad_chunk:
+        print("FAIL chunk %s files not starting with a real VP8 /VP8L/VP8X payload chunk=%s" % (slug, ",".join(bad_chunk)))
+        overall_ok = False
+    else:
+        print("OK chunk %s all %d files begin with a real VP8 /VP8L/VP8X payload chunk" % (slug, count))
+
+    if bad_dims:
+        print("FAIL dims %s files with implausible pixel dimensions=%s" % (slug, ",".join(bad_dims)))
+        overall_ok = False
+    else:
+        print("OK dims %s all %d files have plausible pixel dimensions (width and height both in [%d,%d])" % (slug, count, DIM_MIN, DIM_MAX))
 
 if oversize_details:
     print("FAIL maxsize " + "; ".join(oversize_details) + (" (limit %d bytes)" % MAX_BYTES))
@@ -625,12 +800,17 @@ rm -f "$PAGE_IMAGES_PY"
 CONTENT_JSON_FILE=""
 
 if [ "$SKIP_CONTENT" -eq 1 ]; then
-  echo "SKIPPED -- content checker + three-way content agreement (requested via --skip-content or SXC1_SKIP_CONTENT=1)"
+  echo "SKIPPED -- content checker + three-way content agreement + exact-bytes source integrity (requested via --skip-content or SXC1_SKIP_CONTENT=1)"
   skip "exe:content-check runs under wasm-run.mjs and exits 0"
   skip "three-way content agreement/guide-book (content-check --json vs translations/guide-book.md)"
   skip "three-way content agreement/startup-guide (content-check --json vs translations/startup-guide.md)"
   skip "three-way content agreement/midi (content-check --json vs translations/midi.md)"
   skip "three-way content agreement/oss (content-check --json vs translations/oss.md)"
+  skip "exact-bytes source integrity/guide-book (content-check --dump-source vs translations/guide-book.md)"
+  skip "exact-bytes source integrity/startup-guide (content-check --dump-source vs translations/startup-guide.md)"
+  skip "exact-bytes source integrity/midi (content-check --dump-source vs translations/midi.md)"
+  skip "exact-bytes source integrity/oss (content-check --dump-source vs translations/oss.md)"
+  skip "exact-bytes source integrity/glossary (content-check --dump-source vs translations/glossary.md)"
 else
   TOOLCHAIN_ENV_FILE="${GHC_WASM_PREFIX:-$HOME/.ghc-wasm}/env"
   if [ -f "$TOOLCHAIN_ENV_FILE" ]; then
@@ -823,6 +1003,49 @@ PYEOF
     done
   fi
   rm -f "$THREEWAY_PY"
+
+  # -------------------------------------------------------------------------
+  # Check 12 (NEW4, M1 gate round 3): EXACT-BYTES SOURCE INTEGRITY.
+  #
+  # Check 11 above is a STRUCTURAL fingerprint only: chars/lines/pages/
+  # headings/tables/figures/sections/subsections/parts are all it compares,
+  # so an equal-length, line-count-preserving prose edit (e.g. swapping one
+  # five-character word for another of the same length) leaves every one of
+  # those fields identical and a stale build sails straight through it.
+  # This check instead diffs the ACTUAL embedded bytes: task
+  # 'content-core-model' added `content-check --dump-source <slug>`, which
+  # writes the exact embedded UTF-8 bytes for a document to stdout -- no
+  # banner, no trailing newline of its own beyond whatever the source file
+  # already ends with -- for exactly this purpose. Comparing that
+  # byte-for-byte against translations/<slug>.md is strictly stronger than
+  # any digest (a digest would only tell you THAT it changed; this doesn't
+  # need to, because it IS the full comparison) and needs no cryptographic
+  # code. Runs for all FIVE embedded documents, including glossary, which
+  # checks 10/11 do not cover at all (content-check's stats/three-way
+  # agreement only track the four manual documents). Inside the content
+  # axis, like checks 10/11: --skip-content skips this too, and (NEW7,
+  # check "Final" below) a skipped content axis can no longer silently
+  # report result=complete.
+  # -------------------------------------------------------------------------
+  DUMP_SOURCE_SLUGS=(guide-book startup-guide midi oss glossary)
+  if [ -n "$CONTENT_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    for slug in "${DUMP_SOURCE_SLUGS[@]}"; do
+      DUMP_OUT="$(mktemp -t "sxc1-check-site-dump.XXXXXX")"
+      register_temp_file "$DUMP_OUT"
+      TRANSLATION_FILE="$REPO_ROOT/translations/$slug.md"
+      if wasm-run.mjs "$CONTENT_CHECK_BIN" --dump-source "$slug" >"$DUMP_OUT" 2>/dev/null \
+         && [ -f "$TRANSLATION_FILE" ] && cmp -s "$DUMP_OUT" "$TRANSLATION_FILE"; then
+        ok "exact-bytes source integrity/$slug (content-check --dump-source $slug is byte-identical to translations/$slug.md)"
+      else
+        fail "exact-bytes source integrity/$slug (observed: content-check --dump-source $slug diverges from translations/$slug.md -- stale build or a translation edited without rebuilding)"
+      fi
+      rm -f "$DUMP_OUT"
+    done
+  else
+    for slug in "${DUMP_SOURCE_SLUGS[@]}"; do
+      fail "exact-bytes source integrity/$slug (observed: toolchain env or exe:content-check binary unavailable -- see checks above)"
+    done
+  fi
 fi
 
 # ===========================================================================
@@ -955,7 +1178,29 @@ run_browser_stage() {
   # than the golden constants baked into browser-check.mjs. Falls back to
   # those built-in constants (no --expect-json) when --skip-content was
   # passed or check 10/11 could not produce a JSON capture.
-  local -a browser_cmd=("$REPO_ROOT/scripts/browser-check.mjs" --url "$run_url")
+  #
+  # --timeout override (M1 gate round 3 harness fix): this governs ONE
+  # browser-check.mjs invocation -- one call to run_browser_stage(), i.e.
+  # either check 7's root run or check 8's authoritative sub-path run, each
+  # gets its own fresh budget, not a shared one. browser-check.mjs's own
+  # default is 45000ms (sized back when the only real work was M0's single
+  # counter page). M1's round-3 gate additions -- the exhaustive 108-page
+  # /ja image-decode sweep (NEW6) plus a genuinely cold second CDP target
+  # for the deep-link check (NEW5) -- made that default too tight under
+  # load: on this project's 4-core development machine, a busy run was
+  # observed to exhaust the 45s budget mid-sweep (one stage reported "cold
+  # target failed to boot", an unrelated sub-path stage exited 2 in the
+  # same run) and pass cleanly on an otherwise-idle re-run with nothing
+  # else changed -- i.e. budget starvation masquerading as a real failure,
+  # exactly the class of check this whole gate round exists to eliminate.
+  # check-site.sh therefore overrides the default explicitly with real
+  # headroom: 120000ms (120s) per stage. That is comfortably above the
+  # sweep's measured cost (the 108-route pass itself takes low single-digit
+  # seconds; decoding the ~9.4MB image set adds more but nowhere near a
+  # minute) even several times over on a loaded CI runner, while a genuine
+  # hang (dead CDP peer, boot that never completes) still fails -- just at
+  # 120s instead of 45s, not never.
+  local -a browser_cmd=("$REPO_ROOT/scripts/browser-check.mjs" --url "$run_url" --timeout 120000)
   if [ -n "${CONTENT_JSON_FILE:-}" ] && [ -s "$CONTENT_JSON_FILE" ]; then
     browser_cmd+=(--expect-json "$CONTENT_JSON_FILE")
   fi
@@ -1012,11 +1257,29 @@ fi
 # ===========================================================================
 # Final: summary + machine-readable result marker.
 #
-# m2 fix: a skipped browser axis is counted in the total (as SKIPPED, not
-# PASS) so "16/16 checks passed" can never be printed for a run that only
-# exercised the structural checks -- and the result= marker below lets a
-# caller that only records this one line (as CI does) tell a full gate from
-# a structural-only run apart, without having to parse the fraction.
+# m2 fix, WIDENED by NEW7 (M1 gate round 3 -- this is an M0 REGRESSION
+# fix, not a new feature): a skipped axis is counted in the total (as
+# SKIPPED, not PASS) so "N/N checks passed" can never be printed for a run
+# that did not exercise everything -- and the result= marker below lets a
+# caller that only records this one line (as CI does) tell a full gate
+# from a partial run apart, without having to parse the fraction.
+#
+# The original m2 fix keyed the marker off SKIP_BROWSER alone, which was
+# the whole truth as long as --skip-browser was the only skippable axis.
+# M1 then added --skip-content (checks 10/11/12) without widening the
+# marker, so `SXC1_SKIP_CONTENT=1 ./scripts/check-site.sh` could print
+# result=complete while the content checker, three-way agreement and
+# exact-bytes source-integrity checks all silently never ran -- exactly
+# the kind of can't-fail check this whole gate round exists to eliminate,
+# and a real regression of a guarantee this comment used to describe as
+# already won. The rule is now keyed off the SKIPPED counter itself, which
+# every skippable axis already increments via skip(): result=complete iff
+# SKIPPED is exactly 0, regardless of how many axes exist or which flag(s)
+# skipped them. A future third skippable axis is therefore covered for
+# free, as long as it reports through skip() like the first two do. CI
+# additionally asserts SKIPPED is 0 directly (not just the marker) so a
+# hypothetical bug in this very condition cannot self-certify -- see
+# .github/workflows/site.yml.
 # ===========================================================================
 if [ "$SKIPPED" -gt 0 ]; then
   echo "check-site: ${PASS}/${TOTAL} checks passed (${SKIPPED} skipped)"
@@ -1024,7 +1287,7 @@ else
   echo "check-site: ${PASS}/${TOTAL} checks passed"
 fi
 
-if [ "$SKIP_BROWSER" -eq 1 ]; then
+if [ "$SKIPPED" -gt 0 ]; then
   echo "check-site: result=structural-only"
 else
   echo "check-site: result=complete"

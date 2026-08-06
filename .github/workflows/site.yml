@@ -129,18 +129,35 @@ jobs:
 
       # check-site.sh needs no new CI step for M1: the content checker
       # (exe:content-check under wasm-run.mjs), the three-way content
-      # agreement check, and the page-image checks are all checks already
-      # inside check-site.sh (read it -- checks 9, 10, 11), which this
-      # step already ran on M0. The generous timeout below is sized for
-      # the browser axis, which now visits all 108 page routes twice (once
-      # at the origin root, once at a GitHub-Pages-style sub-path) instead
-      # of M0's single counter page.
+      # agreement check, the exact-bytes source-integrity check, the
+      # deepened page-image checks and the app.wasm size tripwire are all
+      # checks already inside check-site.sh (read it -- checks 9-13),
+      # which this step already ran on M0. The generous timeout below is
+      # sized for the browser axis, which now visits all 108 page routes
+      # in their /ja form (real image decode) twice per route (once at the
+      # origin root, once at a GitHub-Pages-style sub-path) instead of M0's
+      # single counter page.
+      #
+      # NEW7 (M1 gate round 3, M0 regression fix): asserting the
+      # result=complete marker alone is no longer sufficient by itself --
+      # it never was airtight against a *hypothetical* bug in check-site.sh's
+      # own marker logic, and round 3 showed exactly that class of gap can
+      # go unnoticed for a full milestone. So this step now asserts BOTH
+      # independently: (1) result=complete is printed, AND (2) the summary
+      # line does not carry a "(N skipped)" suffix, i.e. SKIPPED is
+      # actually 0 by check-site.sh's own accounting, not merely by its
+      # marker's say-so. Either one alone is exactly the can't-fail shape
+      # this gate round was lost to; both together is not.
       - name: Verify site
         timeout-minutes: 30
         run: |
           ./scripts/check-site.sh | tee /tmp/check-site.log
           grep -q 'check-site: result=complete' /tmp/check-site.log \
-            || { echo "::error::browser verification did not run (no result=complete marker) -- a silently skipped browser axis is a CI failure"; exit 1; }
+            || { echo "::error::browser verification did not run (no result=complete marker) -- a silently skipped axis is a CI failure"; exit 1; }
+          if grep -qE '\([1-9][0-9]* skipped\)' /tmp/check-site.log; then
+            echo "::error::check-site.sh skipped one or more checks even though result=complete was printed -- NEW7 guard tripped, this should be impossible"
+            exit 1
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
