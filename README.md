@@ -16,13 +16,29 @@ bundle that boots in a real browser. No course content yet — see
 
 - Linux x86\_64 (aarch64-linux and macOS are also supported by the toolchain, but only
   x86\_64 Linux has been exercised for M0).
-- `git`, `curl`, `tar`, `xz`, `unzip`, `unzstd` (zstd), `jq`, `make`, a C compiler, `sed`.
+- `git`, `curl`, `tar`, `xz`, `unzip`, `unzstd` (zstd), `jq`, `make`, a C compiler, `sed`,
+  `realpath`.
+- Node.js 22+ is required for the global `WebSocket` that `scripts/browser-check.mjs`
+  (the headless-browser driver `check-site.sh` calls) depends on; M0 was validated on
+  Node 24. You do not need to install this yourself: `./scripts/install-toolchain.sh`
+  also lays down a private Node under `$HOME/.ghc-wasm/nodejs/bin/node`, and
+  `check-site.sh` resolves a usable Node in the order `$SXC1_NODE` → that private Node →
+  `node` on `PATH`, so the toolchain's own Node is used automatically if nothing better
+  qualifies. Set `SXC1_NODE=/path/to/node` to force a specific binary.
 - `python3`, for the dev server.
 - Google Chrome or Chromium, for the automated headless-browser check.
 - About 12 GiB of free disk space.
 
 No system-wide Haskell installation is needed or created — everything the toolchain
-installs lands under `$HOME/.ghc-wasm`, and nothing outside that directory is touched.
+installs lands under `$HOME/.ghc-wasm` by default. That default is overridable with
+`GHC_WASM_PREFIX`, and a careless value there would be genuinely dangerous: upstream's
+`setup.sh` begins with `rm -rf "$PREFIX"`. `install-toolchain.sh` refuses unsafe values
+of `GHC_WASM_PREFIX` **before touching the network** — empty, `/`, exactly `$HOME`, the
+repository root or anything inside it, an ancestor of either, a path containing `..`, or
+an *existing* non-empty directory that is not already one of its own toolchain installs
+(recognised by its stamp file, or by having both an `env` file and a `wasm32-wasi-ghc/`
+directory). None of these refusals has a `--force` override — `--force` only ever means
+"reinstall over an existing toolchain," never "wipe whatever happens to be at this path."
 
 ## Build
 
@@ -66,11 +82,22 @@ user-agent. Piping that response to `sh` would execute a web page, not an instal
 
 Instead, `scripts/install-toolchain.sh` clones the read-only GitHub mirror
 (`github.com/haskell-wasm/ghc-wasm-meta`) at the pinned commit above and runs its
-`setup.sh` directly — git verifies the content by commit hash, so there is no separate
-checksum file to maintain. Every actual binary distribution `setup.sh` fetches lives on
-GitHub Releases or `downloads.haskell.org`, both reachable from this machine; only
-`gitlab.haskell.org` is walled off. No script in this repository ever pipes a downloaded
-file into a shell.
+`setup.sh` directly — git verifies the content of that *source* tree by commit hash.
+That is source integrity, not bindist integrity: the commit hash says nothing about the
+~785 MB of GHC wasm bindist, wasi-sdk, libffi, Node, binaryen and cabal binaries that
+`setup.sh` goes on to download afterwards. Those are verified separately. The pinned
+clone's own `autogen.json` carries an SRI digest (`sha256-…`/`sha512-…`) for every one of
+them, and `install-toolchain.sh` prepends a `curl` shim to `setup.sh`'s `PATH` that
+intercepts each `-o <file>` download, looks its URL up in `autogen.json`, and compares
+the file's SHA-256 or SHA-512 against the pinned digest — aborting the install on any
+mismatch, and **failing closed** (also aborting) if a download's URL has no pinned digest
+at all. The installer's stamp file records how many downloads were checked this way as
+`sri_verified_downloads=N` (7 on a full install), so the control is auditable after the
+fact rather than merely asserted; `./scripts/install-toolchain.sh --verify-sri-selftest`
+regression-tests the digest comparator itself in about a second. Every actual binary
+distribution `setup.sh` fetches lives on GitHub Releases or `downloads.haskell.org`, both
+reachable from this machine; only `gitlab.haskell.org` is walled off. No script in this
+repository ever pipes a downloaded file into a shell.
 
 ## Repository layout
 
@@ -111,14 +138,33 @@ browser, `index.js` instantiates `app.wasm` against a vendored WASI shim and the
 generated JSFFI import object, runs `_initialize` to start the Haskell RTS, then calls
 `hs_start()` to mount the Miso app. Every URL in the output is relative (`./app.wasm`,
 never `/app.wasm`), so the same bundle works unmodified at any GitHub Pages sub-path, at
-a domain root, or offline from a local directory.
+a domain root, or offline when served locally (`./scripts/serve-site.sh`).
+`check-site.sh` proves the sub-path claim behaviourally, not just syntactically: it
+copies the built bundle under a non-root prefix, serves it there, and requires the full
+headless-browser check to pass against that sub-path — a bundle that only works from the
+origin root now fails this check even if it slips past the (advisory) grep for absolute
+URLs. The bundle does **not** work opened directly as a `file://` URL, though:
+`index.js` is an ES module that imports sibling modules and `fetch`es `app.wasm`, and
+browsers give `file://` pages an opaque origin that blocks both.
 
 ## Deployment
 
-`.github/workflows/site.yml` builds the site and runs `check-site.sh` on every push, then
-uploads `site/public/` as a GitHub Pages artifact — nothing built is ever committed to
-the repository. Deploying that artifact still requires GitHub Pages to be **enabled** on
-the repository, which is an open question with the owner (see `PLAN.md`).
+`.github/workflows/site.yml` builds the site and runs `check-site.sh` on every push and
+pull request, then uploads `site/public/` as a GitHub Pages artifact — nothing built is
+ever committed to the repository. `check-site.sh` prints a final machine-readable marker,
+`check-site: result=complete` when every check (including both browser runs — root and
+sub-path) actually executed, or `check-site: result=structural-only` if the browser axis
+was skipped (`--skip-browser` / `SXC1_SKIP_BROWSER=1`); CI fails the build unless it sees
+`result=complete`, so a silently skipped browser axis can never pass as a full gate.
+
+The `deploy` job that publishes to GitHub Pages is separate from `build`/`check` and
+stays genuinely inert — it does not run at all — until the repository variable
+`ENABLE_PAGES` is explicitly set to `true`. Enabling it needs three things from the
+owner, none of which have happened yet (open question in `PLAN.md`): make the repository
+public (GitHub Pages requires a public repo on a free account), enable Pages with the
+"GitHub Actions" source, and set the `ENABLE_PAGES` repository variable to `true`. Until
+then, every push still builds and verifies the site on CI — only the publish step is
+gated.
 
 ## Measured figures
 
@@ -147,6 +193,11 @@ silently miscompile GHC's output, so M0's definition of done does not depend on 
 - **Need to reinstall the toolchain** — `./scripts/install-toolchain.sh --force`.
 - **`wasm32-wasi-ghc: command not found`** — the toolchain env script isn't sourced in
   your shell: run `. "$HOME/.ghc-wasm/env"`.
+- **`check-site: no usable Node.js found` / `SXC1_NODE=... is not a usable Node.js`** —
+  `check-site.sh` needs Node 22+ with a global `WebSocket` (validated on Node 24), tried
+  in the order `$SXC1_NODE` → `$HOME/.ghc-wasm/nodejs/bin/node` → `node` on `PATH`. Run
+  `./scripts/install-toolchain.sh` if the private toolchain Node is missing, upgrade
+  whatever Node is on `PATH`, or set `SXC1_NODE=/path/to/node` explicitly.
 
 ## Design rationale
 

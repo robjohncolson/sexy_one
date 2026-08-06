@@ -11,45 +11,62 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Workflow-scope permissions are the minimum common to every job
+# (checkout). The deploy job alone elevates to pages:write/id-token:write
+# below -- the build job, which executes repository-controlled shell
+# scripts on pull_request, never holds deployment or OIDC permissions.
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Per-ref build group: superseded PRs cancel their own in-flight build,
+    # but a main build is never cancelled mid-flight by an unrelated PR or
+    # manual run. This is a separate group from the deploy job's `pages`
+    # group below, so an expensive build is never queued behind Pages'
+    # single-pending-run semantics.
+    concurrency:
+      group: build-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       # ----------------------------------------------------------------
-      # Cache the GHC WebAssembly toolchain. The installer script embeds
-      # the pinned ghc-wasm-meta commit, so hashing it is a correct cache
-      # key: any change to the pinned commit/flavour invalidates the cache.
+      # Cache the GHC WebAssembly toolchain. This tree is immutable, not
+      # incrementally reusable, so there are deliberately no restore-keys:
+      # a partial match (e.g. after a pin bump, or a runner image
+      # migration) is never desirable -- it would restore a toolchain that
+      # does not match the pin and, worse, get re-saved under the new key,
+      # poisoning the cache. The key covers OS, arch, the runner image and
+      # the installer script itself, so any of those changing forces a
+      # fresh install. install-toolchain.sh runs unconditionally below (no
+      # `if: cache-hit != 'true'`): it is idempotent and now self-heals a
+      # stale/mismatched restore via a strict stamp check instead of
+      # trusting cache-hit.
       # ----------------------------------------------------------------
       - name: Cache GHC WebAssembly toolchain
         id: toolchain
         uses: actions/cache@v6
         with:
           path: ~/.ghc-wasm
-          key: ghc-wasm-${{ runner.os }}-${{ hashFiles('scripts/install-toolchain.sh') }}
-          restore-keys: |
-            ghc-wasm-${{ runner.os }}-
+          key: ghc-wasm-${{ runner.os }}-${{ runner.arch }}-${{ env.ImageOS }}-${{ hashFiles('scripts/install-toolchain.sh') }}
 
       - name: Install GHC WebAssembly toolchain
-        if: steps.toolchain.outputs.cache-hit != 'true'
         timeout-minutes: 60
         run: ./scripts/install-toolchain.sh
 
       # ----------------------------------------------------------------
       # Cache cabal's incremental build directory so warm builds (e.g. a
       # cache hit above, or repeated app-only changes) don't recompile
-      # miso and its dependency closure from scratch every run.
+      # miso and its dependency closure from scratch every run. Unlike the
+      # toolchain cache, this one IS genuinely incrementally reusable, so
+      # it keeps its restore-keys.
       # ----------------------------------------------------------------
       - name: Cache cabal build directory
         uses: actions/cache@v6
@@ -60,10 +77,15 @@ jobs:
             dist-newstyle-${{ runner.os }}-
 
       - name: Build site
+        timeout-minutes: 30
         run: ./scripts/build-site.sh
 
       - name: Verify site
-        run: ./scripts/check-site.sh
+        timeout-minutes: 15
+        run: |
+          ./scripts/check-site.sh | tee /tmp/check-site.log
+          grep -q 'check-site: result=complete' /tmp/check-site.log \
+            || { echo "::error::browser verification did not run (no result=complete marker) -- a silently skipped browser axis is a CI failure"; exit 1; }
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
@@ -81,14 +103,31 @@ jobs:
             site/dist-newstyle/**/*.log
 
   # ----------------------------------------------------------------------
-  # This job stays inert until GitHub Pages is enabled for the repository
-  # (PLAN.md open question 1: Pages has not yet been enabled by the owner).
-  # Once enabled, pushes to main will deploy the artifact built above.
+  # This job stays inert until the repository variable ENABLE_PAGES is
+  # explicitly set to 'true'. The GitHub repository does not exist yet:
+  # its name and visibility are still open with the owner (PLAN.md open
+  # question 1), and GitHub Pages requires a public repo on a free
+  # account. Gating on an explicit opt-in variable (rather than assuming
+  # Pages is configured) is safe under either outcome and needs no code
+  # change when the decision lands -- unset (the default) means the job
+  # is skipped and `main` stays green; once the owner makes the repo
+  # public, enables Pages with the GitHub Actions source, and sets
+  # ENABLE_PAGES=true as a repository variable, pushes to main deploy.
   # ----------------------------------------------------------------------
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.ENABLE_PAGES == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    # Deploys share GitHub Pages' own single-pending-deployment semantics:
+    # a queued deploy for a newer main commit supersedes an older pending
+    # one, but a deploy is never cancelled once it has started.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

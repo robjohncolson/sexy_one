@@ -53,7 +53,7 @@ Two consequences: (a) nothing has to be installed outside `~/.ghc-wasm`, and (b)
 
 | Component | Pin | Why this pin |
 |---|---|---|
-| `ghc-wasm-meta` | GitHub mirror `haskell-wasm/ghc-wasm-meta` @ **`c75985a1b58fb0376eea9149ba5c7b933b3c7455`** (2026-08-05) | Pinning the commit pins `autogen.json`, which pins every bindist URL. Git's own hashing verifies integrity — no checksum file to maintain. |
+| `ghc-wasm-meta` | GitHub mirror `haskell-wasm/ghc-wasm-meta` @ **`c75985a1b58fb0376eea9149ba5c7b933b3c7455`** (2026-08-05) | Pinning the commit pins `autogen.json`, which pins every bindist URL and its SRI digest. **Correction (post-M0 review, M1):** git's commit hash verifies only the `ghc-wasm-meta` *source* tree — it says nothing about the ~785 MB of bindists `setup.sh` goes on to download. That is a separate integrity gap, and it is now closed: `install-toolchain.sh` verifies every download against the SRI digest `autogen.json` already carries for it. See §4.2 and R1's residual, below. |
 | GHC wasm flavour | **`FLAVOUR=9.14`** → `wasm32-wasi-ghc-9.14.tar.xz` from `haskell-wasm/ghc-wasm-bindists` release `20260731T193144` (467 MB) | The 9.14 branch is the newest release-branch flavour, is what `ghc-wasm-meta`'s CI job `x86_64-linux-ubuntu-9.14` exercises, **and that job runs `tests/miso.sh`** — i.e. upstream continuously builds Miso against exactly this flavour. |
 | Boot libs (verified from the GHC 9.14.1 release notes) | base 4.22.0.0, template-haskell 2.24.0.0, ghc-experimental 9.1401.0, text 2.1.3, bytestring 0.12.2.0, containers 0.8, mtl 2.3.1, transformers 0.6.1.2 | **Every one of miso 1.12.0.0's version bounds is satisfied with no `allow-newer` needed** — notably TH 2.24 sits inside miso's `>= 2.21 && < 2.25`. Checked bound-by-bound against `miso.cabal`. |
 | Miso | **`miso == 1.12.0.0`** from Hackage (uploaded 2026-06-27; Stackage nightly-2026-06-28), with `index-state: 2026-08-01T00:00:00Z` | Latest release. I downloaded the sdist and confirmed it ships `js/miso.js`, `js/miso.prod.js`, `cbits/foreign.c` and the whole `ffi/wasm/` tree, so the Hackage tarball is complete for a wasm build. Hackage + `index-state` is more reproducible than upstream's `source-repository-package` git tag (tags move; the index does not). Equivalent git commit, if ever needed: `9f1222293fe92e7d22272e884ac97c205876b943`. |
@@ -122,6 +122,23 @@ we need (risk R3).
 The script is **destructive** (`rm -rf $PREFIX` on entry), so our wrapper detects an
 existing good install and no-ops unless `--force`, and exposes `--check` for cheap
 verification. It writes a stamp file recording the pin and the resolved GHC version.
+
+**Post-M0 review correction (B1, M1):** the destructiveness above was worse in practice
+than this paragraph implied. The original "existing good install" detection did not fire
+for a directory that was not already a toolchain (only for one containing a readable
+`env`), so a caller-supplied `GHC_WASM_PREFIX` — including something as careless as
+`$HOME` itself — could reach `setup.sh`'s `rm -rf "$PREFIX"` with **no** `--force` flag
+and no warning; this was reproduced. Fixed: `install-toolchain.sh` now canonicalises
+`$PREFIX` and, before any network access and with no `--force` override, hard-refuses
+empty, `/`, exactly `$HOME`, the repository root or anything inside it, an ancestor of
+either, any path containing `..`, and any existing non-empty directory that is not
+already a recognized toolchain install (its own stamp file, or an `env` file plus a
+`wasm32-wasi-ghc/` directory). Separately, none of `setup.sh`'s downloads were
+integrity-checked at all, despite `autogen.json` carrying an SRI digest for every one of
+them (M1, table above) — `install-toolchain.sh` now intercepts every `curl -o` download
+via a `PATH`-prepended shim, verifies it against that digest, aborts on mismatch, and
+fails closed on any download whose URL is not pinned. Both fixes are detailed in
+`briefs/M0-fixes-triage.md`.
 
 ### 4.3 Compile and link
 
@@ -212,14 +229,33 @@ prints both sizes so the README can record the real trade-off. Order is fixed �
 
 1. Required files exist in `site/public/`.
 2. `app.wasm` begins `\0asm\x01\0\0\0`.
-3. Node parses the module and asserts `WebAssembly.Module.exports` contains **`hs_start`**,
-   `memory` and `_initialize` — a direct check that the reactor/export linker flags took effect.
+3. The resolved Node (see correction below) parses the module and asserts
+   `WebAssembly.Module.exports` contains **`hs_start`**, `memory` and `_initialize` — a
+   direct check that the reactor/export linker flags took effect.
 4. `ghc_wasm_jsffi.js` is non-empty and default-exports a function.
-5. `index.html` / `index.js` contain **no** root-absolute URLs and **no** external origins
-   (the Pages-subpath and no-CDN invariants, enforced mechanically).
-6. Headless-Chrome run of `browser-check.mjs` against a locally served copy.
+5. `index.html` / `index.js` contain **no** root-absolute URLs and **no** external origins,
+   by a syntactic scan.
+6. Headless-Chrome run of `browser-check.mjs` against a locally served copy, at the
+   origin root.
+7. The same headless-Chrome run again, against the bundle served under a non-root
+   sub-path (`<tmp>/sub/path/`) — the **authoritative** Pages-subpath deployability check.
 
-`browser-check.mjs` speaks the Chrome DevTools Protocol directly over Node 24's built-in
+**Post-M0 review correction (M9, M5):** item 5's original framing — "the Pages-subpath
+and no-CDN invariants, enforced mechanically" — overstated what a four-pattern grep over
+double-quoted spellings can prove. `fetch('/app.wasm')` (single-quoted, otherwise
+identical) passed that grep while being completely dead once served from a project
+sub-path — reproduced, and it scored a full "17/17 checks passed." Item 5 is now
+explicitly *advisory* defence-in-depth with a broadened pattern set (single/double
+quotes, template literals, `url(/...)`, `new URL('/...')`, protocol-relative `//host`);
+item 7 above, the behavioural sub-path run, is the actual enforcement and its failure is
+a hard failure of `check-site.sh`. Separately, Node was assumed to be on `PATH` and was
+never actually resolved or version-checked by the script; `check-site.sh` now resolves it
+explicitly (`$SXC1_NODE` → the toolchain's own private Node → `node` on `PATH`) and
+validates it exposes a global `WebSocket` and `WebAssembly` before using it for items 3,
+6 and 7 — a fresh clone on a host meeting every *other* documented prerequisite but with
+no system Node previously had no working verification path at all.
+
+`browser-check.mjs` speaks the Chrome DevTools Protocol directly over Node's built-in
 `WebSocket` — **no npm install, no puppeteer, no playwright**. It launches
 `google-chrome --headless=new` into a throwaway profile, navigates, waits for
 `__SXC1_BOOTED`, asserts `#counter-value` is `0`, clicks increment → `1`, decrement twice
@@ -235,6 +271,22 @@ Chrome, so the browser test runs for real in CI) → `upload-pages-artifact`. A 
 deploys to Pages, gated on `refs/heads/main`, so it stays inert until the owner answers
 PLAN open question #1 (repo name/visibility).
 
+**Post-M0 review correction (M6, M3):** two claims above did not survive review.
+First, "gated on `refs/heads/main`, so it stays inert" was wrong — the `refs/heads/main`
+condition alone does not depend on Pages being enabled, so the first push to `main` after
+the repository exists would have run `actions/deploy-pages` and failed the whole
+workflow. `deploy` is now gated on **both** the `main`-ref condition **and** the
+repository variable `vars.ENABLE_PAGES == 'true'`, which is unset (and so the job is
+skipped, `main` stays green) until the owner makes the repo public, enables Pages with
+the GitHub Actions source, and sets that variable — safe under either outcome of PLAN
+open question #1, with no workflow change needed once the decision lands. Second,
+"install if cold" no longer describes the toolchain step: the cache key dropped its
+`restore-keys` (a partial match after a pin bump would restore a stale toolchain and then
+get re-saved under the new key, poisoning the cache) and `install-toolchain.sh` now runs
+**unconditionally** — it is idempotent (~1s when the stamp already matches the pin) and
+self-heals a stale or mismatched cache restore via a strict stamp comparison instead of
+trusting `cache-hit`.
+
 ---
 
 ## 5. Risks found in research
@@ -248,7 +300,13 @@ endpoint `bootstrap.sh` itself fetches is walled the same way. Piping that to `s
 a challenge page. *Mitigation:* clone the GitHub read-only mirror at a pinned commit and run
 `setup.sh` directly; never pipe a download to a shell. All real bindists live on GitHub
 Releases and `downloads.haskell.org`, both reachable. *Residual:* if the mirror lags,
-`autogen.json` may point at an older bindist — acceptable, and pinned anyway.
+`autogen.json` may point at an older bindist — acceptable, and pinned anyway. **Residual,
+updated (post-M0 review, M1):** this plan originally left a second gap unaddressed —
+`setup.sh`'s ~785 MB of downloaded bindists were not hash-verified at all, even though
+`autogen.json` carries an SRI digest for each of them. That gap is now **closed**, not
+residual: `install-toolchain.sh` intercepts every download via a `curl` shim, verifies it
+against the pinned SRI digest (SHA-256 or SHA-512), aborts the install on mismatch, and
+fails closed on any download whose URL has no pinned digest — see §4.2.
 
 **R2 — the wasm backend is still officially a tech preview.** The GHC 9.15 user's guide
 (2026-03) still says "The wasm backend is still a tech preview and not included in the
