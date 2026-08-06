@@ -6,8 +6,8 @@
 // os, path). No npm packages, no package.json, no node_modules anywhere.
 //
 // Usage:
-//   node scripts/browser-check.mjs [--url URL] [--browser PATH]
-//                                   [--timeout MS] [--self-test] [--keep-open]
+//   node scripts/browser-check.mjs [--url URL] [--expect-json FILE] [--quick]
+//                                   [--browser PATH] [--timeout MS] [--keep-open]
 //
 // The whole run is bounded by ONE monotonic deadline derived from
 // --timeout: the WebSocket handshake, every individual CDP command and
@@ -24,9 +24,12 @@
 //      process died out from under us, or the --timeout deadline expired
 //      before the harness itself could finish
 //
-// See the "Shared boot / test contract" in briefs/M0-manifest.json for the
-// window.__SXC1_BOOTED / window.__SXC1_BOOT_ERROR / #boot-status / #counter-value
-// / #btn-increment / #btn-decrement / #btn-reset contract this script checks.
+// See the M1 DOM contract in briefs/M1-manifest.json for the
+// window.__SXC1_BOOTED / window.__SXC1_BOOT_ERROR / #boot-status contract
+// (unchanged from M0) and the #sxc1-header / #sxc1-home / #sxc1-toc /
+// #sxc1-page / #sxc1-footer markup this script asserts on. M0's counter
+// assertions (#counter-value, #btn-increment/-decrement/-reset) are gone;
+// this drives the manual reader instead.
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -34,6 +37,41 @@ import * as http from 'node:http';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
+// ---------------------------------------------------------------------------
+// Manual page counts (slug -> number of pages), used to build the full
+// 108-route sweep and to bound --quick's sample. Mirrors
+// briefs/M1-manifest.json's golden corpus table.
+// ---------------------------------------------------------------------------
+
+const DOC_PAGES = {
+  'guide-book': 71,
+  'startup-guide': 15,
+  midi: 6,
+  oss: 16,
+};
+
+// Golden stats table (briefs/M1-manifest.json), used when --expect-json is
+// not given. Only the numeric fields that table lists are compared in that
+// case; a real --expect-json file (content-check --json's output) is
+// compared field-for-field instead.
+const GOLDEN_FIELDS = [
+  'chars', 'lines', 'pages', 'headings', 'figures', 'tables', 'sections', 'subsections', 'parts',
+];
+const GOLDEN_DOCS = [
+  { slug: 'guide-book', chars: 111559, lines: 2356, pages: 71, headings: 188, figures: 190, tables: 20, sections: 29, subsections: 78, parts: 5 },
+  { slug: 'startup-guide', chars: 29145, lines: 567, pages: 15, headings: 51, figures: 43, tables: 5, sections: 21, subsections: 27, parts: 0 },
+  { slug: 'midi', chars: 7372, lines: 160, pages: 6, headings: 8, figures: 4, tables: 7, sections: 6, subsections: 1, parts: 0 },
+  { slug: 'oss', chars: 42533, lines: 388, pages: 16, headings: 6, figures: 0, tables: 0, sections: 5, subsections: 0, parts: 0 },
+];
+
+const GUIDE_BOOK_PART_TITLES = [
+  'PART 0 — Part: Preparation',
+  'PART 1 — Part: Pad play',
+  'PART 2 — Part: Sampling',
+  'PART 3 — Part: Sequencer',
+  'PART 4 — Part: Leveling up',
+];
 
 // ---------------------------------------------------------------------------
 // Argument parsing
@@ -44,8 +82,9 @@ function parseArgs(argv) {
     url: 'http://127.0.0.1:8123/',
     browser: null,
     timeout: 45000,
-    selfTest: false,
     keepOpen: false,
+    expectJson: null,
+    quick: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -59,8 +98,11 @@ function parseArgs(argv) {
       case '--timeout':
         opts.timeout = Number(argv[++i]);
         break;
-      case '--self-test':
-        opts.selfTest = true;
+      case '--expect-json':
+        opts.expectJson = argv[++i];
+        break;
+      case '--quick':
+        opts.quick = true;
         break;
       case '--keep-open':
         opts.keepOpen = true;
@@ -87,17 +129,22 @@ function printHelp() {
   console.log(`Usage: browser-check.mjs [options]
 
 Options:
-  --url <url>       Page to check (default: http://127.0.0.1:8123/)
-  --browser <path>  Browser executable (default: $SXC1_BROWSER, else the
-                     first of google-chrome, google-chrome-stable, chromium,
-                     chromium-browser found on PATH)
-  --timeout <ms>    Overall run timeout in milliseconds (default: 45000).
-                     Bounds the WebSocket connect, every CDP command and
-                     every polling loop -- not just the polling loops.
-  --self-test       Check the driver itself against a synthetic fixture
-                     page instead of the real site
-  --keep-open       Do not kill the browser on exit (debugging)
-  --help            Show this help and exit`);
+  --url <url>         Page to check (default: http://127.0.0.1:8123/)
+  --expect-json <file> JSON produced by 'content-check --json'. When given,
+                       the running app's #sxc1-content-stats is compared
+                       against it field-for-field. When absent, it is
+                       compared against the golden numbers table baked
+                       into this script.
+  --quick              Sweep a small sample of pages (first/middle/last of
+                       each manual) instead of all 108 routes.
+  --browser <path>     Browser executable (default: $SXC1_BROWSER, else the
+                       first of google-chrome, google-chrome-stable, chromium,
+                       chromium-browser found on PATH)
+  --timeout <ms>       Overall run timeout in milliseconds (default: 45000).
+                       Bounds the WebSocket connect, every CDP command and
+                       every polling loop -- not just the polling loops.
+  --keep-open          Do not kill the browser on exit (debugging)
+  --help               Show this help and exit`);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +250,7 @@ function resolveBrowser(explicitPath) {
 }
 
 // ---------------------------------------------------------------------------
-// Deadline plumbing (M4 fix).
+// Deadline plumbing (carried over from M0/M4 unchanged).
 //
 // The whole run shares ONE monotonic deadline, computed once in main() from
 // --timeout. `remaining()` reports the budget left; `withDeadline()` races
@@ -211,8 +258,8 @@ function resolveBrowser(explicitPath) {
 // the WebSocket handshake (connectWebSocket), the DevTools HTTP poll, and
 // (via CDPClient.send's own per-command timer, which consults the same
 // clock through a `getRemaining` callback) every CDP command including the
-// boot- and counter-polling loops that repeatedly call it -- is bounded by
-// this single clock.
+// boot- and page-sweep-polling loops that repeatedly call it -- is bounded
+// by this single clock.
 // ---------------------------------------------------------------------------
 
 // Milliseconds left until `deadline` (a Date.now()-style timestamp). Can be
@@ -394,44 +441,27 @@ function connectWebSocket(url) {
 }
 
 // ---------------------------------------------------------------------------
-// Self-test fixture: a plain-JS page that reproduces the boot / test
-// contract without any WebAssembly involved, so the driver can prove it
-// works before the real Miso/WASM app exists.
+// Route helpers -- build the 108-route (or --quick sample) sweep list from
+// DOC_PAGES, so the list of routes lives in exactly one place.
 // ---------------------------------------------------------------------------
 
-const SELF_TEST_FIXTURE_HTML = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>browser-check self-test fixture</title>
-</head>
-<body>
-<div id="boot-status">Loading...</div>
-<main id="app">
-  <output id="counter-value">0</output>
-  <div class="buttons">
-    <button id="btn-decrement">-</button>
-    <button id="btn-reset">reset</button>
-    <button id="btn-increment">+</button>
-  </div>
-</main>
-<script>
-  let n = 0;
-  const counterEl = document.getElementById('counter-value');
-  function render() { counterEl.textContent = String(n); }
-  document.getElementById('btn-increment').addEventListener('click', () => { n += 1; render(); });
-  document.getElementById('btn-decrement').addEventListener('click', () => { n -= 1; render(); });
-  document.getElementById('btn-reset').addEventListener('click', () => { n = 0; render(); });
-  render();
-  // Simulate an async boot, same as the real WASM loader does.
-  setTimeout(() => {
-    document.getElementById('boot-status').hidden = true;
-    window.__SXC1_BOOTED = true;
-  }, 50);
-</script>
-</body>
-</html>
-`;
+function fullRouteList() {
+  const routes = [];
+  for (const [slug, count] of Object.entries(DOC_PAGES)) {
+    for (let n = 1; n <= count; n++) routes.push({ slug, n });
+  }
+  return routes;
+}
+
+function quickRouteList() {
+  const routes = [];
+  for (const [slug, count] of Object.entries(DOC_PAGES)) {
+    const mid = Math.max(1, Math.ceil(count / 2));
+    const set = new Set([1, mid, count]);
+    for (const n of set) routes.push({ slug, n });
+  }
+  return routes;
+}
 
 // ---------------------------------------------------------------------------
 // Main
@@ -485,43 +515,36 @@ async function main() {
     if (cdp) cdp.failFatally(browserFailure);
   };
 
-  try {
-    let targetUrl = opts.url;
-
-    // --self-test: stand up a synthetic fixture page and serve it locally,
-    // then run the exact same assertion sequence against it below.
-    if (opts.selfTest) {
-      const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sxc1-browsercheck-fixture-'));
-      fs.writeFileSync(path.join(fixtureDir, 'index.html'), SELF_TEST_FIXTURE_HTML);
-      cleanupFns.push(() => removeDirWithRetry(fixtureDir));
-
-      const fixturePort = await findFreePort();
-      const fixtureServer = spawn(
-        'python3',
-        ['-m', 'http.server', '--bind', '127.0.0.1', '--directory', fixtureDir, String(fixturePort)],
-        { stdio: 'ignore' },
-      );
-      cleanupFns.push(() => new Promise((resolve) => {
-        if (fixtureServer.exitCode !== null || fixtureServer.signalCode !== null) {
-          resolve();
-          return;
-        }
-        const forceKillTimer = setTimeout(() => {
-          try { fixtureServer.kill('SIGKILL'); } catch { /* already gone */ }
-        }, 2000);
-        fixtureServer.once('exit', () => { clearTimeout(forceKillTimer); resolve(); });
-        try {
-          fixtureServer.kill('SIGTERM');
-        } catch {
-          clearTimeout(forceKillTimer);
-          resolve();
-        }
-      }));
-
-      targetUrl = `http://127.0.0.1:${fixturePort}/`;
-      await waitForHttpOk(targetUrl, deadline);
-      console.log(`[self-test] serving synthetic fixture at ${targetUrl}`);
+  // Load --expect-json up front so a bad path fails fast, before we ever
+  // launch a browser.
+  let expected = { docs: GOLDEN_DOCS, fields: GOLDEN_FIELDS, full: false };
+  if (opts.expectJson) {
+    let raw;
+    try {
+      raw = fs.readFileSync(opts.expectJson, 'utf8');
+    } catch (err) {
+      console.error(`error: could not read --expect-json file '${opts.expectJson}': ${err.message}`);
+      process.exit(2);
+      return;
     }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      console.error(`error: --expect-json file '${opts.expectJson}' is not valid JSON: ${err.message}`);
+      process.exit(2);
+      return;
+    }
+    if (!parsed || !Array.isArray(parsed.docs)) {
+      console.error(`error: --expect-json file '${opts.expectJson}' has no top-level "docs" array`);
+      process.exit(2);
+      return;
+    }
+    expected = { docs: parsed.docs, fields: null, full: true };
+  }
+
+  try {
+    const targetUrl = opts.url;
 
     // 1. Resolve the browser executable. Missing browser is a hard failure.
     const browserPath = resolveBrowser(opts.browser);
@@ -641,7 +664,9 @@ async function main() {
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
 
-    // 5. Enable Runtime/Page and record console errors + uncaught exceptions.
+    // 5. Enable Runtime/Page and record console errors + uncaught exceptions
+    // for the ENTIRE run (every navigation below shares this one page
+    // target, so this one listener pair covers the whole sweep).
     const consoleErrors = [];
     const exceptions = [];
     cdp.on('Runtime.consoleAPICalled', (params, sid) => {
@@ -663,7 +688,10 @@ async function main() {
     // Evaluate an expression in the page and return its value, throwing on
     // a JS-level exception (as opposed to a CDP transport error). Routed
     // through cdp.send(), so it is bounded by the shared deadline and by
-    // failFatally() the same way every other command is.
+    // failFatally() the same way every other command is. awaitPromise:true
+    // lets a single evaluate() run an internal poll loop (used throughout
+    // below to wait for a settled render without round-tripping to Node
+    // for every tick).
     const evaluate = async (expression) => {
       const res = await cdp.send('Runtime.evaluate', {
         expression,
@@ -711,27 +739,12 @@ async function main() {
       }
     };
 
-    const readCounter = () => evaluate(
-      `(() => { const e = document.querySelector('#counter-value'); return e ? e.textContent.trim() : null; })()`,
-    );
-    const pollCounterFor = async (expected, timeoutMs = 2000) => {
-      const localDeadline = Math.min(Date.now() + timeoutMs, deadline);
-      let last = null;
-      while (true) {
-        last = await readCounter();
-        if (last === expected) return last;
-        if (Date.now() >= localDeadline) return last;
-        await sleep(50);
-      }
-    };
-    const click = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
-
-    // m3(a)/(b) fix: never let a missing required DOM node throw out of
-    // this block (which used to escape as an uncaught exception and get
-    // misreported as exit 2 "harness error") and never treat absence as a
-    // pass. elementExists()/assertElement() always resolve to a boolean and
-    // always go through report(), so a missing node is an ordinary FAILED
-    // assertion (exit 1).
+    // m3(a)/(b) fix (carried over from M0): never let a missing required
+    // DOM node throw out of this block (which would escape as an uncaught
+    // exception and get misreported as exit 2 "harness error") and never
+    // treat absence as a pass. elementExists()/assertElement() always
+    // resolve to a boolean and always go through report(), so a missing
+    // node is an ordinary FAILED assertion (exit 1).
     const elementExists = (selector) => evaluate(
       `document.querySelector(${JSON.stringify(selector)}) !== null`,
     );
@@ -741,10 +754,20 @@ async function main() {
       return exists === true;
     };
 
-    // Click `selector`, reporting both its presence and the click itself as
-    // ordinary assertions, instead of a bare evaluate() whose
-    // `.click()` on a null querySelector() result would throw out of this
-    // block.
+    // Set window.location.hash and poll (inside the page, one round trip)
+    // until `readySelector` appears -- this is how every navigation below
+    // waits for a settled render instead of a fixed sleep.
+    const goto = async (hash, readySelector, timeoutMs = 5000) => evaluate(`(async () => {
+      window.location.hash = ${JSON.stringify(hash)};
+      const start = Date.now();
+      while (Date.now() - start < ${timeoutMs}) {
+        if (document.querySelector(${JSON.stringify(readySelector)})) return true;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      return document.querySelector(${JSON.stringify(readySelector)}) !== null;
+    })()`);
+
+    const click = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
     const clickAssert = async (selector, label) => {
       const present = await assertElement(selector, `${selector} is present before clicking it`);
       if (!present) {
@@ -773,37 +796,26 @@ async function main() {
         report('app boots (window.__SXC1_BOOTED becomes true)', false, { timeout: true });
       }
       for (const name of [
-        'counter starts at 0',
-        'increment sets counter to 1',
-        'two decrements set counter to -1',
-        'reset sets counter to 0',
         '#boot-status is hidden after boot',
+        '#sxc1-content-stats is valid JSON',
+        '#sxc1-content-stats matches expected stats',
+        '#/m/guide-book TOC contains the five PART titles',
+        '#/m/guide-book/p/17 renders the expected text',
+        'JA toggle shows a decoded original-page image',
+        'JA toggle hides the panel again',
+        '#/m/guide-book/p/17/ja deep-links into the JA-visible state',
+        'next/prev navigation',
+        'page 1 has no enabled prev / last page has no enabled next',
+        'guide-book p.15 has a p.17 cross-reference link',
+        '108-route sweep',
+        'mobile viewport has no horizontal overflow',
+        '#sxc1-disclaimer names CASIO and non-affiliation',
         'no console errors or uncaught exceptions',
       ]) {
         report(name, false, 'skipped: app did not boot');
       }
     } else {
-      const initial = await pollCounterFor('0');
-      report('counter starts at 0', initial === '0', initial);
-
-      await clickAssert('#btn-increment', 'click #btn-increment');
-      const afterIncrement = await pollCounterFor('1');
-      report('increment sets counter to 1', afterIncrement === '1', afterIncrement);
-
-      await clickAssert('#btn-decrement', 'click #btn-decrement (1 of 2)');
-      await clickAssert('#btn-decrement', 'click #btn-decrement (2 of 2)');
-      const afterTwoDecrements = await pollCounterFor('-1');
-      report('two decrements set counter to -1', afterTwoDecrements === '-1', afterTwoDecrements);
-
-      await clickAssert('#btn-reset', 'click #btn-reset');
-      const afterReset = await pollCounterFor('0');
-      report('reset sets counter to 0', afterReset === '0', afterReset);
-
-      // m3(b) fix: the boot-status contract requires #boot-status to exist
-      // -- without it a boot failure has nowhere to render -- so absence is
-      // now a FAILED assertion rather than a vacuous pass. Existence and
-      // hiddenness are asserted together in one CDP round trip so there is
-      // no window between checking one and checking the other.
+      // -- 1. Boot / #boot-status ------------------------------------------------
       const bootStatus = await evaluate(`(() => {
         const e = document.querySelector('#boot-status');
         if (!e) return { exists: false, hidden: false };
@@ -815,8 +827,243 @@ async function main() {
         bootStatus,
       );
 
+      // -- 2. #sxc1-content-stats vs --expect-json / golden numbers --------------
+      const statsRaw = await evaluate(`(() => {
+        const e = document.querySelector('#sxc1-content-stats');
+        return e ? e.textContent : null;
+      })()`);
+      let statsParsed = null;
+      try { statsParsed = JSON.parse(statsRaw); } catch { /* reported below */ }
+      report('#sxc1-content-stats is valid JSON', statsParsed !== null, statsRaw);
+
+      if (statsParsed) {
+        const mismatches = [];
+        const actualDocs = Array.isArray(statsParsed.docs) ? statsParsed.docs : [];
+        for (const edoc of expected.docs) {
+          const adoc = actualDocs.find((d) => d.slug === edoc.slug);
+          if (!adoc) { mismatches.push(`${edoc.slug}: missing from app stats`); continue; }
+          const fields = expected.full ? Object.keys(edoc) : expected.fields;
+          for (const f of fields) {
+            if (JSON.stringify(adoc[f]) !== JSON.stringify(edoc[f])) {
+              mismatches.push(`${edoc.slug}.${f}: got ${JSON.stringify(adoc[f])} want ${JSON.stringify(edoc[f])}`);
+            }
+          }
+        }
+        report(
+          `#sxc1-content-stats matches ${opts.expectJson ? `--expect-json ${opts.expectJson}` : 'the golden numbers'}`,
+          mismatches.length === 0,
+          mismatches,
+        );
+      } else {
+        report('#sxc1-content-stats matches expected stats', false, 'skipped: stats JSON did not parse');
+      }
+
+      // -- 3. guide-book TOC has the five exact PART titles -----------------------
+      await goto('#/m/guide-book', '#sxc1-toc');
+      const tocText = await evaluate(`(() => {
+        const e = document.querySelector('#sxc1-toc');
+        return e ? e.textContent : null;
+      })()`);
+      const missingParts = GUIDE_BOOK_PART_TITLES.filter((t) => !(tocText || '').includes(t));
+      report(
+        '#/m/guide-book TOC contains the five PART titles',
+        missingParts.length === 0,
+        { missingParts },
+      );
+
+      // -- 4. guide-book p.17 renders #page-17 with the expected text ------------
+      await goto('#/m/guide-book/p/17', '#page-17');
+      const page17 = await evaluate(`(() => {
+        const e = document.querySelector('#page-17');
+        return e ? e.textContent : null;
+      })()`);
+      report(
+        '#/m/guide-book/p/17 renders #page-17 containing the expected text',
+        Boolean(page17 && page17.includes('Tap the pads to make sounds')),
+        (page17 || '').slice(0, 120),
+      );
+
+      // -- 5. JA toggle: image really decodes, then hides again -------------------
+      await clickAssert('#btn-ja-toggle', 'click #btn-ja-toggle');
+      const jaShown = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 5000) {
+          const img = document.querySelector('#ja-image');
+          if (img && img.complete && img.naturalWidth > 0) {
+            return { ok: true, src: img.getAttribute('src'), naturalWidth: img.naturalWidth };
+          }
+          await new Promise((r) => setTimeout(r, 30));
+        }
+        const img = document.querySelector('#ja-image');
+        return { ok: false, exists: !!img, complete: img ? img.complete : null, naturalWidth: img ? img.naturalWidth : null };
+      })()`);
+      report(
+        'JA toggle shows a decoded original-page image',
+        Boolean(jaShown && jaShown.ok && typeof jaShown.src === 'string' && jaShown.src.endsWith('pages/guide-book/page-17.webp')),
+        jaShown,
+      );
+
+      await clickAssert('#btn-ja-toggle', 'click #btn-ja-toggle again');
+      const jaHidden = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 3000) {
+          if (document.querySelector('#ja-panel') === null) return true;
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        return document.querySelector('#ja-panel') === null;
+      })()`);
+      report('JA toggle hides the panel again', jaHidden === true, jaHidden);
+
+      // -- 6. .../p/17/ja deep-links straight into the JA-visible state ----------
+      await goto('#/m/guide-book/p/17/ja', '#ja-panel');
+      const deepLinked = await evaluate(`(() => {
+        const article = document.querySelector('#sxc1-page');
+        const img = document.querySelector('#ja-image');
+        return {
+          hasJaClass: !!(article && article.classList.contains('ja-visible')),
+          panelExists: document.querySelector('#ja-panel') !== null,
+          imgOk: !!(img && img.complete && img.naturalWidth > 0),
+        };
+      })()`);
+      report(
+        '#/m/guide-book/p/17/ja deep-links into the JA-visible state on a cold load',
+        Boolean(deepLinked && deepLinked.hasJaClass && deepLinked.panelExists && deepLinked.imgOk),
+        deepLinked,
+      );
+
+      // -- 7. prev/next navigation + disabled ends --------------------------------
+      await goto('#/m/guide-book/p/17', '#page-17');
+      await clickAssert('#btn-next-page', 'click #btn-next-page');
+      const afterNext = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 3000) {
+          if (document.querySelector('#page-18')) break;
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        return { hash: window.location.hash, has18: document.querySelector('#page-18') !== null };
+      })()`);
+      report(
+        '#btn-next-page moves to page 18 and the content changes',
+        Boolean(afterNext && afterNext.hash === '#/m/guide-book/p/18' && afterNext.has18),
+        afterNext,
+      );
+
+      await clickAssert('#btn-prev-page', 'click #btn-prev-page');
+      const afterPrev = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 3000) {
+          if (document.querySelector('#page-17')) break;
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        return { hash: window.location.hash, has17: document.querySelector('#page-17') !== null };
+      })()`);
+      report(
+        '#btn-prev-page returns to page 17',
+        Boolean(afterPrev && afterPrev.hash === '#/m/guide-book/p/17' && afterPrev.has17),
+        afterPrev,
+      );
+
+      await goto('#/m/guide-book/p/1', '#page-1');
+      const firstPageNav = await evaluate(`(() => {
+        const prev = document.querySelector('#btn-prev-page');
+        return { exists: !!prev, hasHref: !!(prev && prev.hasAttribute('href')) };
+      })()`);
+      report(
+        'page 1 has no enabled prev link',
+        Boolean(firstPageNav && firstPageNav.exists && firstPageNav.hasHref === false),
+        firstPageNav,
+      );
+
+      await goto('#/m/guide-book/p/71', '#page-71');
+      const lastPageNav = await evaluate(`(() => {
+        const next = document.querySelector('#btn-next-page');
+        return { exists: !!next, hasHref: !!(next && next.hasAttribute('href')) };
+      })()`);
+      report(
+        'last page has no enabled next link',
+        Boolean(lastPageNav && lastPageNav.exists && lastPageNav.hasHref === false),
+        lastPageNav,
+      );
+
+      // -- 8. cross-reference link: guide-book p.15 -> p.17 -----------------------
+      await goto('#/m/guide-book/p/15', '#page-15');
+      const crossRef = await evaluate(`(() => {
+        const a = Array.from(document.querySelectorAll('#page-15 a.page-ref'))
+          .find((el) => el.getAttribute('href') === '#/m/guide-book/p/17');
+        return a !== undefined;
+      })()`);
+      report('guide-book p.15 has a p.17 cross-reference link', crossRef === true, crossRef);
+
+      // -- 9. FULL SWEEP: every page route renders a non-empty #sxc1-page --------
+      const routes = opts.quick ? quickRouteList() : fullRouteList();
+      const sweepStart = Date.now();
+      const sweepFailures = [];
+      for (const { slug, n } of routes) {
+        const hash = `#/m/${slug}/p/${n}`;
+        const result = await evaluate(`(async () => {
+          window.location.hash = ${JSON.stringify(hash)};
+          const start = Date.now();
+          while (Date.now() - start < 4000) {
+            const el = document.querySelector('#sxc1-page');
+            if (el && el.textContent.trim().length > 0 && document.querySelector(${JSON.stringify(`#page-${n}`)})) {
+              return { ok: true };
+            }
+            await new Promise((r) => setTimeout(r, 15));
+          }
+          const el = document.querySelector('#sxc1-page');
+          return { ok: false, textLen: el ? el.textContent.trim().length : -1 };
+        })()`);
+        if (!result || result.ok !== true) sweepFailures.push({ hash, result });
+      }
+      const sweepMs = Date.now() - sweepStart;
+      report(
+        `all ${routes.length} page routes render a non-empty #sxc1-page${opts.quick ? ' (--quick sample)' : ''}`,
+        sweepFailures.length === 0,
+        { count: routes.length, ms: sweepMs, failures: sweepFailures.slice(0, 5) },
+      );
+      console.log(`[sweep] ${routes.length} routes in ${sweepMs}ms`);
+
+      // -- 10. Mobile viewport: no horizontal overflow ----------------------------
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 390, height: 844, deviceScaleFactor: 3, mobile: true,
+      }, sessionId);
+
+      const mobileChecks = [];
+      for (const [hash, ready] of [
+        ['#/m/guide-book/p/10', '#page-10'],
+        ['#/m/midi/p/3', '#page-3'],
+      ]) {
+        await goto(hash, ready);
+        const overflow = await evaluate(`(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          innerWidth: window.innerWidth,
+        }))()`);
+        const ok = Boolean(overflow) && overflow.scrollWidth <= overflow.innerWidth + 1;
+        mobileChecks.push({ hash, ok, overflow });
+      }
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      report(
+        'mobile viewport (390x844) has no horizontal overflow on guide-book p.10 and midi p.3',
+        mobileChecks.every((c) => c.ok),
+        mobileChecks,
+      );
+
+      // -- 11. Disclaimer ----------------------------------------------------------
+      await goto('#/m/guide-book/p/1', '#page-1');
+      const disclaimer = await evaluate(`(() => {
+        const e = document.querySelector('#sxc1-disclaimer');
+        return e ? e.textContent : null;
+      })()`);
+      const disclaimerLower = (disclaimer || '').toLowerCase();
+      report(
+        '#sxc1-disclaimer names CASIO and non-affiliation',
+        disclaimerLower.includes('not affiliated') && (disclaimer || '').includes('CASIO COMPUTER CO., LTD.'),
+        disclaimer,
+      );
+
+      // -- 12. Console hygiene across the WHOLE run ---------------------------------
       const noErrors = consoleErrors.length === 0 && exceptions.length === 0;
-      report('no console errors or uncaught exceptions', noErrors, { consoleErrors, exceptions });
+      report('no console errors or uncaught exceptions across the whole run', noErrors, { consoleErrors, exceptions });
     }
 
     console.log(`browser-check: ${passed}/${total} assertions passed`);

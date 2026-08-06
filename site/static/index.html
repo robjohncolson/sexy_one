@@ -7,16 +7,35 @@
 <style>
   /*
    * All visual styling for the SXC-1 Trainer lives here. The Haskell/Miso
-   * application (compiled to WebAssembly) contributes markup only and is
-   * mounted into <body> at runtime, using these ids/classes:
-   *   #app                 the root element rendered by Miso
-   *   #counter-value        the <output> holding the model integer
-   *   .buttons              wrapper around the three buttons
-   *   #btn-increment         "+" button
-   *   #btn-decrement         "-" button
-   *   #btn-reset             "reset" button
-   *   .subtitle              the descriptive line under the title
-   * Before boot completes, #boot-status (below) is the only visible content.
+   * application (compiled to WebAssembly) contributes markup only, mounted
+   * by APPENDING <main id="app"> to <body> at runtime -- static body markup
+   * (#boot-status, <noscript>) survives beside it. Before boot completes,
+   * #boot-status is the only visible content.
+   *
+   * M1 DOM contract this file styles (identical on every route):
+   *   #app > #sxc1-header        brand link (a.brand) + a route-dependent
+   *                               breadcrumb
+   *   #app > #sxc1-content-stats always [hidden]; never rendered visibly
+   *   #app > ... one of:
+   *     #sxc1-home                  ul.manual-list > li > a.manual-card
+   *     #sxc1-toc                   section.toc-group > h2.toc-group-title
+   *                                  + ol.toc-sections > li > a + span.toc-page
+   *                                  (+ ul.toc-subs > li > a)
+   *     #sxc1-page                  (+ class "ja-visible" when JA is shown)
+   *                                  p.page-running-header?
+   *                                  div.page-body#page-<n>
+   *                                    figure.md-figure > figcaption
+   *                                    blockquote.md-note
+   *                                    div.table-wrap > table
+   *                                    span.md-placeholder, code, a.page-ref
+   *                                    ol[start], nested ul/ol
+   *                                  figure#ja-panel > img#ja-image + figcaption?
+   *                                  button#btn-ja-toggle
+   *                                  nav.page-nav > a#btn-prev-page, a#btn-next-page
+   *   #app > #sxc1-footer         p#sxc1-disclaimer
+   *
+   * Headings rendered inside a page carry id="h-<slug>" (styled generically
+   * via .page-body h1..h6, no dedicated hook needed).
    */
 
   :root {
@@ -30,6 +49,16 @@
     --danger: #c94b4b;
     --border: #d9dce2;
     --shadow: 0 10px 30px rgba(20, 24, 34, 0.08);
+
+    --hover-bg: rgba(47, 111, 237, 0.08);
+    --note-bg: rgba(47, 111, 237, 0.07);
+    --code-bg: rgba(27, 30, 36, 0.06);
+    --code-text: #b3261e;
+    --table-head-bg: rgba(27, 30, 36, 0.035);
+    --table-stripe: rgba(27, 30, 36, 0.028);
+    --table-edge: rgba(20, 24, 34, 0.14);
+    --ja-bg: #e7e9ee;
+    --header-bg: rgba(244, 245, 247, 0.85);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -43,6 +72,16 @@
       --danger: #ff8383;
       --border: #30343d;
       --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+      --hover-bg: rgba(111, 155, 255, 0.14);
+      --note-bg: rgba(111, 155, 255, 0.1);
+      --code-bg: rgba(238, 240, 244, 0.09);
+      --code-text: #ff9b8f;
+      --table-head-bg: rgba(238, 240, 244, 0.06);
+      --table-stripe: rgba(238, 240, 244, 0.045);
+      --table-edge: rgba(0, 0, 0, 0.55);
+      --ja-bg: #23262d;
+      --header-bg: rgba(20, 22, 27, 0.85);
     }
   }
 
@@ -54,25 +93,27 @@
     height: 100%;
   }
 
+  /* The document is a normal top-anchored reading page, not a centred
+     flex box -- M0's counter card layout is replaced entirely. */
   body {
     margin: 0;
     min-height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1.5rem;
-    padding: 2rem 1rem;
+    overflow-x: hidden;
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
       Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-    line-height: 1.5;
+    line-height: 1.65;
+  }
+
+  #app {
+    display: block;
+    width: 100%;
   }
 
   #boot-status {
     max-width: 32rem;
-    width: 100%;
+    margin: 3rem auto;
     text-align: center;
     padding: 1rem 1.25rem;
     border-radius: 0.75rem;
@@ -90,85 +131,10 @@
     word-break: break-word;
   }
 
-  #app {
-    width: 100%;
-    max-width: 26rem;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 1rem;
-    box-shadow: var(--shadow);
-    padding: 2rem 1.75rem 1.75rem;
-    text-align: center;
-  }
-
-  #app h1 {
-    margin: 0 0 0.35rem;
-    font-size: 1.5rem;
-    letter-spacing: -0.01em;
-  }
-
-  #app .subtitle {
-    margin: 0 0 1.5rem;
-    color: var(--muted);
-    font-size: 0.95rem;
-  }
-
-  #counter-value {
-    display: block;
-    font-size: 3.5rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    margin: 0.5rem 0 1.75rem;
-  }
-
-  .buttons {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .buttons button {
-    appearance: none;
-    border: 1px solid var(--border);
-    border-radius: 0.6rem;
-    background: var(--accent);
-    color: var(--accent-contrast);
-    font-size: 1.1rem;
-    font-weight: 600;
-    padding: 0.65rem 1.4rem;
-    min-width: 3.5rem;
-    cursor: pointer;
-    transition: transform 0.08s ease, filter 0.15s ease;
-  }
-
-  .buttons button#btn-reset {
-    background: transparent;
-    color: var(--text);
-    font-size: 0.95rem;
-    font-weight: 500;
-  }
-
-  .buttons button:hover {
-    filter: brightness(1.08);
-  }
-
-  .buttons button:active {
-    transform: translateY(1px) scale(0.98);
-  }
-
-  .buttons button:focus-visible {
-    outline: 3px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  .buttons button#btn-reset:focus-visible {
-    outline-color: var(--muted);
-  }
-
   noscript {
+    display: block;
     max-width: 26rem;
+    margin: 2rem auto;
     text-align: center;
     color: var(--danger);
     background: var(--card-bg);
@@ -178,24 +144,581 @@
     box-shadow: var(--shadow);
   }
 
-  footer {
+  /* -------------------------------------------------------------------
+     Header: sticky brand + breadcrumb. Capped so it never costs more
+     than ~3.5rem of vertical space on a phone; a long breadcrumb scrolls
+     horizontally inside the bar instead of wrapping to a second line.
+     ------------------------------------------------------------------- */
+
+  #sxc1-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-height: 2.75rem;
+    max-height: 3.5rem;
+    overflow: hidden;
+    padding: 0.55rem 1.1rem;
+    background: var(--header-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  #sxc1-header a.brand {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  #sxc1-header a.brand:hover {
+    color: var(--accent);
+  }
+
+  /* Everything in the header besides the brand link is treated as the
+     breadcrumb, whatever element the app wraps it in. */
+  #sxc1-header > *:not(.brand) {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    font-size: 0.8rem;
     color: var(--muted);
+  }
+
+  #sxc1-header > *:not(.brand) a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+
+  #sxc1-header > *:not(.brand) a:hover,
+  #sxc1-header > *:not(.brand) a:focus-visible {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  a:focus-visible,
+  button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 0.2rem;
+  }
+
+  /* #sxc1-content-stats carries the machine-readable corpus JSON and must
+     never render, under any circumstance. */
+  #sxc1-content-stats,
+  [hidden] {
+    display: none !important;
+  }
+
+  /* -------------------------------------------------------------------
+     Shared reading-column width for single-column sections.
+     ------------------------------------------------------------------- */
+
+  #sxc1-home,
+  #sxc1-toc,
+  #sxc1-footer {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 1.75rem clamp(1rem, 4vw, 2rem) 3rem;
+  }
+
+  /* -------------------------------------------------------------------
+     Home: manual list cards.
+     ------------------------------------------------------------------- */
+
+  #sxc1-home p {
+    color: var(--muted);
+    margin: 0 0 1.5rem;
+  }
+
+  .manual-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .manual-card {
+    display: block;
+    min-height: 44px;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    color: var(--text);
+    text-decoration: none;
+    box-shadow: var(--shadow);
+    transition: transform 0.1s ease, box-shadow 0.15s ease;
+  }
+
+  .manual-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(20, 24, 34, 0.14);
+  }
+
+  .manual-card strong {
+    display: block;
+    font-size: 1.05rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .manual-card small {
+    color: var(--muted);
+  }
+
+  /* -------------------------------------------------------------------
+     Manual contents (table of contents).
+     ------------------------------------------------------------------- */
+
+  .toc-group {
+    margin: 0 0 2.25rem;
+  }
+
+  .toc-group-title {
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.75rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 2px solid var(--accent);
+    color: var(--text);
+  }
+
+  .toc-sections {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .toc-sections > li {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .toc-sections > li > a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 44px;
+    padding: 0.6rem 0.3rem;
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .toc-sections > li > a:hover,
+  .toc-sections > li > a:focus-visible {
+    background: var(--hover-bg);
+    border-radius: 0.4rem;
+  }
+
+  .toc-page {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .toc-subs {
+    list-style: none;
+    margin: 0 0 0.4rem 1rem;
+    padding: 0 0 0 0.85rem;
+    border-left: 2px solid var(--border);
+  }
+
+  .toc-subs li a {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0.35rem 0.3rem;
+    color: var(--muted);
+    font-size: 0.92rem;
+    text-decoration: none;
+  }
+
+  .toc-subs li a:hover,
+  .toc-subs li a:focus-visible {
+    color: var(--accent);
+    background: var(--hover-bg);
+    border-radius: 0.4rem;
+  }
+
+  /* -------------------------------------------------------------------
+     Page reader: header/body/JA-panel/toggle/nav on a CSS grid. One
+     column by default; at >= 60rem, when the article also carries
+     "ja-visible", the panel becomes a sticky second column beside the
+     text. Below 60rem (or when JA is off) everything simply stacks full
+     width in document order -- that is how "beside (or instead of)"
+     becomes a CSS decision, never a Haskell one.
+     ------------------------------------------------------------------- */
+
+  #sxc1-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 1.75rem clamp(1rem, 4vw, 2rem) 4rem;
+  }
+
+  .page-running-header {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .page-body {
+    min-width: 0;
+  }
+
+  .page-body > * {
+    margin: 0 0 1rem;
+  }
+
+  .page-body > *:first-child {
+    margin-top: 0;
+  }
+
+  .page-body > *:last-child {
+    margin-bottom: 0;
+  }
+
+  .page-body h1,
+  .page-body h2,
+  .page-body h3,
+  .page-body h4,
+  .page-body h5,
+  .page-body h6 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.55rem;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  .page-body h1 { font-size: 1.75rem; }
+  .page-body h2 { font-size: 1.4rem; }
+  .page-body h3 { font-size: 1.15rem; }
+  .page-body h4 { font-size: 1rem; }
+  .page-body h5,
+  .page-body h6 { font-size: 0.92rem; color: var(--muted); }
+
+  .page-body p {
+    margin: 0 0 1rem;
+  }
+
+  .page-body a {
+    color: var(--accent);
+  }
+
+  .page-body ul,
+  .page-body ol,
+  blockquote.md-note ul,
+  blockquote.md-note ol {
+    margin: 0 0 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .page-body li {
+    margin-bottom: 0.4rem;
+    padding-left: 0.2rem;
+  }
+
+  .page-body li::marker,
+  blockquote.md-note li::marker {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .page-body ul ul,
+  .page-body ul ol,
+  .page-body ol ul,
+  .page-body ol ol {
+    margin-top: 0.4rem;
+    margin-bottom: 0.2rem;
+    padding-left: 1.35rem;
+  }
+
+  /* ol[start] must keep displaying its literal start number -- default
+     browser decimal counting already honours [start]; this rule only
+     guards against list-style ever being reset elsewhere. */
+  .page-body ol[start] {
+    list-style-type: decimal;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 0.15em 0.4em;
+    border-radius: 0.3em;
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+
+  blockquote.md-note {
+    margin: 1.25rem 0;
+    padding: 0.9rem 1.1rem;
+    border-left: 4px solid var(--accent);
+    background: var(--note-bg);
+    border-radius: 0 0.6rem 0.6rem 0;
+    color: var(--text);
+  }
+
+  blockquote.md-note > *:first-child {
+    margin-top: 0;
+  }
+
+  blockquote.md-note > *:last-child {
+    margin-bottom: 0;
+  }
+
+  blockquote.md-note p {
+    margin: 0 0 0.6rem;
+  }
+
+  blockquote.md-note figure.md-figure {
+    margin: 0.75rem 0;
+  }
+
+  figure.md-figure {
+    margin: 1.25rem 0;
+    padding: 0.9rem 1.05rem;
+    border: 1px dashed var(--border);
+    border-radius: 0.6rem;
+    background: var(--card-bg);
+  }
+
+  figure.md-figure figcaption {
+    font-style: italic;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  figure.md-figure figcaption::before {
+    content: "Figure not reproduced \2014\0020";
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  span.md-placeholder {
+    display: inline-block;
+    font-style: italic;
+    font-size: 0.92em;
+    color: var(--muted);
+    background: var(--note-bg);
+    padding: 0.05em 0.4em;
+    border-radius: 0.3em;
+  }
+
+  a.page-ref {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
+  }
+
+  a.page-ref:hover {
+    filter: brightness(1.15);
+  }
+
+  /* Tables: the mobile risk. The wrapper scrolls; the document body
+     never does. */
+  div.table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 1.25rem 0;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow: inset -14px 0 10px -10px var(--table-edge);
+  }
+
+  div.table-wrap table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 26rem;
+    font-size: 0.88rem;
+  }
+
+  div.table-wrap th,
+  div.table-wrap td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  div.table-wrap thead th {
+    background: var(--table-head-bg);
+    border-bottom: 2px solid var(--border);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  div.table-wrap tbody tr:nth-child(even) {
+    background: var(--table-stripe);
+  }
+
+  /* -------------------------------------------------------------------
+     JA panel: neutral background so a page render never blends in, plus
+     a light border. Sticky beside the text only in the wide 2-column
+     layout below.
+     ------------------------------------------------------------------- */
+
+  #ja-panel {
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--ja-bg);
+    overflow: hidden;
+  }
+
+  #ja-panel a {
+    display: block;
+    line-height: 0;
+  }
+
+  #ja-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: var(--ja-bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  #ja-panel figcaption {
+    padding: 0.6rem 0.85rem;
     font-size: 0.8rem;
     text-align: center;
-    max-width: 26rem;
+    color: var(--muted);
+  }
+
+  #btn-ja-toggle {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.65rem 1rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.6rem;
+    background: transparent;
+    color: var(--accent);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+
+  #btn-ja-toggle:hover {
+    background: var(--hover-bg);
+  }
+
+  .page-nav {
+    display: flex;
+    gap: 1rem;
+  }
+
+  #btn-prev-page,
+  #btn-next-page {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.65rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--card-bg);
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+  }
+
+  #btn-prev-page:hover,
+  #btn-next-page:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent);
+  }
+
+  /* -------------------------------------------------------------------
+     Footer / disclaimer.
+     ------------------------------------------------------------------- */
+
+  #sxc1-footer {
+    border-top: 1px solid var(--border);
+    margin-top: 1rem;
+  }
+
+  #sxc1-disclaimer {
+    margin: 1.5rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* -------------------------------------------------------------------
+     Wide-viewport page grid: text column capped for reading comfort,
+     JA panel a sticky sidebar spanning the full height of the page's
+     rows (running header through prev/next nav). Named areas (not
+     `grid-row: 1 / -1`) because there is no `grid-template-rows`, so a
+     negative row line has no fixed implicit-grid end to resolve
+     against; named areas give the JA column an explicit, unambiguous
+     span across exactly these four rows regardless of how tall
+     .page-body's own content makes the "body" row. The running header
+     is optional per page -- an unused "header" cell is harmless.
+     ------------------------------------------------------------------- */
+  @media (min-width: 60rem) {
+    #sxc1-page.ja-visible {
+      max-width: 78rem;
+      grid-template-columns: minmax(0, 44rem) minmax(18rem, 28rem);
+      grid-template-areas:
+        "header ja"
+        "body   ja"
+        "toggle ja"
+        "nav    ja";
+      column-gap: 2.5rem;
+    }
+
+    #sxc1-page.ja-visible .page-running-header { grid-area: header; }
+    #sxc1-page.ja-visible .page-body { grid-area: body; }
+    #sxc1-page.ja-visible #btn-ja-toggle { grid-area: toggle; }
+    #sxc1-page.ja-visible .page-nav { grid-area: nav; }
+
+    #sxc1-page.ja-visible #ja-panel {
+      grid-area: ja;
+      align-self: start;
+      position: sticky;
+      top: calc(3.5rem + 1.5rem);
+    }
   }
 
   @media (max-width: 30rem) {
-    #app {
-      padding: 1.5rem 1.25rem 1.25rem;
-    }
-
-    #counter-value {
-      font-size: 2.75rem;
-    }
-
-    .buttons button {
-      flex: 1 1 6rem;
+    .page-nav {
+      flex-direction: column;
     }
   }
 </style>
@@ -207,8 +730,6 @@
     This application requires JavaScript to run (it boots a WebAssembly
     module compiled from Haskell). Please enable JavaScript and reload.
   </noscript>
-
-  <footer>SXC-1 Trainer - unofficial fan project. Not affiliated with Casio.</footer>
 
   <script type="module" src="./index.js"></script>
 </body>

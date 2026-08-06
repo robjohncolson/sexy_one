@@ -32,6 +32,14 @@ SKIP_BROWSER=0
 if [ "${SXC1_SKIP_BROWSER:-0}" = "1" ]; then
   SKIP_BROWSER=1
 fi
+# --skip-content: local-iteration escape hatch for the exe:content-check +
+# three-way content agreement checks (B and C below), which need a built
+# wasm32-wasi content-check binary. Off by default -- see check 11's usage
+# text for why this must never be the default.
+SKIP_CONTENT=0
+if [ "${SXC1_SKIP_CONTENT:-0}" = "1" ]; then
+  SKIP_CONTENT=1
+fi
 
 usage() {
   cat <<EOF
@@ -49,6 +57,13 @@ Options:
                    the final marker reads result=structural-only instead of
                    result=complete -- this is a local escape hatch only;
                    CI asserts result=complete.
+  --skip-content   SKIPPED (conspicuously, never silently) the exe:content-check
+                   run and the three-way content agreement check (also
+                   honoured via SXC1_SKIP_CONTENT=1). Local-iteration escape
+                   hatch only -- never the default, and CI must not pass it.
+                   When skipped, checks 7/8's browser run falls back to
+                   scripts/browser-check.mjs's own built-in golden numbers
+                   instead of --expect-json.
   --port N         TCP port to try first for the dev server used by the
                    browser checks (default: 8123, env SXC1_PORT). If busy,
                    the next free port is used instead.
@@ -87,6 +102,28 @@ Checks performed, in order:
      skipped. A bundle that only works at the origin root (e.g. because it
      fetches an absolute "/app.wasm" instead of a relative "./app.wasm")
      fails this check even when check 5's syntactic scan misses it.
+  9. PAGE IMAGES: every site/public/pages/<slug>/page-NN.webp exists for
+     guide-book (1-71), startup-guide (1-15), midi (1-6) and oss (1-16) --
+     108 files, two-digit zero padding -- each begins with the "RIFF"..
+     "WEBP" magic at offsets 0 and 8, none exceeds 300 KB, and the total is
+     under 12 MB (reported as info).
+  10. CONTENT CHECKER: sources $HOME/.ghc-wasm/env (actionable failure, not
+     a silent skip, if missing), resolves exe:content-check via
+     `wasm32-wasi-cabal list-bin`, and runs it under wasm-run.mjs -- must
+     exit 0. FAILs (never silently skips) with "run ./scripts/build-site.sh
+     first" if the binary is missing; `wasmtime run --dir=/ <binary>` is
+     the documented fallback runner. Unless --skip-content.
+  11. THREE-WAY CONTENT AGREEMENT: `exe:content-check --json`'s stats are
+     diffed field-by-field (chars, lines, pages, headings, tables, figures,
+     sections, subsections, parts, per document) against numbers an
+     embedded python3 snippet recomputes INDEPENDENTLY, straight from
+     translations/*.md by regex. This is what catches a STALE BUILD -- a
+     translation edited without rebuilding makes `chars` diverge and this
+     check goes red instead of silently serving old content. Unless
+     --skip-content. The same JSON is also passed to checks 7/8's
+     scripts/browser-check.mjs via --expect-json, so the running app is
+     compared against numbers derived from the source of truth rather than
+     constants baked into the harness.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -97,6 +134,10 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --skip-browser)
       SKIP_BROWSER=1
+      shift
+      ;;
+    --skip-content)
+      SKIP_CONTENT=1
       shift
       ;;
     --port)
@@ -238,6 +279,10 @@ SERVER_LOGS=()
 # exit path, not just the happy one. Initialised before the traps are
 # installed so cleanup can never reference it unset.
 TEMP_DIRS=()
+# Same idea for ordinary temp FILES the content-checker/three-way checks
+# create (the captured --json, the embedded python3 snippet's script file):
+# tracked here, never left behind, regardless of which check fails.
+TEMP_FILES=()
 
 cleanup() {
   local pid
@@ -266,6 +311,13 @@ cleanup() {
     rm -rf "$dir"
   done
   TEMP_DIRS=()
+
+  local f
+  for f in "${TEMP_FILES[@]+"${TEMP_FILES[@]}"}"; do
+    [ -n "$f" ] || continue
+    rm -f "$f"
+  done
+  TEMP_FILES=()
 }
 trap cleanup EXIT
 trap 'cleanup; exit 130' INT
@@ -286,6 +338,13 @@ unregister_temp_dir() {
     [ "$d" = "$target" ] || filtered+=("$d")
   done
   TEMP_DIRS=("${filtered[@]+"${filtered[@]}"}")
+}
+
+# register_temp_file: bookkeeping for TEMP_FILES above (mirrors
+# register_temp_dir). Register immediately after every `mktemp` used by the
+# content-checker / three-way checks below.
+register_temp_file() {
+  TEMP_FILES+=("$1")
 }
 
 echo "check-site: checking '$DIR'"
@@ -464,6 +523,309 @@ report_size "$WASM_FILE" "app.wasm"
 report_size "$JSFFI_FILE" "ghc_wasm_jsffi.js"
 
 # ===========================================================================
+# Check 9: PAGE IMAGES. site/public/pages/<slug>/page-NN.webp exists for
+# guide-book 1-71, startup-guide 1-15, midi 1-6, oss 1-16 (108 files,
+# two-digit zero padding); each begins with the RIFF/WEBP magic at offsets 0
+# and 8; none exceeds 300 KB; the total is under 12 MB (reported as info).
+# A single python3 pass (not 108 shell/dd invocations) does the byte-level
+# work and prints OK/FAIL/INFO lines that this script just dispatches.
+# ===========================================================================
+PAGE_IMAGES_PY="$(mktemp -t sxc1-check-site-pages.XXXXXX.py)"
+register_temp_file "$PAGE_IMAGES_PY"
+cat > "$PAGE_IMAGES_PY" <<'PYEOF'
+import os
+import sys
+
+BASE = sys.argv[1]
+DOCS = [("guide-book", 71), ("startup-guide", 15), ("midi", 6), ("oss", 16)]
+MAX_BYTES = 300 * 1024
+TOTAL_MAX_BYTES = 12 * 1024 * 1024
+
+total_bytes = 0
+overall_ok = True
+oversize_details = []
+
+for slug, count in DOCS:
+    missing = []
+    bad_magic = []
+    slug_total = 0
+    for n in range(1, count + 1):
+        fname = "page-%02d.webp" % n
+        path = os.path.join(BASE, slug, fname)
+        if not os.path.isfile(path):
+            missing.append(fname)
+            continue
+        size = os.path.getsize(path)
+        slug_total += size
+        if size > MAX_BYTES:
+            oversize_details.append("%s/%s=%d bytes" % (slug, fname, size))
+        with open(path, "rb") as fh:
+            head = fh.read(12)
+        if len(head) < 12 or head[0:4] != b"RIFF" or head[8:12] != b"WEBP":
+            bad_magic.append(fname)
+
+    total_bytes += slug_total
+
+    if missing:
+        print("FAIL count %s expected=%d files, missing=%s" % (slug, count, ",".join(missing)))
+        overall_ok = False
+    else:
+        print("OK count %s all %d files present (page-01.webp..page-%02d.webp)" % (slug, count, count))
+
+    if bad_magic:
+        print("FAIL magic %s files failing RIFF/WEBP magic=%s" % (slug, ",".join(bad_magic)))
+        overall_ok = False
+    else:
+        print("OK magic %s all %d files begin RIFF..WEBP" % (slug, count))
+
+if oversize_details:
+    print("FAIL maxsize " + "; ".join(oversize_details) + (" (limit %d bytes)" % MAX_BYTES))
+    overall_ok = False
+else:
+    print("OK maxsize none of 108 files exceeds %d bytes (300 KB)" % MAX_BYTES)
+
+print("INFO total %d bytes (%.2f MB) across 108 files" % (total_bytes, total_bytes / 1024.0 / 1024.0))
+
+if total_bytes > TOTAL_MAX_BYTES:
+    print("FAIL totalsize %d bytes exceeds %d bytes (12 MB)" % (total_bytes, TOTAL_MAX_BYTES))
+    overall_ok = False
+else:
+    print("OK totalsize %d bytes under %d bytes (12 MB)" % (total_bytes, TOTAL_MAX_BYTES))
+
+sys.exit(0 if overall_ok else 1)
+PYEOF
+
+if command -v python3 >/dev/null 2>&1; then
+  PAGE_IMAGES_OUT="$(python3 "$PAGE_IMAGES_PY" "$DIR/pages" 2>&1)" || true
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in
+      "OK "*)   ok "page-images/${line#OK }" ;;
+      "FAIL "*) fail "page-images/${line#FAIL } (observed above)" ;;
+      "INFO "*) info "page-images/${line#INFO }" ;;
+      *)        fail "page-images (unexpected output: $line)" ;;
+    esac
+  done <<< "$PAGE_IMAGES_OUT"
+else
+  fail "page-images (observed: python3 not found on PATH -- required for check 9)"
+fi
+rm -f "$PAGE_IMAGES_PY"
+
+# ===========================================================================
+# Checks 10 & 11: CONTENT CHECKER + THREE-WAY CONTENT AGREEMENT, unless
+# --skip-content. See usage() above for the full description; the short
+# version is: (10) exe:content-check, a real Haskell parser over the
+# TH-embedded corpus, must run under wasm-run.mjs and exit 0; (11) its
+# `--json` stats are diffed field-by-field against numbers an embedded
+# python3 snippet recomputes independently, straight from
+# translations/*.md -- this is the check that catches a stale build. The
+# captured JSON is also handed to checks 7/8's browser driver via
+# --expect-json (see CONTENT_JSON_FILE below).
+# ===========================================================================
+CONTENT_JSON_FILE=""
+
+if [ "$SKIP_CONTENT" -eq 1 ]; then
+  echo "SKIPPED -- content checker + three-way content agreement (requested via --skip-content or SXC1_SKIP_CONTENT=1)"
+  skip "exe:content-check runs under wasm-run.mjs and exits 0"
+  skip "three-way content agreement/guide-book (content-check --json vs translations/guide-book.md)"
+  skip "three-way content agreement/startup-guide (content-check --json vs translations/startup-guide.md)"
+  skip "three-way content agreement/midi (content-check --json vs translations/midi.md)"
+  skip "three-way content agreement/oss (content-check --json vs translations/oss.md)"
+else
+  TOOLCHAIN_ENV_FILE="${GHC_WASM_PREFIX:-$HOME/.ghc-wasm}/env"
+  if [ -f "$TOOLCHAIN_ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$TOOLCHAIN_ENV_FILE"
+    ok "GHC WebAssembly toolchain env sourced ($TOOLCHAIN_ENV_FILE)"
+  else
+    fail "GHC WebAssembly toolchain env sourced (observed: '$TOOLCHAIN_ENV_FILE' missing -- run ./scripts/install-toolchain.sh)"
+  fi
+
+  CONTENT_CHECK_BIN=""
+  if command -v wasm32-wasi-cabal >/dev/null 2>&1; then
+    CONTENT_CHECK_BIN="$(cd "$REPO_ROOT/site" && wasm32-wasi-cabal list-bin exe:content-check 2>/dev/null | tail -n1 || true)"
+  fi
+
+  if [ -n "$CONTENT_CHECK_BIN" ] && [ -f "$CONTENT_CHECK_BIN" ]; then
+    ok "exe:content-check binary resolved (observed: $CONTENT_CHECK_BIN)"
+  else
+    fail "exe:content-check binary resolved (observed: missing -- run ./scripts/build-site.sh first; fallback runner: wasmtime run --dir=/ <binary>)"
+    CONTENT_CHECK_BIN=""
+  fi
+
+  if [ -n "$CONTENT_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    CONTENT_RUN_LOG="$(mktemp -t sxc1-check-site-content-run.XXXXXX)"
+    register_temp_file "$CONTENT_RUN_LOG"
+    if wasm-run.mjs "$CONTENT_CHECK_BIN" >"$CONTENT_RUN_LOG" 2>&1; then
+      ok "exe:content-check runs under wasm-run.mjs and exits 0"
+    else
+      fail "exe:content-check runs under wasm-run.mjs and exits 0 (observed: non-zero exit; output follows)"
+      sed 's/^/    /' "$CONTENT_RUN_LOG" >&2
+    fi
+    rm -f "$CONTENT_RUN_LOG"
+  else
+    fail "exe:content-check runs under wasm-run.mjs and exits 0 (observed: toolchain env or binary unavailable -- see checks above; fallback runner: wasmtime run --dir=/ <binary>)"
+  fi
+
+  # Capture `content-check --json` once, for both the three-way agreement
+  # check below and checks 7/8's --expect-json.
+  if [ -n "$CONTENT_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    CANDIDATE_JSON="$(mktemp -t sxc1-check-site-stats.XXXXXX.json)"
+    register_temp_file "$CANDIDATE_JSON"
+    if wasm-run.mjs "$CONTENT_CHECK_BIN" --json >"$CANDIDATE_JSON" 2>/dev/null && [ -s "$CANDIDATE_JSON" ]; then
+      CONTENT_JSON_FILE="$CANDIDATE_JSON"
+    fi
+  fi
+
+  THREEWAY_PY="$(mktemp -t sxc1-check-site-threeway.XXXXXX.py)"
+  register_temp_file "$THREEWAY_PY"
+  cat > "$THREEWAY_PY" <<'PYEOF'
+import json
+import re
+import sys
+
+DOCS = [
+    ("guide-book", "translations/guide-book.md"),
+    ("startup-guide", "translations/startup-guide.md"),
+    ("midi", "translations/midi.md"),
+    ("oss", "translations/oss.md"),
+]
+FIELDS = ["chars", "lines", "pages", "headings", "tables", "figures", "sections", "subsections", "parts"]
+
+PAGE_MARKER_RE = re.compile(r"^<!-- page (\d+) -->$")
+HEADING_LINE_RE = re.compile(r"^#{1,6} +\S")
+TABLE_SEP_RE = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
+FIGURE_RE = re.compile(r"(?<!\*)\*\[[^\]\n]*\]\*(?!\*)")
+BODY_HEADING_RE = re.compile(r"^(#{1,6}) +(\S.*)$")
+PART_RE = re.compile(r"^PART\s+\d+\b")
+
+
+def compute(path):
+    text = open(path, encoding="utf-8").read()
+    chars = len(text)
+    lines_list = text.split("\n")
+    lines = len(lines_list)
+
+    page_markers = []
+    for i, l in enumerate(lines_list):
+        m = PAGE_MARKER_RE.match(l)
+        if m:
+            page_markers.append((i, int(m.group(1))))
+    nums = [n for _, n in page_markers]
+    if nums != list(range(1, len(nums) + 1)):
+        raise ValueError("page markers not 1..N once each: %r" % (nums,))
+    pages = len(nums)
+
+    headings = sum(1 for l in lines_list if HEADING_LINE_RE.match(l))
+    tables = sum(1 for l in lines_list if TABLE_SEP_RE.match(l))
+    figures = len(FIGURE_RE.findall(text))
+
+    body_start = page_markers[0][0] + 1 if page_markers else 0
+    heads = []
+    level_counts = {}
+    for l in lines_list[body_start:]:
+        m = BODY_HEADING_RE.match(l)
+        if m:
+            lvl = len(m.group(1))
+            txt = m.group(2).strip()
+            heads.append((lvl, txt))
+            level_counts[lvl] = level_counts.get(lvl, 0) + 1
+    qualifying = sorted(lvl for lvl, c in level_counts.items() if c >= 2)
+    if qualifying:
+        sec_level = qualifying[0]
+    elif heads:
+        sec_level = heads[0][0]
+    else:
+        sec_level = 1
+
+    sections = sum(1 for lvl, _ in heads if lvl == sec_level)
+    subsections = sum(1 for lvl, _ in heads if lvl == sec_level + 1)
+    parts = sum(1 for lvl, txt in heads if lvl == sec_level and PART_RE.match(txt))
+
+    return dict(chars=chars, lines=lines, pages=pages, headings=headings,
+                tables=tables, figures=figures, sections=sections,
+                subsections=subsections, parts=parts)
+
+
+def main():
+    json_path = sys.argv[1] if len(sys.argv) > 1 else ""
+    parsed_docs = {}
+    parse_error = None
+    if json_path:
+        try:
+            with open(json_path, encoding="utf-8") as fh:
+                data = json.load(fh)
+            for d in data.get("docs", []):
+                parsed_docs[d.get("slug")] = d
+        except Exception as e:
+            parse_error = "could not read/parse content-check --json capture: %s" % e
+    else:
+        parse_error = "no content-check --json capture available (see check 10 above)"
+
+    overall_ok = True
+    for slug, path in DOCS:
+        try:
+            py = compute(path)
+        except Exception as e:
+            print("FAIL %s recompute-error=%s" % (slug, e))
+            overall_ok = False
+            continue
+        if parse_error is not None:
+            print("FAIL %s %s" % (slug, parse_error))
+            overall_ok = False
+            continue
+        cc = parsed_docs.get(slug)
+        if cc is None:
+            print("FAIL %s missing from content-check --json docs[]" % slug)
+            overall_ok = False
+            continue
+        diffs = []
+        for field in FIELDS:
+            if cc.get(field) != py[field]:
+                diffs.append("%s: content-check=%r python=%r" % (field, cc.get(field), py[field]))
+        if diffs:
+            print("FAIL %s " % slug + "; ".join(diffs))
+            overall_ok = False
+        else:
+            print("OK %s " % slug + " ".join("%s=%s" % (f, py[f]) for f in FIELDS))
+
+    sys.exit(0 if overall_ok else 1)
+
+
+main()
+PYEOF
+
+  if command -v python3 >/dev/null 2>&1; then
+    THREEWAY_OUT="$(cd "$REPO_ROOT" && python3 "$THREEWAY_PY" "$CONTENT_JSON_FILE" 2>&1)" || true
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      case "$line" in
+        "OK "*)
+          rest="${line#OK }"
+          slug="${rest%% *}"
+          detail="${rest#* }"
+          ok "three-way content agreement/$slug ($detail)"
+          ;;
+        "FAIL "*)
+          rest="${line#FAIL }"
+          slug="${rest%% *}"
+          detail="${rest#* }"
+          fail "three-way content agreement/$slug (observed: $detail)"
+          ;;
+        *)
+          fail "three-way content agreement (unexpected output: $line)"
+          ;;
+      esac
+    done <<< "$THREEWAY_OUT"
+  else
+    for slug in guide-book startup-guide midi oss; do
+      fail "three-way content agreement/$slug (observed: python3 not found on PATH)"
+    done
+  fi
+  rm -f "$THREEWAY_PY"
+fi
+
+# ===========================================================================
 # Checks 7 & 8: headless-Chrome smoke test at the root, and (authoritative)
 # at a non-root GitHub-Pages-style sub-path, unless skipped.
 # ===========================================================================
@@ -587,9 +949,19 @@ run_browser_stage() {
   fi
 
   local run_url="http://127.0.0.1:${START_SERVER_PORT}${url_path}"
+  # Check 11 fix: hand the SAME content-check --json capture to the browser
+  # driver via --expect-json, so #sxc1-content-stats is compared against
+  # numbers derived from the source of truth (translations/*.md) rather
+  # than the golden constants baked into browser-check.mjs. Falls back to
+  # those built-in constants (no --expect-json) when --skip-content was
+  # passed or check 10/11 could not produce a JSON capture.
+  local -a browser_cmd=("$REPO_ROOT/scripts/browser-check.mjs" --url "$run_url")
+  if [ -n "${CONTENT_JSON_FILE:-}" ] && [ -s "$CONTENT_JSON_FILE" ]; then
+    browser_cmd+=(--expect-json "$CONTENT_JSON_FILE")
+  fi
   echo "check-site: serving '$serve_dir' at $run_url (browser: $browser_path)"
   set +e
-  "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --url "$run_url"
+  "$NODE" "${browser_cmd[@]}"
   local browser_rc=$?
   set -e
   if [ "$browser_rc" -eq 0 ]; then

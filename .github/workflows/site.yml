@@ -83,21 +83,60 @@ jobs:
       # miso and its dependency closure from scratch every run. Unlike the
       # toolchain cache, this one IS genuinely incrementally reusable, so
       # it keeps its restore-keys.
+      #
+      # M1: the key now also hashes site/src/**, site/test/** (the new
+      # sxc1-content library and its exe:content-check test suite) and
+      # translations/*.md. That last one is load-bearing, not decorative:
+      # translations/*.md is embedded into the wasm at COMPILE TIME by
+      # Template Haskell (SXC1.Content.Embed, via `extra-source-files:
+      # ../translations/*.md` in site/sxc1-trainer.cabal) and reparsed at
+      # runtime from that embedded copy -- the app never fetches the
+      # markdown at runtime. If a translation edit didn't appear in this
+      # key, a restored dist-newstyle would report "up to date" and CI
+      # would happily build, verify and deploy wasm containing the OLD
+      # translation text. Hashing the sources is enough to invalidate on
+      # code changes; the content needs the same treatment because it also
+      # flows into the compiled artifact.
       # ----------------------------------------------------------------
       - name: Cache cabal build directory
         uses: actions/cache@v6
         with:
           path: site/dist-newstyle
-          key: dist-newstyle-${{ runner.os }}-${{ hashFiles('site/cabal.project', 'site/sxc1-trainer.cabal', 'site/app/**') }}
+          key: dist-newstyle-${{ runner.os }}-${{ hashFiles('site/cabal.project', 'site/sxc1-trainer.cabal', 'site/app/**', 'site/src/**', 'site/test/**', 'translations/*.md') }}
           restore-keys: |
             dist-newstyle-${{ runner.os }}-
 
+      # ----------------------------------------------------------------
+      # No separate image-rendering step: the 108 WebP page images the
+      # reader's "show original page (JA)" panel uses are committed under
+      # site/static/pages/<slug>/page-NN.webp and copied verbatim into
+      # site/public/ by build-site.sh's `cp -R site/static/. site/public/`
+      # (build-site.sh itself is unmodified for M1 -- it already did this
+      # copy for M0's static shell). CI installs no PDF/image tooling and
+      # runs no rendering step; the bytes reviewed in git are the bytes
+      # served. To regenerate the images by hand after a source PDF
+      # changes, run ./scripts/render-page-images.sh locally (it needs
+      # poppler-utils and either cwebp or python3-pil, neither of which
+      # this workflow installs) and commit the result.
+      #
+      # site/public ends up about 13 MB (currently 3.7 MB app.wasm/JSFFI
+      # plus ~9.4 MB of committed page images) -- well inside GitHub
+      # Pages' 1 GB artifact limit.
+      # ----------------------------------------------------------------
       - name: Build site
         timeout-minutes: 30
         run: ./scripts/build-site.sh
 
+      # check-site.sh needs no new CI step for M1: the content checker
+      # (exe:content-check under wasm-run.mjs), the three-way content
+      # agreement check, and the page-image checks are all checks already
+      # inside check-site.sh (read it -- checks 9, 10, 11), which this
+      # step already ran on M0. The generous timeout below is sized for
+      # the browser axis, which now visits all 108 page routes twice (once
+      # at the origin root, once at a GitHub-Pages-style sub-path) instead
+      # of M0's single counter page.
       - name: Verify site
-        timeout-minutes: 15
+        timeout-minutes: 30
         run: |
           ./scripts/check-site.sh | tee /tmp/check-site.log
           grep -q 'check-site: result=complete' /tmp/check-site.log \

@@ -3,38 +3,75 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
-import           Miso
-import           Miso.Html.Element  as H
-import           Miso.Html.Event    as E
-import           Miso.Html.Property as P
-import           Miso.Lens
+import qualified Data.Text   as T
 
-data Action = Increment | Decrement | Reset deriving (Show, Eq)
+import           Miso
+
+import           SXC1.Route  (Route (..), parseRoute, renderRoute)
+
+import           View.Pages  (viewRoute)
+
+-- | Read window.location.hash via Miso's own DSL.
+--
+-- MEASURED (briefs/M1-plan.md P4): a raw FFI `foreign` `import` binding
+-- returning 'GHC.Wasm.Prim.JSString' does not link on this toolchain (GHC
+-- emits a C stub referencing HsJSString\/rts_mkJSString that
+-- wasm32-wasi-clang rejects). 'jsg', '(!)', 'fromJSValUnchecked' and
+-- 'MisoString'\/'fromMisoString' are all re-exported by @import Miso@, so
+-- no further imports are needed here.
+currentHash :: IO T.Text
+currentHash = do
+  loc <- jsg ("window" :: MisoString) ! ("location" :: MisoString)
+  h   <- fromJSValUnchecked =<< loc ! ("hash" :: MisoString)
+  pure (fromMisoString (h :: MisoString))
+
+-- | Write window.location.hash. Assigning it (rather than pushState) is
+-- ordinary browser navigation -- it updates the address bar, pushes a
+-- history entry and fires \"hashchange\" like any other hash change -- so
+-- the JA toggle's state stays a real, shareable deep link instead of
+-- an in-memory-only flag.
+setHash :: T.Text -> IO ()
+setHash h = do
+  loc <- jsg ("window" :: MisoString) ! ("location" :: MisoString)
+  setProp ("hash" :: MisoString) (ms h) (Object loc)
+
+newtype Model = Model { mRoute :: Route } deriving (Eq)
+
+data Action
+  = HashChanged
+  | SetRoute Route
+  | ToggleJA
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
 #endif
 
 main :: IO ()
-main = startApp defaultEvents counterApp
+main = do
+  h <- currentHash
+  startApp defaultEvents (readerApp (parseRoute h))
 
-counterApp :: App Int Action
-counterApp = component 0 updateModel viewModel
+readerApp :: Route -> App Model Action
+readerApp r0 = (component (Model r0) updateModel viewModel)
+  { subs = [ windowSub "hashchange" emptyDecoder (const HashChanged) ] }
 
-updateModel :: Action -> Effect parent props Int Action
+updateModel :: Action -> Effect parent props Model Action
 updateModel = \case
-  Increment -> this += 1
-  Decrement -> this -= 1
-  Reset     -> this .= 0
+  HashChanged ->
+    io (SetRoute . parseRoute <$> currentHash)
 
-viewModel :: props -> Int -> View Int Action
-viewModel _ n = H.main_ [ P.id_ "app" ]
-  [ H.h1_ [] [ "SXC-1 Trainer" ]
-  , H.p_ [ P.class_ "subtitle" ] [ "M0 toolchain spike - Miso compiled to WebAssembly" ]
-  , H.output_ [ P.id_ "counter-value" ] [ text (ms n) ]
-  , H.div_ [ P.class_ "buttons" ]
-    [ H.button_ [ P.id_ "btn-decrement", E.onClick Decrement ] [ "-" ]
-    , H.button_ [ P.id_ "btn-reset",     E.onClick Reset     ] [ "reset" ]
-    , H.button_ [ P.id_ "btn-increment", E.onClick Increment ] [ "+" ]
-    ]
-  ]
+  SetRoute r -> do
+    modify (\m -> m { mRoute = r })
+    io_ (scrollIntoView "app")
+
+  ToggleJA -> do
+    r <- gets mRoute
+    case r of
+      RPage slug n ja -> do
+        let r' = RPage slug n (not ja)
+        modify (\m -> m { mRoute = r' })
+        io_ (setHash (renderRoute r'))
+      _ -> pure ()
+
+viewModel :: props -> Model -> View Model Action
+viewModel _ (Model r) = viewRoute ToggleJA r

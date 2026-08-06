@@ -7,26 +7,31 @@ This is an unofficial fan project and is **not affiliated with Casio**.
 
 ## Status
 
-**M0 (toolchain spike).** The site currently ships a counter page whose only job is to
-prove the build pipeline end to end: Haskell → GHC's WebAssembly backend → a static
-bundle that boots in a real browser. No course content yet — see
-[`PLAN.md`](PLAN.md) for the full milestone roadmap.
+**M1 (manual reader).** All four translated manuals — the guide book, the startup guide,
+the MIDI implementation notes and the OSS/licence notes — are browsable end to end: a
+home page listing all four, grouped chapter/section navigation into each one, page-by-page
+reading of the translated text, and a per-page toggle that reveals the original Japanese
+page as a scanned image. See [`PLAN.md`](PLAN.md) for the full milestone roadmap and
+[`briefs/M1-plan.md`](briefs/M1-plan.md) for the design this milestone implements.
 
 ## Prerequisites
 
 - Linux x86\_64 (aarch64-linux and macOS are also supported by the toolchain, but only
-  x86\_64 Linux has been exercised for M0).
+  x86\_64 Linux has been exercised so far).
 - `git`, `curl`, `tar`, `xz`, `unzip`, `unzstd` (zstd), `jq`, `make`, a C compiler, `sed`,
   `realpath`.
 - Node.js 22+ is required for the global `WebSocket` that `scripts/browser-check.mjs`
-  (the headless-browser driver `check-site.sh` calls) depends on; M0 was validated on
-  Node 24. You do not need to install this yourself: `./scripts/install-toolchain.sh`
+  (the headless-browser driver `check-site.sh` calls) depends on; validated on Node 24
+  and Node 26. You do not need to install this yourself: `./scripts/install-toolchain.sh`
   also lays down a private Node under `$HOME/.ghc-wasm/nodejs/bin/node`, and
   `check-site.sh` resolves a usable Node in the order `$SXC1_NODE` → that private Node →
   `node` on `PATH`, so the toolchain's own Node is used automatically if nothing better
   qualifies. Set `SXC1_NODE=/path/to/node` to force a specific binary.
-- `python3`, for the dev server.
+- `python3`, for the dev server and for `check-site.sh`'s independent content re-check.
 - Google Chrome or Chromium, for the automated headless-browser check.
+- To *regenerate* the committed page images (not needed to build or run the site):
+  `poppler-utils` (`pdftoppm`, `pdfinfo`) and either `cwebp` or Python 3 with Pillow. See
+  [Original page images](#original-page-images) below.
 - About 12 GiB of free disk space.
 
 No system-wide Haskell installation is needed or created — everything the toolchain
@@ -48,11 +53,134 @@ prints exactly what it is about to remove; anything else is refused always, with
 git clone <repo> && cd casio-sxc1
 ./scripts/install-toolchain.sh    # one time; ~785 MB download, 15-40 min
 ./scripts/build-site.sh           # -> site/public/
-./scripts/check-site.sh           # structural checks + headless browser test
+./scripts/check-site.sh           # structural + content + headless browser checks
 ./scripts/serve-site.sh           # http://127.0.0.1:8123/
 ```
 
-Every command above has been run, in this order, as part of building and verifying M0.
+Every command above has been run, in this order, on this machine, as part of building
+and verifying M1: `install-toolchain.sh` recognised the already-installed toolchain and
+returned in well under a second; a from-scratch `site/dist-newstyle` build (package
+store still warm from the toolchain install) took 10 s; `check-site.sh` ran all 37
+checks — including both the origin-root and GitHub-Pages-sub-path browser sweeps of all
+108 page routes — in under 30 s and printed `check-site: result=complete`; and
+`serve-site.sh` served `site/public/index.html` over plain HTTP with a `200`.
+
+## How the manuals get into the app
+
+`translations/*.md` are embedded into the wasm **at compile time** by Template Haskell
+(`SXC1.Content.Embed.embedUtf8File`, spliced once per document in `SXC1.Content.Corpus`)
+and then parsed **lazily, at runtime**, by the miso-free `sxc1-content` library
+(`site/src/SXC1/`) — no fetch, no JSON, works offline and at any GitHub Pages sub-path.
+`site/sxc1-trainer.cabal` declares:
+
+```
+extra-source-files: ../translations/*.md
+```
+
+This line is load-bearing, not decorative: `addDependentFile` alone makes GHC recompile
+when a translation changes, but only if cabal decides to *invoke* GHC in the first
+place, and cabal's own staleness check has no idea a Haskell module depends on a file
+three directories away unless `extra-source-files` tells it so. Without this line,
+editing a translation and re-running `wasm32-wasi-cabal build` does nothing — cabal
+reports the package up to date and never calls GHC. With it, cabal notices the mtime
+change and GHC reports `[../translations/guide-book.md changed]` before recompiling.
+So the whole content-editing workflow is: edit a file under `translations/`, re-run
+`./scripts/build-site.sh`.
+
+That line does produce one expected, harmless cabal warning, printed once per component
+configured (the library, `exe:app` and `exe:content-check` — three times per build):
+
+```
+Warning: [relative-path-outside] 'extra-source-files: ../translations/*.md' is
+a relative path outside of the source tree. This will not work when generating
+a tarball with 'sdist'.
+```
+
+`cabal sdist` packages a component's declared sources into a distributable tarball and
+refuses to reach outside the package directory (`site/`) while doing it. This project
+never runs `cabal sdist` — there is nothing to publish to Hackage — so the warning is
+inert; it is not worked around.
+
+## Verification
+
+`check-site.sh` computes the same corpus statistics (character/line/page counts,
+heading/table/figure counts, section and subsection counts, PART titles, …) **three
+independent ways** and fails if any two disagree:
+
+1. **The real Haskell parser** — `exe:content-check`, a wasm32-wasi *command* module
+   (not the reactor-model `exe:app`) run on the host by `wasm-run.mjs`, over the
+   TH-embedded corpus.
+2. **An independent regex sweep** — an embedded `python3` snippet that recomputes the
+   same numbers straight from `translations/*.md` by regex, without going anywhere near
+   the Haskell parser.
+3. **The running app** — the built `site/public/` served over HTTP, driven headlessly,
+   reading `#sxc1-content-stats` (a `<div hidden>` whose `textContent` is the same JSON
+   shape) out of the live DOM.
+
+This is what catches a *stale build*: if a translation is edited but the site isn't
+rebuilt, the running app still serves the old numbers while the regex sweep (which reads
+the file directly) sees the new ones, and check 11 goes red instead of silently deploying
+stale content. The same captured JSON is also handed to the browser driver via
+`--expect-json`, so the headless-browser assertions are checked against numbers derived
+from the source of truth rather than constants baked into the test harness.
+
+## Reading the manuals
+
+Every route is a hash fragment, hand-parsed by a pure `parseRoute`/`renderRoute` pair —
+there is no server-side router:
+
+| Route | Renders |
+|---|---|
+| `#/` | Home — a card per manual |
+| `#/m/<slug>` | That manual's table of contents (grouped by front matter / PART / appendix) |
+| `#/m/<slug>/p/<n>` | Page `n` of that manual |
+| `#/m/<slug>/p/<n>/ja` | Page `n`, with the original-Japanese-page panel already open |
+
+`<slug>` is one of `guide-book`, `startup-guide`, `midi`, `oss`. Hash routing was chosen
+because GitHub Pages serves static files with no server-side rewrites — a path-based
+route like `/m/guide-book/p/17` would 404 on a hard refresh or a direct link unless the
+server rewrote every unknown path to `index.html`, which Pages doesn't do — and because
+the project's eventual Pages sub-path is not yet decided (`PLAN.md` open question). A
+hash fragment is never sent to the server at all, so the same bundle works unmodified at
+the domain root, at any sub-path, or served locally. Every route is therefore a
+shareable deep link: `check-site.sh`'s browser sweep loads all 108 page routes — plus the
+`/ja` variant — directly, cold, with no prior navigation, and requires each one to render
+correctly, including landing already in the JA-visible state when the URL says so.
+
+## Original page images
+
+<a id="original-page-images"></a>
+
+108 WebP renders of the original Japanese pages are committed under
+`site/static/pages/<slug>/page-NN.webp` — one per page across all four manuals
+(guide-book 1–71, startup-guide 1–15, midi 1–6, oss 1–16) — for the reader's "Show
+original page (JA)" toggle. They are regenerated from the committed source PDFs with:
+
+```sh
+./scripts/render-page-images.sh              # all four documents
+./scripts/render-page-images.sh --slug midi  # just one
+```
+
+which needs `poppler-utils` (`pdftoppm`) and either `cwebp` or Python 3 + Pillow — **not**
+needed to build or serve the site, only to re-render after a source PDF changes.
+`build-site.sh` itself needs no image tooling at all: the WebP files are ordinary
+committed static assets, copied into `site/public/` by the same `cp -R site/static/.`
+step that has copied the HTML shell since M0.
+
+The measured trade-off that motivated committing WebP instead of PNG: `pdftoppm -r 150`
+renders of all 108 pages run to **34.4 MB** as PNG (this scratch intermediate is
+gitignored under `manuals/pages/` and deleted by the script after encoding, unless
+`--keep-png`). The script encodes each page as WebP two ways — lossy quality 88 and
+lossless — and keeps whichever is smaller, self-tuning between the two rather than
+picking one setting for every document. That was projected at ≈10.4 MB across all 108
+pages; the actual committed set, measured directly (`du -sh site/static/pages`,
+confirmed independently by `check-site.sh` check 9's exact byte sum), comes in a bit
+lighter at **9,375,040 bytes (≈9.4 MB)** — better than projected because this machine has
+no `cwebp` and the images were encoded with Python 3.10 + Pillow 9.0.1's WebP encoder
+instead. The largest single page is well under the 300 KB ceiling `check-site.sh` checks
+for. Because the images are `loading="lazy"` inside a panel that only renders once the
+reader clicks the toggle, none of this is fetched by a visitor who never opens an
+original page.
 
 ## Pinned versions
 
@@ -66,8 +194,9 @@ Every command above has been run, in this order, as part of building and verifyi
 | WASI browser shim | [`@bjorn3/browser_wasi_shim`](https://github.com/bjorn3/browser_wasi_shim) 0.3.0, vendored under `site/static/vendor/` |
 | Toolchain root | `$HOME/.ghc-wasm` (activate with `. "$HOME/.ghc-wasm/env"`) |
 
-These match `briefs/M0-plan.md` exactly; that document is the source of truth if this
-table and the plan ever drift.
+These match `briefs/M0-plan.md` exactly (M1 pins nothing new — no new dependency was
+added, only two new cabal targets against the same toolchain and Miso version); that
+document is the source of truth if this table and the plan ever drift.
 
 ## Why not the documented one-liner
 
@@ -110,33 +239,39 @@ casio-sxc1/
 ├── briefs/                      per-milestone design briefs and task manifests
 ├── scripts/
 │   ├── install-toolchain.sh     one-time GHC-wasm toolchain install ($HOME/.ghc-wasm)
-│   ├── build-site.sh            site/app + site/static -> site/public/
+│   ├── build-site.sh            site/app + site/src + site/static -> site/public/
 │   ├── serve-site.sh            python3 -m http.server on 127.0.0.1
-│   ├── check-site.sh            structural checks + headless-browser smoke test
+│   ├── check-site.sh            structural + content + headless-browser checks
 │   ├── browser-check.mjs        the zero-npm-deps CDP driver check-site.sh calls
-│   └── extract-pages.sh         manual PDF -> page image/text extraction
+│   ├── extract-pages.sh         manual PDF -> page image/text extraction (scratch)
+│   └── render-page-images.sh    manual PDF -> committed site/static/pages/*.webp
 ├── site/
-│   ├── sxc1-trainer.cabal       the `app` executable (wasm32 + javascript stanzas)
+│   ├── sxc1-trainer.cabal       lib:sxc1-trainer + exe:app + exe:content-check
 │   ├── cabal.project            index-state pin, boot-library constraints
-│   ├── app/                     Haskell/Miso source
-│   ├── static/                  HTML shell, boot loader, vendored WASI shim
+│   ├── src/                     SXC1.* -- the miso-free content/route library
+│   ├── app/                     the Miso app (Main.hs, View/) -- depends on the library
+│   ├── test/                    CheckContent.hs -- exe:content-check's corpus validator
+│   ├── static/                  HTML shell, boot loader, vendored WASI shim,
+│   │                             pages/<slug>/page-NN.webp (committed JA page images)
 │   └── public/                  build output (gitignored, never committed)
 ├── manuals/                     original Japanese Casio PDFs (source material)
-├── translations/                English translations of the manuals
+├── translations/                English translations of the manuals (embedded at build time)
 └── .github/workflows/           CI: build, check, and (once enabled) deploy to Pages
 ```
 
 ## How it works
 
-`wasm32-wasi-cabal` builds `site/app/Main.hs` against Miso into a WASI *reactor* module
-(not a command) using `-optl-mexec-model=reactor` plus a linker `--export=hs_start`, so
-the module can be instantiated and driven from JavaScript instead of just run once and
-exiting. GHC's wasm backend then packs every `foreign import javascript` body — and,
-because `miso.cabal` declares `js-sources` for `arch(wasm32)`, Miso's own JS runtime too
-— into a custom wasm section that `post-link.mjs` extracts into `ghc_wasm_jsffi.js`.
-`site/static/` (the HTML shell and boot loader) is copied verbatim over the output
-directory, then `app.wasm` and `ghc_wasm_jsffi.js` are added alongside it. In the
-browser, `index.js` instantiates `app.wasm` against a vendored WASI shim and the
+`wasm32-wasi-cabal` builds `exe:app` — which depends on the `sxc1-content` library in
+`site/src/` for content parsing/routing and on Miso for the view layer — against Miso
+into a WASI *reactor* module (not a command) using `-optl-mexec-model=reactor` plus a
+linker `--export=hs_start`, so the module can be instantiated and driven from JavaScript
+instead of just run once and exiting. GHC's wasm backend then packs every
+`foreign import javascript` body — and, because `miso.cabal` declares `js-sources` for
+`arch(wasm32)`, Miso's own JS runtime too — into a custom wasm section that
+`post-link.mjs` extracts into `ghc_wasm_jsffi.js`. `site/static/` (the HTML shell, boot
+loader, vendored WASI shim and the committed JA page images) is copied verbatim over the
+output directory, then `app.wasm` and `ghc_wasm_jsffi.js` are added alongside it. In the
+browser, `index.js` instantiates `app.wasm` against the vendored WASI shim and the
 generated JSFFI import object, runs `_initialize` to start the Haskell RTS, then calls
 `hs_start()` to mount the Miso app. Every URL in the output is relative (`./app.wasm`,
 never `/app.wasm`), so the same bundle works unmodified at any GitHub Pages sub-path, at
@@ -149,6 +284,11 @@ URLs. The bundle does **not** work opened directly as a `file://` URL, though:
 `index.js` is an ES module that imports sibling modules and `fetch`es `app.wasm`, and
 browsers give `file://` pages an opaque origin that blocks both.
 
+`exe:content-check` is built alongside `exe:app` but is a separate, ordinary wasm32-wasi
+*command* executable (no reactor model, no JS at all) — it links against the
+`sxc1-content` library only, not Miso, and is run directly on the host by `wasm-run.mjs`
+as part of `check-site.sh`. It never ships to the browser.
+
 ## Deployment
 
 `.github/workflows/site.yml` builds the site and runs `check-site.sh` on every push and
@@ -157,7 +297,13 @@ ever committed to the repository. `check-site.sh` prints a final machine-readabl
 `check-site: result=complete` when every check (including both browser runs — root and
 sub-path) actually executed, or `check-site: result=structural-only` if the browser axis
 was skipped (`--skip-browser` / `SXC1_SKIP_BROWSER=1`); CI fails the build unless it sees
-`result=complete`, so a silently skipped browser axis can never pass as a full gate.
+`result=complete`, so a silently skipped browser axis can never pass as a full gate. The
+`dist-newstyle` cache key now also hashes `site/src/**`, `site/test/**` and
+`translations/*.md`, alongside the pre-existing `site/cabal.project`,
+`site/sxc1-trainer.cabal` and `site/app/**` — a translation edit changes what gets
+compiled into the wasm via Template Haskell, so it has to invalidate the cache exactly
+like a source-code change does, or CI could restore a cache built from the old content
+and never notice the translation changed.
 
 The `deploy` job that publishes to GitHub Pages is separate from `build`/`check` and
 stays genuinely inert — it does not run at all — until the repository variable
@@ -170,19 +316,27 @@ gated.
 
 ## Measured figures
 
-Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), one run each:
+Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), one run each, M1:
 
 | Metric | Value |
 |---|---|
-| Cold build (`site/dist-newstyle` and the local Miso build absent) | 29s |
+| Cold build (`site/dist-newstyle` absent, toolchain's package store warm) | 10s |
 | Warm build (`site/dist-newstyle` cache hit, nothing changed) | <1s |
-| `app.wasm`, default build | 2,856,541 bytes raw / 644,452 bytes gzipped |
-| `app.wasm`, `./scripts/build-site.sh --optimize` (`wasm-opt -O2` + strip) | 1,680,570 bytes raw / 528,716 bytes gzipped |
-| `ghc_wasm_jsffi.js` | 48,383 bytes raw / 10,231 bytes gzipped |
+| `app.wasm`, default build | 3,740,140 bytes raw / 823,140 bytes gzipped |
+| `ghc_wasm_jsffi.js` | 49,356 bytes raw / 10,292 bytes gzipped |
+| Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB) |
+| `site/public/` total, after `build-site.sh` | 13,271,184 bytes (≈13 MB) |
+| `check-site.sh`, full run (37 checks, both browser sweeps of 108 routes) | well under 1 min |
 
-`--optimize` is off by default: `wasm-opt` is the one step in this pipeline that can
-silently miscompile GHC's output, so M0's definition of done does not depend on it.
-`check-site.sh` re-validates `app.wasm`'s exports regardless of which build produced it.
+`app.wasm` grew from M0's counter-page baseline (2,856,541 B raw / 644,452 B gzipped) by
+about 883 KB raw / 179 KB gzipped for the whole reader: the content library, the router,
+and every view for the home/TOC/page/JA-panel routes. `site/public/` stays well inside
+GitHub Pages' 1 GB artifact limit with headroom to spare.
+
+`--optimize` (`wasm-opt -O2` + strip) remains off by default: `wasm-opt` is the one step
+in this pipeline that can silently miscompile GHC's output, so M1's definition of done
+does not depend on it. `check-site.sh` re-validates `app.wasm`'s exports regardless of
+which build produced it.
 
 ## Troubleshooting
 
@@ -193,16 +347,29 @@ silently miscompile GHC's output, so M0's definition of done does not depend on 
   executable path, or pass `./scripts/check-site.sh --skip-browser` (equivalently,
   `SXC1_SKIP_BROWSER=1`).
 - **Need to reinstall the toolchain** — `./scripts/install-toolchain.sh --force`.
-- **`wasm32-wasi-ghc: command not found`** — the toolchain env script isn't sourced in
-  your shell: run `. "$HOME/.ghc-wasm/env"`.
+- **`wasm32-wasi-ghc: command not found` / `wasm-run.mjs: command not found`** — the
+  toolchain env script isn't sourced in your shell: run `. "$HOME/.ghc-wasm/env"`.
 - **`check-site: no usable Node.js found` / `SXC1_NODE=... is not a usable Node.js`** —
-  `check-site.sh` needs Node 22+ with a global `WebSocket` (validated on Node 24), tried
-  in the order `$SXC1_NODE` → `$HOME/.ghc-wasm/nodejs/bin/node` → `node` on `PATH`. Run
-  `./scripts/install-toolchain.sh` if the private toolchain Node is missing, upgrade
+  `check-site.sh` needs Node 22+ with a global `WebSocket` (validated on Node 24/26),
+  tried in the order `$SXC1_NODE` → `$HOME/.ghc-wasm/nodejs/bin/node` → `node` on `PATH`.
+  Run `./scripts/install-toolchain.sh` if the private toolchain Node is missing, upgrade
   whatever Node is on `PATH`, or set `SXC1_NODE=/path/to/node` explicitly.
+- **Manual content looks stale** — re-run `./scripts/build-site.sh` after editing a file
+  under `translations/`; `extra-source-files` makes cabal notice, but only a fresh build
+  picks it up. `./scripts/check-site.sh` will tell you if a build is stale: its three-way
+  content agreement check (see [Verification](#verification)) fails loudly rather than
+  silently serving old text.
+
+## Copyright
+
+The English text under `translations/` is a fan translation. Original manual content is
+© CASIO COMPUTER CO., LTD. This project is an unofficial fan effort and is not
+affiliated with, endorsed by, or sponsored by Casio.
 
 ## Design rationale
 
-See [`briefs/M0-plan.md`](briefs/M0-plan.md) for the full design rationale, the risks
-considered, and the fallback plan (Miso on GHC's JavaScript backend) if the WebAssembly
-backend ever proves unworkable.
+See [`briefs/M0-plan.md`](briefs/M0-plan.md) for the toolchain design rationale, the
+risks considered, and the fallback plan (Miso on GHC's JavaScript backend) if the
+WebAssembly backend ever proves unworkable, and [`briefs/M1-plan.md`](briefs/M1-plan.md)
+for the manual-reader design this milestone implements: the content model, the parser
+strategy, the routing scheme, and the page-image delivery decision.

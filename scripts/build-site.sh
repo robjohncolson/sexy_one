@@ -87,14 +87,20 @@ if [ "$CABAL_UPDATE" -eq 1 ]; then
   wasm32-wasi-cabal update
 fi
 
-wasm32-wasi-cabal build -j"$JOBS" exe:app
+wasm32-wasi-cabal build -j"$JOBS" exe:app exe:content-check
 
 # ---------------------------------------------------------------------------
-# 4. Locate the built binary.
+# 4. Locate the built binaries.
 # ---------------------------------------------------------------------------
 WASM="$(wasm32-wasi-cabal list-bin exe:app | tail -n1)"
 if [ ! -f "$WASM" ]; then
   echo "build-site.sh: expected a built binary at '$WASM' but found none" >&2
+  exit 1
+fi
+
+CONTENT_CHECK_BIN="$(wasm32-wasi-cabal list-bin exe:content-check | tail -n1)"
+if [ ! -f "$CONTENT_CHECK_BIN" ]; then
+  echo "build-site.sh: expected a built binary at '$CONTENT_CHECK_BIN' but found none" >&2
   exit 1
 fi
 
@@ -149,3 +155,4 @@ wasm_size() {
 echo "build-site: done in ${DURATION}s (GHC ${GHC_VERSION})"
 echo "build-site: app.wasm            -> $(wasm_size "$REPO_ROOT/site/public/app.wasm")"
 echo "build-site: ghc_wasm_jsffi.js    -> $(wasm_size "$REPO_ROOT/site/public/ghc_wasm_jsffi.js")"
+echo "build-site: exe:content-check    -> $CONTENT_CHECK_BIN"
