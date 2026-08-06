@@ -195,9 +195,17 @@ parseIndexEntries raw =
 --------------------------------------------------------------------------
 
 data Loaded = Loaded
-  { ldIssues      :: [Issue]
-  , ldDecks       :: [Deck]
-  , ldSourceChars :: [(Text, Int)]
+  { ldIssues          :: [Issue]
+  , ldDecks           :: [Deck]
+  , ldSourceChars     :: [(Text, Int)]
+  -- | briefs/M2-signoff-fixes.json, task "quiz-selection-semantics",
+  -- FIX 3: the number of successfully-parsed decks for which the four
+  -- id-inventory-binding checks in 'resolveDeckIssues' actually fired
+  -- (i.e. 'isRealContentPath' held for that deck's own file path). This
+  -- makes the scope OBSERVABLE -- see 'runJsonMode' and
+  -- @scripts/check-site.sh@'s "inventory-binding-scope-fired" check,
+  -- which asserts this equals 'ldDecks'' length on the real corpus.
+  , ldInventoryChecked :: !Int
   }
 
 collectFromDirs :: FilePath -> FilePath -> IO Loaded
@@ -219,7 +227,7 @@ collectFromDirs contentDir translationsDir = do
            { ldIssues = ctxIssues ++
                [ mkIssue E_INDEX_MISSING (Loc (T.pack indexPath) 1)
                    (T.pack indexPath <> " is missing") ]
-           , ldDecks = [], ldSourceChars = []
+           , ldDecks = [], ldSourceChars = [], ldInventoryChecked = 0
            }
     else do
       indexRaw <- readUtf8FileOrHarnessError indexPath
@@ -244,13 +252,22 @@ collectFromDirs contentDir translationsDir = do
         let fp = exercisesDir </> T.unpack nm
         raw <- readUtf8FileOrHarnessError fp
         let (issues, mDeck) = resolveDeckIssues ctx fp raw
-        pure (nm, issues, mDeck, T.length raw)
+        pure (nm, issues, mDeck, T.length raw, isRealContentPath fp)
 
-      let allIssues  = ctxIssues ++ orphanIssues ++ danglingIssues ++ concat [ i | (_, i, _, _) <- perDeck ]
-          decks      = mapMaybe (\(_, _, d, _) -> d) perDeck
+      let allIssues  = ctxIssues ++ orphanIssues ++ danglingIssues ++ concat [ i | (_, i, _, _, _) <- perDeck ]
+          decks      = mapMaybe (\(_, _, d, _, _) -> d) perDeck
           dupIdIssues = globalIdDuplicateIssues decks
-          sourceChars = [ (nm, n) | (nm, _, _, n) <- perDeck ]
-      pure Loaded { ldIssues = allIssues ++ dupIdIssues, ldDecks = decks, ldSourceChars = sourceChars }
+          sourceChars = [ (nm, n) | (nm, _, _, n, _) <- perDeck ]
+          -- FIX 3: count only successfully-parsed decks (mDeck == Just)
+          -- whose own file path is where 'resolveDeckIssues' actually
+          -- scoped the id-inventory-binding checks in -- i.e. exactly the
+          -- decks the four E-ID-* checks were applied to, not merely
+          -- attempted.
+          inventoryChecked = length [ () | (_, _, Just _, _, real) <- perDeck, real ]
+      pure Loaded
+        { ldIssues = allIssues ++ dupIdIssues, ldDecks = decks, ldSourceChars = sourceChars
+        , ldInventoryChecked = inventoryChecked
+        }
 
 -- | E-ID-DUPLICATE: the same exercise id used by more than one exercise,
 -- anywhere in the loaded content root. One issue per OCCURRENCE of a
@@ -287,7 +304,27 @@ runDefaultMode opts = do
 runJsonMode :: Opts -> IO ()
 runJsonMode opts = do
   loaded <- collectFromDirs (optContentDir opts) (optTranslationsDir opts)
-  putStrLn (T.unpack (renderReport (null (ldIssues loaded)) (ldDecks loaded) (ldSourceChars loaded) (ldIssues loaded)))
+  let report = renderReport (null (ldIssues loaded)) (ldDecks loaded) (ldSourceChars loaded) (ldIssues loaded)
+  putStrLn (T.unpack (injectInventoryChecked (ldInventoryChecked loaded) report))
+
+-- | Splices @"inventoryChecked":<n>,@ just inside the opening brace of
+-- the @"totals"@ object 'SXC1.Exercise.Report.renderReport' already
+-- emits, WITHOUT touching that module (owned by another task -- see
+-- briefs/M2-signoff-fixes.json, task "quiz-selection-semantics": "Do not
+-- ... edit anything else ... unless a compile error forces it"; adding a
+-- JSON field is not one). The marker is only @"totals":{@ -- this does
+-- NOT assume anything about 'SXC1.Exercise.Report.totalsJson''s own key
+-- order, so a future reshuffle of its fields cannot silently break this.
+-- A missing marker (the report's shape changed underneath this) leaves
+-- the report untouched rather than corrupt it -- 'check-site.sh' then
+-- reads a null/absent @inventoryChecked@ and fails loudly instead.
+injectInventoryChecked :: Int -> Text -> Text
+injectInventoryChecked n report =
+  let marker = "\"totals\":{"
+      (before, after) = T.breakOn marker report
+  in if T.null after
+       then report
+       else before <> marker <> "\"inventoryChecked\":" <> T.pack (show n) <> "," <> T.drop (T.length marker) after
 
 --------------------------------------------------------------------------
 -- --list-codes
@@ -492,7 +529,7 @@ mkST = STCheck
 stLabel :: Int -> String
 stLabel 1  = "1. grammar: exact issue-code sets over >=20 embedded .ex.md sources"
 stLabel 2  = "2. NEW12-safe runner: groupsOk vacuity guard (permanent negative-control demo)"
-stLabel 3  = "3. engine: Choice grading (exact-set, multi-select)"
+stLabel 3  = "3. engine: Choice grading (exact-set) and Toggle selection arity (replace vs. additive)"
 stLabel 4  = "4. engine: Recall grading (SelfGrade)"
 stLabel 5  = "5. engine: Confirm grading (drill step + device confirm)"
 stLabel 6  = "6. engine: FindPage grading (lookup)"
@@ -830,6 +867,32 @@ choiceExercise = Exercise
   , exNote = [], exHints = []
   }
 
+-- | Single-correct (exactly one 'optCorrect'): mirrors the real q-1-03
+-- shape the M2 designer hand-drove at sign-off (four options, one
+-- correct) -- see briefs/M2-signoff-fixes.json, task
+-- "quiz-selection-semantics", FIX 1.
+singleChoiceExercise :: Exercise
+singleChoiceExercise = Exercise
+  { exId = ExId "st-single-choice-ex", exDeck = DeckId "st-deck", exKind = KQuiz, exTitle = "Single choice test"
+  , exCites = [], exTags = [], exIntro = []
+  , exPrompts = [ Prompt (promptIdFor (ExId "st-single-choice-ex") 1) [] []
+                    (Choice [mkOpt "a" True, mkOpt "b" False, mkOpt "c" False, mkOpt "d" False]) ]
+  , exNote = [], exHints = []
+  }
+
+-- | Multi-correct (exactly two 'optCorrect'): distinct from
+-- 'choiceExercise' (whose correct set is {a,c}, not contiguous) so a
+-- "select both correct options" case can submit the EXACT correct set
+-- and a "select only one" case can submit a genuine STRICT SUBSET of it.
+multiChoiceExercise :: Exercise
+multiChoiceExercise = Exercise
+  { exId = ExId "st-multi-choice-ex", exDeck = DeckId "st-deck", exKind = KQuiz, exTitle = "Multi choice test"
+  , exCites = [], exTags = [], exIntro = []
+  , exPrompts = [ Prompt (promptIdFor (ExId "st-multi-choice-ex") 1) [] []
+                    (Choice [mkOpt "a" True, mkOpt "b" True, mkOpt "c" False]) ]
+  , exNote = [], exHints = []
+  }
+
 recallExercise :: Exercise
 recallExercise = Exercise
   { exId = ExId "st-recall-ex", exDeck = DeckId "st-deck", exKind = KQuiz, exTitle = "Recall test"
@@ -875,6 +938,60 @@ choiceChecks =
       (let (_, ev) = step choiceExercise (Submit 0 1500 1000) (fst (step choiceExercise (Toggle 0 "b") st0))
        in case ev of { [e] -> peOutcome e == Incorrect; _ -> False })
       "selecting only b (missing a,c and including a non-correct option) must grade Incorrect"
+  ] ++ singleAnswerReplaceChecks ++ multiSelectAdditiveChecks
+
+-- | briefs/M2-signoff-fixes.json, task "quiz-selection-semantics", FIX 1:
+-- these two cases PIN the learner path the M2 designer hand-drove at
+-- sign-off and would FAIL against the pre-fix engine (whose 'Toggle' was
+-- unconditionally additive): clicking a wrong option then the single
+-- correct one must leave ONLY the correct one selected (never both), and
+-- re-clicking an already-selected option must still clear it.
+singleAnswerReplaceChecks :: [STCheck]
+singleAnswerReplaceChecks =
+  let st0 = initialState (ExId "st-single-choice-ex") 1000
+      -- wrong (b) then right (a), NO deselect in between -- the ordinary
+      -- learner path this whole fix exists for.
+      (st1, _)   = step singleChoiceExercise (Toggle 0 "b") st0
+      (st2, _)   = step singleChoiceExercise (Toggle 0 "a") st1
+      (_, ev3)   = step singleChoiceExercise (Submit 0 1500 1000) st2
+      -- re-clicking the already-selected option clears it.
+      (st1r, _)  = step singleChoiceExercise (Toggle 0 "a") st0
+      (st2r, _)  = step singleChoiceExercise (Toggle 0 "a") st1r
+  in
+  [ mkST 3 "choice-arity/single-answer-toggle-replaces-not-adds"
+      (case IntMap.lookup 0 (esResponses st2) of { Just (RChosen sel) -> sel == ["a"]; _ -> False })
+      ("wrong-then-right must leave selection exactly [a], got " ++ show (IntMap.lookup 0 (esResponses st2)))
+  , mkST 3 "choice-arity/single-answer-wrong-then-right-grades-correct"
+      (case ev3 of { [e] -> peOutcome e == Correct; _ -> False })
+      ("clicking the correct option after a wrong one must grade Correct, got " ++ show ev3)
+  , mkST 3 "choice-arity/single-answer-re-click-still-clears"
+      (case IntMap.lookup 0 (esResponses st2r) of { Just (RChosen sel) -> null sel; _ -> False })
+      ("re-clicking the selected option must clear it, got " ++ show (IntMap.lookup 0 (esResponses st2r)))
+  ]
+
+-- | briefs/M2-signoff-fixes.json, task "quiz-selection-semantics", FIX 1:
+-- a prompt with two or more correct options must keep today's additive
+-- Toggle behaviour -- the grading rule (exact-set equality) is otherwise
+-- unchanged, so both the exact correct set and a strict subset of it are
+-- exercised here.
+multiSelectAdditiveChecks :: [STCheck]
+multiSelectAdditiveChecks =
+  let st0 = initialState (ExId "st-multi-choice-ex") 1000
+      (st1, _)  = step multiChoiceExercise (Toggle 0 "a") st0
+      (st2, _)  = step multiChoiceExercise (Toggle 0 "b") st1
+      (_, evEx) = step multiChoiceExercise (Submit 0 1500 1000) st2
+      (st1s, _) = step multiChoiceExercise (Toggle 0 "a") st0
+      (_, evSs) = step multiChoiceExercise (Submit 0 1500 1000) st1s
+  in
+  [ mkST 3 "choice-arity/multi-select-toggle-stays-additive"
+      (case IntMap.lookup 0 (esResponses st2) of { Just (RChosen sel) -> sortT sel == ["a", "b"]; _ -> False })
+      ("toggling a then b on a multi-correct prompt must select both, got " ++ show (IntMap.lookup 0 (esResponses st2)))
+  , mkST 3 "choice-arity/multi-select-exact-correct-set-is-correct"
+      (case evEx of { [e] -> peOutcome e == Correct; _ -> False })
+      ("selecting exactly the correct set {a,b} must grade Correct, got " ++ show evEx)
+  , mkST 3 "choice-arity/multi-select-strict-subset-is-incorrect"
+      (case evSs of { [e] -> peOutcome e == Incorrect; _ -> False })
+      ("selecting only {a}, a strict subset of the correct set {a,b}, must grade Incorrect, got " ++ show evSs)
   ]
 
 recallChecks :: [STCheck]

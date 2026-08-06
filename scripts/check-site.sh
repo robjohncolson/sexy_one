@@ -961,6 +961,7 @@ if [ "$SKIP_CONTENT" -eq 1 ]; then
   skip "exe:exercise-check binary resolved"
   skip "exercise-check runs under wasm-run.mjs and exits 0 (--content-dir/--translations-dir --json)"
   skip "exercise validator reports zero issues over real content (exercise-check --json ok:true)"
+  skip "exercise-stats/inventory-binding-scope-fired (totals.inventoryChecked equals totals.decks)"
   skip "exercise-stats/fnv1a-vectors (FNV-1a/32 pinned against published test vectors)"
   skip "exercise-stats/index-directory-agreement (content/exercises/INDEX vs directory, both directions)"
   skip "exercise-stats/totals-agreement (python re-derivation vs exercise-check --json totals)"
@@ -1284,6 +1285,49 @@ else:
     esac
   else
     fail "exercise validator reports zero issues over real content (exercise-check --json ok:true) (observed: no JSON capture available or python3 missing)"
+  fi
+
+  # -------------------------------------------------------------------------
+  # Check 15b (briefs/M2-signoff-fixes.json, task "quiz-selection-semantics",
+  # FIX 3): INVENTORY-BINDING SCOPE IS OBSERVABLE.
+  #
+  # The four id-inventory-binding checks (E-ID-NOT-IN-INVENTORY/
+  # E-ID-RETIRED/E-ID-TYPE-MISMATCH/E-ID-CHAPTER-MISMATCH) only apply to a
+  # deck file whose own path contains the literal substring
+  # "content/exercises/" (isRealContentPath, site/test/CheckExercises.hs).
+  # On the shipped configuration that is correct -- but the scope actually
+  # firing was, until this fix, invisible in this report: a future move of
+  # the content root, a CI that builds from a copied tree, or a rename
+  # could silently disable all four checks with everything else still
+  # green (the "check that can silently stop checking" pattern this
+  # project has shipped twice). exercise-check --json's
+  # totals.inventoryChecked now reports how many successfully-parsed
+  # decks the scope actually fired for; on the real corpus this must
+  # equal totals.decks (today: 4). A content root at a path lacking
+  # "content/exercises/" reports inventoryChecked=0 and turns this check
+  # RED -- demonstrated by hand against a sandboxed copy of the real
+  # content, not by this script itself (this check only ever runs against
+  # the real corpus, via $EXERCISE_JSON_FILE above).
+  # -------------------------------------------------------------------------
+  if [ -n "$EXERCISE_JSON_FILE" ] && command -v python3 >/dev/null 2>&1; then
+    INV_OUT="$(python3 -c '
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    data = json.load(fh)
+t = data.get("totals", {})
+inv = t.get("inventoryChecked")
+decks = t.get("decks")
+if inv is not None and inv == decks:
+    print("OK inventoryChecked=%r equals totals.decks=%r" % (inv, decks))
+else:
+    print("FAIL inventoryChecked=%r totals.decks=%r -- the id-inventory-binding checks did not fire over the whole real corpus" % (inv, decks))
+' "$EXERCISE_JSON_FILE" 2>&1)" || true
+    case "$INV_OUT" in
+      "OK "*) ok "exercise-stats/inventory-binding-scope-fired (${INV_OUT#OK })" ;;
+      *)      fail "exercise-stats/inventory-binding-scope-fired (observed: ${INV_OUT#FAIL })" ;;
+    esac
+  else
+    fail "exercise-stats/inventory-binding-scope-fired (observed: no exercise-check --json capture available or python3 missing)"
   fi
 
   # -------------------------------------------------------------------------

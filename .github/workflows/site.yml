@@ -65,6 +65,16 @@ jobs:
       # `if: cache-hit != 'true'`): it is
       # idempotent and now self-heals a stale/mismatched restore via a
       # strict stamp check instead of trusting cache-hit.
+      #
+      # restore-keys IS FORBIDDEN on THIS cache (M0 finding M3): a broad
+      # restore-key here previously let a stale toolchain be certified
+      # fresh, because install-toolchain.sh's health check accepted any
+      # working compiler regardless of pin -- see briefs/M0-codex-findings.json
+      # finding M3. It is permitted (and, as of
+      # briefs/M2-signoff-fixes.json task "quiz-selection-semantics" FIX 4,
+      # restored) on the CABAL dist-newstyle cache below, which has no
+      # equivalent lying health check of its own -- see that cache step's
+      # comment for why the two differ.
       # ----------------------------------------------------------------
       - name: Cache GHC WebAssembly toolchain
         id: toolchain
@@ -82,39 +92,62 @@ jobs:
       # cache hit above, or a re-run with nothing relevant changed) don't
       # recompile miso and its dependency closure from scratch every run.
       #
-      # M2: exact-key-only, no fallback restore-key -- a prior, looser
-      # revision of this step fell back to a same-OS partial match on any
-      # miss. That fallback is gone: a partial match would restore a
-      # dist-newstyle built from a DIFFERENT hashed input (an older
-      # site/src, an older translations/*.md, ...) than the commit under
-      # test, trading a faster warm build for exactly the kind of
-      # can't-tell-if-it-actually-checked-this-commit ambiguity check 15-17
-      # (see scripts/check-site.sh) exists to rule out on the content side
-      # -- the same reasoning the toolchain cache above already applies.
-      # cabal's own component-level staleness check still recompiles
-      # anything genuinely stale on a hit; the exact key just makes a MISS
-      # (full rebuild -- slower, never wrong) the only alternative to a hit
-      # that is provably for this exact input.
+      # restore-keys IS permitted here (unlike the TOOLCHAIN cache above,
+      # where it is forbidden -- M0 finding M3: a broad toolchain
+      # restore-key let a stale compiler be certified fresh, because
+      # install-toolchain.sh's health check accepted any working
+      # wasm32-wasi-ghc regardless of pin). A brief M2-signoff-fixes
+      # revision of this step removed the fallback and asserted zero
+      # whole-file `restore-keys` occurrences across the ENTIRE workflow --
+      # that assertion was overbroad and wrong (briefs/M2-signoff-fixes.json,
+      # task "quiz-selection-semantics", FIX 4): M0 M3 is specifically
+      # about the toolchain's own lying health check, which this cache has
+      # no equivalent of. A restore-keys HIT here can only ever be a
+      # PARTIAL match (an older site/src, an older translations/*.md, ...
+      # than the commit under test) that is never trusted blindly: GHC's
+      # own recompilation checking is content-based (it recompiles
+      # whatever the restored tree's object hashes say is stale, exactly
+      # as it would on any developer's warm local rebuild), M1 already
+      # hashes site/src and site/test into the key below, addDependentFile
+      # covers translations and content at compile time, and
+      # scripts/check-site.sh's checks 11/12/15-17 (three-way stats
+      # agreement, exact-bytes source integrity, and the exercise-stats
+      # agreement/fixture checks) independently catch any residual
+      # staleness BEHAVIOURALLY, after the fact, the same way they would
+      # catch a developer's own forgotten rebuild. Removing the fallback
+      # bought no additional safety and cost a full miso + library rebuild
+      # from scratch on every source change in CI. See the exact-key-only
+      # TOOLCHAIN cache comment above for why THAT cache is different: it
+      # has no content-based staleness check of its own to fall back on,
+      # so a partial hit there is trusted uncritically by
+      # install-toolchain.sh's own (too-loose) health check -- this cache
+      # is never trusted uncritically by anything, cabal always re-verifies.
       #
-      # The key hashes site/cabal.project, site/sxc1-trainer.cabal,
-      # site/app/**, site/src/**, site/test/** and translations/*.md. That
-      # last one is load-bearing, not decorative: translations/*.md is
-      # embedded into the wasm at COMPILE TIME by Template Haskell
-      # (SXC1.Content.Embed, via `extra-source-files: ../translations/*.md`
-      # in site/sxc1-trainer.cabal) and reparsed at runtime from that
-      # embedded copy -- the app never fetches the markdown at runtime. If
-      # a translation edit didn't appear in this key, a restored
-      # dist-newstyle would report "up to date" and CI would happily
-      # build, verify and deploy wasm containing the OLD translation text.
-      # Hashing the sources is enough to invalidate on code changes; the
-      # content needs the same treatment because it also flows into the
-      # compiled artifact.
+      # The key (and the restore-keys prefix) hashes site/cabal.project,
+      # site/sxc1-trainer.cabal, site/app/**, site/src/**, site/test/** and
+      # translations/*.md. That last one is load-bearing, not decorative:
+      # translations/*.md is embedded into the wasm at COMPILE TIME by
+      # Template Haskell (SXC1.Content.Embed, via `extra-source-files:
+      # ../translations/*.md` in site/sxc1-trainer.cabal) and reparsed at
+      # runtime from that embedded copy -- the app never fetches the
+      # markdown at runtime. If a translation edit didn't appear in this
+      # key, an exact-key hit would report "up to date" and CI would
+      # happily build, verify and deploy wasm containing the OLD
+      # translation text -- hashing the sources is enough to invalidate on
+      # code changes; the content needs the same treatment because it also
+      # flows into the compiled artifact. The restore-keys prefix below
+      # (everything up to and including the trailing '-') is deliberately
+      # coarser than the exact key so a partial match is still possible on
+      # a miss; a full rebuild triggered by cabal's own staleness check on
+      # a restored partial match is slower than a hit, never wrong.
       # ----------------------------------------------------------------
       - name: Cache cabal build directory
         uses: actions/cache@v6
         with:
           path: site/dist-newstyle
           key: dist-newstyle-${{ runner.os }}-${{ hashFiles('site/cabal.project', 'site/sxc1-trainer.cabal', 'site/app/**', 'site/src/**', 'site/test/**', 'translations/*.md') }}
+          restore-keys: |
+            dist-newstyle-${{ runner.os }}-
 
       # ----------------------------------------------------------------
       # No separate image-rendering step: the 108 WebP page images the

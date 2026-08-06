@@ -205,11 +205,31 @@ step ex action st = case action of
   Begin t   -> (initialState (exId ex) t, [])
   Restart t -> (initialState (exId ex) t, [])
 
+  -- Selection semantics (missing from the original manifest -- see
+  -- briefs/M2-signoff-fixes.json, task "quiz-selection-semantics", FIX 1):
+  -- a prompt with exactly ONE correct option is single-answer, so
+  -- selecting a fresh option REPLACES the selection outright (radio
+  -- behaviour) -- otherwise a learner who clicks a wrong option, then the
+  -- right one, ends up with BOTH selected and is graded wrong while the
+  -- correct answer sits there visibly pressed. A prompt with two or more
+  -- correct options is genuinely multi-select and keeps the original
+  -- additive/toggle behaviour. Either way, re-clicking an already-selected
+  -- option still clears just that one -- the grading rule itself (exact-set
+  -- equality, in 'Submit' below) is completely unchanged; only what a
+  -- click DOES to the selection set was ever unspecified.
   Toggle i optIdent ->
     let cur = case IntMap.lookup i (esResponses st) of
                 Just (RChosen sel) -> sel
                 _                  -> []
-        sel' = if optIdent `elem` cur then filter (/= optIdent) cur else cur ++ [optIdent]
+        isSingleAnswer = case safeIndex (exPrompts ex) i of
+          Just p -> case prBody p of
+            Choice opts -> length (filter optCorrect opts) == 1
+            _           -> False
+          Nothing -> False
+        sel'
+          | optIdent `elem` cur = filter (/= optIdent) cur
+          | isSingleAnswer      = [optIdent]
+          | otherwise           = cur ++ [optIdent]
     in (st { esResponses = IntMap.insert i (RChosen sel') (esResponses st) }, [])
 
   Submit i monoMs wallMs -> gradeStep ex st i monoMs wallMs $ \prompt -> case prBody prompt of

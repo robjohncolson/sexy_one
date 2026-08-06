@@ -762,7 +762,20 @@ window.__SXC1_BOOTED = true;
       '</article>';
     Array.prototype.forEach.call(document.querySelectorAll('.ex-option'), function (btn) {
       btn.addEventListener('click', function () {
-        quizSelected[btn.id] = !quizSelected[btn.id];
+        // Single-answer replace (radio) semantics -- this fixture's quiz
+        // has exactly ONE correct option (FIXTURE.quiz.correctOpt), same
+        // as SXC1.Exercise.Engine's Toggle handler now implements for
+        // any single-correct prompt (briefs/M2-signoff-fixes.json, task
+        // "quiz-selection-semantics", FIX 1/2): selecting a fresh option
+        // replaces the whole selection outright; re-clicking the
+        // already-selected option still clears it. This is what makes
+        // the "wrong option, then correct option, no deselect" path
+        // above land on exactly one selected id, matching the grader's
+        // selectedIds.length === 1 && selectedIds[0] === correctOpt
+        // rule below.
+        var wasSelected = quizSelected[btn.id];
+        quizSelected = Object.create(null);
+        if (!wasSelected) quizSelected[btn.id] = true;
         renderQuiz();
       });
     });
@@ -923,7 +936,13 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson) {
     Boolean(wrongFeedback && /^Not quite/.test(wrongFeedback.text) && wrongFeedback.cls.split(/\s+/).includes('incorrect')),
     wrongFeedback,
   );
-  await h.clickAssert(`#${fixture.quiz.wrongOpt}`, 'deselect the wrong quiz option');
+  // NO deselect step here (briefs/M2-signoff-fixes.json, task
+  // "quiz-selection-semantics", FIX 2): the ordinary learner path is
+  // wrong option -> submit -> correct option -> submit, full stop. A
+  // manual deselect between the two clicks made this assertion
+  // satisfiable only via a path no real learner takes, which is exactly
+  // how the single/multi selection-arity defect (SXC1.Exercise.Engine's
+  // 'Toggle') shipped past this harness -- see FIX 1.
   await h.clickAssert(`#${fixture.quiz.correctOpt}`, `click the correct quiz option (${fixture.quiz.correctOpt})`);
   await h.clickAssert('#btn-ex-submit', 'click #btn-ex-submit (correct answer)');
   // #ex-feedback already EXISTS (from the wrong attempt above), so this
