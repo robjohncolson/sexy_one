@@ -1,10 +1,10 @@
 # SXC-1 Trainer — Master exercise inventory
 
-**What this file is.** The consolidated, deduplicated inventory of all exercise candidates for the SXC-1 Trainer, synthesized from the five per-chapter analyst files in `content/inventory/part-1.md` … `part-5.md`. Content-authoring agents should work from this file; the part files remain the source of full drill wording where an entry here is compressed.
+**What this file is.** The consolidated, deduplicated inventory of all exercise candidates for the SXC-1 Trainer, synthesized from the six per-chapter analyst files in `content/inventory/part-0.md` … `part-5.md`. Content-authoring agents should work from this file; the part files remain the source of full drill wording where an entry here is compressed.
 
 **How items cite manual pages.** A bare citation "(p. N)" is a printed page of `translations/guide-book.md`. "Startup Guide p. N" cites `translations/startup-guide.md`. "midi.md p. N" cites `translations/midi.md`. Cross-references of the form "(see PART n, p. N)" reproduce the book's own internal numbering, where the Guide Book labels Pad play–Leveling up as PART 1–4 and leaves Preparation unnumbered.
 
-**IDs.** Every candidate has a stable id `t-c-nn` where `t` is `q` (quiz/flashcard), `d` (device drill), or `l` (reference lookup); `c` is the chapter number **in this inventory's 1–5 order** (1 = Preparation … 5 = Leveling up — note this is offset by one from the book's own PART numbers); `nn` is a two-digit sequence. Ids are stable: never renumber; retired items keep their id with a tombstone note.
+**IDs.** Every candidate has a stable id `t-c-nn` where `t` is `q` (quiz/flashcard), `d` (device drill), or `l` (reference lookup); `c` is the chapter number **in this inventory's 0–5 order** (0 = front matter, pp. 1–11; 1 = Preparation … 5 = Leveling up — chapters 1–5 are offset by one from the book's own PART numbers, and chapter 0 covers the unnumbered material before the book's parts); `nn` is a two-digit sequence. Ids are stable: never renumber; retired items keep their id with a tombstone note.
 
 **Difficulty tags.** `intro` = first-contact, single-fact or single-action; `core` = the chapter's central skills/facts; `stretch` = advanced, destructive, multi-mode, or spec-level material.
 
@@ -15,6 +15,16 @@ Terminology follows `translations/glossary.md` (binding): on-device labels verba
 ## Course map
 
 Chapters in teaching order, with deduplicated learning objectives. Preparation objectives already merge the Startup Guide's overlapping setup content (power, volume, troubleshooting) — do not author separate Startup Guide setup exercises.
+
+### Chapter 0 — Front matter (pp. 1–11)
+1. Identify all 13 numbered callouts in "Names of parts" and state each part's function (p. 10).
+2. Distinguish the five connectors of the connector section (PHONE, LINE OUT, AUDIO IN jacks; DATA, POWER/DATA ports); of the two USB ports, only POWER/DATA supplies power (p. 10).
+3. Map each `INPUT SELECT` position (`MIC` / `♪` / `USB`) to its input source (p. 10).
+4. Interpret the safety labels (Warning / Caution) and the Prohibited / Required graphic symbols (p. 3).
+5. Locate — not memorize — the applicable safety/operating precaution (batteries, USB cable/power, placement and environment, cleaning, volume, straps, backup) (pp. 2–9).
+6. Apply the everyday operating practices: MAIN VOL to minimum before power-on or headphones; close-range mic use; screen saver (≈30 min) vs Auto Power Off; USB power takes priority over batteries; LINE OUT does not silence the speaker (pp. 7–8).
+7. Navigate the Operation overview mode map: which press (short/long, which button) reaches each screen from Performance mode (p. 11).
+8. Use the p. 11 function table to find the page where each function is explained (p. 11).
 
 ### Chapter 1 — Part: Preparation (pp. 12–13; Startup Guide pp. 6, 13)
 1. Power the unit from an outlet: included USB Type-C cable → POWER/DATA port → USB AC adaptor (p. 12; Startup Guide p. 6).
@@ -76,10 +86,85 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 
 ## Inventory
 
+### Chapter 0 — Front matter
+
+*Canonical home for panel/connector/button identification (Names of parts, p. 10) and for the safety/spec lookups of pp. 1–9. Pure identification facts duplicated in later chapters were retired in favor of this chapter (tombstones at q-1-14, q-1-15, q-1-16, q-3-05, q-3-06); procedural neighbors stay in their chapters and carry [Reinforces q-0-…] tags. Safety and spec material is deliberately lookup-only, not flashcards.*
+
+#### Quiz/flashcard candidates
+- **q-0-01** (intro) The ⚠ Warning safety label indicates content that could result in death or serious injury (p. 3).
+- **q-0-02** (intro) The ⚠ Caution safety label indicates content that could result in minor injury or property damage (p. 3).
+- **q-0-03** (intro) The crossed-out circle symbol marks "something you must not do" (Prohibited); the filled circle symbol marks "something you must do" (Required) (p. 3).
+- **q-0-04** (intro) Panel item 1, the display (OLED display), displays various information such as waveforms and settings (p. 10).
+- **q-0-05** (intro) Panel item 2, the directional buttons, are used to select menus, change values, and so on (p. 10).
+- **q-0-06** (intro) The unit has two sliders: `INPUT VOL` and `MAIN VOL` (p. 10).
+- **q-0-07** (core) The `INPUT VOL` slider adjusts the input level for recording (p. 10).
+- **q-0-08** (core) The `MAIN VOL` slider adjusts the volume of the built-in speaker and headphones (p. 10). [Reinforced by q-1-19 (direction of travel).]
+- **q-0-09** (core) The `FX1`/`FX2` button/dial pairs apply effects to sounds and edit waveforms: the buttons switch ON/OFF, the dials select effects and change parameters (p. 10). [Detail in q-2-45–46.]
+- **q-0-10** (intro) The function button row comprises six buttons: `▶/■`, `REC`, `ONE SHOT`, `LOOP`, `DEL`, `EDIT` (p. 10).
+- **q-0-11** (intro) Function button `▶/■` is play/stop (p. 10).
+- **q-0-12** (intro) Function button `REC` starts/stops recording (sampling) (p. 10). [Detail in q-3-13 onward.]
+- **q-0-13** (intro) Function button `ONE SHOT` toggles full-sound playback (p. 10). [Detail in q-2-30–31.]
+- **q-0-14** (intro) Function button `LOOP` toggles loop playback (p. 10). [Detail in q-2-32–33.]
+- **q-0-15** (intro) Function button `DEL` deletes sounds (p. 10). [Detail in q-3-28–31.]
+- **q-0-16** (intro) Function button `EDIT` switches editing modes (parameters / waveform editing) (p. 10). [Detail in q-5-07, q-5-17.]
+- **q-0-17** (intro) Pads section: a sound is assigned to each pad and pressing a pad plays it; the pads are used to play, record, and edit sounds (p. 10).
+- **q-0-18** (intro) The built-in microphone is used for recording with the unit on its own (p. 10).
+- **q-0-19** (intro) The bank select buttons (`A`/`B`/`C`/`D`) switch sound banks and sequences while performing (p. 10). [Detail in q-2-11, q-4-11.]
+- **q-0-20** (intro) The connector section holds five connectors: the PHONE, LINE OUT, and AUDIO IN jacks and the DATA and POWER/DATA ports (p. 10).
+- **q-0-21** (intro) The PHONE jack connects headphones (3.5 mm stereo mini) (p. 10). [Absorbs retired q-1-14.]
+- **q-0-22** (intro) The LINE OUT jack connects to a mixer, speakers, etc. to output sound (3.5 mm stereo mini) (p. 10). [Absorbs retired q-1-15.]
+- **q-0-23** (intro) The AUDIO IN jack connects an external device to input sound (3.5 mm stereo mini) (p. 10). [Reinforced by q-3-07.]
+- **q-0-24** (core) The DATA port is a USB port for data communication with a smartphone (MIDI/audio transfer) (p. 10). [Reinforced by q-5-62.]
+- **q-0-25** (core) The POWER/DATA port is a USB port for power supply and for data communication with a smartphone (MIDI/audio transfer) (p. 10). [Reinforced by q-1-01.]
+- **q-0-26** (core) Of the two USB ports, only POWER/DATA supplies power; both handle data communication with a smartphone (p. 10).
+- **q-0-27** (intro) The power switch turns the unit's power ON/OFF (p. 10). [Reinforced by q-1-18.]
+- **q-0-28** (core) The `INPUT SELECT` switch switches the input source for recording: `MIC` = built-in microphone, `♪` = AUDIO IN jack, `USB` = USB port (p. 10). [Absorbs retired q-3-05, q-3-06; reinforced by q-3-07–08.]
+- **q-0-29** (intro) The built-in speaker is used for playback with the unit on its own; the five-view diagram places it on the rear (p. 10; also p. 13). [Absorbs retired q-1-16; the speaker-mute behavior stays at q-1-17.]
+- **q-0-30** (intro) The battery cover is removed to insert batteries (p. 10).
+- **q-0-31** (core) The MAIN VOL is shared between the headphones and the speaker; the actual volume differs between them at the same slider position — set MAIN VOL to minimum before turning the power on or connecting headphones, and raise it gradually (p. 7).
+- **q-0-32** (core) The built-in microphone is designed for close-range sound pickup: use it with the sound source close to the mic, and make a test recording before important recordings (p. 7).
+- **q-0-33** (core) Screen saver function: if no operation is performed for about 30 minutes, the display turns off automatically; a button or pad operation restores it. This is different from Auto Power Off (p. 7). [APO itself: q-1-11–13, q-5-55.]
+- **q-0-34** (core) If a USB AC adaptor is connected to the POWER/DATA port while batteries are installed, USB power takes priority (p. 8).
+- **q-0-35** (core) Even when an external speaker or similar is connected to the LINE OUT jack, sound is still output from the unit's speaker; to silence it, set MAIN VOL to minimum (p. 8). [Contrast with q-1-17 (PHONE jack does mute the speaker).]
+- **q-0-36** (intro) Performance mode is the normal mode for performing (p. 11).
+- **q-0-37** (core) Short-pressing an `A`–`D` button leads to bank selection; long-pressing an `A`–`D` button leads to sequence selection (p. 11). [Reinforced by q-2-11, q-4-03.]
+- **q-0-38** (core) From Performance mode, `REC` enters REC mode, `DEL` enters DEL mode, and `EDIT` enters EDIT mode (p. 11). [Reinforced by q-3-13, q-3-28, q-5-07.]
+- **q-0-39** (core) `EDIT` opens EDIT mode, while long-pressing `EDIT` opens the system settings (p. 11). [Reinforced by q-5-49.]
+
+#### Device drill candidates
+*None — front matter contains no hands-on procedures; its material is identification (flashcards) and safety/spec reference (lookups), and the p. 11 mode-map transitions are drilled in the chapters that own each mode.*
+
+#### Reference-lookup candidates
+- **l-0-01** (intro) On which page does each PART of the Guide Book begin? → CONTENTS (p. 1).
+- **l-0-02** (intro) What general notes precede use (accuracy, liability for damages and data loss, no reproduction, keep the manual)? → "Please note the following" (p. 2).
+- **l-0-03** (intro) What do the safety labels and graphic symbols mean in detail? → label table and symbol examples, head of "Safety precautions" (p. 3).
+- **l-0-04** (core) What to do if battery fluid gets on skin or clothing, or into the eyes — and how are batteries kept from children? → Warning, Batteries (p. 3).
+- **l-0-05** (core) Which USB-cable practices are prohibited or required (specified cable and adaptor only, no heavy objects or bundled use, no wet hands, damaged-cable response, lightning)? → Warning, USB cable (p. 3).
+- **l-0-06** (core) Where must the unit not be placed or used (humidity, dust, oil smoke, heat, direct sunlight, vibration, outside 0°C–40°C, unstable stands, heavy objects on top)? → Warning, Location and place of use (p. 4).
+- **l-0-07** (core) What three steps to take on smoke, unusual odor, heat, or water/foreign objects inside? → power off → disconnect the USB cable → contact the "Repair inquiries" contact (p. 4).
+- **l-0-08** (intro) Where must headphones or the unit not be used? → Warning items on driving and on railroad crossings, station platforms, roads, construction sites (p. 4).
+- **l-0-09** (core) Which battery handling rules prevent bursting and fluid leakage? → Caution, Batteries (p. 5); explosion-related battery cautions also under "About the batteries" (p. 9).
+- **l-0-10** (intro) What are the display and disassembly warnings? → Warning, Display / Do not disassemble or modify (p. 5).
+- **l-0-11** (core) How do you clean and disinfect the unit safely? → Caution, Care and cleaning (p. 5); full cleaning and chemicals detail in Operating precautions (p. 7).
+- **l-0-12** (intro) What are the volume and hearing cautions? → Caution, Volume (p. 6).
+- **l-0-13** (intro) What are the strap cautions? → Caution, Strap (p. 6); attachment note under "Strap (commercially available)" (p. 8).
+- **l-0-14** (core) How and why should stored content be backed up? → Caution, "Back up important data": regularly, with the dedicated smartphone app (p. 6; backup settings on p. 60).
+- **l-0-15** (intro) What is the health precaution concerning strong or flashing light? → Caution, Health precaution (p. 6).
+- **l-0-16** (core) Which handling rules protect the precision electronics (no drops or pressure, no pointed objects on buttons/pads/display, no disassembly, no static-prone locations)? → Operating precautions (p. 7).
+- **l-0-17** (core) Operating temperature range and environment guidance? → 0°C to 40°C, "Operating environment" (p. 7; placement warnings also p. 4).
+- **l-0-18** (intro) Are faint "hiss"/"buzz" noise, a popping sound at power-on, or LED brightness/color variation malfunctions? → no; Operating precautions (p. 7) and "LEDs" (p. 8).
+- **l-0-19** (core) What data-loss risks surround recording on battery power, and how to avoid them? → power-cut warnings, Operating precautions (p. 7) and "About the batteries" (p. 9): use the USB AC adaptor for long recordings; check remaining battery charge first.
+- **l-0-20** (intro) Which substances and objects must be kept away from the unit (solvents, alcohols, cosmetics, oily foods; magnetic cards)? → Operating precautions (p. 7).
+- **l-0-21** (core) In what order do you connect and power on external devices, and what if the sound distorts? → "Connections" (p. 8). [Content behind pointer l-3-02.]
+- **l-0-22** (core) What plug does the PHONE jack accept? → a 3.5 mm stereo mini plug (3-pole) only — "Connections" (p. 8).
+- **l-0-23** (core) How do you communicate with a smartphone without drawing power from it? → smartphone on the DATA port, USB AC adaptor on the POWER/DATA port — "Precautions concerning USB power" (p. 8).
+- **l-0-24** (core) What setting change is needed after switching to eneloop batteries? → set `BATTERY Type` to "BAT-e" — "Replacing the batteries" (p. 9; the setting itself on p. 55). [Setting values: q-5-56.]
+- **l-0-25** (core) Which operation moves between each pair of screens, and on which page is each function explained? → mode map and function table, "Operation overview" (p. 11).
+
 ### Chapter 1 — Part: Preparation
 
 #### Quiz/flashcard candidates
-- **q-1-01** (intro) The included USB Type-C cable connects to the POWER/DATA port (p. 12).
+- **q-1-01** (intro) The included USB Type-C cable connects to the POWER/DATA port (p. 12). [Reinforces q-0-25.]
 - **q-1-02** (intro) The separately available USB AC adaptor is the AD-XA06J Type-C (p. 12; Startup Guide p. 6).
 - **q-1-03** (core) A commercially available USB AC adaptor must conform to the USB standard with an output of DC 5 V, 1 A or higher (p. 12).
 - **q-1-04** (core) A commercially available USB cable used for power must conform to the USB 2.0 standard and be no longer than 1 m (p. 12).
@@ -92,12 +177,12 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-1-11** (intro) Auto Power Off: if no operation is performed for a set period while the power is on, the power turns off automatically (p. 12).
 - **q-1-12** (intro) To resume after Auto Power Off, switch the power switch OFF→ON once (p. 12).
 - **q-1-13** (intro) The time until Auto Power Off can be set in the system settings (see p. 55) (p. 12). [Reinforced by q-5-55.]
-- **q-1-14** (intro) Headphones connect to the PHONE jack (p. 13).
-- **q-1-15** (intro) Active speakers or an external mixer connect to the LINE OUT jack (p. 13).
-- **q-1-16** (intro) The built-in speaker is on the rear of the unit (p. 13).
+- **q-1-14** (retired) Tombstone — absorbed by q-0-21: the PHONE-jack identification card is canonical in Chapter 0 (p. 10; this card had cited p. 13).
+- **q-1-15** (retired) Tombstone — absorbed by q-0-22: the LINE OUT identification card is canonical in Chapter 0 (p. 10; this card had cited p. 13).
+- **q-1-16** (retired) Tombstone — absorbed by q-0-29: the built-in-speaker identification card is canonical in Chapter 0 (p. 10; this card had cited p. 13). The speaker-mute behavior stays at q-1-17.
 - **q-1-17** (core) No sound is output from the built-in speaker while headphones or another device are connected to the PHONE jack (p. 13).
-- **q-1-18** (intro) Sliding the power switch to [ON] shows the startup screen and readies the unit for use (Startup Guide p. 6).
-- **q-1-19** (intro) The MAIN VOL slider adjusts the volume of the built-in speaker and the PHONE jack: left lower, right raise (Startup Guide p. 6).
+- **q-1-18** (intro) Sliding the power switch to [ON] shows the startup screen and readies the unit for use (Startup Guide p. 6). [Reinforces q-0-27.]
+- **q-1-19** (intro) The MAIN VOL slider adjusts the volume of the built-in speaker and the PHONE jack: left lower, right raise (Startup Guide p. 6). [Reinforces q-0-08.]
 
 #### Device drill candidates
 - **d-1-01** (intro) **Power from a power outlet** — Connect the included USB Type-C cable to the POWER/DATA port, the other end to a USB AC adaptor (AD-XA06J Type-C or compliant), plug into an outlet. Success: power switch [ON] brings up the startup screen with no batteries installed. (p. 12; Startup Guide p. 6)
@@ -130,7 +215,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-2-08** (core) You can create up to 80 banks (p. 16).
 - **q-2-09** (core) Running "Initialize" in the system settings returns the unit to its factory default state; sounds you assigned yourself are erased (p. 16). [Procedure in q-5-60.]
 - **q-2-10** (intro) By default, BANK 1–4 are assigned to the `A`–`D` buttons (p. 16).
-- **q-2-11** (core) After pressing an `A`–`D` button, the directional buttons change the bank assigned to that button (p. 16).
+- **q-2-11** (core) After pressing an `A`–`D` button, the directional buttons change the bank assigned to that button (p. 16). [Reinforces q-0-19, q-0-37.]
 - **q-2-12** (core) BANK1 pad map: pad 1 = bass drum (kick), pad 2 = snare drum, pad 3 = hi-hat, pad 4 = sound effects — all one-shot sounds (p. 17).
 - **q-2-13** (core) BANK1 pads 5–8 = keyboard chord playing, one-shot sounds (p. 17).
 - **q-2-14** (core) BANK1 pads 9–12 = bass phrases and piano phrases, looped sounds (p. 17).
@@ -164,8 +249,8 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-2-42** (intro) Each pad's group and lighting color can be set individually (see PART 4, pp. 48–49) (p. 22).
 - **q-2-43** (core) Switching banks with the directional buttons during playback interrupts the sound — set the banks you plan to use to the `A`–`D` buttons in advance (p. 23).
 - **q-2-44** (core) Two effect lines are provided, `FX1` and `FX2`; you can apply one or both at once (p. 24).
-- **q-2-45** (core) With the `FX1`/`FX2` button unlit, turning the dial selects the effect type (p. 24).
-- **q-2-46** (core) With the `FX1`/`FX2` button lit, turning the dial changes how strongly the effect is applied (p. 24).
+- **q-2-45** (core) With the `FX1`/`FX2` button unlit, turning the dial selects the effect type (p. 24). [Reinforces q-0-09.]
+- **q-2-46** (core) With the `FX1`/`FX2` button lit, turning the dial changes how strongly the effect is applied (p. 24). [Reinforces q-0-09.]
 - **q-2-47** (core) When multiple pads' sounds are layered, the effect is applied to the entire sound playing, and to pads tapped after selecting the effect (p. 24).
 - **q-2-48** (core) FX1 effect types: FILTER, FLANGER, PHASER, BIT CRUSHER (p. 25).
 - **q-2-49** (core) FX2 effect types: ROLL 1, ROLL 1/2, ROLL 1/4, ROLL PATTERN, DELAY 3/4, DELAY 3/16 (p. 25).
@@ -213,15 +298,15 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-3-02** (intro) Sampling can be done easily with the built-in microphone, and recorded sounds can be played on the pads right away (p. 27).
 - **q-3-03** (core) Pads with no sample assigned do not light up (p. 28).
 - **q-3-04** (core) In BANK 14, you can sample to the pads that are unlit (p. 28).
-- **q-3-05** (intro) The `INPUT SELECT` switch positions are `MIC`, `♪`, and `USB` (p. 28).
-- **q-3-06** (intro) `INPUT SELECT` = `MIC` selects the built-in microphone (p. 28).
-- **q-3-07** (core) To record an instrument or external device on the AUDIO IN (♪) jack, set `INPUT SELECT` to `♪` (p. 28).
-- **q-3-08** (core) To record playback sound from a smartphone on the DATA port, set `INPUT SELECT` to `USB` (p. 28).
+- **q-3-05** (retired) Tombstone — absorbed by q-0-28: the `INPUT SELECT` position list is canonical in Chapter 0 (p. 10; this card had cited p. 28).
+- **q-3-06** (retired) Tombstone — absorbed by q-0-28 (position-to-source mapping, p. 10; this card had cited p. 28).
+- **q-3-07** (core) To record an instrument or external device on the AUDIO IN (♪) jack, set `INPUT SELECT` to `♪` (p. 28). [Reinforces q-0-23, q-0-28.]
+- **q-3-08** (core) To record playback sound from a smartphone on the DATA port, set `INPUT SELECT` to `USB` (p. 28). [Reinforces q-0-28.]
 - **q-3-09** (core) When sampling with the built-in microphone, set `INPUT VOL` to maximum (p. 28).
 - **q-3-10** (intro) Use the included USB cable to connect to a smartphone (p. 28).
 - **q-3-11** (core) Adjust the device volume and `INPUT VOL` so the level meter does not peak out while recording (p. 28).
 - **q-3-12** (intro) Before connecting external devices, read "Connections" on p. 8 (p. 28).
-- **q-3-13** (intro) Pressing the `REC` button in Performance mode enters Sampling mode (p. 29).
+- **q-3-13** (intro) Pressing the `REC` button in Performance mode enters Sampling mode (p. 29). [Reinforces q-0-38.]
 - **q-3-14** (intro) In Sampling mode, the `REC` button flashes and the empty pads flash (p. 29).
 - **q-3-15** (intro) The Sampling mode display shows `SAMPLING MODE` with the trigger setting and L/R level meters (p. 29).
 - **q-3-16** (intro) The trigger setting is selected with the directional buttons `←`/`→` (p. 29).
@@ -276,7 +361,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 #### Quiz/flashcard candidates
 - **q-4-01** (intro) The sequencer feature arranges samples freely and plays rhythms, melodies, and more automatically (p. 36).
 - **q-4-02** (intro) The production style the sequencer lets you experience is called "step-based music production" (p. 36).
-- **q-4-03** (core) Enter Sequence mode: in Performance mode, long-press one of the `A`–`D` buttons (p. 36).
+- **q-4-03** (core) Enter Sequence mode: in Performance mode, long-press one of the `A`–`D` buttons (p. 36). [Reinforces q-0-37.]
 - **q-4-04** (core) On the sequence selection display, choose "OK (A)" with `A`; cancel with `B` (p. 36).
 - **q-4-05** (intro) The sequence selection screen shows `SEQUENCE SLCT` / `BANK = 1` / `OK(A) CANCEL(B)` (p. 36).
 - **q-4-06** (intro) During sequence selection the `A` button flashes; once Sequence mode is displayed it is lit (p. 36).
@@ -411,7 +496,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-5-46** (stretch) To split at your own timing: select `AUTO TRIGGER` or `MANUAL TRIGGER`, press one empty pad, input the phrase, press the next empty pad at each split point (p. 54).
 - **q-5-47** (stretch) With `MANUAL TRIGGER` recording starts when you press the first empty pad; with `AUTO TRIGGER`, when the phrase is input (p. 54).
 - **q-5-48** (stretch) End a manual-split recording by pressing the last pad again or pressing `REC` (p. 54).
-- **q-5-49** (core) Open the system settings by long-pressing the `EDIT` button in Performance mode (p. 55).
+- **q-5-49** (core) Open the system settings by long-pressing the `EDIT` button in Performance mode (p. 55). [Reinforces q-0-39.]
 - **q-5-50** (core) In the system settings, select an item with ↑/↓ and change it with ←/→ (p. 55).
 - **q-5-51** (stretch) `AUTO Trig Lv` sets the volume at which AUTO TRIGGER recording starts: 5 levels 1–5 (-28 dB to -12 dB in 4 dB steps); default 3 (p. 55).
 - **q-5-52** (core) The smaller the `AUTO Trig Lv` value, the quieter the sound at which recording starts (p. 55).
@@ -424,7 +509,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-5-59** (intro) `SERIAL No.` displays the serial number when you press the right directional button (view only) (p. 55).
 - **q-5-60** (stretch) `Initialize`: press the right directional button, confirm with `A`; the unit then restarts in its factory default state (p. 55). [Effect on user sounds: q-2-09.]
 - **q-5-61** (intro) The dedicated app is the iOS/Android "CASIO Sampler App" (p. 56).
-- **q-5-62** (core) Connect the unit's `DATA` port to the smartphone with the included USB Type-C cable (p. 56).
+- **q-5-62** (core) Connect the unit's `DATA` port to the smartphone with the included USB Type-C cable (p. 56). [Reinforces q-0-24.]
 - **q-5-63** (intro) If you cannot connect with the included USB Type-C cable, see the support page (p. 56).
 - **q-5-64** (core) After launching the app, turn on the unit's power; the app's pads are displayed to match the state of the unit (p. 56).
 - **q-5-65** (core) To assign a sample in the app: tap an empty pad, then tap "Assign Sound" (p. 57).
@@ -500,7 +585,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 
 ## Drill dependency graph
 
-`drill-id -> requires` (all chapters; "|" = any one of the listed alternatives suffices). Drills with no entry after `->` have no drill prerequisites.
+`drill-id -> requires` (all chapters; "|" = any one of the listed alternatives suffices). Drills with no entry after `->` have no drill prerequisites. Chapter 0 (front matter) contributes no drills.
 
 - d-1-01 ->
 - d-1-02 ->
@@ -563,10 +648,10 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 ## Coverage notes
 
 - **Chapter 1 is thin by design.** Part: Preparation spans only guide-book pp. 12–13 plus the overlapping Startup Guide pp. 6 and 13; nearly everything is intro-level setup. The analyst already merged the Startup Guide overlap (power, volume, startup screen, troubleshooting), so authors must not duplicate it from the Startup Guide side.
-- **Guide-book pp. 1–11 were not inventoried by any analyst** (Safety precautions pp. 3–6, Operating precautions/Connections pp. 8–9, Names of parts p. 10, Operation overview p. 11). Every chapter *assumes* Names of parts (p. 10) — pads, directional buttons, function buttons, bank select buttons, dials, sliders, jacks — and Chapters 3/5 lean on "Connections" (p. 8). If the trainer needs panel-orientation exercises, this is an uncovered gap; the citations above (l-1-07, l-1-08, l-3-02) are the only hooks into that range.
+- **Guide-book pp. 1–11 are inventoried as Chapter 0** (`content/inventory/part-0.md`: front matter, Safety precautions pp. 3–6, Operating precautions/Connections pp. 7–9, Names of parts p. 10, Operation overview p. 11). Panel/connector/button identification is canonical in Chapter 0 (every p. 10 callout has a card; five pure-identification duplicates were retired with tombstones: q-1-14/15/16, q-3-05/06), safety and spec material is deliberately lookup-only, and Chapter 0 has no drills — front matter contains no hands-on procedures. The older hooks into that range (l-1-07, l-1-08, l-3-02) remain valid pointers; l-0-21 carries the "Connections" (p. 8) content itself.
 - **Startup Guide coverage is partial**: only its pp. 6 and 13 were cross-read (via Chapter 1). Its remaining pages were not inventoried.
 - **midi.md is folded into Chapter 5** and yields spec-level (stretch) material only; everything MIDI requires firmware Ver. 1.1.1+, and midi.md p. 5 (revision history) yielded only a lookup.
 - **Forward dependency flagged**: Beat Sync is introduced in Chapter 2 (p. 18) but the ON/OFF toggle lives in the Chapter 5 system settings (p. 55). Drills d-2-05 and d-2-08 need the toggle early — see the note in the dependency graph.
 - **Destructive operations flagged by analysts**: `Initialize` erases user sounds/sampled data (pp. 16, 55; d-5-14); waveform edits cannot be undone — resample a copy first (p. 53; q-5-43); switching banks with the directional buttons during playback interrupts sound (p. 23; q-2-43).
 - **Thin/low-yield page ranges**: pp. 26, 34, 45 are CREATIVE NOTE / history sidebars (technique tips and context cards only); p. 27 is a chapter opener; pp. 56–60 (app) yield app-side procedures that device-only training sessions cannot drill without a smartphone — d-5-15…d-5-18 should be marked optional-equipment.
-- **Analyst file naming offset**: the source files `part-1.md`…`part-5.md` are one off from the book's own PART numbers (part-1 = unnumbered Preparation, part-5 = book PART 4). This inventory's chapter ids use file order 1–5; in-text "(see PART n …)" citations keep the book's numbering — do not "fix" either.
+- **Analyst file naming offset**: the source files `part-1.md`…`part-5.md` are one off from the book's own PART numbers (part-1 = unnumbered Preparation, part-5 = book PART 4), and `part-0.md` covers the front matter before any of the book's parts (pp. 1–11). This inventory's chapter ids use file order 0–5; in-text "(see PART n …)" citations keep the book's numbering — do not "fix" either.
