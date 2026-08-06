@@ -1,0 +1,180 @@
+{
+  "task_type": "review",
+  "reviewed_commits": [
+    "500873826ea59831172f54d4ef1d9ced409b2bcf",
+    "e3bb104f9fb7a60b08314d66a6653641602901c8"
+  ],
+  "scope": [
+    "scripts/install-toolchain.sh",
+    "scripts/browser-check.mjs",
+    "scripts/check-site.sh",
+    ".github/workflows/site.yml",
+    "README.md",
+    "briefs/M0-plan.md"
+  ],
+  "summary": {
+    "verdict_counts": {
+      "FIXED": 14,
+      "PARTIALLY-FIXED": 3,
+      "NOT-FIXED": 0,
+      "REGRESSION": 0
+    },
+    "statement": "Fourteen findings are closed. B1, M1, and M3 remain partially fixed: the prefix guard accepts unvalidated marker names and can still reach upstream rm -rf without --force; the health check accepts a pre-SRI same-pin stamp because it never requires sri_verified_downloads; and the cache key's env.ImageOS expression is empty because ImageOS is only a runner-process environment variable unless first exported into the workflow env context."
+  },
+  "per_finding": [
+    {
+      "id": "B1",
+      "severity": "blocker",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "scripts/install-toolchain.sh:320-397 canonicalizes the prefix and correctly hard-refuses /, HOME, the repository, descendants of the repository, ancestors of HOME/repository, non-directories, and ordinary populated directories before cloning. That closes the concrete HOME/repository typo examples. However, lines 368-387 classify a directory as a recognized toolchain merely if a regular .sxc1-toolchain-stamp exists, or if an env file and wasm32-wasi-ghc directory exist; the marker content is not validated here. If that shallow recognition passes but health_check later rejects the marker, lines 536-539 proceed automatically and line 683 invokes upstream setup.sh, whose first destructive action is rm -rf PREFIX, without requiring --force. A populated arbitrary directory containing an empty or malformed .sxc1-toolchain-stamp therefore still reaches the original destructive sink. This narrows the scenario but does not implement the validated-sentinel plus explicit-replacement property from the original recommendation."
+    },
+    {
+      "id": "M1",
+      "severity": "major",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "For a fresh install, scripts/install-toolchain.sh:588-665 wraps every pinned setup.sh curl -o download, looks the exact URL up in pinned autogen.json, verifies sha256/sha512 SRI, and fails closed for unknown URLs or mismatches; this closes the compromised-release/CDN scenario for newly downloaded bindists. The incomplete upgrade path is at lines 453-518 and 536-539: health_check parses only ghc_wasm_meta_commit, flavour, and ghc_version, and checks that GHC/cabal run. It never parses or requires sri_verified_downloads, although new installs write that field at lines 754-765. An installation produced by the pre-fix wrapper at the same pinned commit/flavour has the same three old stamp fields and can be accepted as healthy, causing the fixed installer to no-op while retaining bindists that were never SRI-verified. Requiring the expected SRI count or an installer/stamp schema version would close this."
+    },
+    {
+      "id": "M2",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "scripts/install-toolchain.sh:61-69 enumerates the pinned setup.sh controls, and lines 672-683 invoke setup.sh through env -u for UPSTREAM_WASI_SDK_PIPELINE_ID, all three UPSTREAM_GHC variables, SKIP_GHC, PLAYWRIGHT, and NIX_SYSTEM while overriding FLAVOUR and PREFIX. Against the pinned setup.sh, this makes both unverified GitLab API/artifact branches unreachable and prevents the skip/playwright paths."
+    },
+    {
+      "id": "M3",
+      "severity": "major",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "The stale-pin cache-poisoning path is closed: scripts/install-toolchain.sh:453-518 requires an exact commit/flavour stamp, live GHC version equal to the stamp, and a runnable cabal; .github/workflows/site.yml:53-62 removes the broad toolchain restore-keys and runs the installer unconditionally. The image-migration part remains incomplete. The cache key at site.yml:58 uses ${{ env.ImageOS }}, but ImageOS is a runner-process variable and is never copied to GITHUB_ENV or otherwise defined in this workflow's env context. The segment therefore resolves empty now (effectively ghc-wasm-Linux-X64--HASH), contrary to lines 46-48. A same-OS/architecture ubuntu-latest image migration can still restore the old native tree; the runtime probes reduce risk but do not establish image identity or exercise every native tool. GitHub's env-context definition is at https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#env-context."
+    },
+    {
+      "id": "M4",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "scripts/browser-check.mjs:227-255 bounds the WebSocket handshake and DevTools poll with the shared deadline; lines 315-362 give every CDP command a remaining-budget timer and reject/clear all pending calls on fatal failure; lines 545-555 wire child exit/error; lines 611-625 wire WebSocket close/error. .github/workflows/site.yml:83-84 adds a 15-minute outer backstop. The original dropped-socket/never-replied-command hang no longer survives beyond the deadline/backstop. The ErrorEvent text issue in advisory 1 affects diagnostics, not settlement."
+    },
+    {
+      "id": "M5",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:147-190 resolves SXC1_NODE, then the private toolchain Node, then PATH node, and validates both global WebSocket and WebAssembly before use; lines 302-313 and 562 use the selected binary. README.md:21-27 documents Node 22+, the bundled Node, resolution order, and override. The documented fresh-clone sequence no longer depends on PATH inheritance from build-site.sh."
+    },
+    {
+      "id": "M6",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": ".github/workflows/site.yml:117-120 gates deploy on non-PR main and vars.ENABLE_PAGES == 'true'. With the variable unset, deploy is inert even if main builds. README.md:160-167 and briefs/M0-plan.md:274-288 document the opt-in."
+    },
+    {
+      "id": "M7",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": ".github/workflows/site.yml:14-25 limits workflow/build permissions to contents:read; lines 35-38 disable checkout credential persistence; lines 121-124 grant pages:write and id-token:write only to deploy. PR build code no longer receives deployment/OIDC authority or a persisted checkout credential."
+    },
+    {
+      "id": "M8",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": ".github/workflows/site.yml:31-33 gives builds a per-ref group and only cancels in-progress PR builds; lines 128-130 put the pages group on deploy alone. A PR run can no longer replace a pending main build/deploy in the shared pages group. Newer main deploys may supersede older pending main deploys, which is an explicit deployment policy rather than the unrelated-PR loss from the finding."
+    },
+    {
+      "id": "M9",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:364-416 broadens but explicitly demotes the textual scan, while lines 593-604 copy the bundle beneath /sub/path/ and require the same full browser acceptance run there. A root-absolute /app.wasm resolves outside that copied bundle and prevents the boot contract from passing, so the original single-quoted fetch scenario is now behaviorally rejected regardless of spelling."
+    },
+    {
+      "id": "m1",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:481-505 now requires the spawned child to be live and the served index.html to byte-match the intended on-disk file before launching the browser; lines 545-557 turn any failure into explicit failed checks. The port probe still has a handoff race, but an unrelated winner no longer passes merely by listening; it must also race the still-live child and serve the exact intended index plus the acceptance contract, closing the filed false-positive mechanism to a reasonable local identity check."
+    },
+    {
+      "id": "m2",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:577-582 counts four browser-stage checks as skipped, lines 617-627 report both the skipped count and result=structural-only, and .github/workflows/site.yml:85-88 requires result=complete. Skip mode remains an explicit successful local structural mode but cannot produce the former complete-looking fraction or pass CI as the full M0 gate."
+    },
+    {
+      "id": "m3",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "scripts/browser-check.mjs:722-749 routes missing buttons and click failures through ordinary report() assertions, and lines 789-803 require #boot-status to exist and be hidden. Missing nodes now produce exit 1 assertion failures rather than either a vacuous pass or an exit 2 harness exception."
+    },
+    {
+      "id": "m4",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "scripts/install-toolchain.sh:399-442 confines download/build prerequisites and disk capacity to preflight_install; --check enters health_check at lines 520-529 before the install preflight is called at line 534. A healthy install can be checked without curl/unzip/compiler/free-space prerequisites."
+    },
+    {
+      "id": "m5",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "README.md:139-148 now says offline when served locally via serve-site.sh and explicitly states that direct file:// loading does not work because of module/fetch origin restrictions. The unsupported direct-directory claim is removed."
+    },
+    {
+      "id": "n1",
+      "severity": "nit",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:233-256 tracks all server log paths and removes them from EXIT/INT/TERM cleanup; lines 521-527 register each new log and process. The 25 observed /tmp/sxc1-check-site-server.* files are historical: their timestamps range from 13:37:10 through 14:48:48 +0900, all before e3bb104 at 15:15:44 +0900, which introduced this cleanup."
+    },
+    {
+      "id": "n2",
+      "severity": "nit",
+      "verdict": "FIXED",
+      "evidence": "scripts/install-toolchain.sh:7 spells gitlab.haskell.org normally. The needless obfuscation is gone without changing behavior."
+    }
+  ],
+  "advisory_notes": [
+    {
+      "number": 1,
+      "verdict": "CONFIRMED",
+      "severity": "nit",
+      "evidence": "scripts/browser-check.mjs:624-625 falls back from ev.message to string interpolation of ev. Node's WebSocket ErrorEvent normally exposes the underlying cause on ev.error, while String(ev) is [object ErrorEvent], so the rejection works but the diagnostic discards the useful cause. This does not reopen M4 because failFatally still rejects and clears pending commands."
+    },
+    {
+      "number": 2,
+      "verdict": "CONFIRMED-AND-STRONGER",
+      "severity": "major",
+      "evidence": ".github/workflows/site.yml:58 references env.ImageOS without defining ImageOS in workflow/job/step env. ImageOS is available to runner processes, not automatically to the GitHub expression env context. Thus the segment is empty in the current workflow, not only if a future image stops setting the process variable. A prior step must export a derived value to GITHUB_ENV/GITHUB_OUTPUT, or the workflow should use a stable explicit runner-image identifier. This is why M3 is only partially fixed."
+    },
+    {
+      "number": 3,
+      "verdict": "CONFIRMED-HISTORICAL",
+      "severity": "none",
+      "evidence": "Exactly 25 /tmp/sxc1-check-site-server.* files were present. Their newest mtime is 2026-08-06 14:48:48 +0900; commit e3bb104, which added n1 cleanup, is 2026-08-06 15:15:44 +0900. Current code registers every newly created log for cleanup, so these files do not evidence a live post-fix server-log leak. They were left untouched during this read-only review."
+    },
+    {
+      "number": 4,
+      "verdict": "VERIFIED-SAFE-FOR-THE-PIN",
+      "severity": "advisory",
+      "evidence": "The exact pinned ghc-wasm-meta setup.sh has seven artifact downloads, and all seven use separate -o output arguments (wasi-sdk, libffi, Node, binaryen, wasmtime, GHC, cabal). Its only curl calls without -o are the two GitLab job-list API calls, each reachable only in an UPSTREAM_* branch; scripts/install-toolchain.sh:61-69 and 672-683 unset the controlling variables. Therefore no artifact consumed by the pinned setup bypasses SRI. The lack of a local assertion is brittle for a future pin bump, but it is not a present M1 bypass because the upstream source is commit-pinned. Pinned source: https://github.com/haskell-wasm/ghc-wasm-meta/blob/c75985a1b58fb0376eea9149ba5c7b933b3c7455/setup.sh"
+    },
+    {
+      "number": 5,
+      "verdict": "CONFIRMED-HARMLESS-FOR-CORRECTNESS",
+      "severity": "advisory",
+      "evidence": ".github/workflows/site.yml:90-93 uploads a Pages-formatted artifact on PR builds. Artifacts are scoped to the workflow run, and the separately gated deploy job cannot run for pull_request, so this cannot publish or poison a later main run. It does consume upload time/storage and could be push-only as hygiene, but it is not a gate defect."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "NEW1",
+      "severity": "minor",
+      "title": "The new sub-path bundle temp directory is not covered by cleanup",
+      "location": "scripts/check-site.sh:236-256, scripts/check-site.sh:599-604",
+      "scenario": "The M9 fix creates SUBPATH_TMP and removes it only after the second run_browser_stage returns. The EXIT/INT/TERM cleanup tracks only server PIDs and logs. SIGINT/SIGTERM during either browser stage, or any set -e failure after mktemp and before the explicit rm, leaves /tmp/sxc1-check-site-subpath.* containing a full copy of the built bundle. This is larger than the n1 log leak and was introduced by the fix diff.",
+      "recommendation": "Track temporary directories alongside SERVER_LOGS in cleanup, register SUBPATH_TMP immediately after mktemp, and remove it there; an explicit happy-path removal may remain but should also unregister it."
+    },
+    {
+      "id": "NEW2",
+      "severity": "nit",
+      "title": "WebSocket ErrorEvent diagnostics discard the underlying error",
+      "location": "scripts/browser-check.mjs:624-625",
+      "scenario": "The new fatal error listener commonly reports CDP WebSocket error: [object ErrorEvent], obscuring whether Chrome reset the socket, refused a frame, or encountered another transport error. Settlement remains correct.",
+      "recommendation": "Prefer ev.error?.stack or ev.error?.message, then ev.message, then String(ev)."
+    }
+  ],
+  "method": "Read-only review of the two requested commit diffs and exact e3bb104 file versions, the original 17 findings, the triage rationale, local /tmp metadata, GitHub's env-context documentation, and the pinned ghc-wasm-meta setup.sh control/download branches. No files other than this required result JSON were modified; no builds, installs, tests, lint, or commits were run.",
+  "final_line": "GATE-BLOCKED — B1 still permits rm -rf of a populated directory on shallow marker-name recognition without --force; M1 accepts pre-SRI same-pin installs because health_check ignores sri_verified_downloads; and M3's runner-image cache isolation is absent because env.ImageOS resolves empty."
+}
