@@ -24,6 +24,7 @@ import           System.Exit           (exitFailure, exitSuccess)
 import           System.IO             (hSetEncoding, stdout, utf8)
 
 import           SXC1.Content.Corpus   (corpusSources, docs, glossarySource)
+import           SXC1.Content.Markdown (headingLineOf)
 import           SXC1.Content.Outline
 import           SXC1.Content.Stats
 import           SXC1.Content.Types
@@ -52,6 +53,9 @@ assertionLabel 5 = "5. glossary <-> part title conformance"
 assertionLabel 6 = "6. anchor slugs unique and non-empty"
 assertionLabel 7 = "7. Route round-trip and totality"
 assertionLabel 8 = "8. every page non-empty, every table has a body row"
+assertionLabel 9 = "9. nested (blockquote/list) heading lines become real Heading blocks"
+assertionLabel 10 = "10. no literal '#' Str token anywhere in the corpus"
+assertionLabel 11 = "11. pinned guide-book anchors on pp. 41/42/43/47 unchanged"
 assertionLabel n = show n ++ ". ?"
 
 --------------------------------------------------------------------------
@@ -254,6 +258,15 @@ glossaryChecks =
 
 --------------------------------------------------------------------------
 -- 6. Anchor slugs unique and non-empty within each document
+--
+-- Deliberately top-level 'pageBlocks' only, NOT 'flattenBlocks': a nested
+-- heading (inside a 'Quote' or list-item, e.g. a guide-book "Tip"
+-- callout's @### ...@ line -- see group 9) is not an outline target and
+-- is given the empty anchor by design, since it never draws from the
+-- page's anchor-slug supply (briefs/M1-fixes-manifest.json,
+-- "nested-headings"). Only top-level headings are required to have
+-- unique, non-empty anchors; group 9's literal-hash guard is what keeps
+-- nested headings honest.
 --------------------------------------------------------------------------
 
 anchorChecks :: [Check]
@@ -262,7 +275,7 @@ anchorChecks =
       (nonEmpty && unique)
       ("count=" ++ show (length slugs) ++ " unique=" ++ show (length (nub slugs)))
   | d <- docs
-  , let slugs    = [ s | p <- docPages d, Heading _ _ s <- flattenBlocks (pageBlocks p) ]
+  , let slugs    = [ s | p <- docPages d, Heading _ _ s <- pageBlocks p ]
         nonEmpty = all (not . T.null) slugs
         unique   = length slugs == length (nub slugs)
   ]
@@ -320,6 +333,139 @@ tableBodyChecks =
     isTableBlock _           = False
 
 --------------------------------------------------------------------------
+-- 9. Nested headings: a blockquote/list-item heading line (e.g. the
+-- guide book's "Tip" callouts, pp. 41/43/47) must parse to a real
+-- 'Heading' block, not fall through to 'Para' text
+-- (briefs/M1-fixes-manifest.json, task "nested-headings").
+--------------------------------------------------------------------------
+
+countHeadingsAt :: [Block] -> Int
+countHeadingsAt bs = length [ () | Heading _ _ _ <- bs ]
+
+-- | Headings that occur strictly *inside* a 'Quote' or a list item's
+-- children -- i.e. everything 'flattenBlocks' finds, minus what is
+-- already present at the given top level.
+nestedHeadingCount :: [Block] -> Int
+nestedHeadingCount bs = countHeadingsAt (flattenBlocks bs) - countHeadingsAt bs
+
+nestedHeadingChecks :: [Check]
+nestedHeadingChecks =
+  [ mkCheck 9 ("nested-headings/" ++ T.unpack (docSlug d))
+      (got == want)
+      ("nested Heading count=" ++ show got ++ " (want " ++ show want ++ ")")
+  | d <- docs
+  , let want = if docSlug d == "guide-book" then 3 else 0
+        got  = nestedHeadingCount (docPreamble d)
+                 + sum [ nestedHeadingCount (pageBlocks p) | p <- docPages d ]
+  ]
+
+--------------------------------------------------------------------------
+-- 10. General literal-hash guard: no 'Str' inline in NESTED BLOCK CONTENT
+-- -- 'Quote' bodies and list-item CHILDREN (recursively; the two places
+-- 4.5 recursively re-parses raw lines as blocks, and so the two places
+-- 'parseBlocksEngine's @consumesSlugs@ gate used to also (wrongly) gate
+-- heading recognition) -- plus top-level Heading\/Para\/Figure captions
+-- and table cells, may begin with a literal heading marker (one to six
+-- '#' characters then a space). This is the general form of group 9's
+-- regression: it catches the whole class of "a heading line fell through
+-- to plain text because it was nested" bug, not just the three known
+-- lines, and reuses 'headingLineOf' so the predicate is exactly the one
+-- that decides real headings, applied to inline text instead of a whole
+-- source line.
+--
+-- Deliberately EXCLUDED: a list item's own marker-line caption
+-- ('liContent'). 4.5's ordered\/bullet-item rule captures @(.*)$@ after
+-- the marker directly as that item's @[Inline]@ content -- a position
+-- 'parseBlocksEngine' never recursively block-parses and this fix does
+-- not touch, unlike 'liChildren' (a nested line indented under the item,
+-- which the same recursive block parse as 'Quote' handles). The corpus
+-- has 13 pre-existing numbered-list items on guide-book pp. 50-53 (the
+-- Resampling\/Auto Chop\/Auto Trigger steps) whose own marker-line text
+-- happens to start with @### @; promoting those to headings too would
+-- push the group-9 guide-book nested-heading count to 16, contradicting
+-- this task's pinned expectation of exactly 3 -- so they are left as the
+-- separate, out-of-scope, unchanged-by-this-fix quirk they are.
+--------------------------------------------------------------------------
+
+isJustT :: Maybe a -> Bool
+isJustT (Just _) = True
+isJustT Nothing  = False
+
+-- | Every 'Str' text under a block list's nested-block-parsed content:
+-- descends into 'Quote' inner blocks, list items' CHILDREN (not their own
+-- marker-line caption -- see above), table cells (header and body),
+-- figure\/heading captions, and 'Strong'\/'Em' formatting.
+allStrText :: [Block] -> [Text]
+allStrText = concatMap blockStrs
+  where
+    blockStrs b = case b of
+      Heading _ inlines _ -> inlineStrs inlines
+      Para inlines         -> inlineStrs inlines
+      Figure _ capInlines   -> inlineStrs capInlines
+      Bullets items          -> concatMap (allStrText . liChildren) items
+      Numbered _ items        -> concatMap (allStrText . liChildren) items
+      Quote inner               -> allStrText inner
+      Table mHeader rows          ->
+        concatMap inlineStrs (maybe [] id mHeader) ++ concatMap (concatMap inlineStrs) rows
+      Unparsed _                    -> []
+
+    inlineStrs = concatMap inlineStrs1
+    inlineStrs1 i = case i of
+      Str t     -> [t]
+      Strong xs -> inlineStrs xs
+      Em xs     -> inlineStrs xs
+      _         -> []
+
+literalHashChecks :: [Check]
+literalHashChecks =
+  [ mkCheck 10 ("literal-hash/" ++ T.unpack (docSlug d))
+      (null offenders)
+      (describe offenders)
+  | d <- docs
+  , let strs      = allStrText (docPreamble d) ++ concatMap (allStrText . pageBlocks) (docPages d)
+        offenders = filter (isJustT . headingLineOf) strs
+  ]
+  where
+    describe :: [Text] -> String
+    describe [] = "0 offenders"
+    describe xs = show (length xs) ++ " offenders: " ++ show (take 5 xs)
+
+--------------------------------------------------------------------------
+-- 11. Pinned anchors: the nested-heading fix must not perturb the
+-- top-level anchor-slug supply on the guide-book pages whose "Tip"
+-- callouts contain nested headings (briefs/M1-fixes-manifest.json,
+-- "nested-headings"). p.41 and p.47 each carry the heading(s) that own
+-- their Tip; p.43's own section heading ("Try creating a pattern that
+-- includes non-drum sounds too") is on p.42 -- p.43 opens mid-numbered-
+-- list with no top-level heading of its own -- so both p.42 (that
+-- heading) and p.43 (empty, as it always was) are pinned to show neither
+-- moved.
+--------------------------------------------------------------------------
+
+topAnchorsOnPage :: Text -> Int -> [Text]
+topAnchorsOnPage slug pn =
+  case [ p | d <- docs, docSlug d == slug, p <- docPages d, pageNumber p == pn ] of
+    (p : _) -> [ s | Heading _ _ s <- pageBlocks p ]
+    []      -> []
+
+pinnedAnchorChecks :: [Check]
+pinnedAnchorChecks =
+  [ mkCheck 11 ("pinned-anchor/guide-book/p" ++ show pn)
+      (got == want)
+      ("got=" ++ show got ++ " want=" ++ show want)
+  | (pn, want) <- pinned
+  , let got = topAnchorsOnPage "guide-book" pn
+  ]
+  where
+    pinned =
+      [ (41, [ "try-creating-various-drum-patterns", "example-1-dance-beat"
+             , "example-2-16-beat", "example-3-half-time" ])
+      , (42, [ "try-creating-a-pattern-that-includes-non-drum-sounds-too" ])
+      , (43, [])
+      , (47, [ "try-layering-pad-performance-over-sequence-playback" ])
+      ]
+
+--------------------------------------------------------------------------
 -- main
 --------------------------------------------------------------------------
 
@@ -344,7 +490,10 @@ main = do
               ++ totalityChecks
               ++ pageNonEmptyChecks
               ++ tableBodyChecks
-      forM_ [1 .. 8] $ \g -> do
+              ++ nestedHeadingChecks
+              ++ literalHashChecks
+              ++ pinnedAnchorChecks
+      forM_ [1 .. 11] $ \g -> do
         let inGroup = filter ((== g) . chkGroup) allChecks
             passed  = length (filter chkOk inGroup)
             total   = length inGroup

@@ -31,8 +31,14 @@ renderBlocks slug = map (renderBlock slug)
 
 renderBlock :: T.Text -> Block -> View model action
 renderBlock slug blk = case blk of
+  -- A nested heading (inside a blockquote or list item, e.g. the guide
+  -- book's "Tip" callouts) is not an outline target and was never given a
+  -- slug from the page's anchor supply (see 'SXC1.Content.Markdown.mkDoc'
+  -- / 'SXC1.Content.Markdown.parseBlocksEngine'), so its anchor is the
+  -- empty string; render it as a real heading element with no id, rather
+  -- than inventing or borrowing an anchor.
   Heading lvl inlines anchor ->
-    headingTag (clampLevel lvl) [ P.id_ (ms ("h-" <> anchor)) ] (renderInlines slug inlines)
+    headingTag (clampLevel lvl) (idAttrs anchor) (renderInlines slug inlines)
 
   Para inlines -> H.p_ [] (renderInlines slug inlines)
 
@@ -94,6 +100,11 @@ figcaptionInlines slug kind capInlines
 
 clampLevel :: Int -> Int
 clampLevel n = max 1 (min 4 n)
+
+idAttrs :: T.Text -> [Attribute action]
+idAttrs anchor
+  | T.null anchor = []
+  | otherwise     = [ P.id_ (ms ("h-" <> anchor)) ]
 
 headingTag :: Int -> [Attribute action] -> [View model action] -> View model action
 headingTag 1 = H.h1_

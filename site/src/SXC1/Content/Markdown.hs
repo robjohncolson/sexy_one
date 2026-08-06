@@ -134,13 +134,19 @@ extractTitleAndRest = go []
       _             -> go (l : acc) ls
 
 --------------------------------------------------------------------------
--- Heading lines (top-level only -- see the module note on why nested
--- quote/list content never contributes headings)
+-- Heading lines
 --------------------------------------------------------------------------
 
 -- | Match @^(#{1,6}) +(\\S.*)$@. Because this requires the line to begin
--- with @#@, it naturally never matches a blockquote-marked or indented
--- line -- headings are only ever recognised at a page's top level.
+-- with @#@, it never matches a line still carrying a @>@ blockquote
+-- marker or leading indentation. The cheap text-level scanners in this
+-- module ('mkDoc'\'s per-page anchor supply, 'countHeadingLines',
+-- "SXC1.Content.Outline"\'s heading scan) all apply this to raw,
+-- unstripped lines, so for them it really is top-level-only. The block
+-- parser ('parseBlocksEngine') strips a blockquote's @>@ marker before
+-- recursing, so the very same predicate also recognises a de-quoted
+-- @### ...@ line as a heading -- which is exactly what fixes the
+-- \"Tip\" callouts' nested headings without changing this function.
 headingLineOf :: Text -> Maybe (Int, Text)
 headingLineOf line
   | n >= 1, n <= 6, not (T.null rest), T.head rest == ' ', not (T.null txt) = Just (n, txt)
@@ -324,25 +330,39 @@ isDigitChar c = c >= '0' && c <= '9'
 digitsToInt :: Text -> Int
 digitsToInt = T.foldl' (\acc c -> acc * 10 + (fromEnum c - fromEnum '0')) 0
 
--- | The shared block-parsing engine. @allowHeadings@ is true only for a
--- page's top-level pass -- blockquote content and list-item children are
--- always parsed with it off (see the module note: 4.5's blockquote/list
--- rules only ever enumerate paragraphs, figures, blockquotes and nested
--- lists as valid nested content, never headings). This is also what keeps
--- the golden @headings@ count exact: the corpus has a few decorative
--- @###@ lines inside \"Tip\" callouts that are body text, not structural
--- headings.
+-- | The shared block-parsing engine. Heading lines (4.5's heading rule) are
+-- recognised everywhere -- at a page's top level AND inside blockquote
+-- content and list-item children, per 4.5's blockquote\/list rules
+-- (\"recursively parse the remainder as blocks\", which includes
+-- headings). What is NOT shared is the anchor-slug supply: @consumesSlugs@
+-- is true only for a page's top-level pass, so only top-level headings pop
+-- from it (see 'mkDoc'). A nested heading (inside a 'Quote' or a list
+-- item's children) gets the empty anchor @\"\"@ instead -- it is not an
+-- outline target and must not perturb the slugs later top-level headings
+-- on the same page are waiting to consume.
+--
+-- Earlier, headings were recognised only when @consumesSlugs@ was true,
+-- on the theory that this was needed to keep the golden @headings@ count
+-- exact. That theory was wrong: the golden count comes from
+-- 'countHeadingLines', which scans raw @^#{1,6} ...@ lines and already
+-- excludes any @> ###@ line because it does not begin with @#@. Gating
+-- heading recognition on @consumesSlugs@ bought nothing and cost
+-- rendering fidelity -- a handful of \"Tip\" callouts' @### ...@ lines
+-- were falling through to the paragraph rule and rendering as literal
+-- hash marks (briefs/M1-fixes-manifest.json, task \"nested-headings\").
 --
 -- The @[Text]@ threaded alongside the blocks is the page's pre-computed
 -- anchor-slug supply (see 'mkDoc'); each top-level 'Heading' consumes one.
 parseBlocksEngine :: Int -> Bool -> [Text] -> [Text] -> ([Block], [Text])
-parseBlocksEngine pageCount allowHeadings = go
+parseBlocksEngine pageCount consumesSlugs = go
   where
     go slugs [] = ([], slugs)
     go slugs (l : ls)
       | isBlankLine l = go slugs ls
-      | allowHeadings, Just (lvl, htext) <- headingLineOf l =
-          let (slug, slugsRest)        = popSlug slugs
+      | Just (lvl, htext) <- headingLineOf l =
+          let (slug, slugsRest)
+                | consumesSlugs = popSlug slugs
+                | otherwise     = ("", slugs)
               (restBlocks, slugsFinal) = go slugsRest ls
           in (Heading lvl (parseInline pageCount htext) slug : restBlocks, slugsFinal)
       | isTableRowLine l =
@@ -377,7 +397,7 @@ parseBlocksEngine pageCount allowHeadings = go
             && not (isJustT (quoteLineContent x))
             && not (isJustT (orderedItemOf x))
             && not (isJustT (bulletItemOf x))
-            && not (allowHeadings && isJustT (headingLineOf x))
+            && not (isJustT (headingLineOf x))
 
     popSlug (s : rest) = (s, rest)
     popSlug []          = ("section", [])
