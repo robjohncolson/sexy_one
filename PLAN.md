@@ -80,7 +80,9 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
 - **M1 — Manual reader.** Pipeline from `translations/*.md` into the app; all four
   manuals browsable with chapter navigation and a toggle to view the original JA
   page image beside the translation. *Done when: every page of all four documents is
-  reachable and legible on desktop and phone.*
+  reachable and legible on desktop and phone.* **CLOSED 2026-08-06** (tag `m1`):
+  three sign-off rounds + two Codex gates; 55-check suite; minors NEW9-partial/
+  NEW11/NEW12 tracked into M2's harness tasks.
 - **M2 — Exercise engine.** Haskell exercise engine with three exercise types
   (quiz/flashcard, multi-step guided device drill with self-check, reference lookup),
   a stable content format, and authored content for Preparation + Pad Play chapters.
