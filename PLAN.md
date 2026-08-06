@@ -122,6 +122,14 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
 1. Site title — "SXC-1 Trainer" is a placeholder ("SEXY ONE" is a natural
    candidate given the repo name; owner to confirm).
 
+Deploy-path note (2026-08-06): GitHub's workflow Pages-deployment queue wedged
+(4 consecutive `deployment_queued` timeouts, no posted incident). The m1 build
+is deployed via the legacy branch path (`gh-pages` branch, `build_type=legacy`)
+and `ENABLE_PAGES=false` keeps the workflow deploy job inert. To return to
+workflow deploys: set `ENABLE_PAGES=true`, PUT `build_type=workflow`, push.
+Branch deploys are manual: build + verify locally, copy `site/public` onto
+`gh-pages`, push.
+
 Resolved:
 - Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).
 - GitHub repo (2026-08-06, owner-confirmed): **public**, `robjohncolson/sexy_one`.
