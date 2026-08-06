@@ -445,6 +445,22 @@
     font-weight: 600;
   }
 
+  /* A "titled step" (guide-book pp.50-54: a list item whose own
+     marker-line text is itself heading-shaped -- a heading marker on the
+     same line as the list marker) renders its title as a real heading
+     element -- the first child of the <li> -- so the h1..h4 rule above
+     would otherwise push it down by its usual margin-top and detach it
+     from the step number sitting beside it. Zero it here, the same way
+     "blockquote.md-note > *:first-child" already does for a nested
+     heading inside a "Tip" callout. */
+  .page-body li > h1,
+  .page-body li > h2,
+  .page-body li > h3,
+  .page-body li > h4 {
+    margin-top: 0;
+    margin-bottom: 0.4rem;
+  }
+
   .page-body ul ul,
   .page-body ul ol,
   .page-body ol ul,

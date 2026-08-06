@@ -460,10 +460,30 @@ parseList pageCount kind lns0@(first : _) = (blk, remaining)
     collect (x : xs) curStart accItems = case matchAt x of
       Just (ind, mNum, rest) | ind == baseIndent ->
         let (childLines, xs')  = gatherChildren xs threshold
-            itemInlines         = parseInline pageCount rest
-            itemChildren        = if null childLines
+            childBlocks         = if null childLines
                                      then []
                                      else fst (parseBlocksEngine pageCount False [] childLines)
+            -- An item's own marker-line text (@rest@) is ordinarily just
+            -- inline content. But guide-book pp.50-54's "titled steps"
+            -- (briefs/M1-fixes-2-manifest.json, task "titled-steps") put a
+            -- heading marker on the SAME line as the list marker, e.g.
+            -- @1. ### In Sampling mode ... select \`RESAMPLING\`@. When
+            -- @rest@ is itself heading-shaped, emit it as a 'Heading'
+            -- block at the head of 'liChildren' -- reusing the
+            -- anchor-less nested-heading path used for blockquote/list
+            -- content elsewhere in this engine, so it takes the empty
+            -- anchor, is not an outline target, and does not touch the
+            -- page's anchor-slug supply (which 'parseList' never threads
+            -- through in the first place) -- and leave 'liContent' empty,
+            -- rather than letting the raw @###@ text become literal
+            -- inline content the way it used to (which is what let the
+            -- \'#\'s leak out to the reader as literal characters).
+            -- Applies to ordered and bullet items alike, via 'rest',
+            -- which 'matchAt' produces uniformly for both; only ordered
+            -- items exercise this in the corpus.
+            (itemInlines, itemChildren) = case headingLineOf rest of
+              Just (lvl, htext) -> ([], Heading lvl (parseInline pageCount htext) "" : childBlocks)
+              Nothing            -> (parseInline pageCount rest, childBlocks)
             item                = ListItem itemInlines itemChildren
             curStart'           = case curStart of
                                      Nothing -> mNum

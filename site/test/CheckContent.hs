@@ -56,6 +56,7 @@ assertionLabel 8 = "8. every page non-empty, every table has a body row"
 assertionLabel 9 = "9. nested (blockquote/list) heading lines become real Heading blocks"
 assertionLabel 10 = "10. no literal '#' Str token anywhere in the corpus"
 assertionLabel 11 = "11. pinned guide-book anchors on pp. 41/42/43/47 unchanged"
+assertionLabel 12 = "12. titled-step headings inside list items, per page (pp. 50-54)"
 assertionLabel n = show n ++ ". ?"
 
 --------------------------------------------------------------------------
@@ -348,53 +349,59 @@ countHeadingsAt bs = length [ () | Heading _ _ _ <- bs ]
 nestedHeadingCount :: [Block] -> Int
 nestedHeadingCount bs = countHeadingsAt (flattenBlocks bs) - countHeadingsAt bs
 
+-- | guide-book carries 16 nested headings: the 3 pre-existing blockquote
+-- "Tip"-callout headings (pp. 41/43/47) plus the 13 list-item "titled
+-- step" headings pp. 50-54's @N. ### <title>@ items now parse to
+-- (briefs/M1-fixes-2-manifest.json, task "titled-steps"). The other three
+-- documents have none of either shape.
 nestedHeadingChecks :: [Check]
 nestedHeadingChecks =
   [ mkCheck 9 ("nested-headings/" ++ T.unpack (docSlug d))
       (got == want)
       ("nested Heading count=" ++ show got ++ " (want " ++ show want ++ ")")
   | d <- docs
-  , let want = if docSlug d == "guide-book" then 3 else 0
+  , let want = if docSlug d == "guide-book" then 16 else 0
         got  = nestedHeadingCount (docPreamble d)
                  + sum [ nestedHeadingCount (pageBlocks p) | p <- docPages d ]
   ]
 
 --------------------------------------------------------------------------
--- 10. General literal-hash guard: no 'Str' inline in NESTED BLOCK CONTENT
--- -- 'Quote' bodies and list-item CHILDREN (recursively; the two places
--- 4.5 recursively re-parses raw lines as blocks, and so the two places
--- 'parseBlocksEngine's @consumesSlugs@ gate used to also (wrongly) gate
--- heading recognition) -- plus top-level Heading\/Para\/Figure captions
--- and table cells, may begin with a literal heading marker (one to six
--- '#' characters then a space). This is the general form of group 9's
+-- 10. General literal-hash guard: no 'Str' inline ANYWHERE in the corpus
+-- -- every inline position -- may begin with a literal heading marker
+-- (one to six '#' characters then a space). This covers 'Quote' bodies
+-- and list-item CHILDREN (recursively; the places 4.5 recursively
+-- re-parses raw lines as blocks), a list item's own marker-line caption
+-- ('liContent'), top-level Heading\/Para\/Figure captions, and table
+-- cells (header and body). This is the general form of group 9's
 -- regression: it catches the whole class of "a heading line fell through
--- to plain text because it was nested" bug, not just the three known
+-- to plain text because it was nested" bug, not just specific known
 -- lines, and reuses 'headingLineOf' so the predicate is exactly the one
 -- that decides real headings, applied to inline text instead of a whole
 -- source line.
 --
--- Deliberately EXCLUDED: a list item's own marker-line caption
--- ('liContent'). 4.5's ordered\/bullet-item rule captures @(.*)$@ after
--- the marker directly as that item's @[Inline]@ content -- a position
--- 'parseBlocksEngine' never recursively block-parses and this fix does
--- not touch, unlike 'liChildren' (a nested line indented under the item,
--- which the same recursive block parse as 'Quote' handles). The corpus
--- has 13 pre-existing numbered-list items on guide-book pp. 50-53 (the
--- Resampling\/Auto Chop\/Auto Trigger steps) whose own marker-line text
--- happens to start with @### @; promoting those to headings too would
--- push the group-9 guide-book nested-heading count to 16, contradicting
--- this task's pinned expectation of exactly 3 -- so they are left as the
--- separate, out-of-scope, unchanged-by-this-fix quirk they are.
+-- 'liContent' used to be deliberately excluded here: 4.5's
+-- ordered\/bullet-item rule captures @(.*)$@ after the marker directly as
+-- that item's @[Inline]@ content, and until briefs/M1-fixes-2-manifest.json
+-- task "titled-steps", a heading-shaped @(.*)$@ (guide-book pp. 50-54's
+-- 13 @N. ### <title>@ "titled steps") landed there as literal text
+-- instead of being recognised. Now that 'parseList' (in
+-- "SXC1.Content.Markdown") checks 'liContent'\'s own text for
+-- 'headingLineOf' and, when it matches, promotes it to a 'Heading' at the
+-- head of 'liChildren' (leaving 'liContent' empty) instead, that
+-- exemption is no longer needed: after the fix, no inline position in the
+-- corpus should ever start with a literal heading marker, so the guard
+-- now covers every position with no exclusions.
 --------------------------------------------------------------------------
 
 isJustT :: Maybe a -> Bool
 isJustT (Just _) = True
 isJustT Nothing  = False
 
--- | Every 'Str' text under a block list's nested-block-parsed content:
--- descends into 'Quote' inner blocks, list items' CHILDREN (not their own
--- marker-line caption -- see above), table cells (header and body),
--- figure\/heading captions, and 'Strong'\/'Em' formatting.
+-- | Every 'Str' text anywhere in a block list: descends into 'Quote' inner
+-- blocks, list items' own marker-line caption ('liContent') AND their
+-- CHILDREN ('liChildren'), table cells (header and body), figure\/heading
+-- captions, and 'Strong'\/'Em' formatting -- i.e. every inline position in
+-- the corpus.
 allStrText :: [Block] -> [Text]
 allStrText = concatMap blockStrs
   where
@@ -402,12 +409,14 @@ allStrText = concatMap blockStrs
       Heading _ inlines _ -> inlineStrs inlines
       Para inlines         -> inlineStrs inlines
       Figure _ capInlines   -> inlineStrs capInlines
-      Bullets items          -> concatMap (allStrText . liChildren) items
-      Numbered _ items        -> concatMap (allStrText . liChildren) items
+      Bullets items          -> concatMap itemStrs items
+      Numbered _ items        -> concatMap itemStrs items
       Quote inner               -> allStrText inner
       Table mHeader rows          ->
         concatMap inlineStrs (maybe [] id mHeader) ++ concatMap (concatMap inlineStrs) rows
       Unparsed _                    -> []
+
+    itemStrs (ListItem content children) = inlineStrs content ++ allStrText children
 
     inlineStrs = concatMap inlineStrs1
     inlineStrs1 i = case i of
@@ -466,6 +475,45 @@ pinnedAnchorChecks =
       ]
 
 --------------------------------------------------------------------------
+-- 12. Titled steps: guide-book pp. 50-54's 13 "N. ### <title>" list items
+-- (briefs/M1-fixes-2-manifest.json, task "titled-steps") must each parse
+-- to a 'Heading' block at the head of their list item's 'liChildren',
+-- with the printed manual's own per-page count of titled steps preserved:
+-- p.50 -> 3, p.51 -> 1, p.52 -> 3, p.53 -> 1, p.54 -> 5.
+--------------------------------------------------------------------------
+
+-- | Count list items (anywhere among the given top-level blocks, including
+-- inside a 'Quote' or a nested list, recursively -- though the corpus has
+-- no such nesting for titled steps) whose own first child is a 'Heading'.
+titledStepHeadingCount :: [Block] -> Int
+titledStepHeadingCount = sum . map oneBlock
+  where
+    oneBlock b = case b of
+      Quote inner     -> titledStepHeadingCount inner
+      Bullets items    -> sum (map oneItem items)
+      Numbered _ items  -> sum (map oneItem items)
+      _                    -> 0
+
+    oneItem (ListItem _ children) =
+      headHeading children + titledStepHeadingCount children
+
+    headHeading (Heading {} : _) = 1
+    headHeading _                 = 0
+
+titledStepChecks :: [Check]
+titledStepChecks =
+  [ mkCheck 12 ("titled-step/guide-book/p" ++ show pn)
+      (got == want)
+      ("titled-step Heading count=" ++ show got ++ " (want " ++ show want ++ ")")
+  | (pn, want) <- expected
+  , let got = case [ p | d <- docs, docSlug d == "guide-book", p <- docPages d, pageNumber p == pn ] of
+                (p : _) -> titledStepHeadingCount (pageBlocks p)
+                []      -> -1
+  ]
+  where
+    expected = [(50, 3), (51, 1), (52, 3), (53, 1), (54, 5)]
+
+--------------------------------------------------------------------------
 -- main
 --------------------------------------------------------------------------
 
@@ -493,7 +541,8 @@ main = do
               ++ nestedHeadingChecks
               ++ literalHashChecks
               ++ pinnedAnchorChecks
-      forM_ [1 .. 11] $ \g -> do
+              ++ titledStepChecks
+      forM_ [1 .. 12] $ \g -> do
         let inGroup = filter ((== g) . chkGroup) allChecks
             passed  = length (filter chkOk inGroup)
             total   = length inGroup
