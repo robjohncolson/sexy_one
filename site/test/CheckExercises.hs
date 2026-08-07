@@ -62,24 +62,24 @@ data Opts = Opts
   , optBrowserFixture   :: Bool
   }
 
-defaultOpts :: Opts
-defaultOpts = Opts
-  { optContentDir = "../content", optTranslationsDir = "../translations"
+defaultOpts :: FilePath -> Opts
+defaultOpts root = Opts
+  { optContentDir = root </> "content", optTranslationsDir = root </> "translations"
   , optJson = False, optSelfTest = False, optFixtures = Nothing
   , optListCodes = False, optBrowserFixture = False
   }
 
--- | @content\/fixtures@'s default location relative to the CLI's own
--- default @--content-dir@\/@--translations-dir@ (@../content@,
--- @../translations@ -- both assume @site\/@ as the working directory, per
--- 'defaultOpts'). Letting @--fixtures@ omit its directory (defaulting to
--- this) is what lets @exercise-check --fixtures@ (no path) work the same
--- way @exercise-check@ alone already does for @--content-dir@.
-defaultFixturesDir :: FilePath
-defaultFixturesDir = "../content/fixtures"
+-- | @content\/fixtures@'s default location under the resolved repo root
+-- ('resolveRootPrefix' -- the same root the default @--content-dir@\/
+-- @--translations-dir@ hang off). Letting @--fixtures@ omit its
+-- directory (defaulting to this) is what lets @exercise-check
+-- --fixtures@ (no path) work the same way @exercise-check@ alone already
+-- does for @--content-dir@.
+defaultFixturesDir :: FilePath -> FilePath
+defaultFixturesDir root = root </> "content" </> "fixtures"
 
-parseArgs :: [String] -> Either String Opts
-parseArgs = go defaultOpts
+parseArgs :: FilePath -> [String] -> Either String Opts
+parseArgs root = go (defaultOpts root)
   where
     go o [] = Right o
     go o ("--content-dir" : d : rest)      = go o { optContentDir = d } rest
@@ -89,7 +89,7 @@ parseArgs = go defaultOpts
     -- '--fixtures' takes an OPTIONAL directory: the next token if it does
     -- not itself look like another flag, else 'defaultFixturesDir'.
     go o ("--fixtures" : d : rest) | not ("--" `isPrefixOf` d) = go o { optFixtures = Just d } rest
-    go o ("--fixtures" : rest)             = go o { optFixtures = Just defaultFixturesDir } rest
+    go o ("--fixtures" : rest)             = go o { optFixtures = Just (defaultFixturesDir root) } rest
     go o ("--list-codes" : rest)           = go o { optListCodes = True } rest
     go o ("--browser-fixture" : rest)      = go o { optBrowserFixture = True } rest
     go _ (bad : _)                         = Left ("unknown or incomplete argument: " ++ bad)
@@ -116,18 +116,41 @@ readUtf8FileOrHarnessError fp = do
     Right t -> pure t
     Left e  -> harnessError ("cannot read " ++ fp ++ ": " ++ show e)
 
--- | @content\/exercise-inventory.md@ is ALWAYS read from this fixed,
--- non-overridable relative path -- never from @--content-dir@ (which
--- only governs where EXERCISE FILES and @terminology-rules.tsv@ come
--- from, and is exactly what @--fixtures@ and ad-hoc sandboxes override).
--- This is what lets chapter-title validation work correctly even when
--- @--content-dir@ points at a sandbox that carries no inventory of its
--- own (see 'isRealContentPath' below for the complementary half of this
--- design: the four id-binding checks are scoped to paths that contain
--- @content\/exercises\/@ literally, which a sandboxed @--content-dir@
--- never does).
-fixedInventoryPath :: FilePath
-fixedInventoryPath = "../content/exercise-inventory.md"
+-- | M5 (briefs\/M5-ship.md, debt item 6): the resolved repo-root prefix
+-- every DEFAULT path in this module hangs off. Historically all of them
+-- were spelled @..@-relative (@..\/content@, @..\/translations@, ...),
+-- which silently assumed @site\/@ as the working directory: run from
+-- the repo root, every disk-touching mode died with a harness error
+-- (M2 advisory, authoring-UX wart). The root is now probed: the first
+-- of @.@, @..@, @..\/..@, @..\/..\/..@ that carries
+-- @content\/exercise-inventory.md@ (the one file that structurally
+-- marks this project's root, and the very file 'fixedInventoryPath'
+-- must reach anyway) wins. If none matches, @..@ is returned so the
+-- historical default -- and its error messages -- are preserved
+-- exactly. Explicit @--content-dir@\/@--translations-dir@\/
+-- @--fixtures DIR@ arguments are never affected: only the defaults
+-- (and the self-test's disk groups 17\/18\/20) move with the resolved
+-- root.
+resolveRootPrefix :: IO FilePath
+resolveRootPrefix = go [".", "..", "../..", "../../.."]
+  where
+    go []       = pure ".."
+    go (c : cs) = do
+      hit <- doesFileExist (c </> "content" </> "exercise-inventory.md")
+      if hit then pure c else go cs
+
+-- | @content\/exercise-inventory.md@ is ALWAYS read from this fixed
+-- root-relative path (under 'resolveRootPrefix') -- never from
+-- @--content-dir@ (which only governs where EXERCISE FILES and
+-- @terminology-rules.tsv@ come from, and is exactly what @--fixtures@
+-- and ad-hoc sandboxes override). This is what lets chapter-title
+-- validation work correctly even when @--content-dir@ points at a
+-- sandbox that carries no inventory of its own (see
+-- 'inventoryScopedCodes' below for the complementary half of this
+-- design: which runs the id-binding checks apply to is a STRUCTURAL,
+-- per-run decision, never a path-spelling one).
+fixedInventoryPath :: FilePath -> FilePath
+fixedInventoryPath root = root </> "content" </> "exercise-inventory.md"
 
 --------------------------------------------------------------------------
 -- The shared resolution context
@@ -156,7 +179,8 @@ loadSharedCtx contentDir translationsDir = do
   let manualIdx = buildManualIndex manualSources
       midiRaw   = maybe "" id (lookup "midi" manualSources)
       midiFacts = buildMidiFacts midiRaw
-  inventoryRaw <- readUtf8FileOrHarnessError fixedInventoryPath
+  root <- resolveRootPrefix
+  inventoryRaw <- readUtf8FileOrHarnessError (fixedInventoryPath root)
   let chapterVocab = parseInventoryChapters inventoryRaw
   pure ( ruleIssues ++ groundIssues
        , SharedCtx
@@ -165,21 +189,46 @@ loadSharedCtx contentDir translationsDir = do
            }
        )
 
--- | The four id-inventory-binding checks apply "over content/exercises/
--- only, never to --fixtures" (briefs/M2-manifest.json). That scope is
--- decided here, by the deck FILE's own path: real runs (default
--- @--content-dir ../content@, or an explicit path to the real content
--- root) always produce paths containing the literal substring
--- @content/exercises/@; any sandboxed or fixture content root does not.
-isRealContentPath :: FilePath -> Bool
-isRealContentPath fp = "content/exercises/" `T.isInfixOf` T.pack fp
+-- | M5 (briefs\/M5-ship.md, debt item 7): the STRUCTURAL id-binding
+-- scope. The four id-inventory-binding checks (E-ID-NOT-IN-INVENTORY\/
+-- E-ID-RETIRED\/E-ID-TYPE-MISMATCH\/E-ID-CHAPTER-MISMATCH) and the two
+-- corpus-wide @requires:@ checks (E-DECK-REQUIRES-UNKNOWN\/-CYCLE)
+-- apply "over content\/exercises\/ only, never to --fixtures"
+-- (briefs\/M2-manifest.json). Until M5 that scope was decided by a PATH
+-- SUBSTRING -- a deck bound iff its own file path contained the literal
+-- @content\/exercises\/@ -- which is exactly why every dirs\/ fixture
+-- that wants these checks is named @...--fixture-content@ (its decks
+-- then live under @...-content\/exercises\/@), and why a moved, copied
+-- or renamed content root silently disabled all six checks with
+-- everything else still green (M2 advisory; M5 debt registry item 7).
+-- The scope is now decided STRUCTURALLY, per run, with no path
+-- inspection at all:
+--
+--   * the real-corpus modes (default, @--json@, @--browser-fixture@)
+--     ALWAYS bind -- their contract is the corpus governed by
+--     'fixedInventoryPath', wherever that tree happens to sit on disk;
+--   * a @--fixtures@ dirs\/ fixture binds iff the code its own name
+--     declares is one of the six inventory-scoped codes below -- the
+--     fixture opts in by what it claims to falsify, not by how its
+--     path happens to be spelled;
+--   * loose files\/ fixtures never bind (a single file is no corpus).
+--
+-- The scope actually firing on the real corpus stays observable as
+-- @totals.inventoryChecked@ (see 'ldInventoryChecked' and
+-- scripts\/check-site.sh's "inventory-binding-scope-fired" check).
+inventoryScopedCodes :: [Text]
+inventoryScopedCodes = map codeText
+  [ E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH
+  , E_DECK_REQUIRES_UNKNOWN, E_DECK_REQUIRES_CYCLE
+  ]
 
 -- | Resolve every issue for ONE already-read deck file: grammar
 -- ("SXC1.Exercise.Parse"), citation and verify-hook resolution
 -- ("SXC1.Exercise.Verify"), terminology ("SXC1.Exercise.Lint"), chapter
--- title, and (scoped -- see 'isRealContentPath') the inventory binding.
-resolveDeckIssues :: SharedCtx -> FilePath -> Text -> ([Issue], Maybe Deck)
-resolveDeckIssues ctx fp raw =
+-- title, and -- iff @bindInventory@ (decided structurally by the
+-- caller, see 'inventoryScopedCodes') -- the inventory binding.
+resolveDeckIssues :: SharedCtx -> Bool -> FilePath -> Text -> ([Issue], Maybe Deck)
+resolveDeckIssues ctx bindInventory fp raw =
   (parseIssues ++ citeIssues ++ verifyIssues ++ termIssues ++ chapterIssues ++ idIssues, mDeck)
   where
     (parseIssues, mDeck, cites, verifies, mChapterField, idRows, lintTargets) = parseDeckDetailed fp raw
@@ -190,7 +239,7 @@ resolveDeckIssues ctx fp raw =
       Just (loc, txt) -> resolveChapter (scChapterVocab ctx) loc txt
       Nothing         -> []
     idIssues
-      | isRealContentPath fp =
+      | bindInventory =
           concat [ resolveInventoryId (scInventoryRaw ctx) (scChapterVocab ctx) loc eid kind chText
                  | (loc, eid, kind, chText) <- idRows ]
       | otherwise = []
@@ -216,15 +265,19 @@ data Loaded = Loaded
   -- | briefs/M2-signoff-fixes.json, task "quiz-selection-semantics",
   -- FIX 3: the number of successfully-parsed decks for which the four
   -- id-inventory-binding checks in 'resolveDeckIssues' actually fired
-  -- (i.e. 'isRealContentPath' held for that deck's own file path). This
+  -- (i.e. the run's structural @bindInventory@ held -- M5 item 7). This
   -- makes the scope OBSERVABLE -- see 'runJsonMode' and
   -- @scripts/check-site.sh@'s "inventory-binding-scope-fired" check,
   -- which asserts this equals 'ldDecks'' length on the real corpus.
   , ldInventoryChecked :: !Int
   }
 
-collectFromDirs :: FilePath -> FilePath -> IO Loaded
-collectFromDirs contentDir translationsDir = do
+-- | Load and validate one whole content root. @bindInventory@ is the
+-- structural id-binding scope for every deck in this run -- see
+-- 'inventoryScopedCodes' (M5 debt item 7): True for the real-corpus
+-- modes, per-fixture for dirs\/ fixtures, never for loose files.
+collectFromDirs :: Bool -> FilePath -> FilePath -> IO Loaded
+collectFromDirs bindInventory contentDir translationsDir = do
   contentDirExists <- doesDirectoryExist contentDir
   unless contentDirExists $
     () <$ harnessError ("content directory does not exist: " ++ contentDir)
@@ -266,28 +319,28 @@ collectFromDirs contentDir translationsDir = do
       perDeck <- forM existingEntries $ \(_, nm) -> do
         let fp = exercisesDir </> T.unpack nm
         raw <- readUtf8FileOrHarnessError fp
-        let (issues, mDeck) = resolveDeckIssues ctx fp raw
-        pure (nm, issues, mDeck, T.length raw, isRealContentPath fp)
+        let (issues, mDeck) = resolveDeckIssues ctx bindInventory fp raw
+        pure (nm, issues, mDeck, T.length raw, bindInventory)
 
       let allIssues  = ctxIssues ++ orphanIssues ++ danglingIssues ++ concat [ i | (_, i, _, _, _) <- perDeck ]
           decks      = mapMaybe (\(_, _, d, _, _) -> d) perDeck
           dupIdIssues = globalIdDuplicateIssues decks
           sourceChars = [ (nm, n) | (nm, _, _, n, _) <- perDeck ]
           -- FIX 3: count only successfully-parsed decks (mDeck == Just)
-          -- whose own file path is where 'resolveDeckIssues' actually
-          -- scoped the id-inventory-binding checks in -- i.e. exactly the
-          -- decks the four E-ID-* checks were applied to, not merely
-          -- attempted.
+          -- for which 'resolveDeckIssues' actually applied the four
+          -- E-ID-* id-inventory-binding checks (M5 debt item 7: the
+          -- per-deck flag is this run's structural @bindInventory@, not
+          -- a path-substring probe), not merely attempted them.
           inventoryChecked = length [ () | (_, _, Just _, _, real) <- perDeck, real ]
           -- M3 (briefs/M3-manifest.json, task "size-split-and-format"):
           -- requires: resolution is DIR-class (it needs the whole
           -- corpus) and, like the four id-inventory-binding checks above,
-          -- must NEVER apply to --fixtures -- scoped by the SAME
-          -- 'isRealContentPath' signal (probed once against this run's
-          -- own exercisesDir, since every deck loaded in one
-          -- 'collectFromDirs' call shares the same content root).
-          runIsRealContent = isRealContentPath (exercisesDir </> "probe.ex.md")
-          requiresIssues = if runIsRealContent then globalRequiresIssues decks else []
+          -- must NEVER apply to plain --fixtures runs -- scoped by the
+          -- SAME structural @bindInventory@ signal (every deck loaded in
+          -- one 'collectFromDirs' call shares the same content root, so
+          -- one per-run flag covers both check families -- exactly the
+          -- coupling the old per-path probe emulated).
+          requiresIssues = if bindInventory then globalRequiresIssues decks else []
       pure Loaded
         { ldIssues = allIssues ++ dupIdIssues ++ requiresIssues, ldDecks = decks, ldSourceChars = sourceChars
         , ldInventoryChecked = inventoryChecked
@@ -334,7 +387,8 @@ globalIdDuplicateIssues decks = exerciseIdDupIssues ++ deckSlugDupIssues
 -- more @requires:@ edges, requires itself). Both are DIR-class: they need
 -- the whole corpus, exactly like 'globalIdDuplicateIssues' above, and the
 -- caller ('collectFromDirs') scopes them the same way it scopes the
--- four id-inventory-binding checks -- never applied to --fixtures.
+-- four id-inventory-binding checks -- structurally, per run (M5 item 7;
+-- see 'inventoryScopedCodes'), never to plain --fixtures runs.
 --
 -- One issue per code per deck involved (fixture/report matching is over
 -- the SET of codes, so the exact count does not matter, only that the
@@ -378,9 +432,14 @@ unDeckId (DeckId t) = t
 -- Default mode / --json mode
 --------------------------------------------------------------------------
 
+-- The real-corpus modes below always bind the inventory checks
+-- (structural scope, M5 debt item 7 -- see 'inventoryScopedCodes'):
+-- their contract is THE corpus 'fixedInventoryPath' governs, wherever
+-- that tree sits on disk.
+
 runDefaultMode :: Opts -> IO ()
 runDefaultMode opts = do
-  loaded <- collectFromDirs (optContentDir opts) (optTranslationsDir opts)
+  loaded <- collectFromDirs True (optContentDir opts) (optTranslationsDir opts)
   forM_ (sortOn (\i -> (isFile i, isLine i)) (ldIssues loaded)) $ \i ->
     putStrLn (T.unpack (renderIssue i))
   putStrLn ("exercise-check: " ++ show (length (ldIssues loaded)) ++ " issue(s)")
@@ -388,7 +447,7 @@ runDefaultMode opts = do
 
 runJsonMode :: Opts -> IO ()
 runJsonMode opts = do
-  loaded <- collectFromDirs (optContentDir opts) (optTranslationsDir opts)
+  loaded <- collectFromDirs True (optContentDir opts) (optTranslationsDir opts)
   let report = renderReport (null (ldIssues loaded)) (ldDecks loaded) (ldSourceChars loaded) (ldIssues loaded)
   putStrLn (T.unpack (injectInventoryChecked (ldInventoryChecked loaded) report))
 
@@ -427,7 +486,7 @@ runListCodes opts = do
 
 runBrowserFixture :: Opts -> IO ()
 runBrowserFixture opts = do
-  loaded <- collectFromDirs (optContentDir opts) (optTranslationsDir opts)
+  loaded <- collectFromDirs True (optContentDir opts) (optTranslationsDir opts)
   case (findQuiz loaded, findDrill loaded, findLookup loaded) of
     (Just qz, Just dr, Just lk) -> putStrLn (T.unpack (browserFixtureJson qz dr lk))
     _ -> do
@@ -530,10 +589,13 @@ runFixtures opts fixturesDir = do
   dirsDirExists <- doesDirectoryExist dirsDir
   dirNames <- if dirsDirExists then listDirectory dirsDir else pure []
 
+  -- Loose files/ fixtures NEVER bind the inventory checks (structural
+  -- scope, M5 debt item 7): a single deck file is not a corpus, and no
+  -- files/ fixture declares one of the 'inventoryScopedCodes'.
   fileResults <- forM (filter (".ex.md" `isSuffixOf`) fileNames) $ \fn -> do
     raw <- readUtf8FileOrHarnessError (filesDir </> fn)
     let fp = filesDir </> fn
-        (issues, _) = resolveDeckIssues ctx fp raw
+        (issues, _) = resolveDeckIssues ctx False fp raw
         nm = T.pack fn
         expected = expectedCodeOf nm
         -- A files/ fixture's own on-disk name is <CODE>--<slug>.ex.md
@@ -549,8 +611,9 @@ runFixtures opts fixturesDir = do
         -- every files/ fixture except the one that is deliberately
         -- exercising the naming rule itself; drop it from the comparison
         -- set everywhere else -- symmetric to how the four inventory
-        -- checks below are already scoped by 'isRealContentPath' rather
-        -- than applied unconditionally. This only changes what this
+        -- checks are already scoped structurally (see
+        -- 'inventoryScopedCodes') rather than applied unconditionally.
+        -- This only changes what this
         -- --fixtures comparison considers relevant: 'resolveDeckIssues'
         -- and 'validFileName' are untouched, so real content/exercises/
         -- validation (default mode, --json, --browser-fixture) and the
@@ -568,7 +631,14 @@ runFixtures opts fixturesDir = do
   dirResults <- forM dirNames $ \dn -> do
     isDir <- doesDirectoryExist (dirsDir </> dn)
     if not isDir then pure Nothing else do
-      loaded <- collectFromDirs (dirsDir </> dn) (optTranslationsDir opts)
+      -- M5 debt item 7: a dirs/ fixture opts into the six
+      -- inventory-scoped checks by the code its own name declares
+      -- (structural scope -- see 'inventoryScopedCodes'); every other
+      -- dirs/ fixture runs with the binding off, exactly as before.
+      -- (Until M5 the same opt-in rode on the "--fixture-content" name
+      -- suffix satisfying a path-substring probe.)
+      let bindInv = expectedCodeOf (T.pack dn) `elem` inventoryScopedCodes
+      loaded <- collectFromDirs bindInv (dirsDir </> dn) (optTranslationsDir opts)
       let got = Set.toList (Set.fromList (map isCode (ldIssues loaded)))
           nm = T.pack dn
           expected = expectedCodeOf nm
@@ -604,8 +674,12 @@ fixturesJson results ok =
 main :: IO ()
 main = do
   hSetEncoding stdout utf8
+  -- M5 debt item 6: resolve the repo root ONCE, up front -- the CLI
+  -- defaults hang off it, so the binary now works from the repo root
+  -- exactly as it always has from site/.
+  root <- resolveRootPrefix
   args <- getArgs
-  case parseArgs args of
+  case parseArgs root args of
     Left err -> harnessError err
     Right opts
       | optSelfTest opts       -> runSelfTest
@@ -633,10 +707,12 @@ main = do
 -- SXC1.Midi.Table's freshly-parsed copy of the source table) and the
 -- three committed deck files carrying the six live verify: hooks.
 -- Neither ever degrades to a
--- SILENT pass: an absent directory (this binary is always run from
--- site/, where ../content exists) still yields a non-empty group with an
--- explicit FAIL naming what was missing, never an empty (vacuously
--- "passing") group -- see 'stGroupsAllOk'\/NEW12.
+-- SILENT pass: an absent directory (M5 debt item 6: the disk groups
+-- reach content\/ and translations\/ through 'resolveRootPrefix', so
+-- this binary works from the repo root as well as from site\/) still
+-- yields a non-empty group with an explicit FAIL naming what was
+-- missing, never an empty (vacuously "passing") group -- see
+-- 'stGroupsAllOk'\/NEW12.
 --------------------------------------------------------------------------
 
 data STCheck = STCheck { stGroup :: !Int, stName :: !String, stOk :: !Bool, stMsg :: !String }
@@ -677,9 +753,10 @@ stGroupsAllOk maxG cs = all oneGroupOk [1 .. maxG]
 
 runSelfTest :: IO ()
 runSelfTest = do
-  agreementChecks  <- readerAgreementChecks
-  indexCountChecks <- indexDrivenEmbeddingChecks
-  midiSpecCks      <- midiSpecChecks
+  root <- resolveRootPrefix
+  agreementChecks  <- readerAgreementChecks root
+  indexCountChecks <- indexDrivenEmbeddingChecks root
+  midiSpecCks      <- midiSpecChecks root
   let allChecks = concat
         [ grammarChecks, new12GuardSelfChecks, choiceChecks, recallChecks, confirmChecks
         , findPageChecks, retryChecks, hintChecks, progressEventChecks, promptIdChecks
@@ -1520,11 +1597,11 @@ safeListDirectory dir = do
   exists <- doesDirectoryExist dir
   if exists then listDirectory dir else pure []
 
-readerAgreementChecks :: IO [STCheck]
-readerAgreementChecks = do
-  let exercisesDir     = "../content/exercises"
-      fixturesFilesDir = "../content/fixtures/files"
-      fixturesDirsDir  = "../content/fixtures/dirs"
+readerAgreementChecks :: FilePath -> IO [STCheck]
+readerAgreementChecks root = do
+  let exercisesDir     = root </> "content" </> "exercises"
+      fixturesFilesDir = root </> "content" </> "fixtures" </> "files"
+      fixturesDirsDir  = root </> "content" </> "fixtures" </> "dirs"
   exFiles     <- exMdFilesIn exercisesDir
   fxFileFiles <- exMdFilesIn fixturesFilesDir
   dirNames    <- safeListDirectory fixturesDirsDir
@@ -1547,10 +1624,10 @@ readerAgreementChecks = do
 -- the number of non-comment INDEX lines (M3, deliverable (2)).
 --------------------------------------------------------------------------
 
-indexDrivenEmbeddingChecks :: IO [STCheck]
-indexDrivenEmbeddingChecks = do
-  let indexPath    = "../content/exercises/INDEX"
-      exercisesDir = "../content/exercises"
+indexDrivenEmbeddingChecks :: FilePath -> IO [STCheck]
+indexDrivenEmbeddingChecks root = do
+  let indexPath    = root </> "content" </> "exercises" </> "INDEX"
+      exercisesDir = root </> "content" </> "exercises"
   indexExists <- doesFileExist indexPath
   realCheck <-
     if not indexExists
@@ -1620,17 +1697,19 @@ staticCodeTotalityChecks =
 -- and the M5 content pass reworded the step to a full sweep).
 --------------------------------------------------------------------------
 
-midiSpecMidiPath :: FilePath
-midiSpecMidiPath = "../translations/midi.md"
+midiSpecMidiPath :: FilePath -> FilePath
+midiSpecMidiPath root = root </> "translations" </> "midi.md"
 
 -- | The three committed deck files carrying the six live verify: hooks
 -- (ids per briefs/M4-manifest.json; file names per the merged M3 tree).
-midiSpecHookFiles :: [(FilePath, Text)]
-midiSpecHookFiles =
-  [ ("../content/exercises/024-pad-01.ex.md", "d-2-01")
-  , ("../content/exercises/028-pad-03.ex.md", "d-2-02")
-  , ("../content/exercises/036-pad-07.ex.md", "d-2-09")
+midiSpecHookFiles :: FilePath -> [(FilePath, Text)]
+midiSpecHookFiles root =
+  [ (exDir </> "024-pad-01.ex.md", "d-2-01")
+  , (exDir </> "028-pad-03.ex.md", "d-2-02")
+  , (exDir </> "036-pad-07.ex.md", "d-2-09")
   ]
+  where
+    exDir = root </> "content" </> "exercises"
 
 -- | decode-then-match: does @bytes@, as delivered by Web MIDI, satisfy
 -- @spec@ on channel @ch@?
@@ -1651,16 +1730,17 @@ extractVerifies wantId mDeck = case mDeck of
 renderSpecs :: Maybe [VerifySpec] -> String
 renderSpecs = show
 
-midiSpecChecks :: IO [STCheck]
-midiSpecChecks = do
-  midiExists <- doesFileExist midiSpecMidiPath
+midiSpecChecks :: FilePath -> IO [STCheck]
+midiSpecChecks root = do
+  let midiPath = midiSpecMidiPath root
+  midiExists <- doesFileExist midiPath
   if not midiExists
     then pure [ mkST 20 "midi-spec/midi.md-not-found" False
-                  (midiSpecMidiPath ++ " does not exist -- cannot run the SXC1.Midi.Spec agreement group") ]
+                  (midiPath ++ " does not exist -- cannot run the SXC1.Midi.Spec agreement group") ]
     else do
-      midiRaw <- readUtf8File midiSpecMidiPath
+      midiRaw <- readUtf8File midiPath
       let parsed = parsePadNotes midiRaw
-      hookSpecs <- forM midiSpecHookFiles $ \(fp, wantId) -> do
+      hookSpecs <- forM (midiSpecHookFiles root) $ \(fp, wantId) -> do
         fileExists <- doesFileExist fp
         if not fileExists
           then pure Nothing

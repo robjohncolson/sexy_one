@@ -208,7 +208,11 @@ Checks performed, in order:
      convention -- against the REAL content/translations roots with
      --content-dir/--translations-dir/--json, requiring the run to exit 0
      AND the captured JSON's "ok" field to be true (issues, if any, are
-     printed). Unless --skip-content.
+     printed). M5 (briefs/M5-ship.md debt item 6) adds one sibling
+     check: the SAME binary must also pass --self-test when invoked
+     from the REPO ROOT (cwd-robust content-root resolution -- its
+     disk groups read content/ and translations/ through the probed
+     root). Unless --skip-content.
   16. INDEPENDENT PYTHON RE-DERIVATION (content axis): a from-scratch
      Python re-implementation recomputes, straight from
      content/exercises/*.ex.md and content/exercises/INDEX (never from
@@ -250,9 +254,14 @@ Checks performed, in order:
   18. M4 DEVICE-VERIFICATION GATE (task "verification"): checks V1-V8
      from briefs/M4-manifest.json, on the EXISTING axes only -- no new
      skip flag. V1, V2, V8 (size/budget: the frozen ceiling constant
-     asserted in this script's own source; the briefs/M4-budget.json
-     task-local ceiling with observed gzip and delta from the M3
-     baseline; the budget's authorisation/staleness gate), V3/V4 (the
+     asserted in this script's own source; then, per the coordinator's
+     2026-08-08 M5 re-scope ruling recorded in briefs/M5-budget.json,
+     V2 measures the artifact against THAT file's task_local_ceiling_
+     bytes (= m4_final + m5_reserve) printing the observed gzip and its
+     delta from m4_final_gzip_bytes, and V8 checks the M5 budget's own
+     arithmetic, the fresh artifact against the M5 window, AND that
+     briefs/M4-budget.json still stands unchanged as the M4 historical
+     record), V3/V4 (the
      scripts/fake-midi.js harness fake exists, parses, names every
      driver member, and is NEVER shipped into site/public or
      site/static), V5 (the seven M4 structural invariants over site/app,
@@ -1039,99 +1048,137 @@ else
   fail "$V1_LABEL (observed: live value=$WASM_GZIP_CEILING_BYTES, assignment lines matching ^WASM_GZIP_CEILING_BYTES==$CEILING_ASSIGN_COUNT -- the frozen ceiling was moved; that is a coordinator decision, never a task's)"
 fi
 
-# --- V2: the M4 task-local budget ceiling ---------------------------------
-# briefs/M4-budget.json (wave 0, m4-baseline) records the merged-M3
-# baseline (m3_final_gzip_bytes) and licenses M4 exactly
-# task_local_ceiling_bytes = min(940000, m3_final + 42000). The artifact
-# measured here is whatever is at --dir, and THE SHIPPING ARTIFACT IS
-# build-site.sh --optimize's OUTPUT (PLAN.md "Size ruling" + its
-# 2026-08-07 amendment: wasm-opt --detect-features -Oz --converge): a
-# plain unoptimized build measures ~1,147K gzip and correctly fails both
-# check 13 and this check, because that artifact is not what ships.
+# --- V2: the M5 task-local budget ceiling (BUDGET WINDOW re-scoped by ------
+# the coordinator's 2026-08-08 ruling, recorded in briefs/M5-budget.json) --
+# briefs/M4-budget.json's task_local_ceiling_bytes (932,713 = m3_final +
+# m4_budget) was an M4-SCOPED construct; M4 closed at m4_final = 927,008
+# gzip, and the M4 budget's 60,000-byte reserve was held under the frozen
+# 1,000,000 ceiling explicitly FOR M5's polish. The M5 window is therefore
+# task_local_ceiling_bytes = m4_final + m5_reserve = 987,008, recorded in
+# briefs/M5-budget.json -- without this re-point, the M5 tree (932,087,
+# 626 bytes under the old M4 ceiling) would false-block the a11y pass. V2
+# measures the artifact at --dir against the M5 window and prints the
+# delta from m4_final_gzip_bytes so growth across the M5 waves stays
+# visible in every log. briefs/M4-budget.json is preserved UNCHANGED as
+# the M4 historical record -- V8 below still checks its internal
+# arithmetic. As before: THE SHIPPING ARTIFACT IS build-site.sh
+# --optimize's OUTPUT (PLAN.md "Size ruling" + its 2026-08-07 amendment:
+# wasm-opt --detect-features -Oz --converge); a plain unoptimized build
+# correctly fails both check 13 and this check, because that artifact is
+# not what ships.
 M4_BUDGET_JSON="$REPO_ROOT/briefs/M4-budget.json"
-M4_BUDGET_FIELDS=""
-if [ -f "$M4_BUDGET_JSON" ] && command -v python3 >/dev/null 2>&1; then
-  M4_BUDGET_FIELDS="$(python3 -c '
+M5_BUDGET_JSON="$REPO_ROOT/briefs/M5-budget.json"
+M5_BUDGET_FIELDS=""
+if [ -f "$M5_BUDGET_JSON" ] && command -v python3 >/dev/null 2>&1; then
+  M5_BUDGET_FIELDS="$(python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1], encoding="utf-8"))
-print(d["task_local_ceiling_bytes"], d["m3_final_gzip_bytes"],
-      d["m4_budget_bytes"], d["second_build_gzip_bytes"],
-      d["ceiling_bytes"], d["authorised"])
-' "$M4_BUDGET_JSON" 2>/dev/null || true)"
+print(d["task_local_ceiling_bytes"], d["m4_final_gzip_bytes"],
+      d["m5_reserve_bytes"], d["ceiling_bytes"], d["m5_entry_gzip_bytes"])
+' "$M5_BUDGET_JSON" 2>/dev/null || true)"
 fi
-M4_TASK_CEILING=""; M4_M3_FINAL=""; M4_BUDGET_BYTES=""; M4_SECOND_BUILD=""; M4_CEILING_FIELD=""; M4_AUTHORISED=""
-if [ -n "$M4_BUDGET_FIELDS" ]; then
-  read -r M4_TASK_CEILING M4_M3_FINAL M4_BUDGET_BYTES M4_SECOND_BUILD M4_CEILING_FIELD M4_AUTHORISED <<< "$M4_BUDGET_FIELDS"
+M5_TASK_CEILING=""; M5_M4_FINAL=""; M5_RESERVE=""; M5_CEILING_FIELD=""; M5_ENTRY=""
+if [ -n "$M5_BUDGET_FIELDS" ]; then
+  read -r M5_TASK_CEILING M5_M4_FINAL M5_RESERVE M5_CEILING_FIELD M5_ENTRY <<< "$M5_BUDGET_FIELDS"
 fi
-V2_LABEL="app.wasm gzip is under briefs/M4-budget.json's task_local_ceiling_bytes (the M4 task-local budget; the shipping artifact is build-site.sh --optimize's output per PLAN.md's Size ruling)"
-if [ -n "$M4_BUDGET_FIELDS" ] && [ -f "$WASM_FILE" ]; then
-  M4_DELTA=$((WASM_GZIP_BYTES - M4_M3_FINAL))
-  info "M4 budget: app.wasm gzip observed=$WASM_GZIP_BYTES bytes; task_local_ceiling_bytes=$M4_TASK_CEILING; delta from m3_final_gzip_bytes ($M4_M3_FINAL) = $M4_DELTA bytes"
-  if [ "$WASM_GZIP_BYTES" -le "$M4_TASK_CEILING" ]; then
-    ok "$V2_LABEL (observed: $WASM_GZIP_BYTES of $M4_TASK_CEILING bytes; delta from m3_final_gzip_bytes=$M4_M3_FINAL is +$M4_DELTA bytes; headroom $((M4_TASK_CEILING - WASM_GZIP_BYTES)) bytes)"
+V2_LABEL="app.wasm gzip is under briefs/M5-budget.json's task_local_ceiling_bytes (the M5 task-local budget = m4_final + m5_reserve; the shipping artifact is build-site.sh --optimize's output per PLAN.md's Size ruling)"
+if [ -n "$M5_BUDGET_FIELDS" ] && [ -f "$WASM_FILE" ]; then
+  M5_DELTA=$((WASM_GZIP_BYTES - M5_M4_FINAL))
+  info "M5 budget: app.wasm gzip observed=$WASM_GZIP_BYTES bytes; task_local_ceiling_bytes=$M5_TASK_CEILING; delta from m4_final_gzip_bytes ($M5_M4_FINAL) = $M5_DELTA bytes"
+  if [ "$WASM_GZIP_BYTES" -le "$M5_TASK_CEILING" ]; then
+    ok "$V2_LABEL (observed: $WASM_GZIP_BYTES of $M5_TASK_CEILING bytes; delta from m4_final_gzip_bytes=$M5_M4_FINAL is $M5_DELTA bytes; headroom $((M5_TASK_CEILING - WASM_GZIP_BYTES)) bytes)"
   else
-    fail "$V2_LABEL (observed: $WASM_GZIP_BYTES bytes, OVER task_local_ceiling_bytes=$M4_TASK_CEILING by $((WASM_GZIP_BYTES - M4_TASK_CEILING)) bytes; delta from m3_final_gzip_bytes=$M4_M3_FINAL is +$M4_DELTA bytes)"
+    fail "$V2_LABEL (observed: $WASM_GZIP_BYTES bytes, OVER task_local_ceiling_bytes=$M5_TASK_CEILING by $((WASM_GZIP_BYTES - M5_TASK_CEILING)) bytes; delta from m4_final_gzip_bytes=$M5_M4_FINAL is $M5_DELTA bytes)"
   fi
 else
-  fail "$V2_LABEL (observed: briefs/M4-budget.json missing/unparseable, python3 missing, or app.wasm missing)"
+  fail "$V2_LABEL (observed: briefs/M5-budget.json missing/unparseable, python3 missing, or app.wasm missing)"
 fi
 
-# --- V8: the budget file is authorised and not stale ----------------------
-# The manifest's literal wording ("m3_final_gzip_bytes is within 3000
-# bytes of a freshly measured build") was written at tag m2, when a fresh
-# build of the tree WAS the M3 baseline. On the merged M4 tree a fresh
-# shipping build lawfully exceeds that baseline by the licensed M4 delta
-# (observed ~+35K of ~42K licensed), so the staleness window is applied to
-# what can still be honestly measured from THIS tree, per the
-# coordinator's binding Size ruling (the measurement, like V2's, is of
-# the OPTIMIZED shipping artifact at --dir):
-#   (a) authorised is literally true (wave 0's M3_FINAL <= 895000 gate);
-#   (b) ceiling_bytes is 1000000 and task_local_ceiling_bytes is exactly
-#       min(940000, m3_final_gzip_bytes + m4_budget_bytes) -- a doctored
-#       ceiling cannot license anything the formula does not;
-#   (c) |m3_final_gzip_bytes - second_build_gzip_bytes| <= 3000 -- the
-#       budget's own two-build variance record still coheres (this is the
-#       manifest's 3000-byte window applied to the two recorded fresh
-#       builds; wave 0 measured zero inter-build variance);
-#   (d) the freshly measured artifact sits in
-#       [m3_final - 3000, task_local_ceiling_bytes]: an artifact more
-#       than the variance window BELOW the recorded baseline proves the
-#       baseline never described this pipeline/tree (stale-high budget);
-#       one above the task ceiling is over-licensed (stale-low budget) --
-#       so a stale budget cannot silently license an over-budget artefact
-#       in either direction.
-V8_LABEL="briefs/M4-budget.json is authorised and not stale (authorised:true; task_local_ceiling_bytes == min(940000, m3_final+m4_budget); ceiling_bytes==1000000; |m3_final - second_build| <= 3000; fresh optimized-artifact gzip within [m3_final-3000, task_local_ceiling_bytes])"
-if [ -n "$M4_BUDGET_FIELDS" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
+# --- V8: both budget files cohere (M5 re-scope, same 2026-08-08 ruling ----
+# as V2's) -- the M5 window is internally consistent AND the M4 record ----
+# still stands ------------------------------------------------------------
+# The fresh measurement, like V2's, is of the OPTIMIZED shipping artifact
+# at --dir:
+#   (a) M5: task_local_ceiling_bytes is exactly m4_final_gzip_bytes +
+#       m5_reserve_bytes -- a doctored ceiling cannot license anything
+#       the formula does not;
+#   (b) M5: ceiling_bytes is the frozen 1000000 (the outer tripwire,
+#       V1/check 13 -- the budget file may not pretend otherwise);
+#   (c) M5: the freshly measured artifact sits in
+#       [m4_final - 3000, task_local_ceiling_bytes]: an artifact more
+#       than the variance window BELOW the recorded M4 close proves the
+#       recorded baseline never described this pipeline/tree (stale-high
+#       budget); one above the task ceiling is over-licensed (stale-low
+#       budget). m5_entry_gzip_bytes is a FIXED historical record of the
+#       reader-debt-wave tree and is deliberately NOT re-measured against
+#       the fresh artifact -- later M5 waves lawfully move away from it;
+#   (d) M4: briefs/M4-budget.json still exists and its own internal
+#       arithmetic still holds (authorised:true; task_local_ceiling_bytes
+#       == min(940000, m3_final+m4_budget); ceiling_bytes==1000000;
+#       |m3_final - second_build| <= 3000) -- the M4 HISTORICAL RECORD is
+#       preserved unchanged, but the fresh artifact is judged against the
+#       M5 window in (c), not against the M3 baseline (that was V8's old
+#       clause (d), retired by the re-scope ruling: the M5 tree sat 626
+#       bytes under the M4-scoped ceiling and would have false-blocked
+#       the a11y pass).
+V8_LABEL="briefs/M5-budget.json coheres (task_local_ceiling_bytes == m4_final + m5_reserve; ceiling_bytes==1000000; fresh optimized-artifact gzip within [m4_final-3000, task_local_ceiling_bytes]) and briefs/M4-budget.json still stands as the M4 historical record (authorised:true; task_local == min(940000, m3_final+m4_budget); ceiling_bytes==1000000; |m3_final - second_build| <= 3000)"
+if [ -f "$M5_BUDGET_JSON" ] && [ -f "$M4_BUDGET_JSON" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
   V8_OUT="$(python3 -c '
-import sys
-task, m3, m4b, second, ceil, auth, observed = sys.argv[1:8]
-task, m3, m4b, second, ceil, observed = int(task), int(m3), int(m4b), int(second), int(ceil), int(observed)
+import json, sys
+try:
+    m5 = json.load(open(sys.argv[1], encoding="utf-8"))
+    m4 = json.load(open(sys.argv[2], encoding="utf-8"))
+except Exception as e:
+    print("FAIL could not parse a budget file: %s" % e)
+    raise SystemExit
+observed = int(sys.argv[3])
 problems = []
-if auth != "True":
-    problems.append("authorised is %r, not true" % auth)
-if ceil != 1000000:
-    problems.append("ceiling_bytes=%d, not the frozen 1000000" % ceil)
-want = min(940000, m3 + m4b)
-if task != want:
-    problems.append("task_local_ceiling_bytes=%d is not min(940000, m3_final+m4_budget)=%d" % (task, want))
-if abs(m3 - second) > 3000:
-    problems.append("|m3_final(%d) - second_build(%d)| = %d exceeds the 3000-byte variance window" % (m3, second, abs(m3 - second)))
-if observed < m3 - 3000:
-    problems.append("fresh artifact gzip=%d is %d bytes BELOW m3_final=%d (beyond the 3000-byte window) -- the recorded baseline never described this pipeline/tree" % (observed, m3 - observed, m3))
-if observed > task:
-    problems.append("fresh artifact gzip=%d is OVER task_local_ceiling_bytes=%d by %d bytes" % (observed, task, observed - task))
+try:
+    m5_task = int(m5["task_local_ceiling_bytes"])
+    m5_final = int(m5["m4_final_gzip_bytes"])
+    m5_res = int(m5["m5_reserve_bytes"])
+    m5_ceil = int(m5["ceiling_bytes"])
+    want = m5_final + m5_res
+    if m5_task != want:
+        problems.append("M5 task_local_ceiling_bytes=%d is not m4_final+m5_reserve=%d" % (m5_task, want))
+    if m5_ceil != 1000000:
+        problems.append("M5 ceiling_bytes=%d, not the frozen 1000000" % m5_ceil)
+    if observed < m5_final - 3000:
+        problems.append("fresh artifact gzip=%d is %d bytes BELOW m4_final=%d (beyond the 3000-byte window) -- the recorded baseline never described this pipeline/tree" % (observed, m5_final - observed, m5_final))
+    if observed > m5_task:
+        problems.append("fresh artifact gzip=%d is OVER task_local_ceiling_bytes=%d by %d bytes" % (observed, m5_task, observed - m5_task))
+except KeyError as e:
+    problems.append("M5-budget.json is missing field %s" % e)
+try:
+    m4_task = int(m4["task_local_ceiling_bytes"])
+    m4_m3 = int(m4["m3_final_gzip_bytes"])
+    m4_b = int(m4["m4_budget_bytes"])
+    m4_second = int(m4["second_build_gzip_bytes"])
+    m4_ceil = int(m4["ceiling_bytes"])
+    if m4.get("authorised") is not True:
+        problems.append("M4 authorised is %r, not true" % m4.get("authorised"))
+    if m4_ceil != 1000000:
+        problems.append("M4 ceiling_bytes=%d, not the frozen 1000000" % m4_ceil)
+    m4_want = min(940000, m4_m3 + m4_b)
+    if m4_task != m4_want:
+        problems.append("M4 task_local_ceiling_bytes=%d is not min(940000, m3_final+m4_budget)=%d -- the historical record was edited" % (m4_task, m4_want))
+    if abs(m4_m3 - m4_second) > 3000:
+        problems.append("M4 |m3_final(%d) - second_build(%d)| = %d exceeds the 3000-byte variance window -- the historical record was edited" % (m4_m3, m4_second, abs(m4_m3 - m4_second)))
+except KeyError as e:
+    problems.append("M4-budget.json is missing field %s" % e)
 if problems:
     print("FAIL " + "; ".join(problems))
 else:
-    print("OK authorised=true, formula holds (task ceiling %d = min(940000, %d+%d)), variance |%d-%d|<=3000, fresh gzip %d in [%d, %d]"
-          % (task, m3, m4b, m3, second, observed, m3 - 3000, task))
-' "$M4_TASK_CEILING" "$M4_M3_FINAL" "$M4_BUDGET_BYTES" "$M4_SECOND_BUILD" "$M4_CEILING_FIELD" "$M4_AUTHORISED" "$WASM_GZIP_BYTES" 2>&1)" || true
+    print("OK M5 formula holds (task ceiling %d = %d+%d, ceiling_bytes=1000000), fresh gzip %d in [%d, %d]; M4 record intact (task ceiling %d = min(940000, %d+%d), authorised, variance |%d-%d|<=3000)"
+          % (m5_task, m5_final, m5_res, observed, m5_final - 3000, m5_task,
+             m4_task, m4_m3, m4_b, m4_m3, m4_second))
+' "$M5_BUDGET_JSON" "$M4_BUDGET_JSON" "$WASM_GZIP_BYTES" 2>&1)" || true
   case "$V8_OUT" in
     "OK "*) ok "$V8_LABEL (${V8_OUT#OK })" ;;
     *)      fail "$V8_LABEL (observed: ${V8_OUT#FAIL })" ;;
   esac
 else
-  fail "$V8_LABEL (observed: briefs/M4-budget.json missing/unparseable, python3 missing, or app.wasm missing)"
+  fail "$V8_LABEL (observed: briefs/M5-budget.json or briefs/M4-budget.json missing, python3 missing, or app.wasm missing)"
 fi
 
 # --- V3: the harness fake exists and carries its whole driver surface -----
@@ -1833,6 +1880,7 @@ if [ "$SKIP_CONTENT" -eq 1 ]; then
   skip "exercise-check runs under wasm-run.mjs and exits 0 (--content-dir/--translations-dir --json)"
   skip "exercise validator reports zero issues over real content (exercise-check --json ok:true)"
   skip "exercise-stats/inventory-binding-scope-fired (totals.inventoryChecked equals totals.decks)"
+  skip "exercise-check --self-test passes from the repo root as well as site/ (cwd-robust content-root resolution, M5 debt item 6)"
   skip "exercise-stats/fnv1a-vectors (FNV-1a/32 pinned against published test vectors)"
   skip "exercise-stats/index-directory-agreement (content/exercises/INDEX vs directory, both directions)"
   skip "exercise-stats/totals-agreement (python re-derivation vs exercise-check --json totals)"
@@ -2171,22 +2219,23 @@ else:
   # FIX 3): INVENTORY-BINDING SCOPE IS OBSERVABLE.
   #
   # The four id-inventory-binding checks (E-ID-NOT-IN-INVENTORY/
-  # E-ID-RETIRED/E-ID-TYPE-MISMATCH/E-ID-CHAPTER-MISMATCH) only apply to a
-  # deck file whose own path contains the literal substring
-  # "content/exercises/" (isRealContentPath, site/test/CheckExercises.hs).
-  # On the shipped configuration that is correct -- but the scope actually
-  # firing was, until this fix, invisible in this report: a future move of
-  # the content root, a CI that builds from a copied tree, or a rename
-  # could silently disable all four checks with everything else still
-  # green (the "check that can silently stop checking" pattern this
-  # project has shipped twice). exercise-check --json's
-  # totals.inventoryChecked now reports how many successfully-parsed
-  # decks the scope actually fired for; on the real corpus this must
-  # equal totals.decks (today: 4). A content root at a path lacking
-  # "content/exercises/" reports inventoryChecked=0 and turns this check
-  # RED -- demonstrated by hand against a sandboxed copy of the real
-  # content, not by this script itself (this check only ever runs against
-  # the real corpus, via $EXERCISE_JSON_FILE above).
+  # E-ID-RETIRED/E-ID-TYPE-MISMATCH/E-ID-CHAPTER-MISMATCH) are scoped
+  # STRUCTURALLY since M5 (briefs/M5-ship.md debt item 7 -- see
+  # inventoryScopedCodes in site/test/CheckExercises.hs): the real-corpus
+  # modes always bind, a dirs/ fixture binds iff the code its own name
+  # declares is inventory-scoped, loose files/ fixtures never bind.
+  # (Until M5 the scope was a path-substring probe for the literal
+  # "content/exercises/", which a moved/copied/renamed content root
+  # silently defeated -- the "check that can silently stop checking"
+  # pattern this project has shipped twice.) exercise-check --json's
+  # totals.inventoryChecked reports how many successfully-parsed decks
+  # the scope actually fired for; on the real corpus this must equal
+  # totals.decks. A wiring regression that stops the binding from firing
+  # reports inventoryChecked=0 and turns this check RED -- demonstrated
+  # in the M5 wave by a sabotage build that forced the --json mode's
+  # bind flag off (inventoryChecked=0 vs decks=52), not by this script
+  # itself (this check only ever runs against the real corpus, via
+  # $EXERCISE_JSON_FILE above).
   # -------------------------------------------------------------------------
   if [ -n "$EXERCISE_JSON_FILE" ] && command -v python3 >/dev/null 2>&1; then
     INV_OUT="$(python3 -c '
@@ -2207,6 +2256,40 @@ else:
     esac
   else
     fail "exercise-stats/inventory-binding-scope-fired (observed: no exercise-check --json capture available or python3 missing)"
+  fi
+
+  # -------------------------------------------------------------------------
+  # Check 15c (M5, briefs/M5-ship.md debt item 6): CWD-ROBUST CONTENT-ROOT
+  # RESOLUTION. exercise-check's default paths (--content-dir/
+  # --translations-dir/--fixtures, the fixed inventory path, and the
+  # self-test's disk groups 17/18/20) were ..-relative -- run from
+  # anywhere but site/ the binary died with harness errors (M2 advisory).
+  # The M5 fix probes for the repo root (resolveRootPrefix in
+  # site/test/CheckExercises.hs), so the SAME binary must now pass
+  # --self-test from the REPO ROOT as well as from site/ (the cwd every
+  # other exercise-check invocation in this script still uses,
+  # unchanged). The self-test is the strongest single probe: its groups
+  # 17/18/20 read content/exercises/, content/fixtures/ and
+  # translations/ through the resolved root, so a broken resolution
+  # cannot pass it from the root. RED state demonstrated with the
+  # pre-fix binary from the repo root: groups 17/18/20 failed
+  # ("../content/exercises/INDEX does not exist", 162/165, exit 1) --
+  # and again with a sabotaged probe marker after the fix.
+  # -------------------------------------------------------------------------
+  BOTHCWD_LABEL="exercise-check --self-test passes from the repo root as well as site/ (cwd-robust content-root resolution, M5 debt item 6)"
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    set +e
+    ROOTCWD_OUT="$(cd "$REPO_ROOT" && wasm-run.mjs "$EXERCISE_CHECK_BIN" --self-test 2>&1)"
+    ROOTCWD_RC=$?
+    set -e
+    ROOTCWD_LAST="$(printf '%s\n' "$ROOTCWD_OUT" | tail -n 1)"
+    if [ "$ROOTCWD_RC" -eq 0 ] && printf '%s' "$ROOTCWD_LAST" | grep -qE '^exercise-check --self-test: [0-9]+/[0-9]+ checks passed$'; then
+      ok "$BOTHCWD_LABEL (observed from the repo root: $ROOTCWD_LAST)"
+    else
+      fail "$BOTHCWD_LABEL (observed: exit $ROOTCWD_RC from the repo root; last line: ${ROOTCWD_LAST:-<empty>})"
+    fi
+  else
+    fail "$BOTHCWD_LABEL (observed: toolchain env or binary unavailable -- see checks above)"
   fi
 
   # -------------------------------------------------------------------------
@@ -3172,7 +3255,16 @@ else
     # before the fix.
     STORAGE_REFUSED_LABEL="storage refused: app boots and reports available=false when localStorage throws (private-mode simulation)"
     STORAGE_PORT=$((PORT + 7))
-    ( cd "$DIR" && python3 -m http.server "$STORAGE_PORT" --bind 127.0.0.1 >/dev/null 2>&1 ) &
+    # M5 fix (briefs/M5-ship.md, debt item 12): this used to be
+    #   ( cd "$DIR" && python3 -m http.server ... ) &
+    # which put the SUBSHELL's pid -- not python's -- in $!; the kill
+    # below (and cleanup()'s) then terminated only the subshell, leaving
+    # the python child orphaned after every full run (observed twice,
+    # 2026-08-07: stray `http.server 8130`/`8307`). `--directory "$DIR"`
+    # lets python serve the bundle with NO subshell and NO cd, so $! IS
+    # the python process and killing it actually stops the server. The
+    # check itself is unchanged.
+    python3 -m http.server "$STORAGE_PORT" --bind 127.0.0.1 --directory "$DIR" >/dev/null 2>&1 &
     STORAGE_SRV_PID=$!
     SERVER_PIDS+=("$STORAGE_SRV_PID")
     sleep 1
@@ -3181,6 +3273,7 @@ else
     STORAGE_REFUSED_RC=$?
     set -e
     kill "$STORAGE_SRV_PID" >/dev/null 2>&1 || true
+    wait "$STORAGE_SRV_PID" 2>/dev/null || true
     if [ "$STORAGE_REFUSED_RC" -eq 0 ]; then
       ok "$STORAGE_REFUSED_LABEL"
     else
