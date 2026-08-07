@@ -152,6 +152,19 @@ build, so any future binaryen defect hits the same net everything else does.
 The 1,000,000 tripwire stays. The alternatives (raise ceiling / stop
 embedding corpus) were rejected while a smaller-than-today option existed.
 
+Size ruling amendment (coordinator, 2026-08-07, M4 wave 0): the wasm-opt
+invocation moves from `-all -O2` to `--detect-features -Oz --converge`.
+Grounds: `-O2` left the gate-cleared m3 artifact at 911,799 gzip — over the
+895,000 line M4's wave-0 kill-switch requires for the 42,000-byte M4 budget
+plus the 60,000-byte M5 reserve; `-Oz --converge` measures 890,713 gzip,
+under the line with all budget arithmetic intact. `-all` is dropped because
+at -Oz binaryen emitted an experimental heap-type encoding
+(custom-descriptors "exact") that shipping V8 rejects at compile —
+`--detect-features` pins binaryen to the module's own declared feature set.
+The full 80/80 check-site suite (including every real-browser flow) ran
+against the exact -Oz artifact before adoption; the behavioral-net argument
+from the original ruling is unchanged.
+
 Resolved:
 - Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).
 - GitHub repo (2026-08-06, owner-confirmed): **public**, `robjohncolson/sexy_one`.

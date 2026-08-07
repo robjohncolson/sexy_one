@@ -128,7 +128,16 @@ cp "$WASM" "$REPO_ROOT/site/public/app.wasm"
 # ---------------------------------------------------------------------------
 if [ "$OPTIMIZE" -eq 1 ]; then
   if command -v wasm-opt >/dev/null 2>&1 && command -v wasm-tools >/dev/null 2>&1; then
-    wasm-opt -all -O2 "$REPO_ROOT/site/public/app.wasm" -o "$REPO_ROOT/site/public/app.opt.wasm"
+    # --detect-features -Oz --converge (coordinator ruling, 2026-08-07, M4
+    # wave 0): -all -O2 left the m3 artifact at 911,799 gzip -- over M4's
+    # 895,000 authorisation line -- and -all at -Oz emitted an
+    # experimental heap-type encoding ("exact", custom-descriptors) that
+    # shipping V8 rejects at compile. --detect-features restricts binaryen
+    # to the features the module itself declares; -Oz --converge then
+    # measures 890,714 gzip, under the line with the 42,000/60,000 M4/M5
+    # budgets intact. Validated by the full check-site + browser suite
+    # against this exact artifact before adoption.
+    wasm-opt --detect-features -Oz --converge "$REPO_ROOT/site/public/app.wasm" -o "$REPO_ROOT/site/public/app.opt.wasm"
     wasm-tools strip -o "$REPO_ROOT/site/public/app.wasm" "$REPO_ROOT/site/public/app.opt.wasm"
     rm -f "$REPO_ROOT/site/public/app.opt.wasm"
   else
