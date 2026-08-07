@@ -3,7 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
-import           Data.IORef            (modifyIORef', newIORef, readIORef)
+import           Data.IORef            (IORef, modifyIORef', newIORef, readIORef, writeIORef)
+import qualified Data.IntMap.Strict     as IntMap
 import           Data.List              (find)
 import qualified Data.Map.Strict        as Map
 import           Data.Map.Strict        (Map)
@@ -26,21 +27,33 @@ import           SXC1.Route             (Route (..), parseDigits, parseRoute, re
 import           Progress.Store         (loadPrefs, loadProgress, loadRaw, savePrefs, saveProgress,
                                          storageAvailable, wipeProgress)
 
+import           Device.Midi            (DeviceStatus (..), DeviceVerifier (..), Hub,
+                                         HubSnapshot (..), hubDisable, hubEnable, hubSetChannel,
+                                         hubSnapshot, newHub, statusText, webMidiVerifier)
 import           Exercises.Corpus       (exerciseCorpus, exerciseStatsJson, jArr, jBool, jInt, jInteger, jKV, jObj,
                                           jStr)
-import           View.Exercise          (ExHandlers (..))
+import           View.Exercise          (DevView (..), ExHandlers (..))
 import qualified View.Exercise          as Exercise
 import           View.Pages             (viewRoute)
 import           View.Progress          (ProgData (..), ProgHandlers (..))
 
 -- | Read window.location.hash via Miso's own DSL.
 --
--- MEASURED (briefs/M1-plan.md P4): a raw FFI `foreign` `import` binding
--- returning 'GHC.Wasm.Prim.JSString' does not link on this toolchain (GHC
--- emits a C stub referencing HsJSString\/rts_mkJSString that
--- wasm32-wasi-clang rejects). 'jsg', '(!)', 'fromJSValUnchecked' and
--- 'MisoString'\/'fromMisoString' are all re-exported by @import Miso@, so
--- no further imports are needed here.
+-- CORRECTION (measured 2026-08-07, M4 design probe P-D -- superseding
+-- M1's P4 claim that used to live here): a raw @foreign import
+-- javascript@ binding -- including one returning
+-- 'GHC.Wasm.Prim.JSString' and a @foreign import javascript \"wrapper\"@
+-- -- COMPILES, LINKS AND RUNS in this executable. The real blocker is
+-- mundane: 'GHC.Wasm.Prim' lives in the @ghc-experimental@ package,
+-- which is not in exe:app's build-depends, so the import does not
+-- compile at all (GHC-87110) until that dependency is added -- with it,
+-- everything links (Miso's own @ffi\/wasm\/Miso\/DSL\/FFI.hs@ has used
+-- exactly these declarations all along). Miso's DSL remains the chosen
+-- route because it needs no new dependency and is proven end to end;
+-- raw JSFFI stays recorded as the escape hatch of last resort for a
+-- future size crunch (briefs\/M4-plan.md section 1, P-D). 'jsg', '(!)',
+-- 'fromJSValUnchecked' and 'MisoString'\/'fromMisoString' are all
+-- re-exported by @import Miso@, so no further imports are needed here.
 currentHash :: IO T.Text
 currentHash = do
   loc <- jsg ("window" :: MisoString) ! ("location" :: MisoString)
@@ -93,23 +106,31 @@ readClocks = do
   pure (MonoMs (toInteger monoNs `div` 1000000), WallMs (round wallMs))
 
 --------------------------------------------------------------------------
--- THE M4 FORWARD HOOK (briefs/M2-manifest.json). Parsed and validated in
--- M2 ("SXC1.Exercise.Verify"), executed in M4. 'noDeviceVerifier' is
--- wired in below; no WebMIDI call and no device permission request
--- exists anywhere in site/app -- the manual confirmation path (a
--- learner clicking a .btn-ex-confirm button) is the only path in M2 and
--- must, and does, work on every browser.
+-- THE M4 DEVICE LAYER (briefs/M4-plan.md sections 3.4/3.7/3.8) -- what
+-- M2's forward hook became. The 'DeviceVerifier' record now lives in
+-- "Device.Midi" beside its one real implementation,
+-- 'Device.Midi.webMidiVerifier' over one 'Device.Midi.Hub'; M2's
+-- do-nothing verifier value is gone. The permission request lives in
+-- 'Device.Midi.hubEnable' -- the ONLY requestMIDIAccess call site in the
+-- codebase, always @{sysex: false}@, reachable only from
+-- #btn-device-enable's click (the 'DEnable' handler below). 'dvAvailable'
+-- remains feature detection only and is still called at boot from 'main',
+-- exactly as M2 already did. The manual confirmation path (a learner
+-- clicking a .btn-ex-confirm button) REMAINS the default and is never
+-- removed, hidden or disabled while device verification is on.
+--
+-- 'DevCtx' bundles what the update loop threads through: the hub, the
+-- verifier built over it, and the watch reconciler's bookkeeping -- the
+-- ACTIVE watch as (promptId text, verify: source text, remover). The
+-- remover is idempotent ('Device.Midi' filters by unique id), so running
+-- it on reconciliation, after the watch already fired, or around a
+-- disable are all safe in any order.
 --------------------------------------------------------------------------
 
-data DeviceVerifier = DeviceVerifier
-  { dvAvailable :: IO Bool
-  , dvWatch     :: VerifySpec -> (ConfirmSource -> IO ()) -> IO (IO ())
-  }
-
-noDeviceVerifier :: DeviceVerifier
-noDeviceVerifier = DeviceVerifier
-  { dvAvailable = pure False
-  , dvWatch     = \_spec _onConfirm -> pure (pure ())
+data DevCtx = DevCtx
+  { dcHub      :: Hub
+  , dcVerifier :: DeviceVerifier
+  , dcWatch    :: IORef (Maybe (Text, Text, IO ()))
   }
 
 --------------------------------------------------------------------------
@@ -167,6 +188,16 @@ data Model = Model
     -- bytes that failed to decode, and nothing else in this Model keeps
     -- them.
   , mRawCorrupt :: !(Maybe Text)
+    -- M4 (task "device-app"): the model's MIRROR of the device hub --
+    -- Miso's 'viewModel' is a pure function of 'Model' and cannot read
+    -- the hub's IORef at render time (the mEventLog precedent), so every
+    -- hub change re-syncs this snapshot via 'DSynced'. 'mDevSupported'
+    -- is the boot-time feature-detect result (a browser cannot gain Web
+    -- MIDI mid-session); 'mDevWatching' mirrors the reconciler's active
+    -- watch as (promptId text, verify: source text).
+  , mDevice       :: !HubSnapshot
+  , mDevSupported :: !Bool
+  , mDevWatching  :: !(Maybe (Text, Text))
   } deriving (Eq)
 
 unDeckId :: DeckId -> Text
@@ -198,6 +229,15 @@ data Action
     -- (the ExBatch/ExClocked two-constructor size discipline, applied
     -- again rather than five new constructors).
   | Prog ProgressOp
+    -- M4: the same discipline once more -- ONE constructor wrapping
+    -- every device operation.
+  | Dev DeviceOp
+
+data DeviceOp
+  = DEnable                              -- ^ #btn-device-enable clicked (enable, or disable when already granted)
+  | DSetChannel Int                      -- ^ #sel-device-channel change \/ #btn-device-use-channel click
+  | DSynced HubSnapshot (Maybe (Text, Text)) -- ^ store a freshly read hub snapshot + active-watch mirror
+  | DConfirm ExId Text                   -- ^ the device callback fired for (exercise, promptId text captured at subscribe time) -- see the stale-confirm guard in 'handleDev'
 
 data ProgressOp
   = PExportReq          -- ^ learner asked for an export
@@ -218,9 +258,17 @@ main :: IO ()
 main = do
   h    <- currentHash
   sink <- mkProgressSink
-  -- THE M4 FORWARD HOOK, wired in (never a WebMIDI call, never a device
-  -- permission request -- 'dvAvailable' is a constant 'pure False' in M2):
-  _ <- dvAvailable noDeviceVerifier
+  -- M4: the device hub. 'newHub' and 'dvAvailable' are feature detection
+  -- ONLY (they read navigator.requestMIDIAccess and test undefined/null;
+  -- they never call it), so both stay safe at boot -- the permission
+  -- request itself lives in 'Device.Midi.hubEnable', reachable only from
+  -- #btn-device-enable's click handler.
+  hub <- newHub
+  let verifier = webMidiVerifier hub
+  supported <- dvAvailable verifier
+  watchRef  <- newIORef Nothing
+  snap0     <- hubSnapshot hub
+  let dev = DevCtx { dcHub = hub, dcVerifier = verifier, dcWatch = watchRef }
   -- M3 startup: probe storage by WRITING (see Progress.Store), load both
   -- blobs, and take today's day from a real wall reading. A corrupt
   -- progress blob puts the app into read-only progress mode from the
@@ -236,7 +284,7 @@ main = do
   prefs   <- loadPrefs
   (_, WallMs wall0) <- readClocks
   let st0 = case loadRes of { DecodeOk s -> s; _ -> emptyProgress }
-  startApp defaultEvents (readerApp sink avail loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
+  startApp defaultEvents (readerApp sink dev supported snap0 avail loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
 
 -- | H6: a cold @RExercise@ route (a deep link, or the very first paint --
 -- Miso's own \"hashchange\" DOM event never fires for the page's INITIAL
@@ -252,10 +300,10 @@ main = do
 -- runtime age as prompt age only because the browser's monotonic origin
 -- is page load -- see this task's final report).
 readerApp
-  :: ProgressSink -> Bool -> DecodeResult -> Maybe Text -> ProgressState -> Prefs -> DayNum -> Route
+  :: ProgressSink -> DevCtx -> Bool -> HubSnapshot -> Bool -> DecodeResult -> Maybe Text -> ProgressState -> Prefs -> DayNum -> Route
   -> App Model Action
-readerApp sink avail loadRes rawBlob st0 prefs today0 r0 =
-  (component model0 (updateModel sink) viewModel)
+readerApp sink dev supported snap0 avail loadRes rawBlob st0 prefs today0 r0 =
+  (component model0 (updateModel sink dev) viewModel)
     { subs  = [ windowSub "hashchange" emptyDecoder (const HashChanged) ]
     , mount = Just (SetRoute r0)
     }
@@ -265,6 +313,7 @@ readerApp sink avail loadRes rawBlob st0 prefs today0 r0 =
       , mProgress = st0, mLoad = loadRes, mStorageOk = avail, mPrefs = prefs
       , mToday = today0, mBooted = False, mExportBlob = Nothing, mImportMsg = Nothing
       , mRawCorrupt = rawBlob
+      , mDevice = snap0, mDevSupported = supported, mDevWatching = Nothing
       }
 
 findExerciseById :: [Deck] -> ExId -> Maybe Exercise
@@ -275,8 +324,8 @@ safeIndexL xs i
   | i < 0     = Nothing
   | otherwise = case drop i xs of { (x : _) -> Just x; [] -> Nothing }
 
-updateModel :: ProgressSink -> Action -> Effect parent props Model Action
-updateModel sink = \case
+updateModel :: ProgressSink -> DevCtx -> Action -> Effect parent props Model Action
+updateModel sink dev = \case
   HashChanged ->
     io (SetRoute . parseRoute <$> currentHash)
 
@@ -311,8 +360,13 @@ updateModel sink = \case
     -- midnight kept yesterday's due/queue until something was graded.
     -- Every navigation now refreshes it from a real wall reading.
     io (do { (_, WallMs w) <- readClocks; pure (Prog (PSetToday (dayOf w))) })
+    -- M4: a route move can change which prompt (if any) should be
+    -- watched -- see 'reconcileEff'.
+    reconcileEff dev
 
   Prog op -> handleProg op
+
+  Dev op -> handleDev dev op
 
   ToggleJA -> do
     r <- gets mRoute
@@ -323,7 +377,11 @@ updateModel sink = \case
         io_ (setHash (renderRoute r'))
       _ -> pure ()
 
-  ExBatch exid acts -> applyExActions sink exid acts
+  ExBatch exid acts -> do
+    applyExActions sink exid acts
+    -- M4: a batch can move the cursor (ConfirmStep/Advance/Restart/
+    -- Begin), which changes which prompt should be watched.
+    reconcileEff dev
 
   ExClocked exid mk -> io $ do
     (mono, wall) <- readClocks
@@ -382,6 +440,174 @@ handleProg op = case op of
   PSaved st -> modify (\m -> case mLoad m of
     DecodeEmpty -> m { mLoad = DecodeOk st }
     _           -> m)
+
+--------------------------------------------------------------------------
+-- M4 device layer: the reconciler, the stale-confirm guard, and the
+-- hidden #sxc1-device-state payload.
+--------------------------------------------------------------------------
+
+handleDev :: DevCtx -> DeviceOp -> Effect parent props Model Action
+handleDev dev op = case op of
+  -- #btn-device-enable. When already granted the same button disables
+  -- (its label tracks the status): run the active watch's remover (a
+  -- no-op if none), clear the bookkeeping, and tear the JS side down --
+  -- then reconcile, so a later re-enable starts from consistent state.
+  DEnable -> do
+    m <- get
+    withSink $ \snk -> do
+      snap <- hubSnapshot (dcHub dev)
+      if snapStatus snap == DevGranted
+        then do
+          mw <- readIORef (dcWatch dev)
+          mapM_ (\(_, _, remover) -> remover) mw
+          writeIORef (dcWatch dev) Nothing
+          hubDisable (dcHub dev)
+        else
+          -- The notify callback the hub closes over: every asynchronous
+          -- hub event (grant, deny, hot-plug rebind, message) re-syncs
+          -- the model's mirror through the component's own sink.
+          hubEnable (dcHub dev) (syncDevice dev snk)
+      reconcileWatch dev m snk
+      syncDevice dev snk
+
+  DSetChannel c -> withSink $ \snk -> do
+    hubSetChannel (dcHub dev) c
+    syncDevice dev snk
+
+  DSynced snap watching ->
+    modify (\m -> m { mDevice = snap, mDevWatching = watching })
+
+  -- THE STALE-CONFIRM GUARD (briefs/M4-plan.md section 3.7, finding
+  -- M4-F3): 'SXC1.Exercise.Engine.gradeStep' does NOT check that the
+  -- graded index is the cursor, so a 'ConfirmStep' for an already-passed
+  -- step would re-grade it and emit a duplicate event. The engine is
+  -- frozen, so the guard lives here: the device callback carries the
+  -- promptId TEXT captured at subscribe time, and it becomes a batch
+  -- ONLY IF that text still names the prompt at the exercise's current
+  -- cursor and that step is still unanswered. Otherwise it is dropped
+  -- silently. The batch itself is IDENTICAL to the manual Confirm
+  -- button's ('exOnConfirm') except for 'ByDevice', via the same
+  -- 'ExClocked' path -- events, mExResults, the capped log and the M3
+  -- sink all behave exactly as they do for a button press.
+  DConfirm exid pidText -> do
+    m <- get
+    let st = Map.findWithDefault (initialState exid (MonoMs 0)) (unExId exid) (mExStates m)
+        i  = esCursor st
+        unanswered = case IntMap.lookup i (esResponses st) of
+          Nothing          -> True
+          Just RUnanswered -> True
+          _                -> False
+    if not (esDone st) && unanswered && unPromptId (promptIdFor exid (i + 1)) == pidText
+      then issue (ExClocked exid (\mono wall -> [ConfirmStep i ByDevice mono wall, Advance mono wall]))
+      else pure ()
+
+-- | Push the hub's current state (and the reconciler's active-watch
+-- bookkeeping) into the model mirror, through the sink.
+syncDevice :: DevCtx -> Sink Action -> IO ()
+syncDevice dev snk = do
+  snap <- hubSnapshot (dcHub dev)
+  mw   <- readIORef (dcWatch dev)
+  snk (Dev (DSynced snap (fmap (\(p, s, _) -> (p, s)) mw)))
+
+-- | THE WATCH RECONCILER (briefs/M4-plan.md section 3.7): one function,
+-- run after every action that can move the route or the cursor
+-- ('SetRoute', 'ExBatch', and 'DEnable'). The desired watch is the
+-- current exercise route's prompt at the cursor, when it is a Confirm
+-- carrying a 'VerifySpec' and is not already answered; if its key (the
+-- promptId text) differs from the active one, the old remover runs and
+-- the new spec is watched. Registering a watch touches no JS and is
+-- legal before enabling ("watching before enabling is legal and simply
+-- never fires"), so this runs unconditionally.
+reconcileEff :: DevCtx -> Effect parent props Model Action
+reconcileEff dev = do
+  m <- get
+  withSink $ \snk -> do
+    reconcileWatch dev m snk
+    syncDevice dev snk
+
+reconcileWatch :: DevCtx -> Model -> Sink Action -> IO ()
+reconcileWatch dev m snk = do
+  active <- readIORef (dcWatch dev)
+  let desired = desiredWatch m
+  case (desired, active) of
+    (Nothing, Nothing) -> pure ()
+    (Just (_, pid, _), Just (apid, _, _)) | pid == apid -> pure ()
+    _ -> do
+      mapM_ (\(_, _, remover) -> remover) active
+      case desired of
+        Nothing -> writeIORef (dcWatch dev) Nothing
+        Just (exid, pid, spec) -> do
+          remover <- dvWatch (dcVerifier dev) spec
+                       (\_src -> snk (Dev (DConfirm exid pid)))
+          writeIORef (dcWatch dev) (Just (pid, specSourceText spec, remover))
+
+-- | The watch the current model calls for: an exercise route whose
+-- cursor prompt is a Confirm with a @verify:@ hook, not yet answered.
+desiredWatch :: Model -> Maybe (ExId, Text, VerifySpec)
+desiredWatch m = case mRoute m of
+  RExercise _ exSlug -> do
+    let exid = ExId exSlug
+    ex <- findExerciseById exerciseCorpus exid
+    let st = Map.findWithDefault (initialState exid (MonoMs 0)) exSlug (mExStates m)
+        i  = esCursor st
+    prompt <- safeIndexL (exPrompts ex) i
+    spec   <- case prBody prompt of
+      Confirm _ (Just v) -> Just v
+      _                  -> Nothing
+    let unanswered = case IntMap.lookup i (esResponses st) of
+          Nothing          -> True
+          Just RUnanswered -> True
+          _                -> False
+    if esDone st || not unanswered
+      then Nothing
+      else Just (exid, unPromptId (prId prompt), spec)
+  _ -> Nothing
+
+-- | A spec rendered back in the @verify:@ source grammar (the form CI
+-- and the content files speak), for the #sxc1-device-state payload --
+-- distinct from 'SXC1.Midi.Spec.describeSpec', which renders for the
+-- learner.
+specSourceText :: VerifySpec -> Text
+specSourceText v = case v of
+  VerifyCC n vs -> "cc " <> tshow n <> " " <> T.intercalate "," (map tshow vs)
+  VerifyNote ns -> "note " <> T.intercalate "," (map tshow ns)
+  VerifyPad p b -> "pad " <> tshow p <> " bank " <> T.singleton b
+  VerifyAny     -> "any"
+  where tshow = T.pack . show
+
+-- | The #sxc1-device-state machine-readable payload (briefs/M4-plan.md
+-- section 3.8) -- always rendered, always hidden, on every route.
+-- Built with "Exercises.Corpus"'s existing JSON combinators, never a
+-- second encoder. @confirms@ derives from the CURRENT exercise's
+-- 'esResponses' ('RConfirmed' 'ByDevice'/'ByLearner'), which is how CI
+-- asserts WHO confirmed a step without touching 'ProgressEvent'.
+deviceStateJson :: Model -> Text
+deviceStateJson m = jObj
+  [ jKV "supported"   (jBool (mDevSupported m))
+  , jKV "status"      (jStr (statusText (snapStatus snap)))
+  , jKV "channel"     (jInt (snapChannel snap))
+  , jKV "ports"       (jArr (map jStr (snapPorts snap)))
+  , jKV "allPorts"    (jArr (map jStr (snapAllPorts snap)))
+  , jKV "watching"    watchingJson
+  , jKV "lastMessage" (maybe "null" (jArr . map jInt) (snapLastMsg snap))
+  , jKV "lastChannel" (maybe "null" jInt (snapLastChan snap))
+  , jKV "confirms"    (jArr confirms)
+  ]
+  where
+    snap = mDevice m
+    watchingJson = case mDevWatching m of
+      Nothing         -> "null"
+      Just (pid, src) -> jObj [ jKV "prompt" (jStr pid), jKV "spec" (jStr src) ]
+    confirms = case mRoute m of
+      RExercise _ exSlug -> case Map.lookup exSlug (mExStates m) of
+        Nothing -> []
+        Just st ->
+          [ jObj [ jKV "prompt" (jStr (unPromptId (promptIdFor (ExId exSlug) (i + 1))))
+                 , jKV "source" (jStr (case src of { ByDevice -> "device"; ByLearner -> "learner" }))
+                 ]
+          | (i, RConfirmed src) <- IntMap.toAscList (esResponses st)
+          ]
+      _ -> []
 
 -- | On first navigation to an exercise (no state recorded for it yet),
 -- seed a fresh attempt with a real wall-clock reading. Never re-fires
@@ -490,6 +716,19 @@ exHandlersFor exid = ExHandlers
   , exOnShowHint   = \i -> ExBatch exid [ShowHint i]
   , exOnNext       = ExClocked exid (\mono wall -> [Advance mono wall])
   , exOnRestart    = ExClocked exid (\mono wall -> [Restart mono wall])
+    -- M4 (task "device-app"): the device panel's two controls.
+  , exOnDevEnable  = Dev DEnable
+  , exOnDevChannel = Dev . DSetChannel
+  }
+
+-- | Everything "View.Exercise" renders the device panel and the verify
+-- lines from -- assembled fresh each frame straight from the model
+-- mirror, exactly like 'progDataFor'.
+devViewFor :: Model -> DevView
+devViewFor m = DevView
+  { dvwSupported = mDevSupported m
+  , dvwSnap      = mDevice m
+  , dvwWatching  = fmap fst (mDevWatching m)
   }
 
 -- | The current prompt's last graded result, if any -- looked up by
@@ -509,7 +748,7 @@ exerciseBodyView m route = case route of
     let exid   = ExId exSlug
         st     = Map.findWithDefault (initialState exid (MonoMs 0)) (unExId exid) (mExStates m)
         result = currentResult m exid st
-    in Just (Exercise.viewExerciseRunner (exHandlersFor exid) exerciseCorpus deckSlug exSlug st result)
+    in Just (Exercise.viewExerciseRunner (exHandlersFor exid) (devViewFor m) exerciseCorpus deckSlug exSlug st result)
   _ -> Nothing
 
 eventLogJson :: [ProgressEvent] -> Text
@@ -619,4 +858,4 @@ progDataFor m = ProgData
   }
 
 viewModel :: props -> Model -> View Model Action
-viewModel _ m = viewRoute ToggleJA (progHandlersFor m) (progDataFor m) exerciseStatsJson (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson m) (exerciseBodyView m (mRoute m)) (mRoute m)
+viewModel _ m = viewRoute ToggleJA (progHandlersFor m) (progDataFor m) exerciseStatsJson (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson m) (deviceStateJson m) (exerciseBodyView m (mRoute m)) (mRoute m)

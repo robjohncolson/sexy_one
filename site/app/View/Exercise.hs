@@ -16,6 +16,7 @@
 -- would create a module cycle: Main -> View.Pages -> View.Exercise).
 module View.Exercise
   ( ExHandlers (..)
+  , DevView (..)
   , viewExerciseIndex
   , viewDeck
   , viewExerciseRunner
@@ -33,10 +34,12 @@ import           Miso.Html.Element      as H
 import           Miso.Html.Event        as E
 import           Miso.Html.Property     as P
 
-import           SXC1.Exercise.Engine   (ExerciseState (..), Outcome (..), Response (..))
+import           Device.Midi            (DeviceStatus (..), HubSnapshot (..))
+import           SXC1.Exercise.Engine   (ConfirmSource (..), ExerciseState (..), Outcome (..), Response (..))
 import           SXC1.Exercise.Types
+import           SXC1.Midi.Spec         (describeSpec)
 import           SXC1.Progress.Types    (ProgressState)
-import           SXC1.Route             (Route (..), renderRoute)
+import           SXC1.Route             (Route (..), parseDigits, renderRoute)
 
 import qualified View.Blocks            as Blocks
 import qualified View.Progress          as Progress
@@ -60,6 +63,21 @@ data ExHandlers action = ExHandlers
   , exOnShowHint   :: Int -> action
   , exOnNext       :: action
   , exOnRestart    :: action
+    -- M4 (task "device-app"): the device panel's controls.
+  , exOnDevEnable  :: action
+  , exOnDevChannel :: Int -> action
+  }
+
+--------------------------------------------------------------------------
+-- M4: everything the runner renders the device panel and the per-step
+-- verify lines from -- a pure snapshot assembled by Main (see
+-- Main.devViewFor); this module decides nothing about MIDI itself.
+--------------------------------------------------------------------------
+
+data DevView = DevView
+  { dvwSupported :: !Bool            -- ^ boot-time Web MIDI feature-detect result
+  , dvwSnap      :: !HubSnapshot     -- ^ the hub mirror (status\/channel\/ports\/last message)
+  , dvwWatching  :: Maybe Text       -- ^ the armed watch's promptId text, if any
   }
 
 --------------------------------------------------------------------------
@@ -71,6 +89,12 @@ unDeckId (DeckId t) = t
 
 unExId :: ExId -> Text
 unExId (ExId t) = t
+
+unPromptId' :: PromptId -> Text
+unPromptId' (PromptId t) = t
+
+tshow :: Int -> Text
+tshow = T.pack . show
 
 findDeckBySlug :: [Deck] -> Text -> Maybe Deck
 findDeckBySlug decks slug = find ((== slug) . unDeckId . dkId) decks
@@ -197,11 +221,12 @@ viewDeck prog decks slug = case findDeckBySlug decks slug of
 -- see Main.hs), so correctness is never re-derived here; only rendered.
 viewExerciseRunner
   :: ExHandlers action
+  -> DevView
   -> [Deck] -> Text -> Text
   -> ExerciseState
   -> Maybe (Outcome, Int)
   -> View model action
-viewExerciseRunner h decks deckSlug exSlug st mResult =
+viewExerciseRunner h dv decks deckSlug exSlug st mResult =
   case findDeckBySlug decks deckSlug of
     Nothing -> exerciseNotFound (deckSlug <> "/" <> exSlug)
     Just d -> case findExerciseBySlug d exSlug of
@@ -214,6 +239,7 @@ viewExerciseRunner h decks deckSlug exSlug st mResult =
         , H.p_ [ P.id_ "ex-progress" ] [ text (ms progressText) ]
         , H.div_ [ P.id_ "ex-stem" ] (Blocks.renderBlocks "" (exIntro ex))
         ]
+        ++ devicePanelEl ex
         ++ bodyEls ex
         ++ hintsEl ex
         ++ [ H.button_ [ P.id_ "btn-ex-restart", E.onClick (exOnRestart h) ] [ "Restart" ] ]
@@ -334,7 +360,7 @@ viewExerciseRunner h decks deckSlug exSlug st mResult =
                       [ H.p_ [ P.class_ "ex-step-check", P.id_ (ms ("ex-step-" <> T.pack (show stepN) <> "-check")) ]
                           (Blocks.renderInlines "" checkInlines)
                       ]
-                      ++ verifyEl stepN mVerify
+                      ++ verifyEl stepN prompt mVerify
                       ++ citesEl stepN (stepN - 1) prompt
                       ++ confirmEl (stepN - 1)
                     _ -> []
@@ -360,13 +386,43 @@ viewExerciseRunner h decks deckSlug exSlug st mResult =
                   ]
               | otherwise = []
 
-            verifyEl _stepN Nothing = []
-            verifyEl stepN (Just _v) =
-              [ H.p_ [ P.class_ "ex-verify", P.id_ (ms ("ex-step-" <> T.pack (show stepN) <> "-verify")) ]
-                  [ "Automatic device confirmation arrives with WebMIDI support in a future update; "
-                  , "confirm manually for now."
-                  ]
+            -- M4: the live verify line (briefs/M4-plan.md section 3.8),
+            -- replacing M2's fixed placeholder sentence. Keeps the
+            -- p.ex-verify class and the ex-step-N-verify id, and gains
+            -- exactly one state class per render:
+            --   .ex-verify-confirmed  this step was confirmed ByDevice
+            --   .ex-verify-waiting    armed and listening (the active
+            --                         watch names THIS step's promptId
+            --                         and access is granted)
+            --   .ex-verify-idle       everything else -- including every
+            --                         browser with no Web MIDI at all,
+            --                         and steps confirmed manually.
+            verifyEl _stepN _prompt Nothing = []
+            verifyEl stepN prompt (Just v) =
+              [ H.p_ [ P.class_ (ms ("ex-verify " <> stateClass))
+                     , P.id_ (ms ("ex-step-" <> T.pack (show stepN) <> "-verify"))
+                     ]
+                  [ text (ms sentence) ]
               ]
+              where
+                idx0 = stepN - 1
+                pidText = unPromptId' (prId prompt)
+                confirmedByDevice =
+                  IntMap.lookup idx0 (esResponses st) == Just (RConfirmed ByDevice)
+                armed = dvwSupported dv
+                  && snapStatus (dvwSnap dv) == DevGranted
+                  && dvwWatching dv == Just pidText
+                (stateClass, sentence)
+                  | confirmedByDevice =
+                      ( "ex-verify-confirmed" :: Text
+                      , "Confirmed by the device: " <> describeSpec v <> "." )
+                  | armed =
+                      ( "ex-verify-waiting"
+                      , "Waiting for the device: " <> describeSpec v
+                          <> " on MIDI channel " <> tshow (snapChannel (dvwSnap dv)) <> "." )
+                  | otherwise =
+                      ( "ex-verify-idle"
+                      , "Device verification is off — confirm manually, or turn it on above." )
 
             confirmEl idx0
               | idx0 == esCursor st =
@@ -393,3 +449,82 @@ viewExerciseRunner h decks deckSlug exSlug st mResult =
         summaryEl
           | esDone st = [ H.section_ [ P.id_ "ex-summary" ] [ H.p_ [] [ "You've completed this exercise." ] ] ]
           | otherwise = []
+
+        -- M4 (briefs/M4-plan.md section 3.8): the device panel --
+        -- rendered ONLY when Web MIDI is available (boot feature detect)
+        -- AND the current exercise carries at least one verify: hook
+        -- (only drill Confirm steps can, so this is never a quiz or
+        -- lookup route). A browser without Web MIDI renders no
+        -- #ex-device at all. The manual Confirm button is NEVER removed,
+        -- hidden or disabled while device verification is on -- manual
+        -- confirmation is the default path in every state.
+        devicePanelEl ex'
+          | dvwSupported dv && hasVerifyHook ex' =
+              [ H.section_ [ P.id_ "ex-device" ]
+                  ( [ H.button_ [ P.id_ "btn-device-enable", E.onClick (exOnDevEnable h) ]
+                        [ text (ms enableLabel) ]
+                    , H.p_ [ P.id_ "device-status" ] [ text (ms statusSentence) ]
+                    , H.select_
+                        [ P.id_ "sel-device-channel"
+                        , E.onChange (\raw -> case parseDigits (fromMisoString raw) of
+                            Just cn | cn >= 1 && cn <= 16 -> exOnDevChannel h cn
+                            _                             -> exOnDevChannel h chan)
+                        ]
+                        [ H.option_ [ P.value_ (ms (tshow cn)), P.selected_ (cn == chan) ]
+                            [ text (ms (tshow cn)) ]
+                        | cn <- [1 .. 16 :: Int]
+                        ]
+                    , H.p_ [ P.id_ "device-ports" ] [ text (ms portsText) ]
+                    ]
+                    ++ useChannelEl
+                  )
+              ]
+          | otherwise = []
+          where
+            snap = dvwSnap dv
+            chan = snapChannel snap
+
+            hasVerifyHook e = any
+              (\p -> case prBody p of { Confirm _ (Just _) -> True; _ -> False })
+              (exPrompts e)
+
+            -- The likeliest real-device failure: the unit transmits on a
+            -- channel other than the selected one (translations/midi.md
+            -- 1.1: settable 1..16). Name it, and offer the one-click fix.
+            mismatch = case (snapStatus snap, snapLastChan snap) of
+              (DevGranted, Just c) | c /= chan -> Just c
+              _                                -> Nothing
+
+            enableLabel :: Text
+            enableLabel = case snapStatus snap of
+              DevGranted -> "Disable device verification"
+              DevPending -> "Requesting MIDI access\x2026"
+              DevDenied  -> "Retry device access"
+              _          -> "Enable device verification"
+
+            statusSentence :: Text
+            statusSentence = case snapStatus snap of
+              DevOff         -> "Device verification is off."
+              DevPending     -> "Waiting for the browser to grant MIDI access."
+              DevDenied      -> "The browser denied MIDI access. Confirm each step manually, or re-grant access in your browser's site settings and try again."
+              DevUnsupported -> "This browser has no Web MIDI support; confirm each step manually."
+              DevGranted     -> case mismatch of
+                Just c  -> "Received MIDI on channel " <> tshow c
+                             <> "; this drill is listening on channel " <> tshow chan <> "."
+                Nothing -> "Device verification is on, listening on MIDI channel " <> tshow chan <> "."
+
+            portsText :: Text
+            portsText = case snapStatus snap of
+              DevGranted
+                | null (snapPorts snap) ->
+                    "No MIDI input detected — check the USB cable and that the unit is on."
+                | otherwise ->
+                    "Bound MIDI input: " <> T.intercalate ", " (snapPorts snap)
+              _ -> "No device bound yet."
+
+            useChannelEl = case mismatch of
+              Nothing -> []
+              Just c  ->
+                [ H.button_ [ P.id_ "btn-device-use-channel", E.onClick (exOnDevChannel h c) ]
+                    [ text (ms ("Use channel " <> tshow c)) ]
+                ]

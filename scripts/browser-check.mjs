@@ -264,7 +264,11 @@ function parseArgs(argv) {
   const opts = {
     url: 'http://127.0.0.1:8123/',
     browser: null,
-    timeout: 45000,
+    // M4: raised from 45000 -- the run now also carries the 22-assertion
+    // device suite (a dozen fresh targets), and the bare default budget
+    // no longer covered a full real-app run. Purely an upper bound on
+    // hangs; it loosens no assertion.
+    timeout: 240000,
     keepOpen: false,
     expectJson: null,
     quick: false,
@@ -274,6 +278,7 @@ function parseArgs(argv) {
     exerciseFixture: null,
     expectExerciseJson: null,
     checkStorageRefused: false,
+    deviceOnly: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -313,6 +318,9 @@ function parseArgs(argv) {
         break;
       case '--check-storage-refused':
         opts.checkStorageRefused = true;
+        break;
+      case '--device-only':
+        opts.deviceOnly = true;
         break;
       case '--help':
       case '-h':
@@ -381,6 +389,13 @@ Options:
                        (see its own summary output for valid keys) --
                        a faster dev loop, not part of the documented
                        pass/fail contract.
+  --device-only        M4 dev loop: run ONLY the 22 WebMIDI device
+                       assertions (D1..D22) against --url, in their own
+                       throwaway browser -- the fast cycle for the M4
+                       sabotage sweep, not part of the documented
+                       pass/fail contract (the full run and check-site
+                       both run the same suite as part of everything
+                       else).
   --check-storage-refused
                        M3 harness item C, negative control c3 -- NOT part
                        of the ordinary pass/fail run, and NOT invoked by
@@ -809,6 +824,7 @@ function selfTestFixtureHtml(selector) {
   <div id="sxc1-event-log" hidden>[]</div>
   <div id="sxc1-prompt-baseline" hidden>null</div>
   <div id="sxc1-progress" hidden></div>
+  <div id="sxc1-device-state" hidden></div>
   <div id="sxc1-root"></div>
 </div>
 <script>
@@ -907,6 +923,306 @@ window.__SXC1_BOOTED = true;
   var TAB = String.fromCharCode(9);
   var NL = String.fromCharCode(10);
   var BS = String.fromCharCode(92);
+
+  // -----------------------------------------------------------------------
+  // M4 harness wave: a small, self-contained, DELIBERATELY INDEPENDENT
+  // mirror of the app's device layer (Device.Midi + Main's reconciler /
+  // stale-confirm guard / #sxc1-device-state payload) -- the same
+  // discipline as the M3 progress mini-mirror above: --self-test proves
+  // the D-assertions THEMSELVES can fail (each 'dev*' selector below
+  // sabotages exactly one decision point), never that the real app
+  // matches this fixture. The fixture drill carries TWO verify hooks so
+  // both spec kinds are exercised: step 1 "cc 80 127", step 2
+  // "pad 1 bank A" (note 36).
+  //
+  // The device-confirm APPLY path deliberately runs in TWO queued hops
+  // (match -> guard -> apply), mirroring the real app's action queue
+  // (hub callback -> DConfirm guard -> ExClocked -> ExBatch), so the
+  // one-shot and stale-confirm sabotages are observable the same way
+  // they would be in the app.
+  // -----------------------------------------------------------------------
+  var DRILL_SPECS = [
+    { kind: 'cc', num: 80, values: [127], text: 'cc 80 127' },
+    { kind: 'note', notes: [36], text: 'pad 1 bank A' }
+  ];
+  var DEV = {
+    supported: (typeof navigator.requestMIDIAccess === 'function'),
+    status: 'off',
+    channel: 1,
+    ports: [],
+    allPorts: [],
+    lastMessage: null,
+    lastChannel: null,
+    access: null,
+    boundPorts: [],
+    watchingPrompt: null,
+    skipNextReconcile: false
+  };
+  if (!DEV.supported) DEV.status = 'unsupported';
+  var drillConfirms = [];
+  // SABOTAGE, selector 'devBootRequest' (-> D3): request the permission
+  // at boot, with no learner click -- exactly what constraint 2 forbids.
+  if (sel('devBootRequest') && DEV.supported) {
+    try {
+      // The result (and the real browser's rejection, when no fake is
+      // installed) is deliberately swallowed: the sabotage is the CALL
+      // happening at boot, which D3 reads off the fake's calls array.
+      navigator.requestMIDIAccess({ sysex: false }).then(function () { }, function () { });
+    } catch (e) { /* ignored */ }
+  }
+
+  function onDrillRoute() {
+    var parts = location.hash.replace(/^#/, '').split('/').filter(Boolean);
+    return parts.length === 3 && parts[0] === 'x' && parts[2] === FIXTURE.drill.id;
+  }
+  function onQuizRoute() {
+    var parts = location.hash.replace(/^#/, '').split('/').filter(Boolean);
+    return parts.length === 3 && parts[0] === 'x' && parts[2] === FIXTURE.quiz.id;
+  }
+  function currentDrillPrompt() {
+    if (!onDrillRoute()) return null;
+    if (drillCursor >= FIXTURE.drill.steps) return null;
+    return FIXTURE.drill.id + '#' + (drillCursor + 1);
+  }
+  function specTextFor(prompt) {
+    var idx = parseInt(prompt.split('#')[1], 10) - 1;
+    return DRILL_SPECS[idx] ? DRILL_SPECS[idx].text : '';
+  }
+
+  function devUpdateState() {
+    var el = document.getElementById('sxc1-device-state');
+    if (!el) return;
+    el.textContent = JSON.stringify({
+      supported: DEV.supported,
+      status: DEV.status,
+      channel: DEV.channel,
+      ports: DEV.ports,
+      allPorts: DEV.allPorts,
+      watching: DEV.watchingPrompt
+        ? { prompt: DEV.watchingPrompt, spec: specTextFor(DEV.watchingPrompt) }
+        : null,
+      lastMessage: DEV.lastMessage,
+      lastChannel: DEV.lastChannel,
+      confirms: onDrillRoute() ? drillConfirms.slice() : []
+    });
+    devRefreshPanel();
+  }
+
+  // The reconciler mirror: the desired watch is the drill route's current
+  // step, when it exists and is unanswered (the fixture's cursor only
+  // ever sits on unanswered steps). SABOTAGE 'devStaleConfirm' (-> D15):
+  // a MANUAL confirm skips the disarm exactly once, so the previous
+  // step's watch stays armed -- the stale state the app's guard exists
+  // to make harmless. SABOTAGE 'devKeepWatchOnNav' (-> D16): a route
+  // move away from the drill never disarms.
+  function devReconcile() {
+    if (DEV.skipNextReconcile) { DEV.skipNextReconcile = false; devUpdateState(); return; }
+    var desired = currentDrillPrompt();
+    if (sel('devKeepWatchOnNav') && desired === null && DEV.watchingPrompt !== null) {
+      devUpdateState();
+      return;
+    }
+    var changed = DEV.watchingPrompt !== desired;
+    DEV.watchingPrompt = desired;
+    // Keep the verify lines' waiting/idle classes in step with the watch
+    // (the real app re-renders everything on every action; this fixture
+    // must do it by hand). renderDrill never calls back into
+    // devReconcile, so this cannot recurse.
+    if (changed && onDrillRoute()) renderDrill();
+    devUpdateState();
+  }
+
+  function devDecode(bytes) {
+    if (!bytes.length) return null;
+    var s = bytes[0];
+    if (s < 128 || s >= 240) return null;
+    var ch = (s % 16) + 1;
+    var kind = s - (s % 16);
+    if (kind === 176 && bytes.length === 3) return { channel: ch, kind: 'cc', a: bytes[1], b: bytes[2] };
+    if (kind === 144 && bytes.length === 3) return { channel: ch, kind: 'note', a: bytes[1], b: bytes[2] };
+    return { channel: ch, kind: 'other' };
+  }
+
+  // The matcher mirror, with one named sabotage per decision point --
+  // each maps to exactly one D-assertion:
+  //   'devIgnoreChannel' (-> D10)  drop the channel test
+  //   'devWrongCC'       (-> D8)   compare no CC number
+  //   'devIgnoreValue'   (-> D9)   ignore the value list
+  //   'devPadAnyNote'    (-> D11)  any note satisfies a pad spec
+  function devMatches(prompt, m) {
+    if (!m || m.kind === 'other') return false;
+    if (!sel('devIgnoreChannel') && m.channel !== DEV.channel) return false;
+    var idx = parseInt(prompt.split('#')[1], 10) - 1;
+    var spec = DRILL_SPECS[idx];
+    if (!spec) return false;
+    if (spec.kind === 'cc') {
+      if (m.kind !== 'cc') return false;
+      if (!sel('devWrongCC') && m.a !== spec.num) return false;
+      if (!sel('devIgnoreValue') && spec.values.indexOf(m.b) === -1) return false;
+      return true;
+    }
+    if (m.kind !== 'note') return false;
+    if (!sel('devPadAnyNote') && spec.notes.indexOf(m.a) === -1) return false;
+    return true;
+  }
+
+  function devApplyConfirm(stepIdx) {
+    pushEvent(FIXTURE.drill.id, 'drill', 'correct', drillStepAt, FIXTURE.drill.id + '#' + (stepIdx + 1));
+    drillConfirms.push({ prompt: FIXTURE.drill.id + '#' + (stepIdx + 1), source: 'device' });
+    drillCursor += 1;
+    drillStepAt = Date.now();
+    if (onDrillRoute()) renderDrill();
+    devReconcile();
+  }
+
+  function devOnMessage(ev) {
+    var bytes = Array.prototype.slice.call(ev.data);
+    DEV.lastMessage = bytes;
+    var m = devDecode(bytes);
+    DEV.lastChannel = m ? m.channel : null;
+    if (DEV.watchingPrompt && devMatches(DEV.watchingPrompt, m)) {
+      var captured = DEV.watchingPrompt;
+      // SABOTAGE 'devNotOneShot' (-> D14): the matched watch is not
+      // removed, so a second message in the same turn matches again.
+      if (!sel('devNotOneShot')) DEV.watchingPrompt = null;
+      setTimeout(function () {
+        // hop 1: the stale-confirm guard (skipped under 'devStaleConfirm')
+        var ok = sel('devStaleConfirm') || (currentDrillPrompt() === captured);
+        if (!ok) { devUpdateState(); return; }
+        var stepIdx = drillCursor;
+        setTimeout(function () { devApplyConfirm(stepIdx); }, 0);
+      }, 0);
+    }
+    devUpdateState();
+  }
+
+  function devBindPorts() {
+    DEV.boundPorts.forEach(function (p) { p.onmidimessage = null; });
+    DEV.boundPorts = [];
+    DEV.ports = [];
+    DEV.allPorts = [];
+    if (!DEV.access) { devUpdateState(); return; }
+    var all = Array.from(DEV.access.inputs.values());
+    DEV.allPorts = all.map(function (p) { return p.name; });
+    var low = function (s) { return String(s || '').toLowerCase(); };
+    var hasAny = function (p, needles) {
+      return needles.some(function (ndl) {
+        return low(p.name).indexOf(ndl) !== -1 || low(p.manufacturer).indexOf(ndl) !== -1;
+      });
+    };
+    var chosen = all.filter(function (p) { return hasAny(p, ['sxc-1', 'sxc1', 'sxc 1']); });
+    if (chosen.length === 0) chosen = all.filter(function (p) { return hasAny(p, ['casio']); });
+    // SABOTAGE 'devNoFallback' (-> D13): bind only name-matched ports.
+    if (chosen.length === 0 && !sel('devNoFallback')) chosen = all;
+    // SABOTAGE 'devBindAll' (-> D12): bind every port, selected or not.
+    if (sel('devBindAll')) chosen = all;
+    chosen.forEach(function (p) { p.onmidimessage = devOnMessage; });
+    DEV.boundPorts = chosen;
+    DEV.ports = chosen.map(function (p) { return p.name; });
+    devUpdateState();
+  }
+
+  function devEnable() {
+    if (!DEV.supported || DEV.status === 'pending') return;
+    if (DEV.status === 'granted') {
+      // parity with the app: the same button disables when already on
+      DEV.boundPorts.forEach(function (p) { p.onmidimessage = null; });
+      if (DEV.access) DEV.access.onstatechange = null;
+      DEV.access = null;
+      DEV.boundPorts = [];
+      DEV.ports = [];
+      DEV.allPorts = [];
+      DEV.lastMessage = null;
+      DEV.lastChannel = null;
+      DEV.status = 'off';
+      DEV.watchingPrompt = null;
+      devReconcile();
+      return;
+    }
+    DEV.status = 'pending';
+    devUpdateState();
+    navigator.requestMIDIAccess({ sysex: sel('devSysexTrue') ? true : false }).then(function (access) {
+      DEV.access = access;
+      access.onstatechange = function () { devBindPorts(); };
+      DEV.status = 'granted';
+      devBindPorts();
+    }, function () {
+      DEV.status = 'denied';
+      devUpdateState();
+    });
+  }
+
+  function devVerifyLineHtml(stepN) {
+    var spec = DRILL_SPECS[stepN - 1];
+    if (!spec) return '';
+    var prompt = FIXTURE.drill.id + '#' + stepN;
+    var confirmedByDevice = drillConfirms.some(function (c) {
+      return c.prompt === prompt && c.source === 'device';
+    });
+    var cls, sentence;
+    if (confirmedByDevice) {
+      cls = 'ex-verify-confirmed';
+      sentence = 'Confirmed by the device: ' + spec.text + '.';
+    } else if (DEV.supported && DEV.status === 'granted' && DEV.watchingPrompt === prompt) {
+      cls = 'ex-verify-waiting';
+      sentence = 'Waiting for the device: ' + spec.text + ' on MIDI channel ' + DEV.channel + '.';
+    } else {
+      cls = 'ex-verify-idle';
+      sentence = 'Device verification is off ' + String.fromCharCode(8212) + ' confirm manually, or turn it on above.';
+    }
+    return '<p class="ex-verify ' + cls + '" id="ex-step-' + stepN + '-verify">' + sentence + '</p>';
+  }
+
+  // The device panel mirror. Rendered on the drill route when supported
+  // -- and, under SABOTAGE 'devPanelAlways' (-> D1 and D4), always,
+  // everywhere, exactly the unconditional render the app must never do.
+  function devRefreshPanel() {
+    var existing = document.getElementById('ex-device');
+    if (existing) existing.parentNode.removeChild(existing);
+    var show = (DEV.supported && onDrillRoute()) || sel('devPanelAlways');
+    if (!show) return;
+    var host = root();
+    if (!host) return;
+    var label = DEV.status === 'granted' ? 'Disable device verification'
+      : DEV.status === 'pending' ? 'Requesting MIDI access...'
+        : DEV.status === 'denied' ? 'Retry device access'
+          : 'Enable device verification';
+    var mismatch = DEV.status === 'granted' && DEV.lastChannel !== null && DEV.lastChannel !== DEV.channel;
+    var statusText;
+    if (DEV.status === 'off') statusText = 'Device verification is off.';
+    else if (DEV.status === 'pending') statusText = 'Waiting for the browser to grant MIDI access.';
+    else if (DEV.status === 'denied') statusText = 'The browser denied MIDI access. Confirm each step manually, or re-grant access and try again.';
+    else if (DEV.status === 'unsupported') statusText = 'This browser has no Web MIDI support; confirm each step manually.';
+    else if (mismatch) statusText = 'Received MIDI on channel ' + DEV.lastChannel + '; this drill is listening on channel ' + DEV.channel + '.';
+    else statusText = 'Device verification is on, listening on MIDI channel ' + DEV.channel + '.';
+    var portsText = DEV.status === 'granted'
+      ? (DEV.ports.length === 0
+        ? 'No MIDI input detected ' + String.fromCharCode(8212) + ' check the USB cable and that the unit is on.'
+        : 'Bound MIDI input: ' + DEV.ports.join(', '))
+      : 'No device bound yet.';
+    var options = '';
+    for (var ci = 1; ci <= 16; ci++) {
+      options += '<option value="' + ci + '"' + (ci === DEV.channel ? ' selected' : '') + '>' + ci + '</option>';
+    }
+    var el = document.createElement('section');
+    el.id = 'ex-device';
+    el.innerHTML = '<button id="btn-device-enable" type="button">' + label + '</button>' +
+      '<p id="device-status">' + statusText + '</p>' +
+      '<select id="sel-device-channel">' + options + '</select>' +
+      '<p id="device-ports">' + portsText + '</p>' +
+      (mismatch ? '<button id="btn-device-use-channel" type="button">Use channel ' + DEV.lastChannel + '</button>' : '');
+    host.appendChild(el);
+    el.querySelector('#btn-device-enable').addEventListener('click', devEnable);
+    el.querySelector('#sel-device-channel').addEventListener('change', function (ev2) {
+      var v = parseInt(ev2.target.value, 10);
+      if (v >= 1 && v <= 16) { DEV.channel = v; devUpdateState(); }
+    });
+    var useBtn = el.querySelector('#btn-device-use-channel');
+    if (useBtn) useBtn.addEventListener('click', function () {
+      DEV.channel = DEV.lastChannel;
+      devUpdateState();
+    });
+  }
 
   function clamp1_180(x) { return Math.max(1, Math.min(180, x)); }
 
@@ -1490,9 +1806,11 @@ window.__SXC1_BOOTED = true;
   // hugely negative to 0) -- so a cold-load assertion that only checked
   // the M:SS STRING (any value, including "0:00") would miss it; this is
   // why the new cold-load assertion reads elapsedMs itself instead.
-  function pushEvent(exId, kind, outcome, promptAt) {
+  // M4: promptId (optional) lets a DRILL confirm record its own step's
+  // prompt id; every pre-M4 caller keeps the '#1' default unchanged.
+  function pushEvent(exId, kind, outcome, promptAt, promptId) {
     var elapsedMs = LEGACY_ALL ? 0 : Math.max(0, Date.now() - (promptAt || Date.now()));
-    eventLog.push({ deck: FIXTURE.quiz.deck, exercise: exId, prompt: exId + '#1', kind: kind,
+    eventLog.push({ deck: FIXTURE.quiz.deck, exercise: exId, prompt: promptId || (exId + '#1'), kind: kind,
       outcome: outcome, attempt: 1, revealed: false, hints: 0, elapsedMs: elapsedMs, at: Date.now() });
     // NEW14 (continueMatchesLast): mirror the app's psLastPrompt -- the
     // LAST graded exercise -- plus the FIRST, which the sabotage renders
@@ -1626,6 +1944,7 @@ window.__SXC1_BOOTED = true;
       renderQuiz();
       updateProgressPayload();
     });
+    devUpdateState();
   }
 
   function renderDrill() {
@@ -1647,7 +1966,10 @@ window.__SXC1_BOOTED = true;
         : '';
       stepsHtml += '<li class="ex-step" id="ex-step-' + i + '"><div class="ex-step-instruction"><p>Step ' + i + '.</p></div>' +
         '<p class="ex-step-check" id="ex-step-' + i + '-check">Check ' + i + '.</p>' +
-        ((FIXTURE.drill.hasVerify && i === 1) ? '<p class="ex-verify" id="ex-step-1-verify">Automatic device confirmation arrives with WebMIDI support in a future update; confirm manually for now.</p>' : '') +
+        // M4: the live verify line (idle/waiting/confirmed), mirroring
+        // the app's View.Exercise render -- both fixture drill steps
+        // carry a spec (see DRILL_SPECS above).
+        (FIXTURE.drill.hasVerify ? devVerifyLineHtml(i) : '') +
         citeHtml +
         (idx0 === drillCursor ? ('<button class="btn-ex-confirm" id="btn-ex-confirm-' + i + '">Confirm</button>') : '') +
         '</li>';
@@ -1657,14 +1979,22 @@ window.__SXC1_BOOTED = true;
       '<div id="ex-stem"><p>Do the thing.</p></div><ol id="ex-steps">' + stepsHtml + '</ol></article>';
     var btn = document.getElementById('btn-ex-confirm-' + (drillCursor + 1));
     if (btn) btn.addEventListener('click', function () {
-      pushEvent(FIXTURE.drill.id, 'drill', 'correct', drillStepAt);
+      var confirmedIdx = drillCursor;
+      pushEvent(FIXTURE.drill.id, 'drill', 'correct', drillStepAt, FIXTURE.drill.id + '#' + (confirmedIdx + 1));
+      // M4: mirror the app's esResponses-derived confirms array, and the
+      // reconciler's disarm-on-cursor-move (sabotaged once, on exactly
+      // this manual path, by 'devStaleConfirm' -- see devReconcile).
+      drillConfirms.push({ prompt: FIXTURE.drill.id + '#' + (confirmedIdx + 1), source: 'learner' });
+      DEV.skipNextReconcile = sel('devStaleConfirm');
       drillCursor += 1;
       // H1: Advance re-baselines esPromptAt to the NEXT prompt's own
       // monotonic reading -- mirrored here for the step about to become
       // current.
       drillStepAt = Date.now();
       renderDrill();
+      devReconcile();
     });
+    devUpdateState();
   }
 
   function elapsedStr() {
@@ -1771,8 +2101,11 @@ window.__SXC1_BOOTED = true;
     renderIndex();
     updateProgressPayload();
   }
-  window.addEventListener('hashchange', render);
-  render();
+  // M4: every route render reconciles the device watch (mirrors Main.hs)
+  // and keeps #sxc1-device-state fresh on every route.
+  function renderWithDevice() { render(); devReconcile(); }
+  window.addEventListener('hashchange', renderWithDevice);
+  renderWithDevice();
 })();
 <\/script>
 </body></html>`;
@@ -2979,6 +3312,730 @@ function validateExerciseFixture(fx) {
 }
 
 // ---------------------------------------------------------------------------
+// M4 (task "device-app"): the WebMIDI device suite -- assertions D1..D22
+// from briefs/M4-plan.md section 4, driven through scripts/fake-midi.js.
+//
+// The fake is a COMMITTED REPO FILE (reviewable, one copy drives every
+// scenario) loaded with Page.addScriptToEvaluateOnNewDocument on a
+// FRESHLY CREATED target (created at about:blank, attached, domains
+// enabled, script added, only then Page.navigate) -- creating the target
+// directly at the app URL is too late for the app's boot-time feature
+// detection to see it (M4 design probe P-B; same technique as NEW5's
+// cold-deep-link target).
+//
+// The suite is shared verbatim between the real app (main() and
+// --device-only below, driven against --url) and the self-test fixture
+// (runOneSelfTestPass, driven against selfTestFixtureHtml()'s own device
+// mirror) -- "the same assertion code runs against it", the
+// runExerciseAssertions precedent. Only the DEVICE_*_CFG route/byte
+// tables differ.
+//
+// Every negative control asserts its anti-vacuity evidence: emit()'s
+// return value (how many handlers were actually invoked),
+// subscribedCount(), and the lastMessage bytes echoed back out of
+// #sxc1-device-state -- so a control can never pass because nobody was
+// listening. D20 runs the enable flow with NO fake at all: real headless
+// Chrome exposes requestMIDIAccess but rejects it (P-C), which is what
+// proves the fake is load-bearing in every positive assertion.
+// ---------------------------------------------------------------------------
+
+const FAKE_MIDI_PATH = path.join(HARNESS_REPO_ROOT, 'scripts', 'fake-midi.js');
+
+const DEVICE_ASSERTION_NAMES = {
+  d1: 'D1: outcome absent -> #sxc1-device-state reports supported:false, status "unsupported", and no #ex-device is rendered',
+  d2: 'D2: outcome absent -> the drill still confirms manually end to end, exactly as in M3, with the .ex-verify-idle text',
+  d3: 'D3: fake present, no click -> requestMIDIAccess was never called at boot (calls.length === 0)',
+  d4: 'D4: #ex-device present on the drill route, absent on a quiz route',
+  d5: 'D5: clicking #btn-device-enable makes exactly one new requestMIDIAccess call, with sysex === false',
+  d6: 'D6: one SXC-1 port -> status "granted", ports names it, watching is the drill\'s first hook',
+  d7: 'D7: emitting the matching bytes auto-confirms step 1: exactly one new event for the prompt, confirms says source "device"',
+  d8: 'D8: NEG wrong CC number -> delivered to a live port but no confirm (lastMessage proves receipt)',
+  d9: 'D9: NEG wrong CC value -> delivered to a live port but no confirm (lastMessage proves receipt)',
+  d10: 'D10: NEG wrong channel -> no confirm, lastChannel names it, #device-status explains the mismatch, #btn-device-use-channel appears',
+  d11: 'D11: pad hook -> the wrong note does not confirm, the right note does',
+  d12: 'D12: two ports, one SXC-1 -> only the SXC-1 is bound; the other port\'s emit reaches nobody and confirms nothing',
+  d13: 'D13: one unrecognised port -> bound anyway (liberal fallback) and confirms',
+  d14: 'D14: the matching message emitted twice in one turn (plus once settled) -> still exactly one event for that prompt',
+  d15: 'D15: a manual confirm racing/preceding the matching bytes -> no second event, cursor unchanged (stale-confirm protection)',
+  d16: 'D16: navigating away from the drill disarms the watch (watching null) and a later matching emit confirms nothing',
+  d17: 'D17: zero ports at enable -> granted with ports []; hot-plug addPort rebinds and the drill then confirms',
+  d18: 'D18: removePort empties ports without crashing and keeps the watch armed; re-adding a port confirms again',
+  d19: 'D19: outcome deny -> status "denied", #device-status explains, manual confirm still works',
+  d20: 'D20: no fake injected (real headless Chrome) -> enable lands in status "denied" and never confirms (the fake is load-bearing)',
+  d21: 'D21: zero network requests beyond the app\'s own assets across a full device scenario',
+  d22: 'D22: site/public and site/static contain no fake-midi.js',
+};
+
+// Preambles (per-scenario driver setup, run right after the fake installs).
+const DEV_PRE_GRANT_SXC = "window.__SXC1_FAKE_MIDI.setOutcome('grant'); window.__SXC1_FAKE_MIDI.addPort('sxc1-0', 'CASIO SXC-1 MIDI 1', 'CASIO');";
+const DEV_PRE_ABSENT = "window.__SXC1_FAKE_MIDI.setOutcome('absent');";
+const DEV_PRE_DENY = "window.__SXC1_FAKE_MIDI.setOutcome('deny');";
+const DEV_PRE_TWO = "window.__SXC1_FAKE_MIDI.setOutcome('grant'); window.__SXC1_FAKE_MIDI.addPort('other-0', 'Arturia KeyStep', 'Arturia'); window.__SXC1_FAKE_MIDI.addPort('sxc1-0', 'CASIO SXC-1 MIDI 1', 'CASIO');";
+const DEV_PRE_USB = "window.__SXC1_FAKE_MIDI.setOutcome('grant'); window.__SXC1_FAKE_MIDI.addPort('usb-0', 'USB MIDI Device', '');";
+const DEV_PRE_ZERO = "window.__SXC1_FAKE_MIDI.setOutcome('grant');";
+
+// Test vectors come from translations/midi.md, not from imagination:
+// CC 80 = Bank Select A (127 press / 0 release); note 36 = pad 1 bank A;
+// note 37 = pad 2 bank A; note 48 = pad 13 bank A; 0xB1 = CC on ch 2.
+// Routes are the merged-M3 tree's seed decks (briefs/M4-budget.json,
+// evidence item e): the manifest's tag-m2 route names drifted.
+const DEVICE_REAL_CFG = {
+  sxcPortName: 'CASIO SXC-1 MIDI 1',
+  quizRoute: '#/x/pad-01/q-2-01',
+  drill: {
+    route: '#/x/pad-01/d-2-01', exId: 'd-2-01', steps: 3,
+    prompt1: 'd-2-01#1', spec1Text: 'cc 80 127',
+    good: [176, 80, 127], wrongCc: [176, 81, 127], wrongValue: [176, 80, 0],
+    wrongChan: [177, 80, 127], wrongChanNum: 2,
+    progressAfter1: '2 / 3',
+  },
+  pad: {
+    route: '#/x/pad-03/d-2-02', exId: 'd-2-02', prompt: 'd-2-02#1',
+    prepareBytes: null, good: [144, 36, 127], bad: [144, 37, 127],
+  },
+  twoStep: {
+    route: '#/x/pad-03/d-2-02', exId: 'd-2-02',
+    first: [144, 36, 127], firstPrompt: 'd-2-02#1',
+    second: [144, 48, 127], secondPrompt: 'd-2-02#2',
+  },
+};
+
+// The fixture drill (selfTestFixtureHtml) carries two hooks: step 1
+// "cc 80 127", step 2 "pad 1 bank A" (note 36) -- so the pad case is
+// step 2 of the same drill, reached by first confirming step 1 by device.
+const DEVICE_SELFTEST_CFG = {
+  sxcPortName: 'CASIO SXC-1 MIDI 1',
+  quizRoute: `#/x/${SELF_TEST_FIXTURE.quiz.deck}/${SELF_TEST_FIXTURE.quiz.id}`,
+  drill: {
+    route: `#/x/${SELF_TEST_FIXTURE.drill.deck}/${SELF_TEST_FIXTURE.drill.id}`,
+    exId: SELF_TEST_FIXTURE.drill.id, steps: SELF_TEST_FIXTURE.drill.steps,
+    prompt1: `${SELF_TEST_FIXTURE.drill.id}#1`, spec1Text: 'cc 80 127',
+    good: [176, 80, 127], wrongCc: [176, 81, 127], wrongValue: [176, 80, 0],
+    wrongChan: [177, 80, 127], wrongChanNum: 2,
+    progressAfter1: `2 / ${SELF_TEST_FIXTURE.drill.steps}`,
+  },
+  pad: {
+    route: `#/x/${SELF_TEST_FIXTURE.drill.deck}/${SELF_TEST_FIXTURE.drill.id}`,
+    exId: SELF_TEST_FIXTURE.drill.id, prompt: `${SELF_TEST_FIXTURE.drill.id}#2`,
+    prepareBytes: [176, 80, 127], good: [144, 36, 127], bad: [144, 37, 127],
+  },
+  twoStep: {
+    route: `#/x/${SELF_TEST_FIXTURE.drill.deck}/${SELF_TEST_FIXTURE.drill.id}`,
+    exId: SELF_TEST_FIXTURE.drill.id,
+    first: [176, 80, 127], firstPrompt: `${SELF_TEST_FIXTURE.drill.id}#1`,
+    second: [144, 36, 127], secondPrompt: `${SELF_TEST_FIXTURE.drill.id}#2`,
+  },
+};
+
+// M4 negative-sweep map, appended to --self-test-negative exactly like
+// M3_SELECTOR_ASSERTIONS: each fixture selector sabotages one decision
+// point of the fixture's device mirror (see its own comment at the
+// sabotage site) and must make EXACTLY its mapped D-assertion(s) fail.
+// 'devPanelAlways' maps to two on purpose: an unconditionally rendered
+// panel is one root cause observed on two routes (D1's absent drill and
+// D4's quiz), the honest single-root-cause grouping the M3 map already
+// uses for 'jaFirstPersist'.
+const M4_SELECTOR_ASSERTIONS = {
+  devBootRequest: [DEVICE_ASSERTION_NAMES.d3],
+  devSysexTrue: [DEVICE_ASSERTION_NAMES.d5],
+  devPanelAlways: [DEVICE_ASSERTION_NAMES.d1, DEVICE_ASSERTION_NAMES.d4],
+  devWrongCC: [DEVICE_ASSERTION_NAMES.d8],
+  devIgnoreValue: [DEVICE_ASSERTION_NAMES.d9],
+  devIgnoreChannel: [DEVICE_ASSERTION_NAMES.d10],
+  devPadAnyNote: [DEVICE_ASSERTION_NAMES.d11],
+  devBindAll: [DEVICE_ASSERTION_NAMES.d12],
+  devNoFallback: [DEVICE_ASSERTION_NAMES.d13],
+  devNotOneShot: [DEVICE_ASSERTION_NAMES.d14],
+  devStaleConfirm: [DEVICE_ASSERTION_NAMES.d15],
+  devKeepWatchOnNav: [DEVICE_ASSERTION_NAMES.d16],
+};
+
+// Fresh-target factory: everything a device scenario needs, built the
+// P-B way (inject BEFORE navigation). `cdp` and `deadline` come from
+// whichever caller owns the browser (main(), --device-only, or a
+// self-test pass).
+function deviceTargetFactoryFor(cdp, deadline, baseUrl) {
+  const baseNoHash = baseUrl.replace(/#.*$/, '');
+  const originPrefix = baseNoHash.startsWith('file://')
+    ? 'file://'
+    : baseNoHash.replace(/^(\w+:\/\/[^/]+).*$/, '$1');
+  return async function makeDeviceTarget({ preamble = '', injectFake = true, hash = '', network = false }) {
+    const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+    await cdp.send('Runtime.enable', {}, sessionId);
+    await cdp.send('Page.enable', {}, sessionId);
+    const requests = [];
+    if (network) {
+      await cdp.send('Network.enable', {}, sessionId);
+      cdp.on('Network.requestWillBeSent', (params, sid) => {
+        if (sid === sessionId) requests.push(params.request && params.request.url);
+      });
+    }
+    if (injectFake) {
+      const src = fs.readFileSync(FAKE_MIDI_PATH, 'utf8');
+      await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: `${src}\n;(function () { try { ${preamble} } catch (e) { console.error('fake-midi preamble failed: ' + e); } })();`,
+      }, sessionId);
+    }
+    await cdp.send('Page.navigate', { url: `${baseNoHash}${hash}` }, sessionId);
+    const evaluate = async (expression) => {
+      const res = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+      if (res.exceptionDetails) {
+        const d = res.exceptionDetails;
+        throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
+      }
+      return res.result ? res.result.value : undefined;
+    };
+    let booted = false;
+    const bootDeadline = Math.min(deadline, Date.now() + 20000);
+    while (Date.now() < bootDeadline) {
+      try {
+        if ((await evaluate('window.__SXC1_BOOTED === true')) === true) { booted = true; break; }
+      } catch { /* document may still be navigating */ }
+      await sleep(100);
+    }
+    return {
+      booted,
+      evaluate,
+      requests,
+      originPrefix,
+      close: async () => { try { await cdp.send('Target.closeTarget', { targetId }); } catch { /* best effort */ } },
+    };
+  };
+}
+
+async function readDeviceStateJson(evaluate) {
+  const raw = await evaluate("(() => { const e = document.querySelector('#sxc1-device-state'); return e ? e.textContent : null; })()");
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+// Poll #sxc1-device-state until `predicateSrc` (over the parsed payload
+// `p`) is true -- the waitForProgressPredicate idiom.
+async function waitDeviceState(evaluate, predicateSrc, budgetMs) {
+  return waitForTrue(evaluate, `(() => {
+    const e = document.querySelector('#sxc1-device-state');
+    let p = null;
+    try { p = JSON.parse(e ? e.textContent : 'null'); } catch (err) { return false; }
+    if (!p) return false;
+    return Boolean(${predicateSrc});
+  })()`, budgetMs);
+}
+
+async function deviceEventCounts(evaluate, exId, promptId) {
+  return evaluate(`(() => {
+    let log = [];
+    try { log = JSON.parse(document.querySelector('#sxc1-event-log').textContent) || []; } catch (e) { /* empty */ }
+    return {
+      forPrompt: log.filter((ev) => ev.prompt === ${JSON.stringify(promptId)}).length,
+      forExercise: log.filter((ev) => ev.exercise === ${JSON.stringify(exId)}).length,
+    };
+  })()`);
+}
+
+// All direct fake reads are typeof-guarded so a run whose fake was never
+// injected (the S13 sabotage, or a broken preamble) FAILS its assertions
+// with a readable observation (-1 / null) instead of crashing the whole
+// suite on a TypeError.
+function fakeEmitExpr(bytes, portId) {
+  const call = portId === undefined
+    ? `window.__SXC1_FAKE_MIDI.emit(${JSON.stringify(bytes)})`
+    : `window.__SXC1_FAKE_MIDI.emit(${JSON.stringify(bytes)}, ${JSON.stringify(portId)})`;
+  return `(window.__SXC1_FAKE_MIDI ? ${call} : -1)`;
+}
+
+const FAKE_CALLS_LEN_EXPR = '(window.__SXC1_FAKE_MIDI ? window.__SXC1_FAKE_MIDI.calls.length : -1)';
+const FAKE_CALLS_EXPR = '(window.__SXC1_FAKE_MIDI ? window.__SXC1_FAKE_MIDI.calls.slice() : null)';
+const FAKE_SUBSCRIBED_EXPR = '(window.__SXC1_FAKE_MIDI ? window.__SXC1_FAKE_MIDI.subscribedCount() : -1)';
+
+async function devClick(evaluate, selector) {
+  return evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return false; e.click(); return true; })()`);
+}
+
+function sameBytes(a, b) {
+  return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
+}
+
+// One negative probe: emit `bytes`, wait for the hub to echo them back
+// as lastMessage (proof of receipt), give any (wrong) confirm a settle
+// window, and report the event-count delta.
+async function devNegProbe(evaluate, cfgDrill, bytes) {
+  const before = await deviceEventCounts(evaluate, cfgDrill.exId, cfgDrill.prompt1);
+  const delivered = await evaluate(fakeEmitExpr(bytes));
+  const echoed = await waitDeviceState(evaluate, `p.lastMessage && p.lastMessage.join(',') === ${JSON.stringify(bytes.join(','))}`, 3000);
+  await sleep(350);
+  const after = await deviceEventCounts(evaluate, cfgDrill.exId, cfgDrill.prompt1);
+  const ds = await readDeviceStateJson(evaluate);
+  return { delivered, echoed, before, after, ds };
+}
+
+// D1..D22. `makeTarget` is deviceTargetFactoryFor's product; `report`
+// follows the house report(name, ok, observed) contract; `cfg` is one of
+// the DEVICE_*_CFG tables.
+async function runDeviceAssertions(makeTarget, report, cfg) {
+  const N = DEVICE_ASSERTION_NAMES;
+
+  // --- T1: outcome 'absent' -- D1 (graceful degradation) + D2 (the M3
+  // manual drill flow, verbatim, still works). ---------------------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_ABSENT, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d1, false, 'absent-scenario target did not boot');
+      report(N.d2, false, 'absent-scenario target did not boot');
+    } else {
+      const ds = await readDeviceStateJson(t.evaluate);
+      const noPanel = await t.evaluate("document.querySelector('#ex-device') === null");
+      report(
+        N.d1,
+        Boolean(ds && ds.supported === false && ds.status === 'unsupported' && noPanel === true),
+        { ds, noPanel },
+      );
+      const stepCount = await t.evaluate("document.querySelectorAll('#ex-steps > li').length");
+      const verifyInfo = await t.evaluate("(() => { const e = document.querySelector('.ex-verify'); return e ? { cls: e.className, text: e.textContent } : null; })()");
+      let confirmedAll = true;
+      for (let s = 1; s <= cfg.drill.steps; s += 1) {
+        const present = await waitForTrue(t.evaluate, `document.querySelector('#btn-ex-confirm-${s}') !== null`, 4000);
+        const clicked = present && await devClick(t.evaluate, `#btn-ex-confirm-${s}`);
+        if (!clicked) { confirmedAll = false; break; }
+      }
+      // #ex-progress displays min(cursor+1, steps), so "N / N" is already
+      // shown one confirm early -- the settled signal is the confirms
+      // array itself reaching all N steps.
+      const finished = confirmedAll && await waitDeviceState(
+        t.evaluate,
+        `p.confirms.length === ${cfg.drill.steps}`,
+        5000,
+      );
+      const dsAfter = await readDeviceStateJson(t.evaluate);
+      const confirmsOk = Boolean(dsAfter && Array.isArray(dsAfter.confirms)
+        && dsAfter.confirms.length === cfg.drill.steps
+        && dsAfter.confirms.every((c) => c.source === 'learner'));
+      report(
+        N.d2,
+        stepCount === cfg.drill.steps
+          && Boolean(verifyInfo && verifyInfo.cls.split(/\s+/).includes('ex-verify-idle') && /confirm manually/.test(verifyInfo.text))
+          && confirmedAll && finished === true && confirmsOk,
+        { stepCount, verifyInfo, confirmedAll, finished, confirms: dsAfter && dsAfter.confirms },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T2: grant + one SXC-1 port -- D3/D4/D5/D6/D7. --------------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      for (const n of [N.d3, N.d4, N.d5, N.d6, N.d7]) report(n, false, 'grant-scenario target did not boot');
+    } else {
+      const fakePresent = await t.evaluate("typeof window.__SXC1_FAKE_MIDI === 'object'");
+      const callsAtBoot = await t.evaluate(FAKE_CALLS_LEN_EXPR);
+      report(N.d3, fakePresent === true && callsAtBoot === 0, { fakePresent, callsAtBoot });
+
+      const panelOnDrill = await waitForTrue(t.evaluate, "document.querySelector('#ex-device') !== null", 4000);
+      await t.evaluate(`window.location.hash = ${JSON.stringify(cfg.quizRoute)}; true`);
+      await waitForTrue(t.evaluate, "document.querySelector('.kind-quiz') !== null", 5000);
+      const panelOnQuiz = await t.evaluate("document.querySelector('#ex-device') !== null");
+      await t.evaluate(`window.location.hash = ${JSON.stringify(cfg.drill.route)}; true`);
+      await waitForTrue(t.evaluate, "document.querySelector('#ex-device') !== null", 5000);
+      report(N.d4, panelOnDrill === true && panelOnQuiz === false, { panelOnDrill, panelOnQuiz });
+
+      const callsBefore = await t.evaluate(FAKE_CALLS_LEN_EXPR);
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, "p.status === 'granted' || p.status === 'denied'", 6000);
+      const calls = await t.evaluate(FAKE_CALLS_EXPR);
+      report(
+        N.d5,
+        Array.isArray(calls) && calls.length === callsBefore + 1 && calls.length > 0 && calls[calls.length - 1].sysex === false,
+        { callsBefore, calls },
+      );
+
+      const armed = await waitDeviceState(
+        t.evaluate,
+        `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)} && p.watching.spec === ${JSON.stringify(cfg.drill.spec1Text)}`,
+        6000,
+      );
+      const ds6 = await readDeviceStateJson(t.evaluate);
+      report(
+        N.d6,
+        armed === true && Boolean(ds6 && Array.isArray(ds6.ports) && ds6.ports.includes(cfg.sxcPortName)),
+        ds6,
+      );
+
+      const before7 = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const delivered7 = await t.evaluate(fakeEmitExpr(cfg.drill.good));
+      const confirmed7 = await waitDeviceState(
+        t.evaluate,
+        `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)} && c.source === 'device')`,
+        6000,
+      );
+      const after7 = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const progress7 = await t.evaluate("(document.querySelector('#ex-progress')||{}).textContent");
+      report(
+        N.d7,
+        delivered7 >= 1 && confirmed7 === true
+          && before7.forPrompt === 0 && after7.forPrompt === 1 && after7.forExercise === 1
+          && progress7 === cfg.drill.progressAfter1,
+        { delivered7, confirmed7, before7, after7, progress7 },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T3: grant + SXC-1 port -- the sabotage-proven negatives D8/D9/D10.
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      for (const n of [N.d8, N.d9, N.d10]) report(n, false, 'negative-scenario target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+
+      const r8 = await devNegProbe(t.evaluate, cfg.drill, cfg.drill.wrongCc);
+      report(
+        N.d8,
+        r8.delivered >= 1 && r8.echoed === true && sameBytes(r8.ds && r8.ds.lastMessage, cfg.drill.wrongCc)
+          && r8.after.forExercise === r8.before.forExercise,
+        r8,
+      );
+
+      const r9 = await devNegProbe(t.evaluate, cfg.drill, cfg.drill.wrongValue);
+      report(
+        N.d9,
+        r9.delivered >= 1 && r9.echoed === true && sameBytes(r9.ds && r9.ds.lastMessage, cfg.drill.wrongValue)
+          && r9.after.forExercise === r9.before.forExercise,
+        r9,
+      );
+
+      const r10 = await devNegProbe(t.evaluate, cfg.drill, cfg.drill.wrongChan);
+      const statusTxt = await t.evaluate("(document.querySelector('#device-status')||{}).textContent");
+      const useBtn = await t.evaluate("document.querySelector('#btn-device-use-channel') !== null");
+      const namesMismatch = new RegExp(`channel ${cfg.drill.wrongChanNum}`).test(statusTxt || '');
+      report(
+        N.d10,
+        r10.delivered >= 1 && r10.echoed === true
+          && Boolean(r10.ds && r10.ds.lastChannel === cfg.drill.wrongChanNum)
+          && r10.after.forExercise === r10.before.forExercise
+          && namesMismatch && useBtn === true,
+        { r10, statusTxt, useBtn },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T4: the pad/note hook -- D11. ------------------------------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.pad.route });
+    if (!t.booted) {
+      report(N.d11, false, 'pad-scenario target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, "p.status === 'granted'", 6000);
+      if (cfg.pad.prepareBytes) await t.evaluate(fakeEmitExpr(cfg.pad.prepareBytes));
+      const armed = await waitDeviceState(t.evaluate, `p.watching && p.watching.prompt === ${JSON.stringify(cfg.pad.prompt)}`, 6000);
+      const before = await deviceEventCounts(t.evaluate, cfg.pad.exId, cfg.pad.prompt);
+      const deliveredBad = await t.evaluate(fakeEmitExpr(cfg.pad.bad));
+      await waitDeviceState(t.evaluate, `p.lastMessage && p.lastMessage.join(',') === ${JSON.stringify(cfg.pad.bad.join(','))}`, 3000);
+      await sleep(350);
+      const mid = await deviceEventCounts(t.evaluate, cfg.pad.exId, cfg.pad.prompt);
+      const deliveredGood = await t.evaluate(fakeEmitExpr(cfg.pad.good));
+      const confirmed = await waitDeviceState(
+        t.evaluate,
+        `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.pad.prompt)} && c.source === 'device')`,
+        6000,
+      );
+      const after = await deviceEventCounts(t.evaluate, cfg.pad.exId, cfg.pad.prompt);
+      report(
+        N.d11,
+        armed === true && deliveredBad >= 1 && mid.forPrompt === before.forPrompt
+          && deliveredGood >= 1 && confirmed === true && after.forPrompt === before.forPrompt + 1,
+        { armed, deliveredBad, deliveredGood, before, mid, after, confirmed },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T5: two ports, one SXC-1 -- D12. ---------------------------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_TWO, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d12, false, 'two-port target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      const ds = await readDeviceStateJson(t.evaluate);
+      const deliveredOther = await t.evaluate(fakeEmitExpr(cfg.drill.good, 'other-0'));
+      const subscribed = await t.evaluate(FAKE_SUBSCRIBED_EXPR);
+      await sleep(350);
+      const counts = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      report(
+        N.d12,
+        Boolean(ds && Array.isArray(ds.ports) && ds.ports.length === 1 && ds.ports[0] === cfg.sxcPortName
+          && Array.isArray(ds.allPorts) && ds.allPorts.length === 2)
+          && deliveredOther === 0 && subscribed === 1 && counts.forExercise === 0,
+        { ds, deliveredOther, subscribed, counts },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T6: one unrecognised port -- D13 (the liberal fallback). ---------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_USB, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d13, false, 'fallback-port target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, "p.status === 'granted'", 6000);
+      const ds = await readDeviceStateJson(t.evaluate);
+      const subscribed = await t.evaluate(FAKE_SUBSCRIBED_EXPR);
+      const delivered = await t.evaluate(fakeEmitExpr(cfg.drill.good));
+      const confirmed = await waitDeviceState(
+        t.evaluate,
+        `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)} && c.source === 'device')`,
+        6000,
+      );
+      report(
+        N.d13,
+        Boolean(ds && Array.isArray(ds.ports) && ds.ports.includes('USB MIDI Device'))
+          && subscribed >= 1 && delivered >= 1 && confirmed === true,
+        { ds, subscribed, delivered, confirmed },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T7: one-shot -- D14 (same-turn double emit + a settled third). ---
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d14, false, 'one-shot target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      const deliveredPair = await t.evaluate(`[${fakeEmitExpr(cfg.drill.good)}, ${fakeEmitExpr(cfg.drill.good)}]`);
+      await waitDeviceState(t.evaluate, `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)})`, 6000);
+      await sleep(500);
+      const counts = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const deliveredSettled = await t.evaluate(fakeEmitExpr(cfg.drill.good));
+      await sleep(400);
+      const countsAfter = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const progress = await t.evaluate("(document.querySelector('#ex-progress')||{}).textContent");
+      report(
+        N.d14,
+        Array.isArray(deliveredPair) && deliveredPair.every((d) => d >= 1)
+          && counts.forPrompt === 1 && counts.forExercise === 1
+          && deliveredSettled >= 1
+          && countsAfter.forPrompt === 1 && countsAfter.forExercise === 1
+          && progress === cfg.drill.progressAfter1,
+        { deliveredPair, counts, deliveredSettled, countsAfter, progress },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T8: the stale-confirm race -- D15 (manual click + matching bytes
+  // in ONE synchronous turn, then a settled stale emit). -----------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d15, false, 'stale-confirm target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      const raceDelivered = await t.evaluate(`(() => {
+        const b = document.querySelector('#btn-ex-confirm-1');
+        if (!b) return -1;
+        b.click();
+        return ${fakeEmitExpr(cfg.drill.good)};
+      })()`);
+      await waitForTrue(t.evaluate, `(document.querySelector('#ex-progress')||{}).textContent === ${JSON.stringify(cfg.drill.progressAfter1)}`, 6000);
+      await sleep(600);
+      const counts = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const deliveredSettled = await t.evaluate(fakeEmitExpr(cfg.drill.good));
+      await sleep(400);
+      const countsAfter = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const ds = await readDeviceStateJson(t.evaluate);
+      const progress = await t.evaluate("(document.querySelector('#ex-progress')||{}).textContent");
+      const confirmsOk = Boolean(ds && Array.isArray(ds.confirms)
+        && ds.confirms.length === 1
+        && ds.confirms[0].prompt === cfg.drill.prompt1
+        && ds.confirms[0].source === 'learner');
+      report(
+        N.d15,
+        raceDelivered >= 1
+          && counts.forPrompt === 1 && counts.forExercise === 1
+          && deliveredSettled >= 1
+          && countsAfter.forPrompt === 1 && countsAfter.forExercise === 1
+          && progress === cfg.drill.progressAfter1
+          && confirmsOk && sameBytes(ds && ds.lastMessage, cfg.drill.good),
+        { raceDelivered, counts, deliveredSettled, countsAfter, progress, confirms: ds && ds.confirms },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T9: reconciliation on navigation -- D16. -------------------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d16, false, 'navigation target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      await t.evaluate("window.location.hash = '#/x'; true");
+      const disarmed = await waitDeviceState(t.evaluate, 'p.watching === null', 4000);
+      const delivered = await t.evaluate(fakeEmitExpr(cfg.drill.good));
+      await waitDeviceState(t.evaluate, `p.lastMessage && p.lastMessage.join(',') === ${JSON.stringify(cfg.drill.good.join(','))}`, 3000);
+      await sleep(400);
+      const counts = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      report(
+        N.d16,
+        disarmed === true && delivered >= 1 && counts.forPrompt === 0 && counts.forExercise === 0,
+        { disarmed, delivered, counts },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T10: zero ports, hot-plug, unplug -- D17 + D18. ------------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_ZERO, hash: cfg.twoStep.route });
+    if (!t.booted) {
+      report(N.d17, false, 'hot-plug target did not boot');
+      report(N.d18, false, 'hot-plug target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      const grantedZero = await waitDeviceState(t.evaluate, "p.status === 'granted' && p.ports.length === 0", 6000);
+      const portsLine = await t.evaluate("(document.querySelector('#device-ports')||{}).textContent");
+      await t.evaluate(`(window.__SXC1_FAKE_MIDI ? window.__SXC1_FAKE_MIDI.addPort('sxc1-0', ${JSON.stringify(cfg.sxcPortName)}, 'CASIO') : null)`);
+      const rebound = await waitDeviceState(t.evaluate, `p.ports.includes(${JSON.stringify(cfg.sxcPortName)})`, 4000);
+      const delivered1 = await t.evaluate(fakeEmitExpr(cfg.twoStep.first));
+      const confirmed1 = await waitDeviceState(
+        t.evaluate,
+        `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.twoStep.firstPrompt)} && c.source === 'device')`,
+        6000,
+      );
+      report(
+        N.d17,
+        grantedZero === true && /No MIDI input detected/.test(portsLine || '')
+          && rebound === true && delivered1 >= 1 && confirmed1 === true,
+        { grantedZero, portsLine, rebound, delivered1, confirmed1 },
+      );
+
+      const armed2 = await waitDeviceState(t.evaluate, `p.watching && p.watching.prompt === ${JSON.stringify(cfg.twoStep.secondPrompt)}`, 4000);
+      await t.evaluate("(window.__SXC1_FAKE_MIDI ? window.__SXC1_FAKE_MIDI.removePort('sxc1-0') : null)");
+      const emptied = await waitDeviceState(t.evaluate, 'p.ports.length === 0', 4000);
+      const stillWatching = await waitDeviceState(t.evaluate, `p.watching && p.watching.prompt === ${JSON.stringify(cfg.twoStep.secondPrompt)}`, 2000);
+      const alive = await t.evaluate("(document.querySelector('#ex-progress')||{}).textContent !== ''");
+      await t.evaluate(`(window.__SXC1_FAKE_MIDI ? window.__SXC1_FAKE_MIDI.addPort('sxc1-1', ${JSON.stringify(cfg.sxcPortName)}, 'CASIO') : null)`);
+      await waitDeviceState(t.evaluate, `p.ports.includes(${JSON.stringify(cfg.sxcPortName)})`, 4000);
+      const delivered2 = await t.evaluate(fakeEmitExpr(cfg.twoStep.second));
+      const confirmed2 = await waitDeviceState(
+        t.evaluate,
+        `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.twoStep.secondPrompt)} && c.source === 'device')`,
+        6000,
+      );
+      report(
+        N.d18,
+        armed2 === true && emptied === true && stillWatching === true && alive === true
+          && delivered2 >= 1 && confirmed2 === true,
+        { armed2, emptied, stillWatching, alive, delivered2, confirmed2 },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T11: outcome 'deny' -- D19. --------------------------------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_DENY, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d19, false, 'deny target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      const denied = await waitDeviceState(t.evaluate, "p.status === 'denied'", 6000);
+      const statusTxt = await t.evaluate("(document.querySelector('#device-status')||{}).textContent");
+      const clicked = await devClick(t.evaluate, '#btn-ex-confirm-1');
+      const moved = clicked && await waitForTrue(
+        t.evaluate,
+        `(document.querySelector('#ex-progress')||{}).textContent === ${JSON.stringify(cfg.drill.progressAfter1)}`,
+        5000,
+      );
+      const ds = await readDeviceStateJson(t.evaluate);
+      const manualOk = Boolean(ds && ds.confirms.some((c) => c.prompt === cfg.drill.prompt1 && c.source === 'learner'));
+      report(
+        N.d19,
+        denied === true && /denied|access/i.test(statusTxt || '') && moved === true && manualOk,
+        { denied, statusTxt, moved, confirms: ds && ds.confirms },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T12: NO FAKE AT ALL -- D20 (real headless Chrome denies; proves
+  // the fake is load-bearing in every positive assertion above). ---------
+  {
+    const t = await makeTarget({ injectFake: false, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d20, false, 'no-fake target did not boot');
+    } else {
+      const noFake = await t.evaluate("typeof window.__SXC1_FAKE_MIDI === 'undefined'");
+      const realApi = await t.evaluate("typeof navigator.requestMIDIAccess === 'function'");
+      await devClick(t.evaluate, '#btn-device-enable');
+      const denied = await waitDeviceState(t.evaluate, "p.status === 'denied'", 10000);
+      await sleep(300);
+      const ds = await readDeviceStateJson(t.evaluate);
+      const noConfirm = Boolean(ds && Array.isArray(ds.confirms) && ds.confirms.length === 0);
+      report(
+        N.d20,
+        noFake === true && realApi === true && denied === true && noConfirm,
+        { noFake, realApi, denied, confirms: ds && ds.confirms },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T13: the Network domain armed across a full device scenario --
+  // D21 (privacy: MIDI bytes never leave the browser). -------------------
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route, network: true });
+    if (!t.booted) {
+      report(N.d21, false, 'network-armed target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      await t.evaluate(fakeEmitExpr(cfg.drill.good));
+      await waitDeviceState(t.evaluate, `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)})`, 6000);
+      await sleep(400);
+      const offenders = t.requests.filter((u) => typeof u === 'string' && !u.startsWith(t.originPrefix));
+      const sawAny = t.requests.length;
+      const isHttp = t.originPrefix.startsWith('http');
+      report(
+        N.d21,
+        offenders.length === 0 && (!isHttp || sawAny >= 1),
+        { requestCount: sawAny, originPrefix: t.originPrefix, offenders: offenders.slice(0, 5) },
+      );
+    }
+    await t.close();
+  }
+
+  // --- D22: the fake is never shipped. ----------------------------------
+  {
+    const found = [];
+    const walk = (dir) => {
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.name === 'fake-midi.js') found.push(p);
+      }
+    };
+    walk(path.join(HARNESS_REPO_ROOT, 'site', 'public'));
+    walk(path.join(HARNESS_REPO_ROOT, 'site', 'static'));
+    report(N.d22, found.length === 0, { found });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // --self-test / --self-test-negative: launches its OWN throwaway browser
 // (independent of --url and of any static file server -- the fixture is
 // a data: URL, so there is nothing to serve), navigates to the fixture
@@ -3157,6 +4214,81 @@ async function runStorageRefusedCheck(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// M4: --device-only. Launches its own throwaway browser and runs ONLY
+// runDeviceAssertions against --url -- the fast dev loop the sabotage
+// sweep uses (each app mutation needs a rebuild + one targeted run, not
+// a full 108-route sweep). Same launch idiom as --check-storage-refused.
+// ---------------------------------------------------------------------------
+async function runDeviceOnly(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const cleanupFns = [];
+  const runCleanup = async () => {
+    for (const fn of cleanupFns.splice(0).reverse()) {
+      try { await fn(); } catch { /* best-effort cleanup */ }
+    }
+  };
+  const die = async (code, message) => {
+    if (message) console.log(message);
+    await runCleanup();
+    process.exit(code);
+  };
+
+  const browserPath = resolveBrowser(opts.browser);
+  if (!browserPath) {
+    await die(2, 'error: no browser found for --device-only.');
+    return;
+  }
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sxc1-deviceonly-profile-'));
+  cleanupFns.push(() => removeDirWithRetry(userDataDir));
+  const debugPort = await findFreePort();
+  const browserProc = spawn(browserPath, [
+    '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
+    '--disable-dev-shm-usage', `--user-data-dir=${userDataDir}`, `--remote-debugging-port=${debugPort}`, 'about:blank',
+  ], { stdio: 'ignore', detached: true });
+  cleanupFns.push(() => new Promise((resolve) => {
+    const killGroup = (signal) => { try { process.kill(-browserProc.pid, signal); } catch { /* gone */ } };
+    if (browserProc.exitCode !== null || browserProc.signalCode !== null) { killGroup('SIGKILL'); resolve(); return; }
+    const forceKillTimer = setTimeout(() => killGroup('SIGKILL'), 3000);
+    browserProc.once('exit', () => { clearTimeout(forceKillTimer); killGroup('SIGKILL'); resolve(); });
+    killGroup('SIGTERM');
+  }));
+
+  let versionInfo = null;
+  while (Date.now() < deadline) {
+    try {
+      const info = await withDeadline(httpGetJson(`http://127.0.0.1:${debugPort}/json/version`), deadline, 'DevTools /json/version request');
+      if (info && info.webSocketDebuggerUrl) { versionInfo = info; break; }
+    } catch { /* not up yet */ }
+    await sleep(200);
+  }
+  if (!versionInfo) {
+    await die(2, 'error: timed out waiting for DevTools (--device-only)');
+    return;
+  }
+  const ws = await withDeadline(connectWebSocket(versionInfo.webSocketDebuggerUrl), deadline, 'WebSocket connect');
+  cleanupFns.push(() => { try { ws.close(); } catch { /* ignore */ } });
+  const cdp = new CDPClient(ws, { getRemaining: () => remaining(deadline) });
+  ws.addEventListener('close', () => cdp.failFatally(new Error('CDP WebSocket closed unexpectedly')));
+  ws.addEventListener('error', (ev) => cdp.failFatally(new Error(`CDP WebSocket error: ${formatWsErrorEvent(ev)}`)));
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); } else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+  try {
+    const makeTarget = deviceTargetFactoryFor(cdp, deadline, opts.url);
+    await runDeviceAssertions(makeTarget, report, DEVICE_REAL_CFG);
+  } catch (err) {
+    await die(2, `error: ${err && err.stack ? err.stack : err}`);
+    return;
+  }
+  console.log(`browser-check --device-only: ${passed}/${total} assertions passed`);
+  await die(passed === total ? 0 : 1, null);
+}
+
+// ---------------------------------------------------------------------------
 // M3 gate fix NEW10: the per-selector sabotage map. Each key is exactly
 // one M3 sabotage point (see its own comment inside selfTestFixtureHtml
 // for how it is isolated); the value is the exact set of
@@ -3237,7 +4369,7 @@ const LEGACY_EXPECTED_TO_FAIL = [
 // one pass, selector=null; --self-test-negative: many passes, one per
 // selector) can each decide what "done" means. Always cleans up its own
 // browser/profile/fixture file before returning OR throwing.
-async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose }) {
+async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, includeDevice }) {
   const deadline = Date.now() + opts.timeout;
   const cleanupFns = [];
   const runCleanup = async () => {
@@ -3544,6 +4676,19 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose }) {
     await runProgressAssertionsPost(progressHandle, progressCfg);
     results.push(...progressResults);
 
+    // M4: the device suite (D1..D22), driven against THIS SAME fixture
+    // file through freshly created targets with scripts/fake-midi.js
+    // pre-injected -- the same runDeviceAssertions a real run drives
+    // against the real app. Gated by includeDevice: the ordinary
+    // --self-test and every M4 'dev*' negative pass run it; the M3-era
+    // negative passes (and legacy-all) do not, so their runtime and
+    // expected-failure sets stay byte-identical to before M4.
+    if (includeDevice) {
+      const makeTarget = deviceTargetFactoryFor(cdp, deadline, `file://${fixturePath}`);
+      const deviceReport = (name, ok, observed) => { results.push({ name, ok }); report(name, ok, observed); };
+      await runDeviceAssertions(makeTarget, deviceReport, DEVICE_SELFTEST_CFG);
+    }
+
     await runCleanup();
     return { results, passed, total };
   } catch (err) {
@@ -3579,7 +4724,13 @@ async function runSelfTest(opts, negative) {
 
   let outcome;
   try {
-    outcome = await runOneSelfTestPass(opts, null, { expectedExJson, verbose: true });
+    // M4: the self-test now also runs the 22-assertion device suite
+    // (see runOneSelfTestPass), which multiplies the fresh-target count;
+    // the default 45s budget was tuned for the pre-M4 pass, so the floor
+    // is raised here the same way the negative sweep already raises its
+    // own. An explicit larger --timeout is still honoured.
+    const passOpts = { ...opts, timeout: Math.max(opts.timeout, SELF_TEST_MIN_TIMEOUT_MS) };
+    outcome = await runOneSelfTestPass(passOpts, null, { expectedExJson, verbose: true, includeDevice: true });
   } catch (err) {
     console.error(`error: ${err && err.message ? err.message : err}`);
     process.exit(2);
@@ -3588,6 +4739,8 @@ async function runSelfTest(opts, negative) {
   console.log(`browser-check --self-test: ${outcome.passed}/${outcome.total} assertions passed`);
   process.exit(outcome.passed === outcome.total ? 0 : 1);
 }
+
+const SELF_TEST_MIN_TIMEOUT_MS = 240000;
 
 // M3 gate fix NEW10: runs ONE PASS PER SELECTOR (a "clean"/no-sabotage
 // sanity pass, the 'legacy-all' combined pass, then one pass per
@@ -3612,12 +4765,18 @@ async function runSelfTest(opts, negative) {
 const NEGATIVE_SWEEP_MIN_TIMEOUT_MS = 90000;
 
 async function runSelfTestNegative(opts) {
-  const passOpts = { ...opts, timeout: Math.max(opts.timeout, NEGATIVE_SWEEP_MIN_TIMEOUT_MS) };
+  // includeDevice per pass (see runOneSelfTestPass): the M3-era passes
+  // and legacy-all keep their pre-M4 shape and runtime exactly; 'clean'
+  // and every M4 'dev*' pass also run the device suite, with the higher
+  // budget floor that suite needs.
   const passesInOrder = [
-    { key: 'clean', selector: null, expectedToFail: [] },
-    { key: 'legacy-all', selector: 'legacy-all', expectedToFail: LEGACY_EXPECTED_TO_FAIL },
+    { key: 'clean', selector: null, expectedToFail: [], includeDevice: true },
+    { key: 'legacy-all', selector: 'legacy-all', expectedToFail: LEGACY_EXPECTED_TO_FAIL, includeDevice: false },
     ...Object.keys(M3_SELECTOR_ASSERTIONS).map((key) => ({
-      key, selector: key, expectedToFail: M3_SELECTOR_ASSERTIONS[key],
+      key, selector: key, expectedToFail: M3_SELECTOR_ASSERTIONS[key], includeDevice: false,
+    })),
+    ...Object.keys(M4_SELECTOR_ASSERTIONS).map((key) => ({
+      key, selector: key, expectedToFail: M4_SELECTOR_ASSERTIONS[key], includeDevice: true,
     })),
   ];
 
@@ -3641,8 +4800,12 @@ async function runSelfTestNegative(opts) {
       // validateExpectExerciseJson's own comment); null here reproduces
       // the pre-NEW10 behaviour of comparing against the fixture's own
       // built-in SELF_TEST_EXERCISE_STATS regardless.
+      const passOpts = {
+        ...opts,
+        timeout: Math.max(opts.timeout, pass.includeDevice ? SELF_TEST_MIN_TIMEOUT_MS : NEGATIVE_SWEEP_MIN_TIMEOUT_MS),
+      };
       // eslint-disable-next-line no-await-in-loop
-      outcome = await runOneSelfTestPass(passOpts, pass.selector, { expectedExJson: SELF_TEST_EXERCISE_STATS, verbose: false });
+      outcome = await runOneSelfTestPass(passOpts, pass.selector, { expectedExJson: SELF_TEST_EXERCISE_STATS, verbose: false, includeDevice: pass.includeDevice });
     } catch (err) {
       const message = `harness error: ${err && err.message ? err.message : err}`;
       console.error(`  FAIL - ${message}`);
@@ -3733,6 +4896,13 @@ async function main() {
   // text and runStorageRefusedCheck's comment.
   if (opts.checkStorageRefused) {
     await runStorageRefusedCheck(opts);
+    return;
+  }
+
+  // --device-only (M4): the D-suite alone against --url, in its own
+  // throwaway browser -- the sabotage sweep's fast cycle.
+  if (opts.deviceOnly) {
+    await runDeviceOnly(opts);
     return;
   }
 
@@ -4158,6 +5328,11 @@ async function main() {
         'mobile viewport has no horizontal overflow',
         '#sxc1-disclaimer names CASIO and non-affiliation',
         'no console errors or uncaught exceptions',
+        // M4: the device suite runs on its own fresh targets, but a
+        // bundle whose primary target cannot boot is not going to boot
+        // them either -- report the D-assertions as failed-skipped
+        // rather than silently omitting them.
+        ...Object.values(DEVICE_ASSERTION_NAMES),
       ]) {
         report(name, false, 'skipped: app did not boot');
       }
@@ -4736,6 +5911,14 @@ async function main() {
         // runProgressAssertionsPost's own comment.
         await runProgressAssertionsPost(progressHandle, progressCfg);
       }
+
+      // -- 14 (M4). THE DEVICE SUITE, D1..D22 -- always part of a real
+      // run (no flag: the routes are the seed corpus's own, present in
+      // every real bundle). Each scenario gets its own freshly created
+      // target with scripts/fake-midi.js pre-injected BEFORE navigation
+      // (P-B); D20 deliberately injects nothing. See runDeviceAssertions.
+      const makeDeviceTarget = deviceTargetFactoryFor(cdp, deadline, targetUrl);
+      await runDeviceAssertions(makeDeviceTarget, report, DEVICE_REAL_CFG);
     }
 
     console.log(`browser-check: ${passed}/${total} assertions passed`);

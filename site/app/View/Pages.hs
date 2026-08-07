@@ -50,16 +50,18 @@ viewRoute
   -> T.Text                     -- ^ #sxc1-event-log JSON
   -> T.Text                     -- ^ #sxc1-prompt-baseline JSON (M2 re-gate: see Main.promptBaselineJson)
   -> T.Text                     -- ^ #sxc1-progress JSON (M3: see Main.progressJson)
+  -> T.Text                     -- ^ #sxc1-device-state JSON (M4: see Main.deviceStateJson)
   -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
   -> Route
   -> View model action
-viewRoute toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson mExerciseBody route = H.main_ [ P.id_ "app" ]
+viewRoute toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mExerciseBody route = H.main_ [ P.id_ "app" ]
   [ headerView ph pd route
   , statsView
   , exerciseStatsView exStatsJson
   , eventLogView eventLogJson
   , promptBaselineView baselineJson
   , progressPayloadView progressJson
+  , deviceStateView deviceJson
   , routeBody toggleAction ph pd mExerciseBody route
   , footerView
   ]
@@ -217,6 +219,13 @@ promptBaselineView t = H.div_ [ P.id_ "sxc1-prompt-baseline", P.hidden_ True ] [
 -- value-asserted by the harness. See Main.progressJson.
 progressPayloadView :: T.Text -> View model action
 progressPayloadView t = H.div_ [ P.id_ "sxc1-progress", P.hidden_ True ] [ text (ms t) ]
+
+-- | M4: the #sxc1-device-state payload -- always present, always
+-- [hidden], on EVERY route, exactly the way #sxc1-content-stats is
+-- rendered. This is the only DOM difference M4 may create on a browser
+-- without Web MIDI (constraint 5). See Main.deviceStateJson.
+deviceStateView :: T.Text -> View model action
+deviceStateView t = H.div_ [ P.id_ "sxc1-device-state", P.hidden_ True ] [ text (ms t) ]
 
 --------------------------------------------------------------------------
 -- Home ("#/"): project blurb + one card per manual.
