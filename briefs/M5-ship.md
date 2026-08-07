@@ -21,10 +21,14 @@ Reader/UX:
    oss p.11).
 
 Verification/maintenance:
-4. StaticCode totality sweep — a new constructor with a forgotten pattern
-   synonym/codeText arm isn't caught mechanically (M2 gate-3 LOW).
-5. EXERCISE_FIXTURE_FIELDS validation lacks the declared-target fields
-   (M2 gate-3 LOW).
+4. StaticCode totality sweep — CLOSED in M3/M4: CheckExercises.hs carries the
+   sweep (stLabel 19, WHNF + non-empty codeText over every allIssueCodes
+   member); recorded closed in briefs/M4-budget.json contract
+   (low_staticcode_totality_closed=true).
+5. EXERCISE_FIXTURE_FIELDS declared targets — CLOSED in M3: browser-check
+   requires citeSlug/citePage (quiz, drill) and targetPage/targetSlug
+   (lookup); recorded closed in briefs/M4-budget.json contract
+   (low_fixture_declared_targets_closed=true).
 6. `exercise-check` runs only from `site/` (`..`-relative inventory path) —
    authoring-UX wart (M2 advisory).
 7. Inventory id-binding is a path-substring switch — brittle to content-root
