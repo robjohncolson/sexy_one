@@ -55,9 +55,15 @@ Ops:
     the cleanup kills the subshell pid, not the python process (observed twice,
     2026-08-07: orphaned `http.server 8130`/`8307` after full runs; M4
     verification-task housekeeping note).
-8. Revert to workflow Pages deploys when GitHub's deployment queue recovers —
-   set ENABLE_PAGES=true, PUT build_type=workflow, retire the manual gh-pages
-   procedure (PLAN.md deploy-path note).
+8. Revert to workflow Pages deploys — ATTEMPTED AT SHIP (2026-08-08): the
+   repo-settings mutation (gh variable set + PUT build_type) was blocked by
+   the session's permission policy, so m5 shipped via the established
+   gh-pages branch path (live-verified 60/60 both hosts). OWNER ACTION, two
+   commands, whenever convenient:
+     gh variable set ENABLE_PAGES --body true -R robjohncolson/sexy_one
+     gh api -X PUT repos/robjohncolson/sexy_one/pages -f build_type=workflow
+   then push any commit and watch the deployment; if it wedges again
+   (deployment_queued timeouts), PUT build_type=legacy to fall back.
 9. Site title decision — RESOLVED 2026-08-08: owner chose **SEXY ONE**; rename the header, <title>, README landing, and any view/string mentions (keep "SXC-1 trainer" as descriptive prose where it aids search).
 
 Ship checklist (beyond debt):
