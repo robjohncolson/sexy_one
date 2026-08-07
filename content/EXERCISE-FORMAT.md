@@ -21,8 +21,10 @@ hands-on drill, or a timed lookup. A deck usually holds a few exercises, not jus
 group exercises that belong together so a learner working through the deck builds one
 skill at a time.
 
-Deck files live flat in `content/exercises/`, named `NN-slug.ex.md`, where `NN` is a
-two-digit number that only controls reading order (it is not otherwise meaningful) and
+Deck files live flat in `content/exercises/`, named `NN-slug.ex.md` or
+`NNN-slug.ex.md`, where the two- or three-digit number only controls reading
+order (it is not otherwise meaningful; the M3 course uses three digits spaced
+by 2 so decks can be inserted without renumbering) and
 `slug` is a short, lowercase, hyphenated description, e.g. `02-pad-play-banks.ex.md`.
 
 The order decks appear in is **not** just "sorted by filename" — it is controlled by
@@ -302,7 +304,7 @@ and adding the one-line fix a content author actually needs. `--list-codes` prin
 | Code | Class | What it means | Usual fix |
 |---|---|---|---|
 | `E-FILE-TITLE` | file | the file doesn't start with exactly one `#` deck title | make the first non-blank line a single `#` heading; remove any extra `#` heading |
-| `E-FILE-BAD-NAME` | file | the filename isn't `NN-slug.ex.md` | rename to two digits, a hyphen, then `[a-z0-9-]+`, ending `.ex.md` |
+| `E-FILE-BAD-NAME` | file | the filename isn't `NN-slug.ex.md` / `NNN-slug.ex.md` | rename to two or three digits, a hyphen, then `[a-z0-9-]+`, ending `.ex.md` |
 | `E-DECK-EMPTY` | file | the deck has no `##` exercises at all | add at least one exercise, or delete the deck |
 | `E-FIELD-UNKNOWN` | file | a field key this context doesn't recognise | fix the spelling, or remove the field |
 | `E-FIELD-MISSING` | file | a required field never appeared | add it |

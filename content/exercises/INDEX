@@ -1,6 +1,60 @@
-# Reading order for the M2 seed exercise set.
-# Chapter 1 (Part: Preparation), then Chapter 2 (Part: Pad play).
-00-preparation-power.ex.md
-10-pad-play-banks.ex.md
-20-pad-play-sounds.ex.md
-30-pad-play-performance.ex.md
+# Reading order for the M3 full course: 52 decks, 435 live ids.
+# Order follows briefs/M3-plan.md §2.4, chapter by chapter in course order.
+# Chapter 0 — Front matter
+000-ch0-01.ex.md
+002-ch0-02.ex.md
+004-ch0-03.ex.md
+006-ch0-04.ex.md
+008-ch0-05.ex.md
+010-ch0-06.ex.md
+012-ch0-07.ex.md
+014-ch0-08.ex.md
+# Chapter 1 — Part: Preparation
+016-prep-01.ex.md
+018-prep-02.ex.md
+020-prep-03.ex.md
+022-prep-04.ex.md
+# Chapter 2 — Part: Pad play
+024-pad-01.ex.md
+026-pad-02.ex.md
+028-pad-03.ex.md
+030-pad-04.ex.md
+032-pad-05.ex.md
+034-pad-06.ex.md
+036-pad-07.ex.md
+038-pad-08.ex.md
+040-pad-09.ex.md
+# Chapter 3 — Part: Sampling
+042-smp-01.ex.md
+044-smp-02.ex.md
+046-smp-03.ex.md
+048-smp-04.ex.md
+050-smp-05.ex.md
+052-smp-06.ex.md
+054-smp-07.ex.md
+# Chapter 4 — Part: Sequencer
+056-seq-01.ex.md
+058-seq-02.ex.md
+060-seq-03.ex.md
+062-seq-04.ex.md
+064-seq-05.ex.md
+066-seq-06.ex.md
+068-seq-07.ex.md
+070-seq-08.ex.md
+072-seq-09.ex.md
+# Chapter 5 — Part: Leveling up
+074-lvl-01.ex.md
+076-lvl-02.ex.md
+078-lvl-03.ex.md
+080-lvl-04.ex.md
+082-lvl-05.ex.md
+084-lvl-06.ex.md
+086-lvl-07.ex.md
+088-lvl-08.ex.md
+090-lvl-09.ex.md
+092-lvl-10.ex.md
+094-lvl-11.ex.md
+096-lvl-12.ex.md
+098-lvl-13.ex.md
+100-lvl-14.ex.md
+102-lvl-15.ex.md
