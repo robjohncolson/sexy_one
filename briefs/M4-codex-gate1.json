@@ -1,0 +1,66 @@
+{
+  "task_type": "review",
+  "milestone": "M4",
+  "verdict": "GATE-BLOCKED",
+  "summary": "M4 is not code-complete: the stale-confirm guard validates too early and does not bind a device match to the current route or drill attempt, so a queued match can survive navigation, Restart, or disable/re-enable and later enter the normal ConfirmStep/Advance batch. The current implementation otherwise preserves the click-only permission boundary, contains MIDI data locally, implements the intended decode/table/port-selection architecture, and stays within both size ceilings. Even after the code findings are fixed, the gate remains pending the owner's physical-device protocol evidence.",
+  "findings": [
+    {
+      "severity": "HIGH",
+      "title": "The stale-confirm guard does not cover the asynchronous gap between validation and applying the confirmation",
+      "evidence": [
+        "site/app/Main.hs:492 captures only exid and pid; DConfirm reads that exercise state but does not require mRoute to still be that exercise.",
+        "site/app/Main.hs:500 validates only done, answered-state, and prompt id, then site/app/Main.hs:501 emits ExClocked instead of applying an action carrying the validated state generation.",
+        "site/app/Main.hs:380 applies ExBatch without a route, watch-generation, or attempt-generation check, while site/app/Main.hs:386 introduces a second effect hop before that batch.",
+        "site/app/Main.hs:532 keys the active watch only by prompt id. Restarting or re-enabling on the same prompt therefore creates no identity that can distinguish the old attempt from the new one.",
+        "scripts/browser-check.mjs:938 explicitly documents the real callback path as two queued hops (DConfirm -> ExClocked -> ExBatch).",
+        "scripts/browser-check.mjs:3835 tests manual-confirm-before-emit, and scripts/browser-check.mjs:3876 waits for disarming before emitting; neither test covers emit-then-navigate, emit-then-Restart, emit-then-disable/re-enable, or a manual action between the guard and ExBatch."
+      ],
+      "impact": "A device message accepted for an old UI state can confirm or advance an exercise after the user has navigated away, restarted the same prompt, or changed device state. This is the class of stale/duplicate delivery the guard is intended to prevent.",
+      "recommendation": "Carry an exercise/route plus attempt or watch generation through DConfirm and ExClocked, and revalidate it at the state-mutating ExBatch boundary. Increment the generation on Restart, navigation, disable/re-enable, and watch replacement. Add deterministic browser assertions for each in-flight ordering."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "Milestone verify command 6 can report success when content-check fails",
+      "evidence": [
+        "briefs/M4-manifest.json:10 runs content-check through tee under set -eu, without pipefail or a PIPESTATUS check.",
+        "briefs/M4-manifest.json:10 merely requires the generic 'content-check: N/N checks passed' summary and rejects only the special text ': FAIL (0/0)'.",
+        "site/test/CheckContent.hs:1394 prints ordinary failing group and subcheck results, site/test/CheckContent.hs:1406 always prints the numeric summary, and site/test/CheckContent.hs:1409 exits failure for any incomplete total. Thus a normal non-vacuous failure such as 381/382 is masked by tee and is not rejected by the manifest grep."
+      ],
+      "impact": "One listed milestone command has a reproducible false-green class, contrary to the stated manifest-command repair standard. The full check-site command may catch the same defect elsewhere, but this command is not independently trustworthy.",
+      "recommendation": "Use bash with pipefail and capture the checker status via PIPESTATUS[0], then require the exact expected total and reject every FAIL line. Red-test an ordinary 381/382-style failure, not only a 0/0 case."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "D21's network-silence assertion permits same-origin MIDI-data exfiltration",
+      "evidence": [
+        "scripts/browser-check.mjs:3996 starts request collection before the MIDI exercise, but scripts/browser-check.mjs:4008 filters only URLs that do not start with originPrefix.",
+        "scripts/browser-check.mjs:4014 therefore passes if a MIDI handler sends a new same-origin request such as /collect?note=..., even though the requirement is zero network requests beyond the app's own assets.",
+        "scripts/check-site.sh:1260 structurally excludes several named network APIs, but that does not close the runtime gap for same-origin requests or alternate request-producing primitives."
+      ],
+      "impact": "The current app code does not show a MIDI-data network leak, but D21 is not a complete regression guard for the stated privacy invariant and can be satisfied vacuously by same-origin egress.",
+      "recommendation": "Snapshot the completed asset-request baseline before emission and require that the MIDI interaction creates zero additional requests, regardless of origin. Add a negative control that performs same-origin egress after a fake MIDI message."
+    },
+    {
+      "severity": "LOW",
+      "title": "Repeated denied permission retries retain settle callback Functions until a later successful disable",
+      "evidence": [
+        "site/app/Device/Midi.hs:124 stores request settle callbacks in hsSettleCbs, and site/app/Device/Midi.hs:238 appends two Functions for every request.",
+        "site/app/Device/Midi.hs:277 is the only cleanup of that registry. A denied result leaves MIDI disabled but does not call hubDisable, while the UI permits another enable attempt, so repeated denials accumulate callback Functions for the page lifetime."
+      ],
+      "impact": "This does not cause double delivery and a later granted-then-disabled cycle frees the callbacks, but repeated denial/retry cycles leak JS callback wrappers.",
+      "recommendation": "Free each request's resolve/reject Functions once its promise settles, or clear settled entries on the denied/error path as well as on hubDisable."
+    }
+  ],
+  "focus_area_verdicts": {
+    "permission_and_privacy": "IMPLEMENTATION PASS, ASSERTION GAP. requestMIDIAccess is centralized in site/app/Device/Midi.hs:219, requests sysex false at line 236, and Main reaches it through the DEnable click action at site/app/Main.hs:455. Feature detection does not prompt, and no current app path writes MIDI bytes to storage, network, or console. D21 nevertheless fails to prohibit same-origin egress.",
+    "function_lifecycle": "PARTIAL. Port handlers, state-change handlers, watches, and remover functions are cleared idempotently across bind, hot-plug, disable, and re-enable. Repeated denied requests retain their per-request settle Functions, as described in the LOW finding.",
+    "stale_and_duplicate_confirms": "FAIL. The early DConfirm guard is useful but is not atomic with the later ExBatch and has no route/attempt generation. In-flight navigation, Restart, and disable/re-enable orderings remain uncovered and unsafe.",
+    "d_assertion_suite": "PARTIAL. The fake's handler-count instruments and most D assertions have concrete anti-vacuity checks, D20 demonstrates that the fake is load-bearing, and the browser result plumbing is strict. The suite omits the in-flight stale-confirm schedules and D21 allows same-origin requests.",
+    "size_arithmetic": "PASS. 925652 - 890713 = 34939 bytes growth; the artifact is 7061 below the 932713 task ceiling and 74348 below the frozen 1000000 ceiling. The cited cold result 926093 is 6620 below the task ceiling. The --detect-features -Oz --converge amendment and documented small run variance are represented honestly.",
+    "coordinator_amendments": "MOSTLY SOUND, ONE UNREPAIRED FALSE-GREEN. Shipping and check-site optimization flags are aligned; the V8 incompatibility rationale is coherent; Device.Midi's cabal addition, the tags/m3 frozen-path baseline, and use of the M3 routes are sound; zero frozen-path files changed since m3. check-site and CI use real pipeline status. However, briefs/M4-manifest.json:10 still masks ordinary content-check failures, so the manifest verification surface does not yet meet the claimed repair standard."
+  },
+  "architecture_review": "The pure Spec layer is channel-voice-only and velocity-agnostic, preserves the documented Pad 2/Bank C duplicate 68, and implements the SXC-1/Casio/all port fallback. Table is independently parsed and excluded from the app import closure. The MIDI hub has one requestMIDIAccess call site and dispatches bytes -> decode -> watch snapshot -> hit removal -> callbacks -> notification. Device confirmations use the same ConfirmStep/Advance batch as manual confirmations. The device panel is conditional on MIDI availability and hooks, retains manual Confirm, defaults to channel 1 with no Any option, and exposes the mismatch switch. The fake is not part of the shipped artifact by its current filename/import checks. Documentation records M4-F1, the idle copy issue, the check-site child leak, and wasm-opt variance, and the physical protocol explicitly remains unexecuted.",
+  "review_method": "Read-only source and history inspection. Per the subagent constraint, no build, test, lint, browser, or milestone verification command was run.",
+  "outstanding_evidence": "The owner's physical-device protocol run is still required. If the code and verification findings above are fixed, the appropriate interim verdict would be GATE-CLEAR-PENDING-DEVICE-EVIDENCE.",
+  "final_line": "GATE-BLOCKED — fix the in-flight stale-confirm race and the two false-green verification gaps; physical-device evidence is also still outstanding."
+}

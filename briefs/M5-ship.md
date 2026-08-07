@@ -31,10 +31,14 @@ Verification/maintenance:
    moves (M2 advisory; observable via inventoryChecked, but make it structural).
 
 Content:
-10. `d-2-09` step 1's `verify: cc 16 0,127` is unreachable — CC 16 is the
-    continuous FX1 dial (±1 per detent, never 0/127), and the verify grammar
-    has no "any value" form; fix needs a grammar extension or re-pointing the
-    hook (M4 design finding M4-F1; the device protocol pre-warns the owner).
+10. `d-2-09` FX hooks need real-device recalibration (owner evidence,
+    2026-08-07, docs/M4-device-evidence.md): (a) step 1's `cc 16 0,127` is
+    NOT unreachable as M4-F1 predicted — the dial's endpoints emit 0/127, so
+    a full sweep confirms; the instruction text should say "turn fully down"
+    (or the grammar gains an any-value form). (b) step 2's `cc 108 127`
+    misses the first press when step 1's dial motion left FX1 toggled on —
+    the FX buttons transmit 127/0 as ON/OFF edges; hook should accept
+    `0,127` or the step order/wording should guarantee the off state.
 11. Hand-confirmed steps that carry a verify hook show the idle sentence
     ("Device verification is off — confirm manually, or turn it on above.")
     even while device verification is ON — misleading on M4-F1's step 1,

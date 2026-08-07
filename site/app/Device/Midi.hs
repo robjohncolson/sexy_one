@@ -121,9 +121,17 @@ data HubState = HubState
   , hsNextId    :: !Int
   , hsAccess    :: Maybe JSVal     -- ^ the granted MIDIAccess object
   , hsStateCb   :: Maybe Function  -- ^ the installed onstatechange handler
-    -- | The permission promise's two settle callbacks, parked here and
-    -- freed on 'hubDisable': freeing a wrapper from inside its own
-    -- invocation is not obviously safe on this runtime.
+    -- | The CURRENT permission request's two settle callbacks, parked
+    -- here and freed on 'hubDisable' AND at the start of the NEXT
+    -- request ('hubEnable' -- the M4 gate-1 LOW-finding fix: a denied
+    -- request leaves the hub off without ever reaching 'hubDisable', so
+    -- repeated deny\/retry cycles used to accumulate a Function pair per
+    -- attempt for the page lifetime). Freeing a wrapper from inside its
+    -- own invocation is not obviously safe on this runtime, which is why
+    -- the settled pair is NOT freed by the settle callback itself but
+    -- parked until the next enable\/disable -- both of which run from a
+    -- click handler, never from inside a wrapper invocation. At most one
+    -- settled pair is therefore ever parked at a time.
   , hsSettleCbs :: [Function]
   }
 
@@ -230,7 +238,18 @@ hubEnable hub@(Hub ref) notify = do
           modifyIORef' ref (\s -> s { hsStatus = DevUnsupported })
           notify
         else do
-          modifyIORef' ref (\s -> s { hsStatus = DevPending })
+          -- M4 gate-1 fix (briefs/M4-codex-gate1.json, LOW finding):
+          -- free the PREVIOUS attempt's settle callbacks before parking
+          -- a new pair. Reaching this branch means status is DevOff or
+          -- DevDenied (DevPending returned above), so any parked pair
+          -- belongs to a request that has already SETTLED (a settled
+          -- promise never invokes either callback again) -- freeing
+          -- both here is safe, and it is never done from inside a
+          -- wrapper's own invocation (see 'hsSettleCbs'). Denied
+          -- retries are thereby leak-free: each retry frees the
+          -- previous attempt's pair.
+          mapM_ freeFunction (hsSettleCbs st)
+          modifyIORef' ref (\s -> s { hsStatus = DevPending, hsSettleCbs = [] })
           notify
           nav   <- jsg ("navigator" :: MisoString)
           opts  <- createWith [(("sysex" :: MisoString), False)]
@@ -353,7 +372,23 @@ strField v k = do
 --      re-runs Main's reconciler and registers the NEXT step's watch --
 --      removing after firing would delete that freshly registered watch.
 onMidiMessage :: Hub -> IO () -> JSVal -> IO ()
-onMidiMessage (Hub ref) notify ev = do
+onMidiMessage hub@(Hub ref) notify ev = do
+  -- M4 gate-1 fix (briefs/M4-codex-gate1.json, HIGH finding, the
+  -- enable/disable ordering): the port handler's Haskell body runs
+  -- ASYNCHRONOUSLY after the JS-side delivery, so a message delivered
+  -- just before a same-turn 'hubDisable' can reach this point with the
+  -- hub already off (and Main's reconciler may have legally re-armed a
+  -- watch for the next session -- watching-before-enabling is legal).
+  -- A disabled hub must be inert: drop the message entirely -- no
+  -- 'hsLastMsg' (disable reset it to Nothing; a late message must not
+  -- resurrect post-disable evidence), no match, no notify.
+  st0 <- readIORef ref
+  if hsStatus st0 /= DevGranted
+    then pure ()
+    else onMidiMessage' hub notify ev
+
+onMidiMessage' :: Hub -> IO () -> JSVal -> IO ()
+onMidiMessage' (Hub ref) notify ev = do
   d     <- ev ! ("data" :: MisoString)
   n     <- fromJSValUnchecked =<< (d ! ("length" :: MisoString))
   bytes <- mapM (\k -> fromJSValUnchecked =<< (d !! k)) [0 .. (n :: Int) - 1]

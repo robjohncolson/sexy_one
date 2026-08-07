@@ -121,16 +121,21 @@ readClocks = do
 --
 -- 'DevCtx' bundles what the update loop threads through: the hub, the
 -- verifier built over it, and the watch reconciler's bookkeeping -- the
--- ACTIVE watch as (promptId text, verify: source text, remover). The
--- remover is idempotent ('Device.Midi' filters by unique id), so running
--- it on reconciliation, after the watch already fired, or around a
--- disable are all safe in any order.
+-- ACTIVE watch as (promptId text, attempt generation captured at
+-- subscribe time, verify: source text, remover). The generation is part
+-- of the watch's IDENTITY (briefs/M4-codex-gate1.json, HIGH finding:
+-- keying on promptId alone cannot tell a restarted or re-enabled
+-- attempt from the old one when the cursor lands back on the same
+-- prompt), so a generation bump replaces the watch even when the
+-- promptId is unchanged. The remover is idempotent ('Device.Midi'
+-- filters by unique id), so running it on reconciliation, after the
+-- watch already fired, or around a disable are all safe in any order.
 --------------------------------------------------------------------------
 
 data DevCtx = DevCtx
   { dcHub      :: Hub
   , dcVerifier :: DeviceVerifier
-  , dcWatch    :: IORef (Maybe (Text, Text, IO ()))
+  , dcWatch    :: IORef (Maybe (Text, Int, Text, IO ()))
   }
 
 --------------------------------------------------------------------------
@@ -198,6 +203,24 @@ data Model = Model
   , mDevice       :: !HubSnapshot
   , mDevSupported :: !Bool
   , mDevWatching  :: !(Maybe (Text, Text))
+    -- M4 gate-1 fix (briefs/M4-codex-gate1.json, HIGH finding): the
+    -- ATTEMPT GENERATION -- a monotonically increasing counter naming
+    -- which drill ATTEMPT (and device-session) the model is currently
+    -- in. Bumped on every exercise load and Restart ('applyExActions',
+    -- on any batch containing 'Begin'/'Restart') and on every hub
+    -- enable/disable click ('DEnable'). Captured at watch-subscribe
+    -- time ('reconcileWatch') for the device path and at
+    -- click-PROCESSING time for the manual button (never at render
+    -- time -- see 'DConfirm'), carried through 'DConfirm' into
+    -- 'DApplyConfirm', and re-checked by 'guardedConfirmIx' AT BATCH
+    -- APPLICATION TIME -- so an in-flight confirmation whose attempt
+    -- was restarted, reloaded, or device-toggled out from under it is
+    -- dropped even when its prompt id LOOKS current again (Restart
+    -- lands the cursor back on the very promptId the stale confirm
+    -- captured; only the generation can tell the two attempts apart).
+    -- wasm32 'Int' is 32-bit: fine -- a session cannot plausibly bump
+    -- this 2^31 times.
+  , mAttemptGen   :: !Int
   } deriving (Eq)
 
 unDeckId :: DeckId -> Text
@@ -216,8 +239,12 @@ unPromptId (PromptId t) = t
 -- pre-batch state (so e.g. a drill confirm's 'ConfirmStep' immediately
 -- followed by 'Advance' is one undivided step from the learner's
 -- perspective); 'ExClocked' reads both clocks once and then dispatches
--- an 'ExBatch' built from them -- covers Submit\/SelfGrade_\/ConfirmStep\/
--- SubmitPage\/Advance\/Restart\/Begin uniformly.
+-- an 'ExBatch' built from them -- covers Submit\/SelfGrade_\/SubmitPage\/
+-- Advance\/Restart\/Begin uniformly. 'ConfirmStep' no longer travels
+-- this path: BOTH confirm sources go through 'DConfirm'\/'DApplyConfirm'
+-- (the guarded two-hop path -- briefs\/M4-codex-gate1.json, HIGH
+-- finding), which re-validates at batch-application time; an unguarded
+-- 'ExBatch' hop would reopen the stale-confirm window.
 data Action
   = HashChanged
   | SetRoute Route
@@ -237,7 +264,33 @@ data DeviceOp
   = DEnable                              -- ^ #btn-device-enable clicked (enable, or disable when already granted)
   | DSetChannel Int                      -- ^ #sel-device-channel change \/ #btn-device-use-channel click
   | DSynced HubSnapshot (Maybe (Text, Text)) -- ^ store a freshly read hub snapshot + active-watch mirror
-  | DConfirm ExId Text                   -- ^ the device callback fired for (exercise, promptId text captured at subscribe time) -- see the stale-confirm guard in 'handleDev'
+    -- M4 gate-1 fix (briefs/M4-codex-gate1.json, HIGH finding): the ONE
+    -- guarded confirm request -- issued by the device watch callback
+    -- (source 'ByDevice', promptId text + 'Just' the generation captured
+    -- at SUBSCRIBE time in 'reconcileWatch') AND by the manual Confirm
+    -- button (source 'ByLearner', generation 'Nothing' = capture the
+    -- CURRENT generation when this action is PROCESSED). The manual path
+    -- deliberately does NOT capture the generation at render time: the
+    -- generation is invisible in the rendered output, so two frames
+    -- differing only in it diff as unchanged and the DOM keeps the
+    -- OLDER frame's listener closure -- MEASURED (this task's report): a
+    -- drill entered under load renders once before its 'Begin' bump and
+    -- once after, the diff kept the pre-Begin closure, and every manual
+    -- confirm on that attempt was dropped as stale. The click being
+    -- processed IS the manual context capture -- everything BETWEEN that
+    -- capture and the batch's application is then guarded exactly as for
+    -- the device path. One shared guarded path: the full guard
+    -- ('guardedConfirmIx') runs here AND again at 'DApplyConfirm', the
+    -- batch-application hop.
+  | DConfirm ConfirmSource ExId Text (Maybe Int)
+    -- ^ the clock-read hop's result: same identity, plus the two clock
+    -- readings. 'handleDev' re-runs the FULL guard on this action --
+    -- i.e. at the moment the batch is actually applied -- so nothing
+    -- that lands between the two hops (SetRoute, Restart, a manual
+    -- confirm, a hub enable\/disable) can slip a stale confirmation
+    -- through. Never dispatched from anywhere but 'DConfirm''s own
+    -- effect.
+  | DApplyConfirm ConfirmSource ExId Text Int MonoMs WallMs
 
 data ProgressOp
   = PExportReq          -- ^ learner asked for an export
@@ -314,6 +367,7 @@ readerApp sink dev supported snap0 avail loadRes rawBlob st0 prefs today0 r0 =
       , mToday = today0, mBooted = False, mExportBlob = Nothing, mImportMsg = Nothing
       , mRawCorrupt = rawBlob
       , mDevice = snap0, mDevSupported = supported, mDevWatching = Nothing
+      , mAttemptGen = 0
       }
 
 findExerciseById :: [Deck] -> ExId -> Maybe Exercise
@@ -366,7 +420,7 @@ updateModel sink dev = \case
 
   Prog op -> handleProg op
 
-  Dev op -> handleDev dev op
+  Dev op -> handleDev sink dev op
 
   ToggleJA -> do
     r <- gets mRoute
@@ -446,20 +500,29 @@ handleProg op = case op of
 -- hidden #sxc1-device-state payload.
 --------------------------------------------------------------------------
 
-handleDev :: DevCtx -> DeviceOp -> Effect parent props Model Action
-handleDev dev op = case op of
+handleDev :: ProgressSink -> DevCtx -> DeviceOp -> Effect parent props Model Action
+handleDev sink dev op = case op of
   -- #btn-device-enable. When already granted the same button disables
   -- (its label tracks the status): run the active watch's remover (a
   -- no-op if none), clear the bookkeeping, and tear the JS side down --
   -- then reconcile, so a later re-enable starts from consistent state.
+  --
+  -- M4 gate-1 fix (briefs/M4-codex-gate1.json, HIGH finding): the
+  -- attempt generation bumps FIRST, on every enable AND disable click,
+  -- BEFORE the watch is replaced -- so 'reconcileWatch' below registers
+  -- the fresh watch under the NEW generation and any confirmation still
+  -- in flight from the previous device session (captured under the old
+  -- generation) is dropped at 'DApplyConfirm' even though its promptId
+  -- still names the cursor's prompt.
   DEnable -> do
+    modify (\m -> m { mAttemptGen = mAttemptGen m + 1 })
     m <- get
     withSink $ \snk -> do
       snap <- hubSnapshot (dcHub dev)
       if snapStatus snap == DevGranted
         then do
           mw <- readIORef (dcWatch dev)
-          mapM_ (\(_, _, remover) -> remover) mw
+          mapM_ (\(_, _, _, remover) -> remover) mw
           writeIORef (dcWatch dev) Nothing
           hubDisable (dcHub dev)
         else
@@ -477,29 +540,89 @@ handleDev dev op = case op of
   DSynced snap watching ->
     modify (\m -> m { mDevice = snap, mDevWatching = watching })
 
-  -- THE STALE-CONFIRM GUARD (briefs/M4-plan.md section 3.7, finding
-  -- M4-F3): 'SXC1.Exercise.Engine.gradeStep' does NOT check that the
+  -- THE STALE-CONFIRM GUARD, hop 1 of 2 (briefs/M4-plan.md section 3.7,
+  -- finding M4-F3; RESTRUCTURED for briefs/M4-codex-gate1.json's HIGH
+  -- finding): 'SXC1.Exercise.Engine.gradeStep' does NOT check that the
   -- graded index is the cursor, so a 'ConfirmStep' for an already-passed
   -- step would re-grade it and emit a duplicate event. The engine is
-  -- frozen, so the guard lives here: the device callback carries the
-  -- promptId TEXT captured at subscribe time, and it becomes a batch
-  -- ONLY IF that text still names the prompt at the exercise's current
-  -- cursor and that step is still unanswered. Otherwise it is dropped
-  -- silently. The batch itself is IDENTICAL to the manual Confirm
-  -- button's ('exOnConfirm') except for 'ByDevice', via the same
-  -- 'ExClocked' path -- events, mExResults, the capped log and the M3
-  -- sink all behave exactly as they do for a button press.
-  DConfirm exid pidText -> do
+  -- frozen, so the guard lives here -- and it now lives at BOTH hops of
+  -- the confirm path, because the gate showed that guarding only here
+  -- leaves the clock-read hop open: an action landing between this
+  -- validation and the batch's application (SetRoute, Restart, a manual
+  -- confirm, a hub enable/disable) used to change the context AFTER the
+  -- guard had already passed. 'guardedConfirmIx' checks route, cursor
+  -- prompt, answered-state, done-state AND the attempt generation; a
+  -- request failing it is dropped silently. On success the ONLY effect
+  -- is the clock read -- the state-mutating batch is built and guarded
+  -- again at 'DApplyConfirm', the application hop.
+  --
+  -- BOTH confirm sources take this same path: the device watch callback
+  -- ('ByDevice') and the manual Confirm button ('ByLearner' -- see
+  -- 'exOnConfirm'). For the manual button this is a zero-behavior-change
+  -- refactor in every non-racing schedule: the button is rendered ONLY
+  -- for the unanswered cursor step ('View.Exercise.confirmEl'), so its
+  -- captured promptId names the cursor's prompt at click time and the
+  -- generation is bound fresh right here; the guard can only drop a
+  -- manual click that raced a context change through these same two
+  -- hops -- exactly the duplicate-grade schedules the guard exists to
+  -- kill.
+  DConfirm src exid pidText mGen -> do
     m <- get
-    let st = Map.findWithDefault (initialState exid (MonoMs 0)) (unExId exid) (mExStates m)
-        i  = esCursor st
-        unanswered = case IntMap.lookup i (esResponses st) of
-          Nothing          -> True
-          Just RUnanswered -> True
-          _                -> False
-    if not (esDone st) && unanswered && unPromptId (promptIdFor exid (i + 1)) == pidText
-      then issue (ExClocked exid (\mono wall -> [ConfirmStep i ByDevice mono wall, Advance mono wall]))
-      else pure ()
+    -- 'Nothing' = the manual button: bind the CURRENT generation now,
+    -- at click-processing time (see the constructor's own comment for
+    -- why render-time capture is unsound). 'Just' = the device watch's
+    -- subscribe-time capture, taken as-is.
+    let gen = case mGen of { Just g -> g; Nothing -> mAttemptGen m }
+    case guardedConfirmIx m exid pidText gen of
+      Nothing -> pure ()
+      Just _  -> io $ do
+        (mono, wall) <- readClocks
+        pure (Dev (DApplyConfirm src exid pidText gen mono wall))
+
+  -- THE STALE-CONFIRM GUARD, hop 2 of 2 -- BATCH-APPLICATION time. The
+  -- full guard re-runs against the model AS IT IS NOW, in the same
+  -- undivided 'Effect' that applies the batch, so nothing can interpose
+  -- between this check and 'applyExActions'. The batch is byte-identical
+  -- to what the pre-fix 'ExClocked' path produced -- @[ConfirmStep i src
+  -- mono wall, Advance mono wall]@ through the SAME 'applyExActions' --
+  -- so events, mExResults, the capped log and the M3 sink all behave
+  -- exactly as before, followed by the same reconcile 'ExBatch' runs.
+  DApplyConfirm src exid pidText gen mono wall -> do
+    m <- get
+    case guardedConfirmIx m exid pidText gen of
+      Nothing -> pure ()
+      Just i  -> do
+        applyExActions sink exid [ConfirmStep i src mono wall, Advance mono wall]
+        reconcileEff dev
+
+-- | The FULL stale-confirm guard (briefs/M4-codex-gate1.json, HIGH
+-- finding), shared verbatim by both hops of the confirm path: 'Just'
+-- the cursor index to confirm iff, IN THIS model,
+--
+--   1. the route still shows exactly this exercise (a confirmation must
+--      never mutate an exercise the learner has navigated away from);
+--   2. the exercise is not done and its cursor step is still unanswered
+--      (the original M4-F3 duplicate-grade guard);
+--   3. the captured promptId text still names the cursor's prompt; and
+--   4. the captured attempt generation is CURRENT -- the one check that
+--      can tell a restarted/reloaded/device-toggled attempt from the
+--      old one when the cursor lands back on the very same promptId
+--      (checks 2 and 3 are blind to that).
+guardedConfirmIx :: Model -> ExId -> Text -> Int -> Maybe Int
+guardedConfirmIx m exid pidText gen = case mRoute m of
+  RExercise _ exSlug
+    | exSlug == unExId exid
+    , gen == mAttemptGen m
+    , let st = Map.findWithDefault (initialState exid (MonoMs 0)) exSlug (mExStates m)
+    , let i  = esCursor st
+    , let unanswered = case IntMap.lookup i (esResponses st) of
+            Nothing          -> True
+            Just RUnanswered -> True
+            _                -> False
+    , not (esDone st) && unanswered
+    , unPromptId (promptIdFor exid (i + 1)) == pidText
+    -> Just i
+  _ -> Nothing
 
 -- | Push the hub's current state (and the reconciler's active-watch
 -- bookkeeping) into the model mirror, through the sink.
@@ -507,17 +630,19 @@ syncDevice :: DevCtx -> Sink Action -> IO ()
 syncDevice dev snk = do
   snap <- hubSnapshot (dcHub dev)
   mw   <- readIORef (dcWatch dev)
-  snk (Dev (DSynced snap (fmap (\(p, s, _) -> (p, s)) mw)))
+  snk (Dev (DSynced snap (fmap (\(p, _, s, _) -> (p, s)) mw)))
 
--- | THE WATCH RECONCILER (briefs/M4-plan.md section 3.7): one function,
--- run after every action that can move the route or the cursor
--- ('SetRoute', 'ExBatch', and 'DEnable'). The desired watch is the
+-- | THE WATCH RECONCILER (briefs/M4-plan.md section 3.7; amended by the
+-- M4 gate-1 fix): one function, run after every action that can move
+-- the route, the cursor, or the attempt generation ('SetRoute',
+-- 'ExBatch', 'DEnable', and 'DApplyConfirm'). The desired watch is the
 -- current exercise route's prompt at the cursor, when it is a Confirm
--- carrying a 'VerifySpec' and is not already answered; if its key (the
--- promptId text) differs from the active one, the old remover runs and
--- the new spec is watched. Registering a watch touches no JS and is
--- legal before enabling ("watching before enabling is legal and simply
--- never fires"), so this runs unconditionally.
+-- carrying a 'VerifySpec' and is not already answered; if its key --
+-- the (promptId text, attempt generation) PAIR, see 'reconcileWatch' --
+-- differs from the active one, the old remover runs and the new spec is
+-- watched. Registering a watch touches no JS and is legal before
+-- enabling ("watching before enabling is legal and simply never
+-- fires"), so this runs unconditionally.
 reconcileEff :: DevCtx -> Effect parent props Model Action
 reconcileEff dev = do
   m <- get
@@ -529,17 +654,29 @@ reconcileWatch :: DevCtx -> Model -> Sink Action -> IO ()
 reconcileWatch dev m snk = do
   active <- readIORef (dcWatch dev)
   let desired = desiredWatch m
+      gen     = mAttemptGen m
   case (desired, active) of
     (Nothing, Nothing) -> pure ()
-    (Just (_, pid, _), Just (apid, _, _)) | pid == apid -> pure ()
+    -- The watch's identity is (promptId, ATTEMPT GENERATION) -- not the
+    -- promptId alone (briefs/M4-codex-gate1.json, HIGH finding): a
+    -- Restart or an enable/disable bump replaces the watch even though
+    -- the cursor lands back on the very same prompt, so the fresh
+    -- attempt's watch captures the fresh generation and the old
+    -- attempt's in-flight confirm (old generation) can no longer pass
+    -- 'guardedConfirmIx'.
+    (Just (_, pid, _), Just (apid, agen, _, _)) | pid == apid && agen == gen -> pure ()
     _ -> do
-      mapM_ (\(_, _, remover) -> remover) active
+      mapM_ (\(_, _, _, remover) -> remover) active
       case desired of
         Nothing -> writeIORef (dcWatch dev) Nothing
         Just (exid, pid, spec) -> do
+          -- The generation captured HERE, at subscribe time, is what the
+          -- callback carries into 'DConfirm' -- the whole point of the
+          -- guard: it names the attempt this watch was armed FOR, not
+          -- whatever attempt exists when the message finally arrives.
           remover <- dvWatch (dcVerifier dev) spec
-                       (\_src -> snk (Dev (DConfirm exid pid)))
-          writeIORef (dcWatch dev) (Just (pid, specSourceText spec, remover))
+                       (\_src -> snk (Dev (DConfirm ByDevice exid pid (Just gen))))
+          writeIORef (dcWatch dev) (Just (pid, gen, specSourceText spec, remover))
 
 -- | The watch the current model calls for: an exercise route whose
 -- cursor prompt is a Confirm with a @verify:@ hook, not yet answered.
@@ -680,6 +817,15 @@ applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
       , mEventLog  = capEvents (mEventLog m ++ evsAll)
       , mProgress  = prog1
       , mToday     = max (mToday m) today'
+        -- M4 gate-1 fix (briefs/M4-codex-gate1.json, HIGH finding): a
+        -- 'Begin' (every exercise load) or 'Restart' starts a FRESH
+        -- attempt, so the attempt generation bumps in the same modify
+        -- that folds the batch in -- the ExBatch handler's reconcile
+        -- runs right after this and re-registers the watch under the
+        -- new generation, and any confirmation still in flight for the
+        -- OLD attempt fails 'guardedConfirmIx''s generation check even
+        -- though a restarted cursor names the same promptId again.
+      , mAttemptGen = mAttemptGen m + (if clearStale then 1 else 0)
       })
     io_ (mapM_ (sinkRecord sink) evsAll)
     -- NEW8: the first successful save of real progress moves the load
@@ -701,6 +847,21 @@ applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
 -- View
 --------------------------------------------------------------------------
 
+-- | M4 gate-1 fix (briefs/M4-codex-gate1.json, HIGH finding):
+-- 'exOnConfirm' routes the manual Confirm click through the same
+-- two-hop guarded path the device callback takes ('DConfirm' with
+-- 'ByLearner') instead of a raw unguarded 'ExClocked'. The promptId
+-- text is captured at render time -- sound, because the Confirm button
+-- is only ever rendered for the unanswered cursor step
+-- ('View.Exercise.confirmEl') and its rendered identity changes with
+-- the step -- but the GENERATION is deliberately not ('Nothing' = bound
+-- at click-processing time; see 'DConfirm''s own comment for the
+-- measured listener-staleness defect that render-time capture causes).
+-- The guard passes for every ordinary click and can only drop a click
+-- that raced a context change through the confirm path's two hops --
+-- the exact duplicate-grade schedules the guard exists to kill. Events,
+-- results, log and sink behavior are unchanged ('DApplyConfirm' applies
+-- the byte-identical batch through the same 'applyExActions').
 exHandlersFor :: ExId -> ExHandlers Action
 exHandlersFor exid = ExHandlers
   { exOnToggle     = \i optIdent -> ExBatch exid [Toggle i optIdent]
@@ -708,7 +869,7 @@ exHandlersFor exid = ExHandlers
   , exOnReveal     = \i -> ExBatch exid [Reveal i]
   , exOnGot        = \i -> ExClocked exid (\mono wall -> [SelfGrade_ i Got mono wall])
   , exOnMissed     = \i -> ExClocked exid (\mono wall -> [SelfGrade_ i Missed mono wall])
-  , exOnConfirm    = \i -> ExClocked exid (\mono wall -> [ConfirmStep i ByLearner mono wall, Advance mono wall])
+  , exOnConfirm    = \i -> Dev (DConfirm ByLearner exid (unPromptId (promptIdFor exid (i + 1))) Nothing)
   , exOnFindInput  = \i txt -> case parseDigits (fromMisoString txt) of
       Just n  -> ExBatch exid [EnterPage i n]
       Nothing -> NoOp

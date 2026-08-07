@@ -389,8 +389,8 @@ Options:
                        (see its own summary output for valid keys) --
                        a faster dev loop, not part of the documented
                        pass/fail contract.
-  --device-only        M4 dev loop: run ONLY the 22 WebMIDI device
-                       assertions (D1..D22) against --url, in their own
+  --device-only        M4 dev loop: run ONLY the 25 WebMIDI device
+                       assertions (D1..D25) against --url, in their own
                        throwaway browser -- the fast cycle for the M4
                        sabotage sweep, not part of the documented
                        pass/fail contract (the full run and check-site
@@ -936,10 +936,16 @@ window.__SXC1_BOOTED = true;
   // "pad 1 bank A" (note 36).
   //
   // The device-confirm APPLY path deliberately runs in TWO queued hops
-  // (match -> guard -> apply), mirroring the real app's action queue
-  // (hub callback -> DConfirm guard -> ExClocked -> ExBatch), so the
-  // one-shot and stale-confirm sabotages are observable the same way
-  // they would be in the app.
+  // (match -> guard -> guard+apply), mirroring the real app's action
+  // queue after the M4 gate-1 HIGH-finding fix (hub callback -> DConfirm
+  // guard -> clock read -> DApplyConfirm, which re-runs the FULL guard
+  // at batch-application time). The guard carries an ATTEMPT GENERATION
+  // (DEV.gen -- bumped on drill load, Restart, and every device
+  // enable/disable, captured into the watch at arm time), because a
+  // Restart lands the cursor back on the very promptId a stale confirm
+  // captured and only the generation can tell the two attempts apart.
+  // The one-shot, stale-confirm and in-flight sabotages are observable
+  // the same way they would be in the app.
   // -----------------------------------------------------------------------
   var DRILL_SPECS = [
     { kind: 'cc', num: 80, values: [127], text: 'cc 80 127' },
@@ -956,7 +962,11 @@ window.__SXC1_BOOTED = true;
     access: null,
     boundPorts: [],
     watchingPrompt: null,
-    skipNextReconcile: false
+    skipNextReconcile: false,
+    // The attempt generation and the generation the active watch was
+    // armed under (the app's mAttemptGen / dcWatch pair).
+    gen: 0,
+    watchGen: 0
   };
   if (!DEV.supported) DEV.status = 'unsupported';
   var drillConfirms = [];
@@ -1010,11 +1020,14 @@ window.__SXC1_BOOTED = true;
 
   // The reconciler mirror: the desired watch is the drill route's current
   // step, when it exists and is unanswered (the fixture's cursor only
-  // ever sits on unanswered steps). SABOTAGE 'devStaleConfirm' (-> D15):
-  // a MANUAL confirm skips the disarm exactly once, so the previous
-  // step's watch stays armed -- the stale state the app's guard exists
-  // to make harmless. SABOTAGE 'devKeepWatchOnNav' (-> D16): a route
-  // move away from the drill never disarms.
+  // ever sits on unanswered steps). Arming (or re-arming) captures the
+  // CURRENT attempt generation into DEV.watchGen -- the app captures it
+  // at dvWatch-subscribe time in reconcileWatch. SABOTAGE
+  // 'devStaleConfirm' (-> D15): a MANUAL confirm skips the disarm
+  // exactly once, so the previous step's watch stays armed -- the stale
+  // state the app's guard exists to make harmless. SABOTAGE
+  // 'devKeepWatchOnNav' (-> D16): a route move away from the drill
+  // never disarms.
   function devReconcile() {
     if (DEV.skipNextReconcile) { DEV.skipNextReconcile = false; devUpdateState(); return; }
     var desired = currentDrillPrompt();
@@ -1024,6 +1037,7 @@ window.__SXC1_BOOTED = true;
     }
     var changed = DEV.watchingPrompt !== desired;
     DEV.watchingPrompt = desired;
+    DEV.watchGen = DEV.gen;
     // Keep the verify lines' waiting/idle classes in step with the watch
     // (the real app re-renders everything on every action; this fixture
     // must do it by hand). renderDrill never calls back into
@@ -1075,22 +1089,77 @@ window.__SXC1_BOOTED = true;
     devReconcile();
   }
 
+  // The FULL stale-confirm guard mirror (the app's guardedConfirmIx,
+  // M4 gate-1 HIGH-finding restructure), re-run at BOTH hops of the
+  // confirm path -- the second run at application time. Each named
+  // sabotage opens exactly one hole:
+  //   'devStaleConfirm'     (-> D15)      the cursor/answered half
+  //                         degrades to "still on the drill route", so
+  //                         a confirm captured for an already-passed
+  //                         step applies anyway
+  //   'devConfirmAcrossNav' (-> D23)      a confirm whose context
+  //                         NAVIGATED away between match and apply is
+  //                         applied anyway
+  //   'devIgnoreGen'        (-> D24, D25) the attempt-generation
+  //                         re-check is dropped -- one root cause, two
+  //                         in-flight orderings (Restart and disable),
+  //                         the honest single-root-cause grouping the
+  //                         map already uses for 'devPanelAlways'
+  function devConfirmGuardOk(captured) {
+    var promptOk = currentDrillPrompt() === captured.prompt;
+    if (sel('devStaleConfirm')) promptOk = onDrillRoute();
+    if (sel('devConfirmAcrossNav') && !onDrillRoute()) promptOk = true;
+    // SABOTAGE 'devNotOneShot' (-> D14), SECOND layer: the at-most-once
+    // invariant is defended twice -- the watch disarms at match time
+    // (the hub's one-shot removal) AND a duplicate delivery that slipped
+    // past it still fails this guard's cursor-prompt re-check at apply
+    // time. Post gate-1 restructure the second layer alone masks a
+    // missing first (a duplicate apply of an already-device-confirmed
+    // prompt is simply dropped here), so sabotaging only the disarm
+    // would demonstrate the defense-in-depth, never a red D14. The
+    // selector therefore breaches the INVARIANT at both layers: no
+    // disarm (see devOnMessage) and, here, a captured prompt this
+    // attempt already device-confirmed passes anyway. Scoped to
+    // source 'device' so D15's learner-confirmed stale prompt stays
+    // guarded under every other selector's pass.
+    if (sel('devNotOneShot') && drillConfirms.some(function (c) { return c.prompt === captured.prompt && c.source === 'device'; })) promptOk = true;
+    var genOk = captured.gen === DEV.gen || sel('devIgnoreGen');
+    return promptOk && genOk;
+  }
+
   function devOnMessage(ev) {
     var bytes = Array.prototype.slice.call(ev.data);
     DEV.lastMessage = bytes;
     var m = devDecode(bytes);
     DEV.lastChannel = m ? m.channel : null;
+    // SABOTAGE 'devSameOriginEgress' (-> D21): a hostile handler leaks
+    // the received bytes over a SAME-ORIGIN request carrying a query
+    // string -- exactly the class the pre-fix D21 (cross-origin-only
+    // filter) let through. The request fails on the fixture's file://
+    // page and that is fine: CDP's Network domain still records
+    // requestWillBeSent for it (measured -- see this task's report),
+    // which is all D21's collector reads.
+    if (sel('devSameOriginEgress')) {
+      try { fetch('collect?bytes=' + bytes.join('-')).catch(function () { /* the request event is what matters */ }); } catch (e) { /* ditto */ }
+    }
     if (DEV.watchingPrompt && devMatches(DEV.watchingPrompt, m)) {
-      var captured = DEV.watchingPrompt;
+      // What the app captures at subscribe time: the promptId AND the
+      // attempt generation its watch was armed under.
+      var captured = { prompt: DEV.watchingPrompt, gen: DEV.watchGen };
       // SABOTAGE 'devNotOneShot' (-> D14): the matched watch is not
       // removed, so a second message in the same turn matches again.
       if (!sel('devNotOneShot')) DEV.watchingPrompt = null;
       setTimeout(function () {
-        // hop 1: the stale-confirm guard (skipped under 'devStaleConfirm')
-        var ok = sel('devStaleConfirm') || (currentDrillPrompt() === captured);
-        if (!ok) { devUpdateState(); return; }
-        var stepIdx = drillCursor;
-        setTimeout(function () { devApplyConfirm(stepIdx); }, 0);
+        // hop 1 -- the app's DConfirm validation (before its clock read).
+        if (!devConfirmGuardOk(captured)) { devUpdateState(); return; }
+        setTimeout(function () {
+          // hop 2 -- the app's DApplyConfirm: the SAME full guard again,
+          // at application time, against whatever state exists NOW --
+          // anything that landed between the hops (navigation, Restart,
+          // a manual confirm, a device toggle) is seen here.
+          if (!devConfirmGuardOk(captured)) { devUpdateState(); return; }
+          devApplyConfirm(drillCursor);
+        }, 0);
       }, 0);
     }
     devUpdateState();
@@ -1124,6 +1193,10 @@ window.__SXC1_BOOTED = true;
 
   function devEnable() {
     if (!DEV.supported || DEV.status === 'pending') return;
+    // Parity with the app's DEnable: the attempt generation bumps on
+    // EVERY enable/disable click, before the watch is re-armed, so a
+    // confirm in flight across the toggle fails the gen re-check.
+    DEV.gen += 1;
     if (DEV.status === 'granted') {
       // parity with the app: the same button disables when already on
       DEV.boundPorts.forEach(function (p) { p.onmidimessage = null; });
@@ -1146,6 +1219,11 @@ window.__SXC1_BOOTED = true;
       access.onstatechange = function () { devBindPorts(); };
       DEV.status = 'granted';
       devBindPorts();
+      // Re-arm under the CURRENT generation (the enable click bumped
+      // it) -- mirrors the app's DEnable, which runs reconcileWatch
+      // after hubEnable. Hot-plug (onstatechange above) deliberately
+      // does NOT reconcile: rebinding ports never touches watches.
+      devReconcile();
     }, function () {
       DEV.status = 'denied';
       devUpdateState();
@@ -1976,7 +2054,22 @@ window.__SXC1_BOOTED = true;
     }
     root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-drill">' +
       '<h1 id="ex-title">Demo drill</h1><p id="ex-progress">' + Math.min(drillCursor + 1, FIXTURE.drill.steps) + ' / ' + FIXTURE.drill.steps + '</p>' +
-      '<div id="ex-stem"><p>Do the thing.</p></div><ol id="ex-steps">' + stepsHtml + '</ol></article>';
+      '<div id="ex-stem"><p>Do the thing.</p></div><ol id="ex-steps">' + stepsHtml + '</ol>' +
+      '<button id="btn-ex-restart">Restart</button></article>';
+    // M4 gate-1 (D24): the drill's Restart mirror -- the app renders
+    // #btn-ex-restart on every runner. Mirrors Main.hs Restart exactly:
+    // fresh attempt state, confirms wiped (esResponses resets), the
+    // event log KEPT (Restart emits no event), and the attempt
+    // generation bumped -- which is what the in-flight-Restart
+    // stale-drop rides on.
+    document.getElementById('btn-ex-restart').addEventListener('click', function () {
+      drillCursor = 0;
+      drillStepAt = Date.now();
+      drillConfirms = [];
+      DEV.gen += 1;
+      renderDrill();
+      devReconcile();
+    });
     var btn = document.getElementById('btn-ex-confirm-' + (drillCursor + 1));
     if (btn) btn.addEventListener('click', function () {
       var confirmedIdx = drillCursor;
@@ -2077,7 +2170,11 @@ window.__SXC1_BOOTED = true;
       BOOTED = true; PREV_PAGE = null;
       renderHeader(false);
       if (exId === FIXTURE.quiz.id) { renderQuiz(); updateProgressPayload(); return; }
-      if (exId === FIXTURE.drill.id) { drillCursor = 0; renderDrill(); updateProgressPayload(); return; }
+      // M4 gate-1: this fixture resets the drill on every route ENTRY
+      // (its own long-standing semantics; the app Begins only once), so
+      // each entry is a fresh attempt and bumps the generation, exactly
+      // as the app's Begin batch does via applyExActions.
+      if (exId === FIXTURE.drill.id) { drillCursor = 0; DEV.gen += 1; renderDrill(); updateProgressPayload(); return; }
       if (exId === FIXTURE.lookup.id) { lookupStartedAt = 0; lookupResult = null; renderLookup(); updateProgressPayload(); return; }
     }
     if (parts[0] === 'm' && parts.length >= 4 && parts[2] === 'p') {
@@ -3312,7 +3409,7 @@ function validateExerciseFixture(fx) {
 }
 
 // ---------------------------------------------------------------------------
-// M4 (task "device-app"): the WebMIDI device suite -- assertions D1..D22
+// M4 (task "device-app"): the WebMIDI device suite -- assertions D1..D25
 // from briefs/M4-plan.md section 4, driven through scripts/fake-midi.js.
 //
 // The fake is a COMMITTED REPO FILE (reviewable, one copy drives every
@@ -3362,8 +3459,11 @@ const DEVICE_ASSERTION_NAMES = {
   d18: 'D18: removePort empties ports without crashing and keeps the watch armed; re-adding a port confirms again',
   d19: 'D19: outcome deny -> status "denied", #device-status explains, manual confirm still works',
   d20: 'D20: no fake injected (real headless Chrome) -> enable lands in status "denied" and never confirms (the fake is load-bearing)',
-  d21: 'D21: zero network requests beyond the app\'s own assets across a full device scenario',
+  d21: 'D21: zero network requests beyond the app\'s own assets across a full device scenario -- same-origin included: every collected request must match the exact asset-path allowlist and carry no query string',
   d22: 'D22: site/public and site/static contain no fake-midi.js',
+  d23: 'D23: in-flight navigation -- matching bytes emitted and the route changed in the SAME JS turn: no confirmation may land once the drill route is gone, and the emit was provably delivered',
+  d24: 'D24: in-flight Restart -- matching bytes emitted and #btn-ex-restart clicked in the SAME JS turn: the fresh attempt stays blank (no stale confirm lands on it), and a settled re-emit then confirms it (the generation guard does not over-block)',
+  d25: 'D25: in-flight disable -- matching bytes emitted and #btn-device-enable clicked in the SAME JS turn: no confirm lands while the device is off, and re-enable + re-emit then confirms again',
 };
 
 // Preambles (per-scenario driver setup, run right after the fake installs).
@@ -3398,6 +3498,18 @@ const DEVICE_REAL_CFG = {
     first: [144, 36, 127], firstPrompt: 'd-2-02#1',
     second: [144, 48, 127], secondPrompt: 'd-2-02#2',
   },
+  // M4 gate-1 (D23): the exercise the in-flight-navigation scenario
+  // navigates TO -- its event count must stay untouched by the race.
+  quizExId: 'q-2-01',
+  // MEASURED in-flight race outcomes against the real app -- see
+  // T14/T15/T16's own comments for the schedule these pin: this runtime
+  // drains every dispatch chain synchronously within the JS call that
+  // triggered it, so an emit's confirm has fully applied before a
+  // same-turn navigation/click processes ('hit'-shaped phase A
+  // outcomes, nav not strict) and a click's disable has fully torn the
+  // JS side down before a same-turn emit runs.
+  inflightNavStrict: false,
+  inflightDisableRace: 'hit',
 };
 
 // The fixture drill (selfTestFixtureHtml) carries two hooks: step 1
@@ -3425,6 +3537,18 @@ const DEVICE_SELFTEST_CFG = {
     first: [176, 80, 127], firstPrompt: `${SELF_TEST_FIXTURE.drill.id}#1`,
     second: [144, 36, 127], secondPrompt: `${SELF_TEST_FIXTURE.drill.id}#2`,
   },
+  // M4 gate-1 (D23): see DEVICE_REAL_CFG.quizExId.
+  quizExId: SELF_TEST_FIXTURE.quiz.id,
+  // The fixture's mirror queues its confirm hops through REAL
+  // setTimeouts (unlike the app's measured synchronous chains), so the
+  // emit-FIRST orderings leave a confirm genuinely in flight across the
+  // context change and the guard-at-application's drop is
+  // deterministic: strict nav (forPrompt stays 0) and 'drop'-shaped
+  // T16 phase A. This is the "unit-level" arm the gate asked for, and
+  // it is what the mapped sabotage selectors ('devConfirmAcrossNav',
+  // 'devIgnoreGen') turn red on cue.
+  inflightNavStrict: true,
+  inflightDisableRace: 'drop',
 };
 
 // M4 negative-sweep map, appended to --self-test-negative exactly like
@@ -3448,6 +3572,16 @@ const M4_SELECTOR_ASSERTIONS = {
   devNotOneShot: [DEVICE_ASSERTION_NAMES.d14],
   devStaleConfirm: [DEVICE_ASSERTION_NAMES.d15],
   devKeepWatchOnNav: [DEVICE_ASSERTION_NAMES.d16],
+  // M4 gate-1 additions (briefs/M4-codex-gate1.json). 'devIgnoreGen'
+  // maps to two on purpose: dropping the attempt-generation re-check is
+  // ONE root cause observable through two in-flight orderings (Restart
+  // and disable), the same honest single-root-cause grouping as
+  // 'devPanelAlways' above. 'devSameOriginEgress' is the MEDIUM
+  // finding's required negative control: same-origin egress with a
+  // query string during the device flow must turn exactly D21 red.
+  devConfirmAcrossNav: [DEVICE_ASSERTION_NAMES.d23],
+  devIgnoreGen: [DEVICE_ASSERTION_NAMES.d24, DEVICE_ASSERTION_NAMES.d25],
+  devSameOriginEgress: [DEVICE_ASSERTION_NAMES.d21],
 };
 
 // Fresh-target factory: everything a device scenario needs, built the
@@ -3499,9 +3633,47 @@ function deviceTargetFactoryFor(cdp, deadline, baseUrl) {
       evaluate,
       requests,
       originPrefix,
+      baseNoHash,
       close: async () => { try { await cdp.send('Target.closeTarget', { targetId }); } catch { /* best effort */ } },
     };
   };
+}
+
+// M4 gate-1 fix (briefs/M4-codex-gate1.json, MEDIUM finding): D21 used
+// to reject only requests OUTSIDE the app's origin, so a hostile handler
+// could exfiltrate MIDI bytes to the app's OWN origin
+// (fetch('/collect?note=...')) and still pass. The collected request set
+// must instead be a SUBSET of the app's own asset requests, matched by
+// exact path shape:
+//   - NO collected request may carry a query string, ever (no app asset
+//     uses one, and a query string is the natural exfiltration channel);
+//   - under http(s), the request must live under the app's own base URL
+//     and its base-relative path must be one of the complete asset
+//     closure of site/public/: '' (the document), 'index.html',
+//     'index.js', 'app.wasm', 'ghc_wasm_jsffi.js',
+//     'vendor/browser_wasi_shim/<file>.js', or a manual page image
+//     'pages/<slug>/page-<n>.webp' -- plus the browser's OWN
+//     origin-root '/favicon.ico' (browser-initiated, carries no page
+//     data, and cannot carry MIDI bytes without a query string, which
+//     the first rule already rejects);
+//   - under file:// (the self-test fixture), the ONLY legal request is
+//     the fixture document itself.
+// Anything else -- same-origin included -- is an offender. The negative
+// control is the fixture sabotage 'devSameOriginEgress' (a
+// fetch('collect?bytes=...') fired from the message handler), which must
+// turn exactly D21 red in the --self-test-negative sweep.
+function d21Offenders(requests, originPrefix, baseNoHash) {
+  const base = baseNoHash.endsWith('/') ? baseNoHash : `${baseNoHash}/`;
+  const assetRe = /^(|index\.html|index\.js|app\.wasm|ghc_wasm_jsffi\.js|vendor\/browser_wasi_shim\/[A-Za-z0-9._-]+\.js|pages\/[a-z0-9-]+\/page-[0-9]+\.webp)$/;
+  return requests.filter((u) => {
+    if (typeof u !== 'string') return true;
+    if (u.includes('?')) return true;
+    if (originPrefix === 'file://') return u !== baseNoHash;
+    if (u === `${originPrefix}/favicon.ico`) return false;
+    if (u === baseNoHash) return false;
+    if (!u.startsWith(base)) return true;
+    return !assetRe.test(u.slice(base.length));
+  });
 }
 
 async function readDeviceStateJson(evaluate) {
@@ -3568,7 +3740,7 @@ async function devNegProbe(evaluate, cfgDrill, bytes) {
   return { delivered, echoed, before, after, ds };
 }
 
-// D1..D22. `makeTarget` is deviceTargetFactoryFor's product; `report`
+// D1..D25. `makeTarget` is deviceTargetFactoryFor's product; `report`
 // follows the house report(name, ok, observed) contract; `cfg` is one of
 // the DEVICE_*_CFG tables.
 async function runDeviceAssertions(makeTarget, report, cfg) {
@@ -4005,13 +4177,272 @@ async function runDeviceAssertions(makeTarget, report, cfg) {
       await t.evaluate(fakeEmitExpr(cfg.drill.good));
       await waitDeviceState(t.evaluate, `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)})`, 6000);
       await sleep(400);
-      const offenders = t.requests.filter((u) => typeof u === 'string' && !u.startsWith(t.originPrefix));
+      // M4 gate-1 (MEDIUM finding): subset-of-own-assets, not merely
+      // same-origin -- see d21Offenders. Anti-vacuity: the collector saw
+      // at least the document's own navigation request (measured to hold
+      // for file:// fixtures too), so an empty offender list can never
+      // mean "nothing was collected".
+      const offenders = d21Offenders(t.requests, t.originPrefix, t.baseNoHash);
       const sawAny = t.requests.length;
-      const isHttp = t.originPrefix.startsWith('http');
       report(
         N.d21,
-        offenders.length === 0 && (!isHttp || sawAny >= 1),
-        { requestCount: sawAny, originPrefix: t.originPrefix, offenders: offenders.slice(0, 5) },
+        offenders.length === 0 && sawAny >= 1,
+        { requestCount: sawAny, base: t.baseNoHash, offenders: offenders.slice(0, 5) },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T14: in-flight navigation -- D23 (M4 gate-1 HIGH finding). -------
+  // The matching bytes are emitted and the route is changed in the SAME
+  // JS turn, so the confirm is in flight across its two queued hops when
+  // the navigation happens. The guard-at-application must leave exactly
+  // one of the two LEGAL outcomes: the confirmation either completed
+  // entirely before the route change was processed (a legitimate hit --
+  // navigation does not reset exercise state, so this is
+  // indistinguishable from a hit a millisecond earlier), or it was
+  // dropped. FORBIDDEN either way: more than one event, an event for the
+  // navigated-to exercise, or a watch left armed.
+  //
+  // MEASURED (this task's report): against the real app the HIT arm is
+  // what happens, deterministically. This Miso/wasm runtime drains an
+  // entire dispatch chain -- update, its io hops, the actions they
+  // dispatch -- SYNCHRONOUSLY within the JS call that triggered it:
+  // witnessed by T16 phase B, where the fake's subscribedCount() reads 0
+  // immediately after .click() on the disable button (the whole
+  // DEnable-with-hub-teardown chain already ran), and by T15/T16 phase
+  // A, where the emit's confirm has fully applied before the same-turn
+  // click processes. The emit's validation and application are therefore
+  // ATOMIC against every same-turn JS sequence -- the two-hop window
+  // cannot be interleaved in this runtime, which is the empirical
+  // demonstration the gate asked for -- and a route change enters only
+  // via the "hashchange" macrotask, after the chain finished. The
+  // guard-at-application is asserted at unit level by the fixture, whose
+  // mirror queues its two hops through real setTimeouts and reads
+  // location.hash synchronously in its guard: under the self-test cfg
+  // the drop arm IS deterministic and asserted strictly (forPrompt stays
+  // 0), and the mapped 'devConfirmAcrossNav' sabotage turns exactly that
+  // red. The app arm pins the measured schedule instead, so a future
+  // runtime/scheduler change that OPENS the window flips this assertion
+  // loudly rather than silently.
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d23, false, 'in-flight-navigation target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      const before = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const delivered = await t.evaluate(`(() => {
+        const d = ${fakeEmitExpr(cfg.drill.good)};
+        window.location.hash = ${JSON.stringify(cfg.quizRoute)};
+        return d;
+      })()`);
+      const onQuiz = await waitForTrue(t.evaluate, "document.querySelector('.kind-quiz') !== null", 5000);
+      const disarmed = await waitDeviceState(t.evaluate, 'p.watching === null', 4000);
+      await sleep(700);
+      const after = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const quizCounts = await deviceEventCounts(t.evaluate, cfg.quizExId, `${cfg.quizExId}#1`);
+      const ds = await readDeviceStateJson(t.evaluate);
+      const landed = after.forPrompt - before.forPrompt;
+      const landedOk = cfg.inflightNavStrict ? landed === 0 : (landed === 0 || landed === 1);
+      report(
+        N.d23,
+        delivered >= 1 && onQuiz === true && disarmed === true
+          && landedOk && after.forExercise === after.forPrompt
+          && quizCounts.forExercise === 0
+          && sameBytes(ds && ds.lastMessage, cfg.drill.good),
+        { delivered, onQuiz, disarmed, before, after, quizCounts, lastMessage: ds && ds.lastMessage },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T15: in-flight Restart -- D24 (M4 gate-1 HIGH finding). ----------
+  // The ordering the promptId-only guard could never catch: Restart
+  // lands the cursor back on the very promptId the in-flight confirm
+  // captured, so only the ATTEMPT GENERATION can tell the old attempt
+  // from the new one. Two phases, both in ONE JS turn each:
+  //
+  //   Phase A, emit-then-Restart (the gate's literal ordering): in the
+  //   app the confirm applies SYNCHRONOUSLY inside emit() (see T14's
+  //   measured-schedule comment), so the event lands on the OLD attempt
+  //   and the Restart then wipes the state; in the fixture the two
+  //   queued hops are still in flight when the synchronous Restart
+  //   bumps the generation, and the guard-at-application drops them.
+  //   Either way the FRESH attempt must end blank: confirms [] and
+  //   progress 1/N -- a stale confirm applying to the fresh attempt is
+  //   exactly the corruption the gate named, and the fixture's
+  //   'devIgnoreGen' sabotage turns THIS check red on cue.
+  //
+  //   Phase B, Restart-then-emit: in BOTH arms the Restart has fully
+  //   applied (bump + watch replacement under the new generation)
+  //   before the emit runs, so the emit legitimately belongs to the NEW
+  //   attempt and must confirm it -- exactly one event, source
+  //   "device". This is the anti-over-blocking half (a guard that
+  //   swallowed everything would fail it) AND the watch-identity check:
+  //   an app whose reconciler still keys the watch by promptId alone
+  //   (the gate's Main.hs:532 evidence) leaves the OLD generation's
+  //   watch armed across the Restart, and the guard then rightly drops
+  //   the confirm -- flipping this phase red (measured -- the app-side
+  //   red demonstration in this task's report).
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d24, false, 'in-flight-restart target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      const before = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      // Phase A: emit, then Restart, same turn.
+      const deliveredA = await t.evaluate(`(() => {
+        const d = ${fakeEmitExpr(cfg.drill.good)};
+        const b = document.querySelector('#btn-ex-restart');
+        if (!b) return -100;
+        b.click();
+        return d;
+      })()`);
+      const rearmedA = await waitDeviceState(t.evaluate, `p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 5000);
+      await sleep(700);
+      const dsA = await readDeviceStateJson(t.evaluate);
+      const midA = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const progressA = await t.evaluate("(document.querySelector('#ex-progress')||{}).textContent");
+      const landedA = midA.forPrompt - before.forPrompt;
+      const phaseAOk = deliveredA >= 1 && rearmedA === true
+        && Boolean(dsA && Array.isArray(dsA.confirms) && dsA.confirms.length === 0)
+        && progressA === `1 / ${cfg.drill.steps}`
+        && (landedA === 0 || landedA === 1);
+      // Phase B: Restart, then emit, same turn -- must confirm the NEW
+      // attempt exactly once (see the block comment above).
+      const deliveredB = await t.evaluate(`(() => {
+        const b = document.querySelector('#btn-ex-restart');
+        if (!b) return -100;
+        b.click();
+        return ${fakeEmitExpr(cfg.drill.good)};
+      })()`);
+      const confirmedB = await waitDeviceState(
+        t.evaluate,
+        `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)} && c.source === 'device')`,
+        6000,
+      );
+      await sleep(500);
+      const dsB = await readDeviceStateJson(t.evaluate);
+      const midB = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const progressB = await t.evaluate("(document.querySelector('#ex-progress')||{}).textContent");
+      const landedB = midB.forPrompt - midA.forPrompt;
+      const confirmsB = (dsB && Array.isArray(dsB.confirms)) ? dsB.confirms : null;
+      const phaseBOk = deliveredB >= 1 && confirmedB === true && confirmsB !== null
+        && landedB === 1 && confirmsB.length === 1
+        && confirmsB[0].prompt === cfg.drill.prompt1 && confirmsB[0].source === 'device'
+        && progressB === cfg.drill.progressAfter1;
+      report(
+        N.d24,
+        phaseAOk && phaseBOk,
+        { phaseA: { deliveredA, rearmedA, landedA, confirms: dsA && dsA.confirms, progressA },
+          phaseB: { deliveredB, confirmedB, landedB, confirmsB, progressB } },
+      );
+    }
+    await t.close();
+  }
+
+  // --- T16: in-flight disable -- D25 (M4 gate-1 HIGH finding). ----------
+  // Three phases against the disable/re-enable toggle:
+  //
+  //   Phase A, emit-then-disable (the gate's literal ordering): in the
+  //   app the confirm applies SYNCHRONOUSLY inside emit() (T14's
+  //   measured schedule) BEFORE the click processes -- a legitimate hit
+  //   on the still-armed attempt (disable does NOT reset exercise
+  //   state, so step 1 stays confirmed), pinned by cfg
+  //   inflightDisableRace 'hit'. The fixture's hops are still in
+  //   flight when its synchronous disable bumps the generation, so its
+  //   guard-at-application drops them -- cfg 'drop', and the fixture's
+  //   'devIgnoreGen' sabotage turns exactly that red. Anything else (a
+  //   double event, a half-state) fails both arms.
+  //
+  //   Phase B, disable-then-emit: MEASURED identical in both arms --
+  //   the disable's whole chain, JS teardown included, runs
+  //   synchronously inside .click() (the subscribedCount() sample taken
+  //   immediately after it reads 0 -- the load-bearing witness for
+  //   T14's atomicity argument), so nothing is listening by emit time:
+  //   subscribed === 0, delivered === 0, and nothing may land. An app
+  //   whose disable left handlers installed (the teardown-skipped
+  //   defect class) flips this phase red via the subscribed sample
+  //   (measured -- the app-side red demonstration in this task's
+  //   report); Device.Midi.onMidiMessage's status check is the
+  //   defense-in-depth that keeps even a late-processed message inert
+  //   under that defect.
+  //
+  //   Phase C: re-enable + re-emit confirms the (restarted) attempt --
+  //   the recovery half a swallow-everything guard would fail.
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d25, false, 'in-flight-disable target did not boot');
+    } else {
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      const before = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      // Phase A: emit, then disable, same turn.
+      const deliveredA = await t.evaluate(`(() => {
+        const d = ${fakeEmitExpr(cfg.drill.good)};
+        const b = document.querySelector('#btn-device-enable');
+        if (!b) return -100;
+        b.click();
+        return d;
+      })()`);
+      const wentOffA = await waitDeviceState(t.evaluate, "p.status === 'off'", 5000);
+      await sleep(700);
+      const dsA = await readDeviceStateJson(t.evaluate);
+      const midA = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const landedA = midA.forPrompt - before.forPrompt;
+      const confirmsA = (dsA && Array.isArray(dsA.confirms)) ? dsA.confirms : null;
+      const phaseAOk = deliveredA >= 1 && wentOffA === true && confirmsA !== null && (
+        cfg.inflightDisableRace === 'drop'
+          ? (landedA === 0 && confirmsA.length === 0)
+          : (landedA === 1 && confirmsA.length === 1
+             && confirmsA[0].prompt === cfg.drill.prompt1 && confirmsA[0].source === 'device'));
+      // Reset to a fresh, armed attempt: re-enable, then Restart.
+      await devClick(t.evaluate, '#btn-device-enable');
+      await waitDeviceState(t.evaluate, "p.status === 'granted'", 6000);
+      await devClick(t.evaluate, '#btn-ex-restart');
+      const rearmed = await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      const base = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      // Phase B: disable, then emit, same turn -- subscribed sampled
+      // between the two, as the anti-vacuity witness for each arm.
+      const phaseBRace = await t.evaluate(`(() => {
+        const b = document.querySelector('#btn-device-enable');
+        if (!b) return null;
+        b.click();
+        const s = ${FAKE_SUBSCRIBED_EXPR};
+        const d = ${fakeEmitExpr(cfg.drill.good)};
+        return { s, d };
+      })()`);
+      const wentOffB = await waitDeviceState(t.evaluate, "p.status === 'off'", 5000);
+      await sleep(700);
+      const dsB = await readDeviceStateJson(t.evaluate);
+      const midB = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      const landedB = midB.forPrompt - base.forPrompt;
+      const confirmsBOk = Boolean(dsB && Array.isArray(dsB.confirms) && dsB.confirms.length === 0);
+      const phaseBOk = phaseBRace !== null && wentOffB === true && landedB === 0 && confirmsBOk
+        && phaseBRace.s === 0 && phaseBRace.d === 0;
+      // Phase C: re-enable + re-emit confirms again.
+      await devClick(t.evaluate, '#btn-device-enable');
+      const reArmed = await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
+      const deliveredC = await t.evaluate(fakeEmitExpr(cfg.drill.good));
+      const confirmedC = await waitDeviceState(
+        t.evaluate,
+        `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)} && c.source === 'device')`,
+        6000,
+      );
+      const afterC = await deviceEventCounts(t.evaluate, cfg.drill.exId, cfg.drill.prompt1);
+      report(
+        N.d25,
+        phaseAOk && rearmed === true && phaseBOk
+          && reArmed === true && deliveredC >= 1 && confirmedC === true
+          && afterC.forPrompt === midB.forPrompt + 1,
+        { phaseA: { deliveredA, wentOffA, landedA, confirmsA },
+          phaseB: { phaseBRace, wentOffB, landedB, confirmsBOk, expected: cfg.inflightDisableRace },
+          phaseC: { rearmed, reArmed, deliveredC, confirmedC, base, midB, afterC } },
       );
     }
     await t.close();
@@ -4676,7 +5107,7 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, inc
     await runProgressAssertionsPost(progressHandle, progressCfg);
     results.push(...progressResults);
 
-    // M4: the device suite (D1..D22), driven against THIS SAME fixture
+    // M4: the device suite (D1..D25), driven against THIS SAME fixture
     // file through freshly created targets with scripts/fake-midi.js
     // pre-injected -- the same runDeviceAssertions a real run drives
     // against the real app. Gated by includeDevice: the ordinary
@@ -5912,7 +6343,7 @@ async function main() {
         await runProgressAssertionsPost(progressHandle, progressCfg);
       }
 
-      // -- 14 (M4). THE DEVICE SUITE, D1..D22 -- always part of a real
+      // -- 14 (M4). THE DEVICE SUITE, D1..D25 -- always part of a real
       // run (no flag: the routes are the seed corpus's own, present in
       // every real bundle). Each scenario gets its own freshly created
       // target with scripts/fake-midi.js pre-injected BEFORE navigation
