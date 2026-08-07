@@ -68,8 +68,34 @@ Owner-run protocol session, 2026-08-07, local serve of the M4 build
   velocity again exactly 64, consistent with fixed no-velocity
   convention values.
 
-## Pending
+## Channel-mismatch check (protocol §7) — N/A ON THIS FIRMWARE (discovery)
 
-- Note-on velocity byte (optional — design already validated as
-  velocity-agnostic either way), channel-mismatch check (§7), final
-  PASS/FAIL block (§9).
+- The unit's system settings list runs AUTO Trig Lv, Beat Sync, LED
+  Bright, Disp Bright, APO time, Battery type, Power supply,
+  FW Version, Serial No., Initialize — NO "MIDI IN Ch." / "MIDI OUT
+  Ch." items anywhere (owner scrolled the full list twice).
+- **FW Version: 1.0.2.** The MIDI manual's §1.1 menu (items between
+  Disp Bright and APO time) targets FW 1.1.1+; on 1.0.2 the channel is
+  not configurable and the unit transmits on channel 1 fixed.
+- **Manual erratum discovered**: midi.md §1 / revision history claim
+  MIDI IN/OUT arrived in FW 1.1.1 — yet this 1.0.2 unit demonstrably
+  transmits NOTE ON/OFF and Control Change (every auto-confirm above).
+  Launch firmware already had MIDI OUT; 1.1.1 evidently added the
+  channel configuration (and possibly MIDI IN).
+- Consequences for the trainer: the channel-1 default is not merely a
+  sensible default — it is the ONLY transmit channel possible on
+  pre-1.1.1 firmware, so the default is exactly right. The
+  channel-mismatch UI path stays covered by the automated harness
+  (fake device emits on ch 3; mismatch sentence + one-click switch
+  asserted in the D-suite).
+
+## Verdict (owner run, protocol §9 summary)
+
+Everything testable on this hardware PASSED: enable/permission flow,
+port binding ("SXC-1 MIDI 1") with a real ALSA decoy present, pad
+auto-confirm (notes 36/48), CC auto-confirm (80, 108, 109), one-shot
+semantics, hookless steps hand-confirmed by design, M4-F1 step
+resolved (reachable at dial endpoints — content recalibration filed),
+FX toggle behavior characterized (127/0 edges), velocity fixed at 64
+both directions, channel test N/A (FW 1.0.2 predates the setting).
+No device-layer defect found.
