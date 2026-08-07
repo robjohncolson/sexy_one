@@ -2,6 +2,7 @@
 
 deck: pad-play-sounds
 chapter: Part: Pad play
+tier: core
 summary: Get to know BANK1's pad layout, then compare a one-shot sound against a looped one.
 cite: guide-book 17 "Tap the pads to make sounds"
 

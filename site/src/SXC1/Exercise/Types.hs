@@ -79,6 +79,10 @@ data Deck = Deck
   , dkCites     :: [Citation]
   , dkIntro     :: [Block]
   , dkTags      :: [Text]
+  , dkTier      :: !Text    -- ^ @intro@\/@core@\/@stretch@ -- see @tier:@,
+                             -- content\/EXERCISE-FORMAT.md
+  , dkRequires  :: [Text]   -- ^ deck-level prerequisite deck slugs -- see
+                             -- @requires:@, content\/EXERCISE-FORMAT.md
   , dkExercises :: [Exercise]
   } deriving (Eq)
 

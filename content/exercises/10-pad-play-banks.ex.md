@@ -2,6 +2,7 @@
 
 deck: pad-play-banks
 chapter: Part: Pad play
+tier: intro
 summary: Learn what a BANK is, then reach BANK 1 in Performance mode.
 cite: guide-book 15 "a set of sounds assigned to the 16 pads is called a"
 

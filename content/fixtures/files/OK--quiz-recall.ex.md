@@ -2,6 +2,7 @@
 
 deck: fx-safe-quiz-recall
 chapter: Part: Pad play
+tier: core
 summary: Explain what determines the lit bank button and pad colors at power-on.
 cite: guide-book 15 "First, select BANK 1"
 

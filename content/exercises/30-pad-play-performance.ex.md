@@ -2,6 +2,7 @@
 
 deck: pad-play-performance
 chapter: Part: Pad play
+tier: core
 summary: Understand what Beat Sync does for layered loops, then shape a loop's sound with FX1 and FX2.
 cite: guide-book 18 "This feature makes multiple looped sounds play so they sound natural when layered on top of each other."
 

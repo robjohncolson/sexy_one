@@ -41,7 +41,9 @@ after a `#`/`##`/`###` heading — blank lines are allowed *before* the field bl
 # <deck title>                    <- exactly one '#' heading, first thing in the file
 
 deck: <slug>
-chapter: <one of five fixed chapter titles>
+chapter: <one of six fixed chapter titles -- "Front matter" plus five "Part: X" titles>
+tier: intro | core | stretch
+requires: <deck-slug>[, <deck-slug>...]   <- optional
 summary: <one line, learner-facing>
 cite: <slug> <page> "<anchor phrase>"
 
@@ -76,7 +78,19 @@ don't know why they're there:
   headings), cross-checked against the Guide Book's own part titles and the glossary.
   Three independent sources have to agree. This means a chapter title can never quietly
   drift out of sync with the manual's own terminology — and it means you cannot invent
-  a sixth chapter by typing a new string into `chapter:`.
+  a SEVENTH chapter by typing a new string into `chapter:`.
+  **There are SIX chapters, not five** — the course map runs `Chapter 0` through
+  `Chapter 5`: `Chapter 0` is `Front matter` (the unnumbered pp. 1–11 material — panel
+  and connector identification, safety precautions, the mode-map overview — that
+  precedes the Guide Book's own numbered PARTs), then `Chapter 1`–`Chapter 5` are the
+  five `"Part: X"` chapters (`Part: Preparation` … `Part: Leveling up`). `chapter: Front
+  matter` is authorable TODAY, exactly like any other chapter — verified by running
+  `exercise-check` against a deck declaring `chapter: Front matter` with a real
+  `guide-book` p. 10 anchor: `0 issue(s)` (see §7's `E-CHAPTER-UNKNOWN` row and §11 for
+  a worked example). An earlier version of this document said "five" and "cannot invent
+  a sixth chapter" here; that was wrong and blocked every Chapter-0 exercise (64 of
+  them, per `content/exercise-inventory.md`) from ever being authored — `resolveChapter`
+  has always accepted the inventory-derived map, which includes `0 -> "Front matter"`.
 * **Exercise ids are not yours to invent.** Every `id:` must already appear in
   `content/exercise-inventory.md` as `**<id>**`. See "Stability and ids" below for why
   this matters far more than it looks like it should.
@@ -132,7 +146,9 @@ as code), and no two option labels may read the same after trimming whitespace.
 | Field | Required? | Notes |
 |---|---|---|
 | `deck` | **required** | `[a-z0-9-]+`, globally unique across all decks, **permanent** — see stability below |
-| `chapter` | **required** | must exactly match one of the five course-map chapter titles |
+| `chapter` | **required** | must exactly match one of the SIX course-map chapter titles (`Front matter` plus the five `Part: X` titles) |
+| `tier` | **required** | one of `intro`, `core`, `stretch` — a closed set, like `type:`; used by the course map's navigation to group decks by depth (`E-DECK-TIER-UNKNOWN` for anything else) |
+| `requires` | optional | comma-separated deck slugs (same `[a-z0-9-]+` shape as `tags`) — deck-level prerequisites for course-map ordering. Every named slug must be a real deck (`E-DECK-REQUIRES-UNKNOWN`), and the `requires:` graph as a whole must not contain a cycle (`E-DECK-REQUIRES-CYCLE`) — both checked across the WHOLE corpus, like `E-ID-DUPLICATE` |
 | `summary` | **required** | one line, learner-facing (linted for terminology) |
 | `cite` | **required**, repeatable | at least one `<slug> <page> "<anchor>"` |
 | `tags` | optional | comma-separated `[a-z0-9-]+` |
@@ -245,10 +261,14 @@ Two kinds of rule:
   there is no regex, so don't rely on any pattern beyond the exact phrases listed.
 * **`kind=caseof`** — each phrase is the one correct on-device spelling. Any
   case-insensitive occurrence of it that is not byte-for-byte identical to the canonical
-  spelling is an error. This is how `SELECT BANK`, `MASTER BPM`, the five chapter
-  titles, and the device's own (real, printed) misspelling `LOW STRAGE SPACE` are
-  enforced without the rules file having to enumerate every possible wrong spelling —
-  say it in any other case and the validator catches it.
+  spelling is an error. This is how `SELECT BANK`, `MASTER BPM`, the five `Part: X`
+  chapter titles (note: this `caseof` rule covers only the five `"Part: X"`-prefixed
+  titles, chapters 1–5 — it does not need to name `Front matter`, chapter 0, since that
+  title has no on-device-style casing to get wrong; `chapter:`'s own SIX-way closed set,
+  including `Front matter`, is `resolveChapter`'s job, not this rule's — see `E-CHAPTER-UNKNOWN`
+  above and the chapter-count note in §1), and the device's own (real, printed)
+  misspelling `LOW STRAGE SPACE` are enforced without the rules file having to enumerate
+  every possible wrong spelling — say it in any other case and the validator catches it.
 
 Every rule's `glossary_anchor` must be a literal substring of `translations/glossary.md`
 — house style is never invented in the rules file, only *restated* from the binding
@@ -295,7 +315,8 @@ and adding the one-line fix a content author actually needs. `--list-codes` prin
 | `E-CITE-SLUG` | file | the slug isn't one of the four known documents | use `guide-book`, `startup-guide`, `midi` or `oss` |
 | `E-CITE-PAGE` | file | the page number is out of that document's range | check the real page count and fix the number |
 | `E-CITE-ANCHOR` | file | the anchor doesn't occur on that page, or is under 12 characters | quote the page's actual text (whitespace differences are fine) |
-| `E-CHAPTER-UNKNOWN` | file | `chapter:` isn't exactly one of the five course-map titles | copy the title from `content/exercise-inventory.md`'s course map |
+| `E-CHAPTER-UNKNOWN` | file | `chapter:` isn't exactly one of the SIX course-map titles (`Front matter` plus five `Part: X` titles) | copy the title from `content/exercise-inventory.md`'s course map |
+| `E-DECK-TIER-UNKNOWN` | file | `tier:` isn't `intro`, `core` or `stretch` | fix the value |
 | `E-ROLE-UNKNOWN` | file | a `###` heading isn't a role this exercise type allows | fix the role name, or move the content into the body |
 | `E-ROLE-MISSING` | file | a required role is absent (recall-mode quiz needs `### Answer`) | add it |
 | `E-ROLE-REPEATED` | file | a role that may appear at most once (or, for `### Hint`, more than three times) appeared too often | merge into one block, or delete the extra |
@@ -315,6 +336,8 @@ and adding the one-line fix a content author actually needs. `--list-codes` prin
 | `E-INDEX-DANGLING` | dir | `INDEX` names a file that doesn't exist | fix the filename, or remove the line |
 | `E-ID-DUPLICATE` | dir | the same exercise `id:` is used more than once | every id must be used by exactly one exercise, forever |
 | `E-RULE-UNGROUNDED` | dir | a terminology rule's `glossary_anchor` doesn't occur in `translations/glossary.md`, or the row is malformed | fix the anchor text, or fix the row's six columns |
+| `E-DECK-REQUIRES-UNKNOWN` | dir | a `requires:` entry names a deck slug that doesn't exist anywhere in the corpus | fix the slug, or add the missing deck |
+| `E-DECK-REQUIRES-CYCLE` | dir | the `requires:` graph has a cycle (a deck that, via zero or more `requires:` edges, requires itself) | break the cycle -- restructure which deck depends on which |
 | `E-ID-NOT-IN-INVENTORY` | dir | `id:` doesn't appear in `content/exercise-inventory.md` as `**<id>**` | use a real id from the inventory — never invent one |
 | `E-ID-RETIRED` | dir | the id is tagged `(retired)` in the inventory | pick a different, non-retired id |
 | `E-ID-TYPE-MISMATCH` | dir | the id's leading letter (`q`/`d`/`l`) doesn't match `type:` | use an id whose letter matches, or fix `type:` |
@@ -421,6 +444,7 @@ two modes can coexist in the same deck file, just never in the same exercise.
 
 deck: pad-play-choosing-a-bank
 chapter: Part: Pad play
+tier: intro
 summary: Choose BANK 1 in Performance mode and read the bank indicator.
 cite: guide-book 15 "First, select BANK 1"
 
@@ -477,6 +501,8 @@ just adds a muted confirmation line under the step.
 
 deck: pad-play-tap-pads
 chapter: Part: Pad play
+tier: intro
+requires: pad-play-choosing-a-bank
 summary: Tap BANK 1 pads and compare one-shot against looped playback.
 cite: guide-book 17 "Tap the pads to make sounds"
 
@@ -517,6 +543,7 @@ lives in `### Hint` instead.
 
 deck: leveling-up-lookup-beat-sync
 chapter: Part: Leveling up
+tier: stretch
 summary: Locate where the system settings document the Beat Sync feature and its default.
 cite: guide-book 55 "Sets the automatic beat matching described on p. 18 to ON/OFF"
 
@@ -535,4 +562,34 @@ default value is.
 
 Long-press the `EDIT` button in Performance mode to open the system settings, then
 scroll to the Beat Sync line.
+```
+
+### 11.4 `chapter: Front matter` — chapter 0 is authorable today
+
+The claim in §1 that there are SIX chapters, not five, and that `Front matter` (chapter
+0) is authorable right now: here is the proof. This is a real, complete deck file too —
+`exercise-check --content-dir <a scratch content root containing just this deck>
+--translations-dir ../translations` reports `exercise-check: 0 issue(s)` for it, exactly
+like the three examples above. From Guide Book p. 10 ("Names of parts").
+
+```exercise
+# The pads section
+
+deck: front-matter-pads-section
+chapter: Front matter
+tier: intro
+summary: Identify what the pads section is for, per the Names of parts table.
+cite: guide-book 10 "A sound is assigned to each pad, and pressing a pad plays it."
+
+## What the pads section is for
+
+type: quiz
+id: q-0-17
+cite: guide-book 10 "A sound is assigned to each pad, and pressing a pad plays it."
+
+A sound is assigned to each pad. What happens to it when you tap the pad?
+
+### Answer
+
+The assigned sound plays. The pads section is used to play, record, and edit sounds.
 ```

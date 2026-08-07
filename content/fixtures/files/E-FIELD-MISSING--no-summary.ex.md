@@ -2,6 +2,7 @@
 
 deck: fx-safe-quiz
 chapter: Part: Pad play
+tier: core
 cite: guide-book 15 "First, select BANK 1"
 
 Before you start, turn the unit on and let the `SXC-1` logo disappear.

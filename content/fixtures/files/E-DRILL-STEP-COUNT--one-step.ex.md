@@ -2,6 +2,7 @@
 
 deck: fx-drill-one-step
 chapter: Part: Pad play
+tier: core
 summary: Tap pads and listen to one-shot and looped sounds.
 cite: guide-book 17 "Tap the pads to make sounds"
 

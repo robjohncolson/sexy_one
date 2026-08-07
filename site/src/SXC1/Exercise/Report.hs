@@ -6,16 +6,33 @@
 -- "SXC1.Content.Stats"), and this module REUSES that module's
 -- 'SXC1.Content.Stats.jsonEscape' rather than writing a second escaper.
 --
--- The closed code set is a real Haskell 'IssueCode' enumeration --
--- 'allIssueCodes' lists every STATIC (nullary) constructor by hand (see
--- its own Haddock for why 'Bounded'\/'Enum' can no longer do this
--- mechanically now that 'E_TERM' carries a field), plus the one DYNAMIC
--- family member, 'E_TERM' -- and, critically, an 'Issue' can only ever be
--- constructed via 'mkIssue' from a real 'IssueCode' value: the module
--- does not export the raw 'Issue' data constructor. See 'listCodesLines',
--- which @exercise-check --list-codes@ prints verbatim (one line per
--- static code, plus one dynamically-generated @E-TERM.\<rule_id\>@ line
--- per loaded terminology rule).
+-- The closed code set is a real Haskell 'IssueCode' enumeration.
+-- 'IssueCode''s static family ('StaticCode', wrapped by 'Static') is an
+-- ordinary nullary sum type deriving 'Enum'\/'Bounded', so 'allIssueCodes'
+-- is MECHANICALLY DERIVED as @map Static [minBound .. maxBound]@ -- it is
+-- NOT a hand-maintained list, and cannot under-enumerate (a new
+-- constructor appears there automatically) -- plus the one DYNAMIC family
+-- member, 'E_TERM'. Critically, an 'Issue' can only ever be constructed
+-- via 'mkIssue' from a real 'IssueCode' value: the module does not export
+-- the raw 'Issue' data constructor. See 'listCodesLines', which
+-- @exercise-check --list-codes@ prints verbatim (one line per static
+-- code, plus one dynamically-generated @E-TERM.\<rule_id\>@ line per
+-- loaded terminology rule).
+--
+-- M3 gate fix (task \"size-split-and-format\", the inherited M2 LOW): the
+-- one place that COULD still under-enumerate is 'codeText'\/'issueClassOf'
+-- themselves -- before this fix they matched on the 'IssueCode' pattern
+-- synonyms under a @{-\# COMPLETE ... \#-}@ pragma, so a new
+-- 'StaticCode' constructor added without a matching 'codeText' arm was
+-- silently accepted by @-Wall@ (the pragma told the exhaustiveness
+-- checker to trust the hand-maintained COMPLETE list instead of the real
+-- type) and only blew up at RUNTIME, inside @--list-codes@, with a
+-- non-exhaustive-pattern exception. 'codeText' and 'issueClassOf' now
+-- match DIRECTLY on the real 'StaticCode' constructors (via
+-- 'staticCodeText'\/'staticIssueClassOf') with no COMPLETE pragma
+-- anywhere in this module, so @-Wall@'s ordinary exhaustiveness check is
+-- restored: forgetting a 'codeText' arm for a new constructor is a
+-- COMPILE-TIME warning again, not a runtime crash.
 module SXC1.Exercise.Report
   ( -- * Locations
     Loc (..)
@@ -54,6 +71,7 @@ module SXC1.Exercise.Report
       , E_RULE_UNGROUNDED
       , E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH
       , E_BLOCK_UNPARSED
+      , E_DECK_TIER_UNKNOWN, E_DECK_REQUIRES_UNKNOWN, E_DECK_REQUIRES_CYCLE
       )
   , StaticCode
   , IssueClass (..)
@@ -161,6 +179,7 @@ data StaticCode
   | E_RULE_UNGROUNDED_
   | E_ID_NOT_IN_INVENTORY_ | E_ID_RETIRED_ | E_ID_TYPE_MISMATCH_ | E_ID_CHAPTER_MISMATCH_
   | E_BLOCK_UNPARSED_
+  | E_DECK_TIER_UNKNOWN_ | E_DECK_REQUIRES_UNKNOWN_ | E_DECK_REQUIRES_CYCLE_
   deriving (Eq, Show, Enum, Bounded)
 
 data IssueCode
@@ -223,24 +242,16 @@ pattern E_ID_TYPE_MISMATCH    = Static E_ID_TYPE_MISMATCH_
 pattern E_ID_CHAPTER_MISMATCH = Static E_ID_CHAPTER_MISMATCH_
 pattern E_BLOCK_UNPARSED :: IssueCode
 pattern E_BLOCK_UNPARSED = Static E_BLOCK_UNPARSED_
+pattern E_DECK_TIER_UNKNOWN, E_DECK_REQUIRES_UNKNOWN, E_DECK_REQUIRES_CYCLE :: IssueCode
+pattern E_DECK_TIER_UNKNOWN     = Static E_DECK_TIER_UNKNOWN_
+pattern E_DECK_REQUIRES_UNKNOWN = Static E_DECK_REQUIRES_UNKNOWN_
+pattern E_DECK_REQUIRES_CYCLE   = Static E_DECK_REQUIRES_CYCLE_
 
-{-# COMPLETE
-      E_FILE_TITLE, E_FILE_BAD_NAME, E_DECK_EMPTY
-    , E_FIELD_UNKNOWN, E_FIELD_MISSING, E_FIELD_DUPLICATE, E_FIELD_EMPTY, E_FIELD_SYNTAX
-    , E_TYPE_UNKNOWN, E_ID_SYNTAX
-    , E_CITE_SYNTAX, E_CITE_SLUG, E_CITE_PAGE, E_CITE_ANCHOR
-    , E_CHAPTER_UNKNOWN
-    , E_ROLE_UNKNOWN, E_ROLE_MISSING, E_ROLE_REPEATED
-    , E_CHOICE_COUNT, E_CHOICE_NO_CORRECT, E_CHOICE_DUPLICATE
-    , E_QUIZ_MODE_AMBIGUOUS
-    , E_DRILL_STEP_COUNT, E_DRILL_CHECK_MISSING, E_DRILL_STEP_EMPTY
-    , E_VERIFY_SYNTAX, E_VERIFY_CC_UNKNOWN, E_VERIFY_NOTE_RANGE
-    , E_LOOKUP_SPOILER, E_BODY_INDENTED_HEADING
-    , E_INDEX_MISSING, E_INDEX_ORPHAN, E_INDEX_DANGLING, E_ID_DUPLICATE
-    , E_RULE_UNGROUNDED
-    , E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH
-    , E_BLOCK_UNPARSED
-    , E_TERM #-}
+-- NOTE: deliberately NO {-# COMPLETE ... #-} pragma here (M3 gate fix --
+-- see the module Haddock above). 'codeText' and 'issueClassOf' match
+-- directly on the real 'StaticCode' constructors below, which -Wall
+-- checks for exhaustiveness on its own; a COMPLETE pragma on the
+-- 'IssueCode' pattern synonyms would only mask that check again.
 
 -- | The three coverage classes -- see @briefs\/M2-manifest.json@'s
 -- \"COVERAGE CLASSES\" section. 'SeamClass' is capped at exactly one
@@ -256,63 +267,82 @@ data IssueClass = FileClass | DirClass | SeamClass
 allIssueCodes :: [IssueCode]
 allIssueCodes = map Static [minBound .. maxBound]
 
+-- | Dispatches to 'staticCodeText' for the closed family; the one dynamic
+-- member ('E_TERM') is handled here directly since it carries a field a
+-- 'StaticCode'-only function cannot see.
 codeText :: IssueCode -> Text
-codeText c = case c of
-  E_FILE_TITLE           -> "E-FILE-TITLE"
-  E_FILE_BAD_NAME        -> "E-FILE-BAD-NAME"
-  E_DECK_EMPTY            -> "E-DECK-EMPTY"
-  E_FIELD_UNKNOWN         -> "E-FIELD-UNKNOWN"
-  E_FIELD_MISSING         -> "E-FIELD-MISSING"
-  E_FIELD_DUPLICATE       -> "E-FIELD-DUPLICATE"
-  E_FIELD_EMPTY           -> "E-FIELD-EMPTY"
-  E_FIELD_SYNTAX          -> "E-FIELD-SYNTAX"
-  E_TYPE_UNKNOWN          -> "E-TYPE-UNKNOWN"
-  E_ID_SYNTAX              -> "E-ID-SYNTAX"
-  E_CITE_SYNTAX            -> "E-CITE-SYNTAX"
-  E_CITE_SLUG              -> "E-CITE-SLUG"
-  E_CITE_PAGE              -> "E-CITE-PAGE"
-  E_CITE_ANCHOR            -> "E-CITE-ANCHOR"
-  E_CHAPTER_UNKNOWN        -> "E-CHAPTER-UNKNOWN"
-  E_ROLE_UNKNOWN           -> "E-ROLE-UNKNOWN"
-  E_ROLE_MISSING           -> "E-ROLE-MISSING"
-  E_ROLE_REPEATED          -> "E-ROLE-REPEATED"
-  E_CHOICE_COUNT           -> "E-CHOICE-COUNT"
-  E_CHOICE_NO_CORRECT      -> "E-CHOICE-NO-CORRECT"
-  E_CHOICE_DUPLICATE       -> "E-CHOICE-DUPLICATE"
-  E_QUIZ_MODE_AMBIGUOUS    -> "E-QUIZ-MODE-AMBIGUOUS"
-  E_DRILL_STEP_COUNT       -> "E-DRILL-STEP-COUNT"
-  E_DRILL_CHECK_MISSING    -> "E-DRILL-CHECK-MISSING"
-  E_DRILL_STEP_EMPTY       -> "E-DRILL-STEP-EMPTY"
-  E_VERIFY_SYNTAX          -> "E-VERIFY-SYNTAX"
-  E_VERIFY_CC_UNKNOWN      -> "E-VERIFY-CC-UNKNOWN"
-  E_VERIFY_NOTE_RANGE      -> "E-VERIFY-NOTE-RANGE"
-  E_LOOKUP_SPOILER         -> "E-LOOKUP-SPOILER"
-  E_BODY_INDENTED_HEADING  -> "E-BODY-INDENTED-HEADING"
-  E_INDEX_MISSING          -> "E-INDEX-MISSING"
-  E_INDEX_ORPHAN           -> "E-INDEX-ORPHAN"
-  E_INDEX_DANGLING         -> "E-INDEX-DANGLING"
-  E_ID_DUPLICATE           -> "E-ID-DUPLICATE"
-  E_RULE_UNGROUNDED        -> "E-RULE-UNGROUNDED"
-  E_ID_NOT_IN_INVENTORY    -> "E-ID-NOT-IN-INVENTORY"
-  E_ID_RETIRED              -> "E-ID-RETIRED"
-  E_ID_TYPE_MISMATCH        -> "E-ID-TYPE-MISMATCH"
-  E_ID_CHAPTER_MISMATCH     -> "E-ID-CHAPTER-MISMATCH"
-  E_BLOCK_UNPARSED           -> "E-BLOCK-UNPARSED"
-  E_TERM rid                 -> "E-TERM." <> rid
+codeText (Static sc)  = staticCodeText sc
+codeText (E_TERM rid) = "E-TERM." <> rid
+
+-- | Matches DIRECTLY on 'StaticCode' -- see the module Haddock's M3 gate
+-- fix note: this is what makes an added constructor with no arm here a
+-- COMPILE-TIME @-Wall@ incomplete-pattern warning instead of a runtime
+-- exception inside @--list-codes@.
+staticCodeText :: StaticCode -> Text
+staticCodeText c = case c of
+  E_FILE_TITLE_            -> "E-FILE-TITLE"
+  E_FILE_BAD_NAME_         -> "E-FILE-BAD-NAME"
+  E_DECK_EMPTY_            -> "E-DECK-EMPTY"
+  E_FIELD_UNKNOWN_         -> "E-FIELD-UNKNOWN"
+  E_FIELD_MISSING_         -> "E-FIELD-MISSING"
+  E_FIELD_DUPLICATE_       -> "E-FIELD-DUPLICATE"
+  E_FIELD_EMPTY_           -> "E-FIELD-EMPTY"
+  E_FIELD_SYNTAX_          -> "E-FIELD-SYNTAX"
+  E_TYPE_UNKNOWN_          -> "E-TYPE-UNKNOWN"
+  E_ID_SYNTAX_             -> "E-ID-SYNTAX"
+  E_CITE_SYNTAX_           -> "E-CITE-SYNTAX"
+  E_CITE_SLUG_             -> "E-CITE-SLUG"
+  E_CITE_PAGE_             -> "E-CITE-PAGE"
+  E_CITE_ANCHOR_           -> "E-CITE-ANCHOR"
+  E_CHAPTER_UNKNOWN_       -> "E-CHAPTER-UNKNOWN"
+  E_ROLE_UNKNOWN_          -> "E-ROLE-UNKNOWN"
+  E_ROLE_MISSING_          -> "E-ROLE-MISSING"
+  E_ROLE_REPEATED_         -> "E-ROLE-REPEATED"
+  E_CHOICE_COUNT_          -> "E-CHOICE-COUNT"
+  E_CHOICE_NO_CORRECT_     -> "E-CHOICE-NO-CORRECT"
+  E_CHOICE_DUPLICATE_      -> "E-CHOICE-DUPLICATE"
+  E_QUIZ_MODE_AMBIGUOUS_   -> "E-QUIZ-MODE-AMBIGUOUS"
+  E_DRILL_STEP_COUNT_      -> "E-DRILL-STEP-COUNT"
+  E_DRILL_CHECK_MISSING_   -> "E-DRILL-CHECK-MISSING"
+  E_DRILL_STEP_EMPTY_      -> "E-DRILL-STEP-EMPTY"
+  E_VERIFY_SYNTAX_         -> "E-VERIFY-SYNTAX"
+  E_VERIFY_CC_UNKNOWN_     -> "E-VERIFY-CC-UNKNOWN"
+  E_VERIFY_NOTE_RANGE_     -> "E-VERIFY-NOTE-RANGE"
+  E_LOOKUP_SPOILER_        -> "E-LOOKUP-SPOILER"
+  E_BODY_INDENTED_HEADING_ -> "E-BODY-INDENTED-HEADING"
+  E_INDEX_MISSING_         -> "E-INDEX-MISSING"
+  E_INDEX_ORPHAN_          -> "E-INDEX-ORPHAN"
+  E_INDEX_DANGLING_        -> "E-INDEX-DANGLING"
+  E_ID_DUPLICATE_          -> "E-ID-DUPLICATE"
+  E_RULE_UNGROUNDED_       -> "E-RULE-UNGROUNDED"
+  E_ID_NOT_IN_INVENTORY_   -> "E-ID-NOT-IN-INVENTORY"
+  E_ID_RETIRED_            -> "E-ID-RETIRED"
+  E_ID_TYPE_MISMATCH_      -> "E-ID-TYPE-MISMATCH"
+  E_ID_CHAPTER_MISMATCH_   -> "E-ID-CHAPTER-MISMATCH"
+  E_BLOCK_UNPARSED_        -> "E-BLOCK-UNPARSED"
+  E_DECK_TIER_UNKNOWN_     -> "E-DECK-TIER-UNKNOWN"
+  E_DECK_REQUIRES_UNKNOWN_ -> "E-DECK-REQUIRES-UNKNOWN"
+  E_DECK_REQUIRES_CYCLE_   -> "E-DECK-REQUIRES-CYCLE"
 
 issueClassOf :: IssueCode -> IssueClass
-issueClassOf c = case c of
-  E_INDEX_MISSING       -> DirClass
-  E_INDEX_ORPHAN        -> DirClass
-  E_INDEX_DANGLING      -> DirClass
-  E_ID_DUPLICATE        -> DirClass
-  E_RULE_UNGROUNDED     -> DirClass
-  E_ID_NOT_IN_INVENTORY -> DirClass
-  E_ID_RETIRED          -> DirClass
-  E_ID_TYPE_MISMATCH    -> DirClass
-  E_ID_CHAPTER_MISMATCH -> DirClass
-  E_BLOCK_UNPARSED      -> SeamClass
-  _                     -> FileClass
+issueClassOf (E_TERM _)  = FileClass
+issueClassOf (Static sc) = staticIssueClassOf sc
+
+staticIssueClassOf :: StaticCode -> IssueClass
+staticIssueClassOf c = case c of
+  E_INDEX_MISSING_         -> DirClass
+  E_INDEX_ORPHAN_          -> DirClass
+  E_INDEX_DANGLING_        -> DirClass
+  E_ID_DUPLICATE_          -> DirClass
+  E_RULE_UNGROUNDED_       -> DirClass
+  E_ID_NOT_IN_INVENTORY_   -> DirClass
+  E_ID_RETIRED_            -> DirClass
+  E_ID_TYPE_MISMATCH_      -> DirClass
+  E_ID_CHAPTER_MISMATCH_   -> DirClass
+  E_DECK_REQUIRES_UNKNOWN_ -> DirClass
+  E_DECK_REQUIRES_CYCLE_   -> DirClass
+  E_BLOCK_UNPARSED_        -> SeamClass
+  _                        -> FileClass
 
 classText :: IssueClass -> Text
 classText FileClass = "file"

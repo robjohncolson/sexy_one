@@ -21,7 +21,7 @@ import           Control.Monad          (forM, forM_, unless, when)
 import qualified Data.ByteString        as BS
 import qualified Data.IntMap.Strict     as IntMap
 import qualified Data.IntSet            as IntSet
-import           Data.List              (isSuffixOf, sortOn)
+import           Data.List              (isPrefixOf, isSuffixOf, sortOn)
 import qualified Data.Map.Strict        as Map
 import           Data.Map.Strict        (Map)
 import           Data.Maybe             (mapMaybe)
@@ -40,6 +40,7 @@ import           SXC1.Content.Types     (Block (..))
 import           SXC1.Exercise.Engine
 import           SXC1.Exercise.Lint
 import           SXC1.Exercise.Parse
+import           SXC1.Exercise.Reader   (readDeck)
 import           SXC1.Exercise.Report
 import           SXC1.Exercise.Types
 import           SXC1.Exercise.Verify
@@ -66,6 +67,15 @@ defaultOpts = Opts
   , optListCodes = False, optBrowserFixture = False
   }
 
+-- | @content\/fixtures@'s default location relative to the CLI's own
+-- default @--content-dir@\/@--translations-dir@ (@../content@,
+-- @../translations@ -- both assume @site\/@ as the working directory, per
+-- 'defaultOpts'). Letting @--fixtures@ omit its directory (defaulting to
+-- this) is what lets @exercise-check --fixtures@ (no path) work the same
+-- way @exercise-check@ alone already does for @--content-dir@.
+defaultFixturesDir :: FilePath
+defaultFixturesDir = "../content/fixtures"
+
 parseArgs :: [String] -> Either String Opts
 parseArgs = go defaultOpts
   where
@@ -74,7 +84,10 @@ parseArgs = go defaultOpts
     go o ("--translations-dir" : d : rest) = go o { optTranslationsDir = d } rest
     go o ("--json" : rest)                 = go o { optJson = True } rest
     go o ("--self-test" : rest)            = go o { optSelfTest = True } rest
-    go o ("--fixtures" : d : rest)         = go o { optFixtures = Just d } rest
+    -- '--fixtures' takes an OPTIONAL directory: the next token if it does
+    -- not itself look like another flag, else 'defaultFixturesDir'.
+    go o ("--fixtures" : d : rest) | not ("--" `isPrefixOf` d) = go o { optFixtures = Just d } rest
+    go o ("--fixtures" : rest)             = go o { optFixtures = Just defaultFixturesDir } rest
     go o ("--list-codes" : rest)           = go o { optListCodes = True } rest
     go o ("--browser-fixture" : rest)      = go o { optBrowserFixture = True } rest
     go _ (bad : _)                         = Left ("unknown or incomplete argument: " ++ bad)
@@ -264,8 +277,17 @@ collectFromDirs contentDir translationsDir = do
           -- decks the four E-ID-* checks were applied to, not merely
           -- attempted.
           inventoryChecked = length [ () | (_, _, Just _, _, real) <- perDeck, real ]
+          -- M3 (briefs/M3-manifest.json, task "size-split-and-format"):
+          -- requires: resolution is DIR-class (it needs the whole
+          -- corpus) and, like the four id-inventory-binding checks above,
+          -- must NEVER apply to --fixtures -- scoped by the SAME
+          -- 'isRealContentPath' signal (probed once against this run's
+          -- own exercisesDir, since every deck loaded in one
+          -- 'collectFromDirs' call shares the same content root).
+          runIsRealContent = isRealContentPath (exercisesDir </> "probe.ex.md")
+          requiresIssues = if runIsRealContent then globalRequiresIssues decks else []
       pure Loaded
-        { ldIssues = allIssues ++ dupIdIssues, ldDecks = decks, ldSourceChars = sourceChars
+        { ldIssues = allIssues ++ dupIdIssues ++ requiresIssues, ldDecks = decks, ldSourceChars = sourceChars
         , ldInventoryChecked = inventoryChecked
         }
 
@@ -302,6 +324,50 @@ globalIdDuplicateIssues decks = exerciseIdDupIssues ++ deckSlugDupIssues
       ]
     slugCounts :: Map Text Int
     slugCounts = Map.fromListWith (+) [ (slugTxt, 1 :: Int) | d <- decks, let DeckId slugTxt = dkId d ]
+
+-- | M3 (briefs/M3-manifest.json, task "size-split-and-format"):
+-- E-DECK-REQUIRES-UNKNOWN (a @requires:@ entry naming a deck slug that
+-- does not exist anywhere in the loaded corpus) and E-DECK-REQUIRES-CYCLE
+-- (the @requires:@ graph has a cycle -- a deck that, following zero or
+-- more @requires:@ edges, requires itself). Both are DIR-class: they need
+-- the whole corpus, exactly like 'globalIdDuplicateIssues' above, and the
+-- caller ('collectFromDirs') scopes them the same way it scopes the
+-- four id-inventory-binding checks -- never applied to --fixtures.
+--
+-- One issue per code per deck involved (fixture/report matching is over
+-- the SET of codes, so the exact count does not matter, only that the
+-- code fires at all for at least one deck -- same rationale as
+-- 'globalIdDuplicateIssues').
+globalRequiresIssues :: [Deck] -> [Issue]
+globalRequiresIssues decks = unknownIssues ++ cycleIssues
+  where
+    slugSet = Set.fromList [ unDeckId (dkId d) | d <- decks ]
+    graph :: Map Text [Text]
+    graph = Map.fromList [ (unDeckId (dkId d), dkRequires d) | d <- decks ]
+
+    unknownIssues =
+      [ mkIssue E_DECK_REQUIRES_UNKNOWN (Loc (unDeckId (dkId d)) 1)
+          ("deck \"" <> unDeckId (dkId d) <> "\" requires unknown deck slug \"" <> r <> "\"")
+      | d <- decks, r <- dkRequires d, not (r `Set.member` slugSet)
+      ]
+
+    -- 'onCycle n': is @n@ reachable from itself via at least one
+    -- 'requires:' edge? (Edges into a slug not present as a deck --
+    -- already reported by 'unknownIssues' above -- simply dead-end in
+    -- this graph, so they can never contribute to a cycle.)
+    onCycle n = n `Set.member` closureOf (Map.findWithDefault [] n graph)
+    closureOf = go Set.empty
+      where
+        go seen [] = seen
+        go seen (x : xs)
+          | x `Set.member` seen = go seen xs
+          | otherwise           = go (Set.insert x seen) (Map.findWithDefault [] x graph ++ xs)
+
+    cycleIssues =
+      [ mkIssue E_DECK_REQUIRES_CYCLE (Loc (unDeckId (dkId d)) 1)
+          ("deck \"" <> unDeckId (dkId d) <> "\" is part of a requires: cycle")
+      | d <- decks, onCycle (unDeckId (dkId d))
+      ]
 
 unDeckId :: DeckId -> Text
 unDeckId (DeckId t) = t
@@ -548,9 +614,22 @@ main = do
       | otherwise               -> runDefaultMode opts
 
 --------------------------------------------------------------------------
--- --self-test: inline unit tests, NO filesystem access. This is the
--- gate: "treat exercise-check --self-test passing as the deliverable,
--- not merely writing the modules."
+-- --self-test: inline unit tests. This is the gate: "treat
+-- exercise-check --self-test passing as the deliverable, not merely
+-- writing the modules."
+--
+-- M3 (briefs/M3-manifest.json, task "size-split-and-format") amends the
+-- long-standing "NO filesystem access" claim above: groups 1-16 are still
+-- pure, in-memory checks, but group 17 (the SXC1.Exercise.Reader/
+-- SXC1.Exercise.Parse agreement sweep) legitimately reads
+-- content/exercises/ and content/fixtures/ off disk -- there is no other
+-- way to compare the two parsers over the REAL corpus and fixture set
+-- rather than a hand-picked sample -- and group 18's real-corpus half
+-- reads content/exercises/INDEX the same way. Neither ever degrades to a
+-- SILENT pass: an absent directory (this binary is always run from
+-- site/, where ../content exists) still yields a non-empty group with an
+-- explicit FAIL naming what was missing, never an empty (vacuously
+-- "passing") group -- see 'stGroupsAllOk'\/NEW12.
 --------------------------------------------------------------------------
 
 data STCheck = STCheck { stGroup :: !Int, stName :: !String, stOk :: !Bool, stMsg :: !String }
@@ -575,10 +654,13 @@ stLabel 13 = "13. seam: E-BLOCK-UNPARSED via parseBlocksEngineWith (the only way
 stLabel 14 = "14. resolution: resolveCitation/resolveVerify/resolveChapter/resolveInventoryId on synthetic data"
 stLabel 15 = "15. clock: Begin/Restart seed esPromptAt from MonoMs (not WallMs); Advance re-baselines it (H1)"
 stLabel 16 = "16. route: empty interior/trailing segments and non-[a-z0-9-] ids are RNotFound (L3)"
+stLabel 17 = "17. M3: SXC1.Exercise.Reader.readDeck agrees with parseDeck over the real corpus + fixtures"
+stLabel 18 = "18. M3: INDEX-driven embedding -- embeddable deck count == non-comment INDEX lines"
+stLabel 19 = "19. M3: StaticCode totality sweep (codeText/issueClassOf WHNF non-empty for every allIssueCodes member)"
 stLabel n  = show n ++ ". ?"
 
 stMaxGroup :: Int
-stMaxGroup = 16
+stMaxGroup = 19
 
 stGroupsAllOk :: Int -> [STCheck] -> Bool
 stGroupsAllOk maxG cs = all oneGroupOk [1 .. maxG]
@@ -587,11 +669,14 @@ stGroupsAllOk maxG cs = all oneGroupOk [1 .. maxG]
 
 runSelfTest :: IO ()
 runSelfTest = do
+  agreementChecks  <- readerAgreementChecks
+  indexCountChecks <- indexDrivenEmbeddingChecks
   let allChecks = concat
         [ grammarChecks, new12GuardSelfChecks, choiceChecks, recallChecks, confirmChecks
         , findPageChecks, retryChecks, hintChecks, progressEventChecks, promptIdChecks
         , routeConstructorChecks, routeTotalityChecks, blockUnparsedSeamChecks, resolutionChecks
         , clockChecks, routeStrictnessChecks
+        , agreementChecks, indexCountChecks, staticCodeTotalityChecks
         ]
   forM_ [1 .. stMaxGroup] $ \g -> do
     let inGroup = filter ((== g) . stGroup) allChecks
@@ -628,6 +713,7 @@ quizChoiceLines =
   , ""
   , "deck: st-pad-play-banks"
   , "chapter: Part: Pad play"
+  , "tier: core"
   , "summary: Choose BANK 1 in Performance mode and read the bank indicator."
   , "cite: guide-book 15 \"First, select BANK 1\""
   , ""
@@ -659,6 +745,7 @@ quizRecallLines =
   , ""
   , "deck: st-pad-play-banks-2"
   , "chapter: Part: Pad play"
+  , "tier: core"
   , "summary: Choose BANK 1 in Performance mode and read the bank indicator."
   , "cite: guide-book 15 \"First, select BANK 1\""
   , ""
@@ -681,6 +768,7 @@ drillLines =
   , ""
   , "deck: st-pad-play-tap"
   , "chapter: Part: Pad play"
+  , "tier: core"
   , "summary: Tap pads and listen to one-shot and looped sounds."
   , "cite: guide-book 17 \"Tap the pads to make sounds\""
   , ""
@@ -714,6 +802,7 @@ lookupLines =
   , ""
   , "deck: st-leveling-lookup"
   , "chapter: Part: Leveling up"
+  , "tier: core"
   , "summary: Find where Beat Sync is documented."
   , "cite: guide-book 55 \"Beat Sync\""
   , ""
@@ -757,7 +846,11 @@ grammarChecks =
       ["E-FILE-BAD-NAME"]
 
   , grammarCheck "E-DECK-EMPTY/no-exercises"
-      validFp (joinL (take 8 quizChoiceLines))
+      -- 9, not 8, since M3 inserted one "tier: core" line into the deck
+      -- field block -- this must still capture the WHOLE deck header
+      -- (title/blank/deck/chapter/tier/summary/cite/blank/intro-line) and
+      -- nothing past it (no "## " heading yet).
+      validFp (joinL (take 9 quizChoiceLines))
       ["E-DECK-EMPTY"]
 
   , grammarCheck "E-FIELD-UNKNOWN/deck-level"
@@ -831,7 +924,10 @@ grammarChecks =
     -- text of its own either, so H5's E-DRILL-STEP-EMPTY is a correct,
     -- cascading second finding here, not a double-report of one problem.
     grammarCheck "E-DRILL-STEP-COUNT/one-step"
-      validFp (joinL (take 20 drillLines))
+      -- 21, not 20 -- see the E-DECK-EMPTY/no-exercises note above; this
+      -- must still capture exactly one full Step's field block (cite:/
+      -- check:/verify:) and no body text.
+      validFp (joinL (take 21 drillLines))
       ["E-DRILL-STEP-COUNT", "E-DRILL-STEP-EMPTY"]
 
   , grammarCheck "E-DRILL-CHECK-MISSING/step-no-check"
@@ -861,6 +957,32 @@ grammarChecks =
   , grammarCheck "E-FIELD-MISSING/lookup-no-find"
       validFp (joinL (filter (not . ("find:" `T.isPrefixOf`)) lookupLines))
       ["E-FIELD-MISSING"]
+
+  -- M3 (briefs/M3-manifest.json, task "size-split-and-format"): tier:/
+  -- requires:.
+  , grammarCheck "E-DECK-TIER-UNKNOWN/bogus-tier"
+      validFp (joinL (replaceLine "tier: core" "tier: bogus" quizChoiceLines))
+      ["E-DECK-TIER-UNKNOWN"]
+
+  , grammarCheck "E-FIELD-MISSING/tier-missing"
+      validFp (joinL (filter (not . ("tier:" `T.isPrefixOf`)) quizChoiceLines))
+      ["E-FIELD-MISSING"]
+
+  , grammarCheck "E-FIELD-SYNTAX/requires-malformed"
+      validFp (joinL (insertAfter "tier: core" "requires: Not A Slug!" quizChoiceLines))
+      ["E-FIELD-SYNTAX"]
+
+  , grammarCheck "ok/requires-well-formed"
+      validFp (joinL (insertAfter "tier: core" "requires: st-pad-play-banks-2, st-pad-play-tap" quizChoiceLines))
+      []
+
+  , let (_, mD) = parseDeck validFp
+          (joinL (insertAfter "tier: core" "requires: st-pad-play-banks-2, st-pad-play-tap" quizChoiceLines))
+    in mkST 1 "tier-requires/carried-on-Deck"
+         (case mD of
+            Just d  -> dkTier d == "core" && dkRequires d == ["st-pad-play-banks-2", "st-pad-play-tap"]
+            Nothing -> False)
+         (show (fmap (\d -> (dkTier d, dkRequires d)) mD))
   ]
 
 insertAfter :: Text -> Text -> [Text] -> [Text]
@@ -1365,6 +1487,109 @@ routeStrictnessChecks =
       (case parseRoute input of { RNotFound _ -> True; _ -> False })
       ("expected RNotFound, got " ++ show (parseRoute input))
   | input <- ["#/x//a/b", "#/x/a//b", "#/x/A B/c"]
+  ]
+
+--------------------------------------------------------------------------
+-- Group 17: SXC1.Exercise.Reader.readDeck / SXC1.Exercise.Parse.parseDeck
+-- agreement, over EVERY real corpus file and EVERY fixture file (M3,
+-- briefs/M3-manifest.json, task "size-split-and-format", deliverable
+-- (1d)). One 'STCheck' per file, so a failure names the exact file --
+-- see the module Haddock above for why this group legitimately touches
+-- disk.
+--------------------------------------------------------------------------
+
+exMdFilesIn :: FilePath -> IO [FilePath]
+exMdFilesIn dir = do
+  exists <- doesDirectoryExist dir
+  if not exists then pure [] else do
+    names <- listDirectory dir
+    pure [ dir </> n | n <- names, ".ex.md" `isSuffixOf` n ]
+
+safeListDirectory :: FilePath -> IO [FilePath]
+safeListDirectory dir = do
+  exists <- doesDirectoryExist dir
+  if exists then listDirectory dir else pure []
+
+readerAgreementChecks :: IO [STCheck]
+readerAgreementChecks = do
+  let exercisesDir     = "../content/exercises"
+      fixturesFilesDir = "../content/fixtures/files"
+      fixturesDirsDir  = "../content/fixtures/dirs"
+  exFiles     <- exMdFilesIn exercisesDir
+  fxFileFiles <- exMdFilesIn fixturesFilesDir
+  dirNames    <- safeListDirectory fixturesDirsDir
+  fxDirFiles  <- fmap concat $ forM dirNames $ \dn ->
+    exMdFilesIn (fixturesDirsDir </> dn </> "exercises")
+  let allFiles = exFiles ++ fxFileFiles ++ fxDirFiles
+  if null allFiles
+    then pure [ mkST 17 "agreement/corpus-not-found" False
+                  ("none of " ++ exercisesDir ++ ", " ++ fixturesFilesDir ++ ", " ++ fixturesDirsDir
+                     ++ " contained any .ex.md file -- cannot run the agreement sweep") ]
+    else forM allFiles $ \fp -> do
+      raw <- readUtf8File fp
+      let agree = readDeck fp raw == snd (parseDeck fp raw)
+      pure (mkST 17 ("agreement/" ++ fp) agree
+              ("SXC1.Exercise.Reader.readDeck fp raw /= snd (SXC1.Exercise.Parse.parseDeck fp raw) for " ++ fp))
+
+--------------------------------------------------------------------------
+-- Group 18: INDEX-driven embedding -- the number of decks the app will
+-- embed (every INDEX-named, on-disk, readDeck-parseable file) must equal
+-- the number of non-comment INDEX lines (M3, deliverable (2)).
+--------------------------------------------------------------------------
+
+indexDrivenEmbeddingChecks :: IO [STCheck]
+indexDrivenEmbeddingChecks = do
+  let indexPath    = "../content/exercises/INDEX"
+      exercisesDir = "../content/exercises"
+  indexExists <- doesFileExist indexPath
+  realCheck <-
+    if not indexExists
+      then pure [ mkST 18 "index-count/real-corpus" False (indexPath ++ " does not exist") ]
+      else do
+        raw <- readUtf8File indexPath
+        let names = map snd (parseIndexEntries raw)
+        mDecks <- forM names $ \nm -> do
+          let fp = exercisesDir </> T.unpack nm
+          fileExists <- doesFileExist fp
+          if not fileExists then pure Nothing else do
+            rawDeck <- readUtf8File fp
+            pure (readDeck fp rawDeck)
+        let nIndex      = length names
+            nEmbeddable = length (mapMaybe id mDecks)
+        pure [ mkST 18 "index-count/real-corpus" (nIndex == nEmbeddable)
+                 ("INDEX (" ++ indexPath ++ ") has " ++ show nIndex
+                    ++ " non-comment line(s) but only " ++ show nEmbeddable
+                    ++ " named file(s) exist on disk and parse via readDeck") ]
+  -- Permanent negative-control demo (mirrors 'new12GuardSelfChecks''s
+  -- pattern): a synthetic 2-entry INDEX where only 1 entry's file
+  -- actually exists must NOT compare equal -- proving the counting
+  -- mechanism can detect a mismatch at all, independent of whatever the
+  -- REAL corpus happens to look like today. This is the permanent
+  -- in-memory half of the "add a line to a scratch copy of INDEX naming
+  -- a file that does not exist" negative control this task's final
+  -- report also demonstrates by hand against a real scratch INDEX.
+  let syntheticIndexText = "a.ex.md\n# a comment, ignored\nb.ex.md\n"
+      syntheticNames     = map snd (parseIndexEntries syntheticIndexText)
+      syntheticFound     = Map.fromList [("a.ex.md", True)]  -- "b.ex.md" deliberately absent
+      syntheticEmbeddable = length [ () | nm <- syntheticNames, Map.member nm syntheticFound ]
+      syntheticCheck = mkST 18 "index-count/synthetic-mismatch-is-detected"
+        (length syntheticNames /= syntheticEmbeddable)
+        ("a synthetic 2-entry INDEX with only 1 matching file must not compare equal to its embeddable count, got names="
+           ++ show (length syntheticNames) ++ " embeddable=" ++ show syntheticEmbeddable)
+  pure (realCheck ++ [syntheticCheck])
+
+--------------------------------------------------------------------------
+-- Group 19: StaticCode totality sweep (M3, the inherited M2 LOW --
+-- deliverable (4)). Forces 'codeText' and 'issueClassOf' to WHNF for
+-- every member of 'allIssueCodes' and requires a non-empty 'codeText'.
+--------------------------------------------------------------------------
+
+staticCodeTotalityChecks :: [STCheck]
+staticCodeTotalityChecks =
+  [ mkST 19 ("totality/" ++ T.unpack (codeText c))
+      (codeText c `seq` issueClassOf c `seq` not (T.null (codeText c)))
+      "codeText/issueClassOf must force to WHNF and produce a non-empty codeText for every allIssueCodes member"
+  | c <- allIssueCodes
   ]
 
 --------------------------------------------------------------------------

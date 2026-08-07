@@ -2,6 +2,7 @@
 
 deck: preparation-power
 chapter: Part: Preparation
+tier: intro
 summary: Power this unit from an outlet, then confirm the power switch turns it on and off.
 cite: guide-book 12 "USB Type-C cable (connect to the POWER/DATA port)"
 

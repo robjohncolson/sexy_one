@@ -4,6 +4,12 @@
 -- @#sxc1-exercise-stats@ JSON -- the stale-build detector. Reads never
 -- touch disk (see "Exercises.Embed"); everything here is a pure
 -- projection of the compile-time-embedded deck sources.
+--
+-- M3 gate (briefs\/M3-manifest.json, task \"size-split-and-format\"):
+-- reads via 'SXC1.Exercise.Reader.readDeck' -- the STRUCTURAL reader --
+-- rather than the validating 'SXC1.Exercise.Parse.parseDeck', which this
+-- module (and everything reachable from @exe:app@) must never import.
+-- See "SXC1.Exercise.Reader"'s Haddock for the size history.
 module Exercises.Corpus
   ( exerciseCorpus
   , exerciseStatsJson
@@ -25,8 +31,8 @@ import qualified Data.Text           as T
 import           Data.Text           (Text)
 import           Data.Word           (Word32)
 
-import           SXC1.Content.Stats  (jsonEscape)
-import           SXC1.Exercise.Parse (parseDeck)
+import           SXC1.Content.Stats   (jsonEscape)
+import           SXC1.Exercise.Reader (readDeck)
 import           SXC1.Exercise.Types
 
 import           Exercises.Embed     (deckSources)
@@ -45,7 +51,7 @@ import           Exercises.Embed     (deckSources)
 -- order -- the one place that keeps a deck's raw source paired with its
 -- parse, for 'exerciseStatsJson' below.
 parsedDecks :: [(FilePath, Text, Maybe Deck)]
-parsedDecks = [ (fp, raw, snd (parseDeck fp raw)) | (fp, raw) <- deckSources ]
+parsedDecks = [ (fp, raw, readDeck fp raw) | (fp, raw) <- deckSources ]
 
 exerciseCorpus :: [Deck]
 exerciseCorpus = [ d | (_, _, Just d) <- parsedDecks ]

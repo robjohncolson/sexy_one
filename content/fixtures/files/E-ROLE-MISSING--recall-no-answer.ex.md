@@ -2,6 +2,7 @@
 
 deck: fx-role-missing
 chapter: Part: Pad play
+tier: core
 summary: Choose BANK 1 in Performance mode and read the bank indicator.
 cite: guide-book 15 "First, select BANK 1"
 

@@ -7,6 +7,7 @@ build-type:         Simple
 extra-source-files: ../translations/*.md
                     ../content/exercises/*.md
                     ../content/exercises/INDEX
+                    ../content/id-registry.tsv
 
 common app-options
   if arch(wasm32)
@@ -25,11 +26,15 @@ library
                     SXC1.Content.Stats
                     SXC1.Route
                     SXC1.Exercise.Types
+                    SXC1.Exercise.Reader
                     SXC1.Exercise.Parse
                     SXC1.Exercise.Lint
                     SXC1.Exercise.Verify
                     SXC1.Exercise.Engine
                     SXC1.Exercise.Report
+                    SXC1.Progress.Types
+                    SXC1.Progress.Scheduler
+                    SXC1.Progress.Codec
   hs-source-dirs:   src
   build-depends:    base < 5, text, containers, bytestring, template-haskell
   default-language: Haskell2010
@@ -44,6 +49,8 @@ executable app
                     Exercises.Embed
                     Exercises.Corpus
                     View.Exercise
+                    Progress.Store
+                    View.Progress
   build-depends:    base < 5, miso == 1.12.0.0, sxc1-trainer, text, containers
   default-language: Haskell2010
   ghc-options:      -O1 -Wall -ferror-spans
@@ -59,5 +66,19 @@ executable exercise-check
   main-is:          CheckExercises.hs
   hs-source-dirs:   test
   build-depends:    base < 5, text, containers, bytestring, directory, filepath, time, sxc1-trainer
+  default-language: Haskell2010
+  ghc-options:      -O1 -Wall -ferror-spans
+
+executable progress-check
+  main-is:          CheckProgress.hs
+  hs-source-dirs:   test
+  build-depends:    base < 5, text, containers, sxc1-trainer
+  default-language: Haskell2010
+  ghc-options:      -O1 -Wall -ferror-spans
+
+executable registry-check
+  main-is:          CheckRegistry.hs
+  hs-source-dirs:   test
+  build-depends:    base < 5, text, containers, directory, filepath, sxc1-trainer
   default-language: Haskell2010
   ghc-options:      -O1 -Wall -ferror-spans

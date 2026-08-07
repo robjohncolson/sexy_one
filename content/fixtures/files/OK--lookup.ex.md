@@ -2,6 +2,7 @@
 
 deck: fx-safe-lookup
 chapter: Part: Leveling up
+tier: core
 summary: Find where the Beat Sync system setting is documented.
 cite: guide-book 55 "Sets the automatic beat matching described on p. 18 to ON/OFF"
 
