@@ -189,16 +189,20 @@ Checks performed, in order:
      today -- it exists so the bundle roughly doubling before it is caught
      some other way still fails loudly here. The current value and
      headroom are printed on every run, skip or no skip.
-  14. THE CLOCK/M4-STUB INVARIANT (unconditional, not on the content axis):
-     site/app must use the real wall-clock and monotonic-clock mechanisms
-     (GHC.Clock.getMonotonicTimeNSec and JS Date.getTime -- NOT
+  14. THE CLOCK/M4-VERIFIER INVARIANT (unconditional, not on the content
+     axis): site/app must use the real wall-clock and monotonic-clock
+     mechanisms (GHC.Clock.getMonotonicTimeNSec and JS Date.getTime -- NOT
      Data.Time.Clock.POSIX, which does not build for this target) and
-     must wire the M4 DeviceVerifier stub (noDeviceVerifier), all THREE
-     on lines that are not Haskell comments. This replaces a vacuous
-     sibling check (task "exercise-ui"'s own
-     `grep -RqE "getPOSIXTime|POSIX"`, which only ever matches the
-     Haddock comment explaining why POSIX is NOT used -- the M0-n2
-     pattern) with one anchored to the real, non-comment code.
+     must wire the real M4 device verifier (webMidiVerifier, consumed
+     through a dvWatch call site), all FOUR on lines that are not Haskell
+     comments. M4 note: this check used to require the M2-era stub
+     noDeviceVerifier, which M4 (task "device-app", manifest Part B)
+     deliberately DELETED in favour of the real Device.Midi verifier --
+     the identifier list tracks the tree, and check 18's V5 asserts the
+     stub is gone. This replaces a vacuous sibling check (task
+     "exercise-ui"'s own `grep -RqE "getPOSIXTime|POSIX"`, which only
+     ever matches the Haddock comment explaining why POSIX is NOT used --
+     the M0-n2 pattern) with one anchored to the real, non-comment code.
   15. EXERCISE VALIDATOR GATE (content axis): exe:exercise-check, resolved
      and run exactly like exe:content-check (checks 10-12) -- same
      toolchain env, same `wasm32-wasi-cabal list-bin` / wasm-run.mjs
@@ -244,6 +248,26 @@ Checks performed, in order:
      own named splice in Embed.hs, shows up as a RED check instead of a
      silently stale site. The per-deck FNV-1a is what makes this
      byte-sensitive, not merely length-sensitive. Unless --skip-content.
+  18. M4 DEVICE-VERIFICATION GATE (task "verification"): checks V1-V8
+     from briefs/M4-manifest.json, on the EXISTING axes only -- no new
+     skip flag. V1, V2, V8 (size/budget: the frozen ceiling constant
+     asserted in this script's own source; the briefs/M4-budget.json
+     task-local ceiling with observed gzip and delta from the M3
+     baseline; the budget's authorisation/staleness gate), V3/V4 (the
+     scripts/fake-midi.js harness fake exists, parses, names every
+     driver member, and is NEVER shipped into site/public or
+     site/static), V5 (the seven M4 structural invariants over site/app,
+     anchored to non-comment lines: single requestMIDIAccess call site
+     in the device bridge; sysex only as False; no storage under
+     site/app/Device/, case-insensitive; no network egress; the M2 stub
+     noDeviceVerifier gone; a live dvWatch call site; SXC1.Midi.Table
+     unreachable from exe:app) and V7 (every route and DOM id named by
+     docs/M4-device-test-protocol.md exists in the tree, with extraction
+     anti-vacuity floors) are all unconditional. V6 (the 22 WebMIDI
+     device assertions D1..D22 actually ran and passed inside check 7's
+     root browser run) lives on the BROWSER axis: skipped via skip()
+     under --skip-browser, so a skipped run still counts it and the
+     TOTAL never changes.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -717,13 +741,22 @@ check_no_external_origin "$DIR/index.js" "index.js"
 
 # ===========================================================================
 # Check 14 (M2, task "verification", designer size-budget ruling condition
-# A): THE CLOCK/M4-STUB INVARIANT, unconditional -- not on the content axis,
-# never skipped, because it is a pure source-tree scan with no toolchain
-# dependency.
+# A): THE CLOCK/M4-VERIFIER INVARIANT, unconditional -- not on the content
+# axis, never skipped, because it is a pure source-tree scan with no
+# toolchain dependency.
+#
+# M4 UPDATE (task "verification"): the identifier list below used to
+# require the M2-era stub noDeviceVerifier. M4's device-app wave
+# deliberately DELETED that stub (briefs/M4-manifest.json Part B) and
+# replaced it with the real thing: Device.Midi.webMidiVerifier over one
+# Hub, consumed through dvWatch. The list now tracks the tree --
+# webMidiVerifier and dvWatch on non-comment lines -- and reintroducing
+# the stub is caught separately (check 18's V5 asserts noDeviceVerifier
+# is GONE from site/app). Do not put noDeviceVerifier back here.
 #
 # M2 gate fix (M4): this check certifies PRESENCE, not WIRING -- it marks
-# success once getMonotonicTimeNSec, Date.getTime and noDeviceVerifier
-# occur ANYWHERE on a non-comment line, which is satisfied even when the
+# success once getMonotonicTimeNSec, Date.getTime, webMidiVerifier and
+# dvWatch occur ANYWHERE on a non-comment line, which is satisfied even when the
 # app feeds the WRONG clock into Begin/Restart or never calls
 # beginIfNeeded at all on a cold route (H1/H6 -- both shipped past this
 # very check). Identifier presence is not wiring, so this grep is now
@@ -753,13 +786,13 @@ check_no_external_origin "$DIR/index.js" "index.js"
 # required to be present. This is the M0-n2 pattern: a grep satisfied by
 # a comment describing what ISN'T used, not by the code that IS.
 #
-# This check requires all three of getMonotonicTimeNSec, Date.getTime and
-# noDeviceVerifier on lines that are NOT Haskell comments, using a small
-# python3 pass (naive "split each line on its first '--'" line-comment
-# strip -- sufficient here because none of these three identifiers ever
-# appears after a literal '--' inside a string literal in this codebase;
-# a block ({- -}) comment is not specially handled either, for the same
-# reason: none of the three occurs inside one).
+# This check requires all four of getMonotonicTimeNSec, Date.getTime,
+# webMidiVerifier and dvWatch on lines that are NOT Haskell comments,
+# using a small python3 pass (naive "split each line on its first '--'"
+# line-comment strip -- sufficient here because none of these four
+# identifiers ever appears after a literal '--' inside a string literal
+# in this codebase; a block ({- -}) comment is not specially handled
+# either, for the same reason: none of the four occurs inside one).
 # ===========================================================================
 CLOCK_STUB_PY="$(mktemp -t sxc1-check-site-clockstub.XXXXXX.py)"
 register_temp_file "$CLOCK_STUB_PY"
@@ -767,7 +800,7 @@ cat > "$CLOCK_STUB_PY" <<'PYEOF'
 import os
 import sys
 
-TARGETS = ["getMonotonicTimeNSec", "Date.getTime", "noDeviceVerifier"]
+TARGETS = ["getMonotonicTimeNSec", "Date.getTime", "webMidiVerifier", "dvWatch"]
 ROOT = sys.argv[1]
 
 found = {t: False for t in TARGETS}
@@ -789,7 +822,7 @@ missing = [t for t in TARGETS if not found[t]]
 if missing:
     print("FAIL missing on non-comment lines under %s: %s" % (ROOT, ", ".join(missing)))
     sys.exit(1)
-print("OK all three real mechanisms present on non-comment .hs lines under %s: %s" % (ROOT, ", ".join(TARGETS)))
+print("OK all four real mechanisms present on non-comment .hs lines under %s: %s" % (ROOT, ", ".join(TARGETS)))
 sys.exit(0)
 PYEOF
 
@@ -978,6 +1011,487 @@ if [ -f "$WASM_FILE" ]; then
 else
   fail "app.wasm gzip size is under the $WASM_GZIP_CEILING_BYTES byte ceiling (observed: app.wasm missing)"
 fi
+
+# ===========================================================================
+# Check 18 (M4, task "verification"): THE M4 DEVICE-VERIFICATION GATE,
+# checks V1-V8 from briefs/M4-manifest.json. Everything in this section is
+# UNCONDITIONAL (pure source-tree/artifact/JSON work, no toolchain, no
+# browser) EXCEPT V6, which needs the real browser run and therefore lives
+# on the existing BROWSER axis down in the checks-7/8 section -- skipped
+# through skip() so the TOTAL never changes. NO NEW SKIP AXIS: M2's ruling
+# stands (one fewer switch is one fewer route to result=complete without
+# having checked), and the two existing axes are the only two.
+# ===========================================================================
+
+# --- V1: the frozen ceiling CONSTANT itself -------------------------------
+# Check 13 above already fails when the artifact is over the ceiling; this
+# asserts the CONSTANT, in this script's own source, so a silent raise is
+# caught even while the artifact still fits under the raised value (the
+# exact scenario in which check 13 stays green and nobody notices). Three
+# conditions: the live value is 1000000, the source contains exactly one
+# assignment line, and that line is literally WASM_GZIP_CEILING_BYTES=1000000.
+V1_LABEL="WASM_GZIP_CEILING_BYTES is literally 1000000 (the frozen constant asserted in this script's own source; the artifact-under-ceiling half is check 13 above)"
+CEILING_ASSIGN_COUNT="$(grep -c '^WASM_GZIP_CEILING_BYTES=' "${BASH_SOURCE[0]}" || true)"
+if [ "$WASM_GZIP_CEILING_BYTES" -eq 1000000 ] \
+   && [ "$CEILING_ASSIGN_COUNT" -eq 1 ] \
+   && grep -qx 'WASM_GZIP_CEILING_BYTES=1000000' "${BASH_SOURCE[0]}"; then
+  ok "$V1_LABEL"
+else
+  fail "$V1_LABEL (observed: live value=$WASM_GZIP_CEILING_BYTES, assignment lines matching ^WASM_GZIP_CEILING_BYTES==$CEILING_ASSIGN_COUNT -- the frozen ceiling was moved; that is a coordinator decision, never a task's)"
+fi
+
+# --- V2: the M4 task-local budget ceiling ---------------------------------
+# briefs/M4-budget.json (wave 0, m4-baseline) records the merged-M3
+# baseline (m3_final_gzip_bytes) and licenses M4 exactly
+# task_local_ceiling_bytes = min(940000, m3_final + 42000). The artifact
+# measured here is whatever is at --dir, and THE SHIPPING ARTIFACT IS
+# build-site.sh --optimize's OUTPUT (PLAN.md "Size ruling" + its
+# 2026-08-07 amendment: wasm-opt --detect-features -Oz --converge): a
+# plain unoptimized build measures ~1,147K gzip and correctly fails both
+# check 13 and this check, because that artifact is not what ships.
+M4_BUDGET_JSON="$REPO_ROOT/briefs/M4-budget.json"
+M4_BUDGET_FIELDS=""
+if [ -f "$M4_BUDGET_JSON" ] && command -v python3 >/dev/null 2>&1; then
+  M4_BUDGET_FIELDS="$(python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+print(d["task_local_ceiling_bytes"], d["m3_final_gzip_bytes"],
+      d["m4_budget_bytes"], d["second_build_gzip_bytes"],
+      d["ceiling_bytes"], d["authorised"])
+' "$M4_BUDGET_JSON" 2>/dev/null || true)"
+fi
+M4_TASK_CEILING=""; M4_M3_FINAL=""; M4_BUDGET_BYTES=""; M4_SECOND_BUILD=""; M4_CEILING_FIELD=""; M4_AUTHORISED=""
+if [ -n "$M4_BUDGET_FIELDS" ]; then
+  read -r M4_TASK_CEILING M4_M3_FINAL M4_BUDGET_BYTES M4_SECOND_BUILD M4_CEILING_FIELD M4_AUTHORISED <<< "$M4_BUDGET_FIELDS"
+fi
+V2_LABEL="app.wasm gzip is under briefs/M4-budget.json's task_local_ceiling_bytes (the M4 task-local budget; the shipping artifact is build-site.sh --optimize's output per PLAN.md's Size ruling)"
+if [ -n "$M4_BUDGET_FIELDS" ] && [ -f "$WASM_FILE" ]; then
+  M4_DELTA=$((WASM_GZIP_BYTES - M4_M3_FINAL))
+  info "M4 budget: app.wasm gzip observed=$WASM_GZIP_BYTES bytes; task_local_ceiling_bytes=$M4_TASK_CEILING; delta from m3_final_gzip_bytes ($M4_M3_FINAL) = $M4_DELTA bytes"
+  if [ "$WASM_GZIP_BYTES" -le "$M4_TASK_CEILING" ]; then
+    ok "$V2_LABEL (observed: $WASM_GZIP_BYTES of $M4_TASK_CEILING bytes; delta from m3_final_gzip_bytes=$M4_M3_FINAL is +$M4_DELTA bytes; headroom $((M4_TASK_CEILING - WASM_GZIP_BYTES)) bytes)"
+  else
+    fail "$V2_LABEL (observed: $WASM_GZIP_BYTES bytes, OVER task_local_ceiling_bytes=$M4_TASK_CEILING by $((WASM_GZIP_BYTES - M4_TASK_CEILING)) bytes; delta from m3_final_gzip_bytes=$M4_M3_FINAL is +$M4_DELTA bytes)"
+  fi
+else
+  fail "$V2_LABEL (observed: briefs/M4-budget.json missing/unparseable, python3 missing, or app.wasm missing)"
+fi
+
+# --- V8: the budget file is authorised and not stale ----------------------
+# The manifest's literal wording ("m3_final_gzip_bytes is within 3000
+# bytes of a freshly measured build") was written at tag m2, when a fresh
+# build of the tree WAS the M3 baseline. On the merged M4 tree a fresh
+# shipping build lawfully exceeds that baseline by the licensed M4 delta
+# (observed ~+35K of ~42K licensed), so the staleness window is applied to
+# what can still be honestly measured from THIS tree, per the
+# coordinator's binding Size ruling (the measurement, like V2's, is of
+# the OPTIMIZED shipping artifact at --dir):
+#   (a) authorised is literally true (wave 0's M3_FINAL <= 895000 gate);
+#   (b) ceiling_bytes is 1000000 and task_local_ceiling_bytes is exactly
+#       min(940000, m3_final_gzip_bytes + m4_budget_bytes) -- a doctored
+#       ceiling cannot license anything the formula does not;
+#   (c) |m3_final_gzip_bytes - second_build_gzip_bytes| <= 3000 -- the
+#       budget's own two-build variance record still coheres (this is the
+#       manifest's 3000-byte window applied to the two recorded fresh
+#       builds; wave 0 measured zero inter-build variance);
+#   (d) the freshly measured artifact sits in
+#       [m3_final - 3000, task_local_ceiling_bytes]: an artifact more
+#       than the variance window BELOW the recorded baseline proves the
+#       baseline never described this pipeline/tree (stale-high budget);
+#       one above the task ceiling is over-licensed (stale-low budget) --
+#       so a stale budget cannot silently license an over-budget artefact
+#       in either direction.
+V8_LABEL="briefs/M4-budget.json is authorised and not stale (authorised:true; task_local_ceiling_bytes == min(940000, m3_final+m4_budget); ceiling_bytes==1000000; |m3_final - second_build| <= 3000; fresh optimized-artifact gzip within [m3_final-3000, task_local_ceiling_bytes])"
+if [ -n "$M4_BUDGET_FIELDS" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  V8_OUT="$(python3 -c '
+import sys
+task, m3, m4b, second, ceil, auth, observed = sys.argv[1:8]
+task, m3, m4b, second, ceil, observed = int(task), int(m3), int(m4b), int(second), int(ceil), int(observed)
+problems = []
+if auth != "True":
+    problems.append("authorised is %r, not true" % auth)
+if ceil != 1000000:
+    problems.append("ceiling_bytes=%d, not the frozen 1000000" % ceil)
+want = min(940000, m3 + m4b)
+if task != want:
+    problems.append("task_local_ceiling_bytes=%d is not min(940000, m3_final+m4_budget)=%d" % (task, want))
+if abs(m3 - second) > 3000:
+    problems.append("|m3_final(%d) - second_build(%d)| = %d exceeds the 3000-byte variance window" % (m3, second, abs(m3 - second)))
+if observed < m3 - 3000:
+    problems.append("fresh artifact gzip=%d is %d bytes BELOW m3_final=%d (beyond the 3000-byte window) -- the recorded baseline never described this pipeline/tree" % (observed, m3 - observed, m3))
+if observed > task:
+    problems.append("fresh artifact gzip=%d is OVER task_local_ceiling_bytes=%d by %d bytes" % (observed, task, observed - task))
+if problems:
+    print("FAIL " + "; ".join(problems))
+else:
+    print("OK authorised=true, formula holds (task ceiling %d = min(940000, %d+%d)), variance |%d-%d|<=3000, fresh gzip %d in [%d, %d]"
+          % (task, m3, m4b, m3, second, observed, m3 - 3000, task))
+' "$M4_TASK_CEILING" "$M4_M3_FINAL" "$M4_BUDGET_BYTES" "$M4_SECOND_BUILD" "$M4_CEILING_FIELD" "$M4_AUTHORISED" "$WASM_GZIP_BYTES" 2>&1)" || true
+  case "$V8_OUT" in
+    "OK "*) ok "$V8_LABEL (${V8_OUT#OK })" ;;
+    *)      fail "$V8_LABEL (observed: ${V8_OUT#FAIL })" ;;
+  esac
+else
+  fail "$V8_LABEL (observed: briefs/M4-budget.json missing/unparseable, python3 missing, or app.wasm missing)"
+fi
+
+# --- V3: the harness fake exists and carries its whole driver surface -----
+# scripts/fake-midi.js is the committed, reviewable fake behind the D1..D22
+# browser assertions. It must exist, parse, and name every driver member
+# the sabotage sweep depends on -- a fake that silently lost setOutcome or
+# emit would turn the whole device suite vacuous.
+V3_LABEL="scripts/fake-midi.js exists, parses under node --check, and names every driver member (calls setOutcome addPort removePort emit subscribedCount ports)"
+FAKE_MIDI_SRC="$REPO_ROOT/scripts/fake-midi.js"
+if [ -f "$FAKE_MIDI_SRC" ] && "$NODE" --check "$FAKE_MIDI_SRC" >/dev/null 2>&1; then
+  FAKE_MIDI_MISSING=""
+  for member in calls setOutcome addPort removePort emit subscribedCount ports; do
+    if ! grep -Eq "(^|[^A-Za-z0-9_])${member}([^A-Za-z0-9_]|\$)" "$FAKE_MIDI_SRC"; then
+      FAKE_MIDI_MISSING="$FAKE_MIDI_MISSING $member"
+    fi
+  done
+  if [ -z "$FAKE_MIDI_MISSING" ]; then
+    ok "$V3_LABEL"
+  else
+    fail "$V3_LABEL (observed: member(s) not found:$FAKE_MIDI_MISSING)"
+  fi
+else
+  fail "$V3_LABEL (observed: missing, or node --check rejected it)"
+fi
+
+# --- V4: the harness fake is never shipped --------------------------------
+# The fake exists to be INJECTED by the harness (CDP
+# Page.addScriptToEvaluateOnNewDocument); a copy inside the shipped bundle
+# would let the app grant itself a fake MIDI device in production.
+# Checked under the directory being verified AND the canonical
+# site/public + site/static, so a --dir pointed elsewhere still guards
+# the real tree. browser-check.mjs's D22 asserts the same property from
+# the browser side; this is the host-side half that still runs when the
+# browser axis is skipped.
+V4_LABEL="harness fake never shipped: no fake-midi.js under the checked dir, site/public or site/static"
+FAKE_SHIPPED="$(find "$DIR" "$REPO_ROOT/site/public" "$REPO_ROOT/site/static" -name 'fake-midi.js' -print 2>/dev/null | sort -u | tr '\n' ' ')"
+if [ -z "${FAKE_SHIPPED// /}" ]; then
+  ok "$V4_LABEL"
+else
+  fail "$V4_LABEL (observed: $FAKE_SHIPPED)"
+fi
+
+# --- V5: the seven M4 structural invariants over site/app -----------------
+# briefs/M4-plan.md section 5, all anchored to NON-COMMENT lines (M0
+# finding n2: a grep a comment can satisfy -- or defeat -- proves
+# nothing). Same naive first-'--' line-comment strip as checks 14 and the
+# storage guard above, valid here for the same measured reason: none of
+# these identifiers appears after a literal '--' inside a string, nor
+# inside a {- -} block comment, anywhere in site/app. The storage grep is
+# CASE-INSENSITIVE because Miso's API surface is setLocalStorage (M2's
+# recorded lesson). The SXC1.Midi.Table reachability check walks the real
+# import graph from site/app/Main.hs and carries its own anti-vacuity
+# anchor: SXC1.Midi.Spec MUST be in the closure and Table.hs MUST exist
+# on disk, so a broken traversal or a renamed module fails loudly instead
+# of checking nothing.
+M4_INVARIANTS_PY="$(mktemp -t sxc1-check-site-m4inv.XXXXXX.py)"
+register_temp_file "$M4_INVARIANTS_PY"
+cat > "$M4_INVARIANTS_PY" <<'PYEOF'
+import os
+import re
+import sys
+
+APP = sys.argv[1]   # <repo>/site/app
+SRC = sys.argv[2]   # <repo>/site/src
+
+
+def hs_files(root):
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for fn in sorted(filenames):
+            if fn.endswith(".hs"):
+                yield os.path.join(dirpath, fn)
+
+
+def noncomment(path):
+    with open(path, encoding="utf-8") as fh:
+        for i, line in enumerate(fh, 1):
+            code = line.split("--", 1)[0]
+            if code.strip():
+                yield i, code
+
+
+def rel(path):
+    return os.path.relpath(path, os.path.dirname(os.path.dirname(APP)))
+
+
+def scan(root, needles, lower=False):
+    hits = []
+    for path in hs_files(root):
+        for i, code in noncomment(path):
+            hay = code.lower() if lower else code
+            for n in needles:
+                if n in hay:
+                    hits.append((path, i, n))
+    return hits
+
+# 1. requestMIDIAccess: exactly one non-comment occurrence, in the bridge.
+req = scan(APP, ["requestMIDIAccess"])
+if len(req) == 1 and req[0][0].endswith(os.path.join("Device", "Midi.hs")):
+    print("REQMIDI OK exactly one non-comment occurrence, %s:%d" % (rel(req[0][0]), req[0][1]))
+else:
+    print("REQMIDI FAIL want exactly one non-comment occurrence inside site/app/Device/Midi.hs, observed %d: %s"
+          % (len(req), "; ".join("%s:%d" % (rel(p), i) for p, i, _ in req) or "<none>"))
+
+# 2. sysex: exactly once, as False, in the bridge.
+sy = scan(APP, ["sysex"], lower=True)
+sy_ok = (len(sy) == 1
+         and sy[0][0].endswith(os.path.join("Device", "Midi.hs")))
+if sy_ok:
+    _, ln, _ = sy[0]
+    code = [c for i, c in noncomment(sy[0][0]) if i == ln][0]
+    sy_ok = "False" in code
+if sy_ok:
+    print("SYSEX OK exactly one non-comment occurrence, carrying False, %s:%d" % (rel(sy[0][0]), sy[0][1]))
+else:
+    print("SYSEX FAIL want exactly one non-comment occurrence in site/app/Device/Midi.hs with False on the same line, observed %d: %s"
+          % (len(sy), "; ".join("%s:%d" % (rel(p), i) for p, i, _ in sy) or "<none>"))
+
+# 3. No storage under site/app/Device/ (case-insensitive).
+st = scan(os.path.join(APP, "Device"), ["localstorage", "sessionstorage", "miso.storage"], lower=True)
+if not st:
+    print("DEVSTORAGE OK no localStorage/sessionStorage/Miso.Storage on non-comment lines under site/app/Device/ (case-insensitive)")
+else:
+    print("DEVSTORAGE FAIL storage reached from site/app/Device/: %s"
+          % "; ".join("%s:%d (%s)" % (rel(p), i, n) for p, i, n in st))
+
+# 4. No network egress anywhere in site/app.
+net = scan(APP, ["fetch", "getJSON", "postJSON", "sendBeacon", "WebSocket"])
+if not net:
+    print("NETWORK OK no fetch/getJSON/postJSON/sendBeacon/WebSocket on non-comment lines in site/app")
+else:
+    print("NETWORK FAIL network egress identifiers on non-comment lines: %s"
+          % "; ".join("%s:%d (%s)" % (rel(p), i, n) for p, i, n in net))
+
+# 5. The M2 stub is gone.
+stub = scan(APP, ["noDeviceVerifier"])
+if not stub:
+    print("NODEVSTUB OK noDeviceVerifier has zero non-comment occurrences in site/app (M2's stub did not survive M4)")
+else:
+    print("NODEVSTUB FAIL noDeviceVerifier still present: %s"
+          % "; ".join("%s:%d" % (rel(p), i) for p, i, _ in stub))
+
+# 6. dvWatch is defined in the bridge AND called outside it.
+dv = scan(APP, ["dvWatch"])
+dv_in = [h for h in dv if h[0].endswith(os.path.join("Device", "Midi.hs"))]
+dv_out = [h for h in dv if not h[0].endswith(os.path.join("Device", "Midi.hs"))]
+if dv_in and dv_out:
+    print("DVWATCH OK defined in Device/Midi.hs (%d occurrence(s)) and called outside it (%s)"
+          % (len(dv_in), "; ".join("%s:%d" % (rel(p), i) for p, i, _ in dv_out)))
+else:
+    print("DVWATCH FAIL want dvWatch on non-comment lines both inside Device/Midi.hs and outside it (a real call site); observed inside=%d outside=%d"
+          % (len(dv_in), len(dv_out)))
+
+# 7. SXC1.Midi.Table is not reachable from exe:app's import graph.
+module_map = {}
+for root in (APP, SRC):
+    for path in hs_files(root):
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                m = re.match(r"^module\s+([A-Za-z][A-Za-z0-9_.']*)", line)
+                if m:
+                    module_map[m.group(1)] = path
+                    break
+
+IMPORT_RE = re.compile(r"^import\s+(?:qualified\s+)?([A-Za-z][A-Za-z0-9_.']*)")
+main_path = os.path.join(APP, "Main.hs")
+queue = [main_path]
+seen_files = set()
+reached = set()
+while queue:
+    path = queue.pop()
+    if path in seen_files or not os.path.isfile(path):
+        continue
+    seen_files.add(path)
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            m = IMPORT_RE.match(line)
+            if not m:
+                continue
+            name = m.group(1)
+            reached.add(name)
+            target = module_map.get(name)
+            if target is not None and target not in seen_files:
+                queue.append(target)
+
+table_on_disk = os.path.isfile(os.path.join(SRC, "SXC1", "Midi", "Table.hs"))
+problems = []
+if not os.path.isfile(main_path):
+    problems.append("site/app/Main.hs missing")
+if not table_on_disk:
+    problems.append("site/src/SXC1/Midi/Table.hs missing (anti-vacuity anchor: the module this check exists to fence off must exist)")
+if "SXC1.Midi.Spec" not in reached:
+    problems.append("SXC1.Midi.Spec NOT in exe:app's import closure (anti-vacuity anchor: the traversal is broken or the device bridge lost its pure layer)")
+if "SXC1.Midi.Table" in reached:
+    problems.append("SXC1.Midi.Table IS reachable from exe:app (the parse-at-startup table belongs to the checkers, never the app)")
+if problems:
+    print("TABLEREACH FAIL " + "; ".join(problems))
+else:
+    print("TABLEREACH OK SXC1.Midi.Table unreachable from site/app/Main.hs's import closure (%d modules reached, incl. the SXC1.Midi.Spec anchor; Table.hs present on disk)" % len(reached))
+PYEOF
+
+m4_invariant_label() {
+  case "$1" in
+    REQMIDI)    echo "m4-invariants/requestMIDIAccess-single-call-site (exactly one non-comment occurrence in site/app, inside Device/Midi.hs)" ;;
+    SYSEX)      echo "m4-invariants/sysex-false-only (exactly one non-comment occurrence in site/app, carrying False, in Device/Midi.hs)" ;;
+    DEVSTORAGE) echo "m4-invariants/device-no-storage (no localStorage/sessionStorage/Miso.Storage, case-insensitive, on non-comment lines under site/app/Device/)" ;;
+    NETWORK)    echo "m4-invariants/no-network-egress (no fetch/getJSON/postJSON/sendBeacon/WebSocket on non-comment lines in site/app -- MIDI bytes never leave the browser)" ;;
+    NODEVSTUB)  echo "m4-invariants/noDeviceVerifier-gone (zero non-comment occurrences in site/app -- M2's dead stub must not survive M4)" ;;
+    DVWATCH)    echo "m4-invariants/dvWatch-called (defined in Device/Midi.hs and consumed by a real call site outside it)" ;;
+    TABLEREACH) echo "m4-invariants/midi-table-unreachable (SXC1.Midi.Table absent from exe:app's import closure, with SXC1.Midi.Spec as the traversal's anti-vacuity anchor)" ;;
+    *)          echo "m4-invariants/$1" ;;
+  esac
+}
+
+if command -v python3 >/dev/null 2>&1; then
+  M4_INVARIANTS_OUT="$(python3 "$M4_INVARIANTS_PY" "$REPO_ROOT/site/app" "$REPO_ROOT/site/src" 2>&1)" || true
+  M4_INV_SEEN=0
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    tag="${line%% *}"
+    rest="${line#* }"
+    status="${rest%% *}"
+    detail="${rest#* }"
+    label="$(m4_invariant_label "$tag")"
+    case "$status" in
+      OK)   ok "$label ($detail)"; M4_INV_SEEN=$((M4_INV_SEEN + 1)) ;;
+      FAIL) fail "$label (observed: $detail)"; M4_INV_SEEN=$((M4_INV_SEEN + 1)) ;;
+      *)    fail "$label (unexpected output: $line)"; M4_INV_SEEN=$((M4_INV_SEEN + 1)) ;;
+    esac
+  done <<< "$M4_INVARIANTS_OUT"
+  # The scan prints exactly seven verdict lines; anything else (a crashed
+  # python pass prints fewer) is itself a failure, never a silent shrink.
+  if [ "$M4_INV_SEEN" -ne 7 ]; then
+    fail "m4-invariants/verdict-count (observed: $M4_INV_SEEN verdict line(s), want exactly 7 -- the invariant scan itself is broken)"
+  fi
+else
+  for tag in REQMIDI SYSEX DEVSTORAGE NETWORK NODEVSTUB DVWATCH TABLEREACH; do
+    fail "$(m4_invariant_label "$tag") (observed: python3 not found on PATH)"
+  done
+fi
+rm -f "$M4_INVARIANTS_PY"
+
+# --- V7: the real-device protocol names only things that exist ------------
+# docs/M4-device-test-protocol.md is the owner's checklist; a protocol
+# that names a route or a control the app does not have is worse than no
+# protocol. Extraction anti-vacuity floors (this exact vacuity class has
+# bitten two manifest verify commands this milestone): >= 3 routes and
+# >= 7 DOM ids must actually be extracted, so a drifted extraction regex
+# fails loudly instead of successfully checking an empty set. Routes are
+# proven against content/exercises (the named deck must contain the named
+# exercise id); DOM ids against non-comment source literals in site/app.
+M4_PROTOCOL_PY="$(mktemp -t sxc1-check-site-m4proto.XXXXXX.py)"
+register_temp_file "$M4_PROTOCOL_PY"
+cat > "$M4_PROTOCOL_PY" <<'PYEOF'
+import os
+import re
+import sys
+
+DOC = sys.argv[1]
+EXERCISES_DIR = sys.argv[2]
+APP = sys.argv[3]
+
+if not os.path.isfile(DOC):
+    print("ROUTES FAIL docs/M4-device-test-protocol.md is missing")
+    print("DOMIDS FAIL docs/M4-device-test-protocol.md is missing")
+    raise SystemExit(1)
+
+text = open(DOC, encoding="utf-8").read()
+
+routes = sorted(set(re.findall(r"#/x/([A-Za-z0-9-]+)/([A-Za-z0-9-]+)", text)))
+dom_ids = sorted(set(re.findall(r"`#([A-Za-z][A-Za-z0-9_-]*)`", text)))
+
+# Deck slug -> set of exercise ids, straight from content/exercises/.
+decks = {}
+for fn in sorted(os.listdir(EXERCISES_DIR)):
+    if not fn.endswith(".ex.md"):
+        continue
+    deck_name = None
+    ids = set()
+    with open(os.path.join(EXERCISES_DIR, fn), encoding="utf-8") as fh:
+        for line in fh:
+            m = re.match(r"^deck: (\S+)\s*$", line)
+            if m and deck_name is None:
+                deck_name = m.group(1)
+            m = re.match(r"^id: (\S+)\s*$", line)
+            if m:
+                ids.add(m.group(1))
+    if deck_name is not None:
+        decks.setdefault(deck_name, set()).update(ids)
+
+problems = []
+if len(routes) < 3:
+    problems.append("only %d route(s) extracted (< 3) -- the extraction regex has gone vacuous" % len(routes))
+for deck, ex in routes:
+    if deck not in decks:
+        problems.append("route #/x/%s/%s names deck %r, which no content/exercises deck declares" % (deck, ex, deck))
+    elif ex not in decks[deck]:
+        problems.append("route #/x/%s/%s names exercise id %r, which deck %r does not contain" % (deck, ex, ex, deck))
+if problems:
+    print("ROUTES FAIL " + "; ".join(problems))
+else:
+    print("ROUTES OK %d route(s) extracted (%s), each deck/exercise pair exists in content/exercises"
+          % (len(routes), ", ".join("#/x/%s/%s" % r for r in routes)))
+
+# Every DOM id must appear as a quoted literal on a NON-comment line in
+# site/app (the same first-'--' strip as every other invariant here).
+app_code = []
+for dirpath, _dirnames, filenames in os.walk(APP):
+    for fn in filenames:
+        if not fn.endswith(".hs"):
+            continue
+        with open(os.path.join(dirpath, fn), encoding="utf-8") as fh:
+            for line in fh:
+                code = line.split("--", 1)[0]
+                if code.strip():
+                    app_code.append(code)
+blob = "\n".join(app_code)
+
+problems = []
+if len(dom_ids) < 7:
+    problems.append("only %d DOM id(s) extracted (< 7) -- the extraction regex has gone vacuous" % len(dom_ids))
+missing = [i for i in dom_ids if '"%s"' % i not in blob]
+if missing:
+    problems.append("id(s) named by the protocol but absent from site/app non-comment source literals: %s" % ", ".join(missing))
+if problems:
+    print("DOMIDS FAIL " + "; ".join(problems))
+else:
+    print("DOMIDS OK %d DOM id(s) extracted (%s), every one a non-comment source literal in site/app"
+          % (len(dom_ids), ", ".join(dom_ids)))
+PYEOF
+
+m4_protocol_label() {
+  case "$1" in
+    ROUTES) echo "protocol-doc/routes (every #/x/<deck>/<exercise> route in docs/M4-device-test-protocol.md exists in content/exercises; >= 3 extracted)" ;;
+    DOMIDS) echo "protocol-doc/dom-ids (every backticked #id in docs/M4-device-test-protocol.md is a non-comment source literal in site/app; >= 7 extracted)" ;;
+    *)      echo "protocol-doc/$1" ;;
+  esac
+}
+
+if command -v python3 >/dev/null 2>&1; then
+  M4_PROTOCOL_OUT="$(python3 "$M4_PROTOCOL_PY" "$REPO_ROOT/docs/M4-device-test-protocol.md" "$REPO_ROOT/content/exercises" "$REPO_ROOT/site/app" 2>&1)" || true
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    tag="${line%% *}"
+    rest="${line#* }"
+    status="${rest%% *}"
+    detail="${rest#* }"
+    label="$(m4_protocol_label "$tag")"
+    case "$status" in
+      OK)   ok "$label ($detail)" ;;
+      FAIL) fail "$label (observed: $detail)" ;;
+      *)    fail "$label (unexpected output: $line)" ;;
+    esac
+  done <<< "$M4_PROTOCOL_OUT"
+else
+  for tag in ROUTES DOMIDS; do
+    fail "$(m4_protocol_label "$tag") (observed: python3 not found on PATH)"
+  done
+fi
+rm -f "$M4_PROTOCOL_PY"
 
 # ===========================================================================
 # THE SIZE LEDGER (M3 harness, task "harness", item 4): a standing
@@ -2506,8 +3020,16 @@ start_server() {
 # Run one "stage": start a server over `serve_dir`, verify it is healthy
 # (m1), then run scripts/browser-check.mjs against `url_path` on it and
 # report exactly two named checks: "$health_label" and "$browser_label".
+# M4 (task "verification", V6): the stage's browser output is also teed
+# into a temp capture and its path left in LAST_BROWSER_STAGE_LOG, so the
+# V6 check below can prove the D1..D22 device suite actually ran INSIDE
+# the root run (an unplugged suite would leave checks 7/8 green while the
+# device assertions silently stopped existing -- the exact
+# can't-fail-anymore class this project keeps re-finding).
+LAST_BROWSER_STAGE_LOG=""
 run_browser_stage() {
   local serve_dir="$1" on_disk_index="$2" url_path="$3" health_label="$4" browser_label="$5" browser_path="$6"
+  LAST_BROWSER_STAGE_LOG=""
 
   if ! start_server "$serve_dir" "$PORT"; then
     fail "$health_label"
@@ -2570,10 +3092,14 @@ run_browser_stage() {
     browser_cmd+=(--exercise-fixture "$EXERCISE_FIXTURE_FILE")
   fi
   echo "check-site: serving '$serve_dir' at $run_url (browser: $browser_path)"
+  local browser_log
+  browser_log="$(mktemp -t sxc1-check-site-browser-stage.XXXXXX.log)"
+  register_temp_file "$browser_log"
   set +e
-  "$NODE" "${browser_cmd[@]}"
-  local browser_rc=$?
+  "$NODE" "${browser_cmd[@]}" 2>&1 | tee "$browser_log"
+  local browser_rc="${PIPESTATUS[0]}"
   set -e
+  LAST_BROWSER_STAGE_LOG="$browser_log"
   if [ "$browser_rc" -eq 0 ]; then
     ok "$browser_label"
   else
@@ -2585,6 +3111,16 @@ ROOT_HEALTH_LABEL="root dev server serves the on-disk index.html byte-for-byte"
 ROOT_BROWSER_LABEL="browser check at the origin root (http://127.0.0.1:<port>/)"
 SUBPATH_HEALTH_LABEL="sub-path dev server serves the on-disk index.html byte-for-byte"
 SUBPATH_BROWSER_LABEL="browser check at a GitHub-Pages-style sub-path (AUTHORITATIVE deployability check)"
+# M4 (task "verification", V6): the D1..D22 WebMIDI device assertions are
+# part of scripts/browser-check.mjs's ordinary full run (checks 7/8), on
+# fresh CDP targets with scripts/fake-midi.js injected. This named check
+# proves they actually RAN AND PASSED inside check 7's root run, by
+# counting the 22 distinct "ok - D<n>: ..." report lines in that stage's
+# captured output -- so silently unplugging the device suite from the
+# browser driver turns this red even while checks 7/8 stay green. On the
+# EXISTING browser axis: skipped via skip() (counted, conspicuous, TOTAL
+# unchanged), never via any new flag.
+DEVICE_SUITE_LABEL="device assertions D1..D22 ran and passed inside check 7's root browser run (WebMIDI suite driven through scripts/fake-midi.js)"
 
 if [ "$SKIP_BROWSER" -eq 1 ]; then
   echo "SKIPPED -- browser checks (requested via --skip-browser or SXC1_SKIP_BROWSER=1)"
@@ -2593,15 +3129,18 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$SUBPATH_HEALTH_LABEL"
   skip "$SUBPATH_BROWSER_LABEL"
   skip "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation)"
+  skip "$DEVICE_SUITE_LABEL"
 else
   if ! BROWSER_PATH="$(resolve_browser)"; then
     fail "$ROOT_HEALTH_LABEL (observed: no browser found -- set SXC1_BROWSER, install Chrome/Chromium, or pass --skip-browser)"
     fail "$ROOT_BROWSER_LABEL"
     fail "$SUBPATH_HEALTH_LABEL (observed: no browser found -- set SXC1_BROWSER, install Chrome/Chromium, or pass --skip-browser)"
     fail "$SUBPATH_BROWSER_LABEL"
+    fail "$DEVICE_SUITE_LABEL (observed: no browser found, the suite never ran)"
   else
     # Check 7: ordinary root-served smoke test.
     run_browser_stage "$DIR" "$DIR/index.html" "/" "$ROOT_HEALTH_LABEL" "$ROOT_BROWSER_LABEL" "$BROWSER_PATH"
+    ROOT_BROWSER_STAGE_LOG="$LAST_BROWSER_STAGE_LOG"
 
     # Check 8 (M9 fix): copy the bundle under a non-root prefix and require
     # the browser check to pass THERE. This is the property test for GitHub
@@ -2643,6 +3182,21 @@ else
       ok "$STORAGE_REFUSED_LABEL"
     else
       fail "$STORAGE_REFUSED_LABEL (browser-check --check-storage-refused exit $STORAGE_REFUSED_RC)"
+    fi
+
+    # V6 (M4, task "verification") -- see DEVICE_SUITE_LABEL's comment
+    # above. 22 DISTINCT passing device-assertion lines must appear in
+    # check 7's root-stage capture; a failed assertion prints "FAIL - Dn:"
+    # instead and is therefore missing from this count, so V6 goes red
+    # both when the suite is unplugged and when any of its members fail.
+    DEVICE_SUITE_OK_COUNT=0
+    if [ -n "${ROOT_BROWSER_STAGE_LOG:-}" ] && [ -s "$ROOT_BROWSER_STAGE_LOG" ]; then
+      DEVICE_SUITE_OK_COUNT="$(grep -oE '^ok - D([1-9]|1[0-9]|2[0-2]): ' "$ROOT_BROWSER_STAGE_LOG" | sort -u | wc -l | tr -d ' ')"
+    fi
+    if [ "$DEVICE_SUITE_OK_COUNT" -eq 22 ]; then
+      ok "$DEVICE_SUITE_LABEL (observed: 22/22 distinct D-assertions reported ok in the root stage)"
+    else
+      fail "$DEVICE_SUITE_LABEL (observed: $DEVICE_SUITE_OK_COUNT of 22 distinct D-assertions reported ok in the root stage -- the device suite failed, or never ran at all)"
     fi
   fi
 fi

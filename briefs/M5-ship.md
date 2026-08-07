@@ -43,6 +43,10 @@ Content:
     tells the owner to ignore it).
 
 Ops:
+12. check-site's storage-refused stage leaks its python http.server child —
+    the cleanup kills the subshell pid, not the python process (observed twice,
+    2026-08-07: orphaned `http.server 8130`/`8307` after full runs; M4
+    verification-task housekeeping note).
 8. Revert to workflow Pages deploys when GitHub's deployment queue recovers —
    set ENABLE_PAGES=true, PUT build_type=workflow, retire the manual gh-pages
    procedure (PLAN.md deploy-path note).
