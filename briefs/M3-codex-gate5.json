@@ -1,0 +1,24 @@
+{
+  "task_type": "review",
+  "reviewed_commit": "0a7b4f69ea654b2c90c581cd1c1f5135a9b224cb",
+  "verdict": "GATE-CLEAR",
+  "summary": "Both round-4 residuals are fixed. The added schema-1 hostile test directly exercises and pins the three-field M arm through the real v1-to-v2 migration, and the Codec module Haddock now scopes record-level lenience to understood header versions while separately stating that newer headers fail closed. No new defect was found in the focused functional/documentation delta.",
+  "per_item_verdicts": [
+    {
+      "item": 1,
+      "id": "NEW16",
+      "verdict": "FIXED",
+      "evidence": "site/test/CheckProgress.hs adds a schema-1 blob with exactly a three-field M record and 2000000000 in all three numeric positions. decodeState therefore selects the v1 parser arm, after which productionSteps 1 = Just id advances it to schema 2. The assertion pins streakDay and firstDay to dayCap, streakLen to 1000000, lastPrompt to the v1 default empty string, and psVersion to SchemaVersion 2. Removing clamps only from the three-field arm would violate this single focused assertion, while the pre-existing four-field test remains independent. The coordinator-reported sabotage result (exactly one red) and progress-check 84/84 were accepted as supplied under the read-only/no-verification constraint."
+    },
+    {
+      "item": 2,
+      "id": "NEW15",
+      "verdict": "FIXED",
+      "evidence": "The Codec module-level Haddock now limits unknown-tag and malformed-record skipping to a blob whose header version the build understands (at most currentSchema), then states separately that a header above currentSchema is DecodeCorrupt outright and is never partially read through tag-skipping. This agrees with decodeState/migrateWith and with README.md's wire-format, migration, and corrupt-state sections. The remaining BodyAcc Haddock describes only the body accumulator's local behavior and does not claim that future-version blobs decode successfully, so it creates no contradiction."
+    }
+  ],
+  "no_new_defects_ruling": "Commit 0a7b4f6 changes no production behavior: its functional delta is one focused CheckProgress assertion, its documentation delta is the corrected Codec module Haddock, and it also records the prior gate report. The new test uses an Int-parseable hostile value, selects the intended three-field arm by field count, and pins migration normalization. No new defect was found in these changes.",
+  "coordinator_state_ruling": "The supplied progress-check 84/84, registry-check 8/8 plus 16/16, check-site 80/80 with result=complete, and 911790-byte gzip artifact under the 1000000-byte ceiling were accepted as reported. No tests, lint, builds, or other verification commands were run.",
+  "method": "Read-only inspection of commit 0a7b4f6, the round-4 gate report, the added CheckProgress case and its decode/migration path, the complete relevant Codec Haddocks, and all matching README schema/lenience/fail-closed passages. No source edits or commits were made; only this required result JSON was written.",
+  "final_line": "GATE-CLEAR"
+}
