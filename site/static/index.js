@@ -10,6 +10,30 @@
 import { WASI, OpenFile, File, ConsoleStdout } from "./vendor/browser_wasi_shim/index.js";
 import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
 
+// M3 storage-refused fix (harness finding, --check-storage-refused): a
+// JS exception thrown by localStorage (private mode, quota, disabled)
+// does NOT unwind into Haskell as a catchable exception -- it propagates
+// out of the wasm import and kills the calling Haskell computation
+// (observed: boot death via window.__SXC1_BOOT_ERROR). So the app never
+// calls localStorage directly: every access goes through this bridge,
+// which catches JS-side and returns sentinel values instead of throwing.
+// undefined = "missing or refused"; the wasm side treats any refusal as
+// storage-unavailable and runs the fully working no-persistence mode.
+window.__sxc1Storage = {
+  get: (k) => { try { const v = window.localStorage.getItem(k); return v === null ? undefined : v; } catch (e) { return undefined; } },
+  set: (k, v) => { try { window.localStorage.setItem(k, v); return 1; } catch (e) { return 0; } },
+  del: (k) => { try { window.localStorage.removeItem(k); return 1; } catch (e) { return 0; } },
+  probe: () => {
+    try {
+      window.localStorage.setItem("sxc1.storage-probe", "1");
+      const ok = window.localStorage.getItem("sxc1.storage-probe") === "1";
+      window.localStorage.removeItem("sxc1.storage-probe");
+      return ok ? 1 : 0;
+    } catch (e) { return 0; }
+  },
+};
+
+
 const bootStatus = document.getElementById("boot-status");
 
 try {

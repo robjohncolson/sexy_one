@@ -860,9 +860,16 @@ import os
 import sys
 
 ROOTS = sys.argv[1:]
-NEEDLES = ("miso.storage", "localstorage")
+# M3 storage-refused fix: NO Haskell file may reach localStorage or
+# Miso.Storage AT ALL any more (a JS exception thrown by localStorage
+# does not unwind into Haskell -- it killed boot; see Progress/Store.hs's
+# module Haddock). All access goes through the JS-side try/catch bridge
+# window.__sxc1Storage (site/static/index.js), and exactly ONE Haskell
+# file may name that bridge: Progress/Store.hs.
+DIRECT = ("miso.storage", "localstorage")
+BRIDGE = ("__sxc1storage",)
 
-hits = []
+direct_hits, bridge_hits = [], []
 for root in ROOTS:
     for dirpath, _dirnames, filenames in os.walk(root):
         for fn in filenames:
@@ -872,24 +879,23 @@ for root in ROOTS:
             with open(path, encoding="utf-8") as fh:
                 for line in fh:
                     code_part = line.split("--", 1)[0].lower()
-                    if any(n in code_part for n in NEEDLES):
-                        hits.append(path)
-                        break
+                    if any(n in code_part for n in DIRECT):
+                        direct_hits.append(path)
+                    if any(n in code_part for n in BRIDGE):
+                        bridge_hits.append(path)
 
-hits = sorted(set(hits))
-print("HITS " + ("\t".join(hits) if hits else ""))
+print("DIRECT " + "\t".join(sorted(set(direct_hits))))
+print("BRIDGE " + "\t".join(sorted(set(bridge_hits))))
 PYEOF
 
 if command -v python3 >/dev/null 2>&1; then
   STORAGE_GUARD_OUT="$(python3 "$STORAGE_GUARD_PY" "$REPO_ROOT/site/src" "$REPO_ROOT/site/app" "$REPO_ROOT/site/test" 2>&1)" || true
-  STORAGE_HITS="${STORAGE_GUARD_OUT#HITS }"
-  if [ "$STORAGE_HITS" = "$REPO_ROOT/site/app/Progress/Store.hs" ]; then
-    ok "Miso.Storage (case-insensitive, non-comment lines only: Miso.Storage or *localStorage*) appears in exactly one file: site/app/Progress/Store.hs"
+  STORAGE_DIRECT="$(printf '%s\n' "$STORAGE_GUARD_OUT" | sed -n 's/^DIRECT //p')"
+  STORAGE_BRIDGE="$(printf '%s\n' "$STORAGE_GUARD_OUT" | sed -n 's/^BRIDGE //p')"
+  if [ -z "$STORAGE_DIRECT" ] && [ "$STORAGE_BRIDGE" = "$REPO_ROOT/site/app/Progress/Store.hs" ]; then
+    ok "storage access: zero Haskell files touch Miso.Storage/localStorage; the __sxc1Storage bridge is named by exactly site/app/Progress/Store.hs"
   else
-    STORAGE_HITS_DISPLAY="$(printf '%s' "$STORAGE_HITS" | tr '\t' ' ')"
-    STORAGE_HIT_COUNT=0
-    [ -n "$STORAGE_HITS" ] && STORAGE_HIT_COUNT="$(printf '%s' "$STORAGE_HITS" | tr '\t' '\n' | grep -c . || true)"
-    fail "Miso.Storage (case-insensitive, non-comment lines only: Miso.Storage or *localStorage*) appears in exactly one file, site/app/Progress/Store.hs (observed: $STORAGE_HIT_COUNT file(s): ${STORAGE_HITS_DISPLAY:-<none>})"
+    fail "storage access: zero Haskell files may touch Miso.Storage/localStorage and only Progress/Store.hs may name __sxc1Storage (observed direct: ${STORAGE_DIRECT:-<none>}; bridge: ${STORAGE_BRIDGE:-<none>})"
   fi
 else
   fail "Miso.Storage (case-insensitive, non-comment lines only: Miso.Storage or *localStorage*) appears in exactly one file, site/app/Progress/Store.hs (observed: python3 not found on PATH)"
@@ -2586,6 +2592,7 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$ROOT_BROWSER_LABEL"
   skip "$SUBPATH_HEALTH_LABEL"
   skip "$SUBPATH_BROWSER_LABEL"
+  skip "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation)"
 else
   if ! BROWSER_PATH="$(resolve_browser)"; then
     fail "$ROOT_HEALTH_LABEL (observed: no browser found -- set SXC1_BROWSER, install Chrome/Chromium, or pass --skip-browser)"
@@ -2610,6 +2617,33 @@ else
     run_browser_stage "$SUBPATH_TMP" "$SUBPATH_DIR/index.html" "/sub/path/" "$SUBPATH_HEALTH_LABEL" "$SUBPATH_BROWSER_LABEL" "$BROWSER_PATH"
     rm -rf "$SUBPATH_TMP"
     unregister_temp_dir "$SUBPATH_TMP"
+
+    # Check 9 (M3, storage-refused -- PROMOTED from standalone diagnostic
+    # to gating check once the defect it found was fixed): with
+    # localStorage forced to throw (real private-mode behavior: the
+    # object present, every call throwing), the app must still boot and
+    # #sxc1-progress must report available:false. Its red state was the
+    # real pre-fix app (boot death via a JS exception crossing the wasm
+    # boundary); the fix is the window.__sxc1Storage JS-side try/catch
+    # bridge in site/static/index.js + Progress/Store.hs. Falsifiable by
+    # construction: revert either half and this fails exactly as it did
+    # before the fix.
+    STORAGE_REFUSED_LABEL="storage refused: app boots and reports available=false when localStorage throws (private-mode simulation)"
+    STORAGE_PORT=$((PORT + 7))
+    ( cd "$DIR" && python3 -m http.server "$STORAGE_PORT" --bind 127.0.0.1 >/dev/null 2>&1 ) &
+    STORAGE_SRV_PID=$!
+    SERVER_PIDS+=("$STORAGE_SRV_PID")
+    sleep 1
+    set +e
+    "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-storage-refused --url "http://127.0.0.1:$STORAGE_PORT/" >/dev/null 2>&1
+    STORAGE_REFUSED_RC=$?
+    set -e
+    kill "$STORAGE_SRV_PID" >/dev/null 2>&1 || true
+    if [ "$STORAGE_REFUSED_RC" -eq 0 ]; then
+      ok "$STORAGE_REFUSED_LABEL"
+    else
+      fail "$STORAGE_REFUSED_LABEL (browser-check --check-storage-refused exit $STORAGE_REFUSED_RC)"
+    fi
   fi
 fi
 
