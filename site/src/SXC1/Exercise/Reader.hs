@@ -97,16 +97,21 @@ baseNameOf fp = case reverse (T.splitOn "/" (T.pack fp)) of
   (b : _) -> b
   []      -> T.pack fp
 
--- | @^[0-9]{2}-[a-z0-9-]+\.ex\.md$@.
+-- | @^[0-9]{2,3}-[a-z0-9-]+\.ex\.md$@ -- two OR three leading digits.
+-- M2 shipped four decks as @NN-@; M3's 52-deck course (briefs\/M3-plan.md
+-- \1672.4) numbers files @NNN-@ spaced by 2 so a deck can be inserted
+-- without renumbering -- 52 decks spaced by 2 cannot fit two digits.
+-- Both widths stay valid: renaming the M2 seed decks would have churned
+-- history for no benefit.
 validFileName :: FilePath -> Bool
 validFileName fp = case T.stripSuffix ".ex.md" (baseNameOf fp) of
   Nothing   -> False
-  Just stem -> case T.splitAt 2 stem of
-    (nn, rest) ->
-      T.length nn == 2 && T.all isDigitChar nn
-        && case T.uncons rest of
-             Just ('-', slug) -> isSlugLike slug
-             _                -> False
+  Just stem ->
+    let (nn, rest) = T.span isDigitChar stem
+    in (T.length nn == 2 || T.length nn == 3)
+         && case T.uncons rest of
+              Just ('-', slug) -> isSlugLike slug
+              _                -> False
 
 --------------------------------------------------------------------------
 -- Field blocks

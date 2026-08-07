@@ -162,13 +162,48 @@ jobs:
       # poppler-utils and either cwebp or python3-pil, neither of which
       # this workflow installs) and commit the result.
       #
-      # site/public ends up about 13 MB (currently 3.7 MB app.wasm/JSFFI
-      # plus ~9.4 MB of committed page images) -- well inside GitHub
-      # Pages' 1 GB artifact limit.
+      # site/public ends up about 12.8 MB (currently ~3.3 MB app.wasm +
+      # ~49 KB ghc_wasm_jsffi.js from the OPTIMIZED build below, plus
+      # ~9.4 MB of committed page images) -- well inside GitHub Pages'
+      # 1 GB artifact limit.
+      #
+      # --optimize (M3 "Size ruling", PLAN.md, coordinator, 2026-08-07;
+      # wired here by task "docs-and-ci"): THE SHIPPING ARTIFACT IS THE
+      # wasm-opt BUILD. The full 52-deck/435-exercise course does not fit
+      # under check-site.sh's WASM_GZIP_CEILING_BYTES=1000000 unoptimized
+      # -- measured on this tree, the plain default build gzips app.wasm
+      # to roughly 1,094,000-1,097,000 bytes (OVER the ceiling; run
+      # without --optimize locally and check-site.sh's size check will
+      # fail on exactly this). `wasm-opt -all -O2` + `wasm-tools strip`
+      # (build-site.sh's OWN --optimize flag, unmodified by this
+      # workflow -- see scripts/build-site.sh) brings that down to
+      # roughly 907,600-908,000 bytes, comfortably under budget, and
+      # could not be made to miscompile under adversarial testing
+      # (byte-identical exe:*-check self-test output either way; every
+      # headless-browser assertion this project runs green, repeatedly,
+      # against the optimized artifact -- see scripts/check-site.sh's own
+      # WASM_GZIP_CEILING_BYTES comment and its `--optimized` flag, which
+      # reproduces this exact pipeline on demand for local verification).
+      #
+      # build-site.sh's OWN default stays unoptimized (OPTIMIZE=0 there,
+      # unchanged) -- a bare local `./scripts/build-site.sh` is still the
+      # fast, deliberately-unoptimized default for iteration (see
+      # README.md's Build quickstart). ONLY this workflow's own
+      # invocation opts in, because CI's build is what actually gets
+      # verified and (once ENABLE_PAGES is re-enabled -- see the deploy
+      # job below and README.md's Deployment section) shipped: the
+      # artifact "Verify site" checks and "Upload Pages artifact"
+      # publishes two steps down has to be the one that fits the
+      # ceiling, not merely the one that was fastest to produce locally.
+      # check-site.sh's own size check and size ledger measure whatever
+      # is ACTUALLY at site/public/app.wasm, regardless of which flavour
+      # produced it -- so this one flag is the only change needed to make
+      # that artifact the optimized one; check-site.sh itself is
+      # untouched, and so is its WASM_GZIP_CEILING_BYTES constant.
       # ----------------------------------------------------------------
       - name: Build site
         timeout-minutes: 30
-        run: ./scripts/build-site.sh
+        run: ./scripts/build-site.sh --optimize
 
       # ----------------------------------------------------------------
       # M2: run the exercise-content validator directly, as its own named,
@@ -204,6 +239,45 @@ jobs:
           wasm-run.mjs "$BIN" --content-dir "$GITHUB_WORKSPACE/content" --translations-dir "$GITHUB_WORKSPACE/translations"
           wasm-run.mjs "$BIN" --fixtures "$GITHUB_WORKSPACE/content/fixtures"
           wasm-run.mjs "$BIN" --self-test
+
+      # ----------------------------------------------------------------
+      # M3 (task "docs-and-ci"): run the progress-core and id-registry
+      # checkers directly, as their own named, timed step, for the same
+      # reason "Validate exercise content" above runs exe:exercise-check
+      # early -- fast, readable feedback on the pure spaced-repetition
+      # core or the PromptId-stability registry, in seconds, instead of
+      # only surfacing inside the ~1-minute check-site.sh sweep below.
+      #
+      # DELIBERATELY REDUNDANT with check-site.sh, not a replacement for
+      # it: check-site.sh already resolves and runs exe:progress-check
+      # --self-test and exe:registry-check (--self-test AND, unlike
+      # progress-check, a plain run against the real, committed
+      # content/id-registry.tsv and the actual corpus) as part of its own
+      # content-axis gate (see scripts/check-site.sh's "M3 harness item
+      # 6" section) -- so a plain `check-site.sh` run alone already
+      # covers both binaries; the unskippable gate stays check-site.sh's
+      # `result=complete` assertion two steps down, and this step does
+      # not replace or loosen it.
+      #
+      # exe:progress-check and exe:registry-check are built above by
+      # build-site.sh (it now builds exe:app, exe:content-check,
+      # exe:exercise-check, exe:progress-check AND exe:registry-check),
+      # so this step only needs to resolve and run the already-built
+      # binaries -- same `wasm32-wasi-cabal list-bin` / wasm-run.mjs
+      # convention used throughout.
+      # ----------------------------------------------------------------
+      - name: Validate progress core and id registry
+        timeout-minutes: 10
+        run: |
+          . "$HOME/.ghc-wasm/env"
+          cd site
+          PBIN="$(wasm32-wasi-cabal list-bin exe:progress-check | tail -n1)"
+          echo "progress-check binary: $PBIN"
+          wasm-run.mjs "$PBIN" --self-test
+          RBIN="$(wasm32-wasi-cabal list-bin exe:registry-check | tail -n1)"
+          echo "registry-check binary: $RBIN"
+          wasm-run.mjs "$RBIN" --self-test
+          wasm-run.mjs "$RBIN"
 
       # check-site.sh needs no new CI step for M1: the content checker
       # (exe:content-check under wasm-run.mjs), the three-way content
@@ -242,9 +316,20 @@ jobs:
         with:
           path: site/public
 
+      # M3 (task "docs-and-ci"): this step used to opt its own outcome out
+      # of the job result (present since M0). That opt-out changed
+      # nothing about whether this step COULD gate anything -- `if:
+      # failure()` means it only ever runs after an earlier, real step in
+      # this job has already failed, and it is the last step in the job,
+      # so there is nothing after it to skip -- but task "docs-and-ci"
+      # carries its own verify command asserting that no step anywhere in
+      # this directory opts out that way, stricter than any prior
+      # milestone's, so it is cleaned up here too. Removing the opt-out
+      # cannot un-gate anything: the job's pass/fail outcome was always decided
+      # by the earlier failing step, never by whether this best-effort
+      # debug-artifact upload itself succeeded.
       - name: Upload debug artifact on failure
         if: failure()
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: site-debug
