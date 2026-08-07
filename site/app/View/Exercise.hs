@@ -35,9 +35,11 @@ import           Miso.Html.Property     as P
 
 import           SXC1.Exercise.Engine   (ExerciseState (..), Outcome (..), Response (..))
 import           SXC1.Exercise.Types
+import           SXC1.Progress.Types    (ProgressState)
 import           SXC1.Route             (Route (..), renderRoute)
 
 import qualified View.Blocks            as Blocks
+import qualified View.Progress          as Progress
 
 --------------------------------------------------------------------------
 -- Action bundle for the runner. Every field takes whatever the DOM
@@ -121,35 +123,59 @@ exerciseNotFound label = H.section_ [ P.id_ "sxc1-not-found" ]
 -- "#/x": the exercise index, grouped by chapter.
 --------------------------------------------------------------------------
 
-viewExerciseIndex :: [Deck] -> View model action
-viewExerciseIndex decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (map renderChapter chapters)
+-- | Groups decks by chapter (course order: 'uniqueInOrder' over
+-- 'dkChapter', itself INDEX order -- never a hard-coded chapter list, so
+-- this scales unchanged from today's 4 decks to the full 52).
+-- Chapters render as \<details\> (native, no JS, keyboard-operable
+-- disclosure) rather than a flat wall of decks -- the manifest's mobile
+-- guardrail for 52 decks across 6 chapters. 'Progress.deckCardAttrs'
+-- folds a stable @.deck-card[data-tier]@ hook onto the SAME element that
+-- already carries @.ex-deck-card@ (one @class_@, not two -- see that
+-- function's Haddock), so the M2 DOM contract (@.ex-deck-card@) and the
+-- M3 one (@.deck-card@) are the same element, not a duplicated list.
+viewExerciseIndex :: ProgressState -> [Deck] -> View model action
+viewExerciseIndex prog decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (map renderChapter chapters)
   where
     chapterOrder = uniqueInOrder (map dkChapter decks)
     chapters = [ (ch, [ d | d <- decks, dkChapter d == ch ]) | ch <- chapterOrder ]
 
-    renderChapter (chTitle, ds) = H.section_ [ P.class_ "ex-chapter" ]
-      [ H.h2_ [ P.class_ "ex-chapter-title" ] [ text (ms chTitle) ]
+    -- | Open by default while the course is still small enough that
+    -- collapsing costs more taps than it saves (today's 4 decks); once
+    -- the corpus grows toward the full 52 this flips to closed
+    -- automatically, no per-task change needed.
+    startOpen = length decks <= 8
+
+    renderChapter (chTitle, ds) = H.details_ [ P.class_ "ex-chapter", P.open_ startOpen ]
+      [ H.summary_ [ P.class_ "ex-chapter-title" ]
+          [ text (ms chTitle), chapterProgressEl ds ]
       , H.ul_ [ P.class_ "ex-deck-list" ] (map renderDeckCard ds)
       ]
 
+    chapterProgressEl ds =
+      let (done, total) = Progress.chapterDoneCount prog ds
+      in H.span_ [ P.class_ "chapter-progress" ]
+           [ text (ms (T.pack (show done) <> "/" <> T.pack (show total))) ]
+
     renderDeckCard d = H.li_ []
-      [ H.a_ [ P.class_ "ex-deck-card", P.href_ (ms (renderRoute (RDeck (unDeckId (dkId d))))) ]
-          [ H.span_ [ P.class_ "ex-deck-title" ] [ text (ms (dkTitle d)) ]
-          , H.span_ [ P.class_ "ex-deck-count" ]
+      [ H.a_ ( P.href_ (ms (renderRoute (RDeck (unDeckId (dkId d))))) : Progress.deckCardAttrs "ex-deck-card" d )
+          ( H.span_ [ P.class_ "ex-deck-title" ] [ text (ms (dkTitle d)) ]
+          : H.span_ [ P.class_ "ex-deck-count" ]
               [ text (ms (T.pack (show (length (dkExercises d))) <> " exercises")) ]
-          ]
+          : Progress.deckMetaEls prog decks d
+          )
       ]
 
 --------------------------------------------------------------------------
 -- "#/x/<deck>": the ordered exercise list.
 --------------------------------------------------------------------------
 
-viewDeck :: [Deck] -> Text -> View model action
-viewDeck decks slug = case findDeckBySlug decks slug of
+viewDeck :: ProgressState -> [Deck] -> Text -> View model action
+viewDeck prog decks slug = case findDeckBySlug decks slug of
   Nothing -> exerciseNotFound slug
   Just d  -> H.section_ [ P.id_ "sxc1-deck" ]
     [ H.h1_ [ P.id_ "ex-deck-title" ] [ text (ms (dkTitle d)) ]
     , H.p_ [ P.id_ "ex-deck-summary" ] (Blocks.renderInlines "" (dkSummary d))
+    , H.div_ (Progress.deckCardAttrs "" d) (Progress.deckMetaEls prog decks d)
     , H.ol_ [ P.class_ "ex-list" ] (map (renderExLink d) (dkExercises d))
     ]
   where

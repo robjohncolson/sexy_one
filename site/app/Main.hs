@@ -23,7 +23,7 @@ import           SXC1.Progress.Scheduler (applyEvents, dueCount, retention, revi
 import           SXC1.Progress.Types    (DayNum (..), ProgressState (..), dayOf, emptyProgress)
 import           SXC1.Route             (Route (..), parseDigits, parseRoute, renderRoute)
 
-import           Progress.Store         (loadPrefs, loadProgress, savePrefs, saveProgress,
+import           Progress.Store         (loadPrefs, loadProgress, loadRaw, savePrefs, saveProgress,
                                          storageAvailable, wipeProgress)
 
 import           Exercises.Corpus       (exerciseCorpus, exerciseStatsJson, jArr, jBool, jInt, jInteger, jKV, jObj,
@@ -31,6 +31,7 @@ import           Exercises.Corpus       (exerciseCorpus, exerciseStatsJson, jArr
 import           View.Exercise          (ExHandlers (..))
 import qualified View.Exercise          as Exercise
 import           View.Pages             (viewRoute)
+import           View.Progress          (ProgData (..), ProgHandlers (..))
 
 -- | Read window.location.hash via Miso's own DSL.
 --
@@ -159,6 +160,13 @@ data Model = Model
   , mBooted     :: !Bool            -- ^ False only until the mount 'SetRoute' has run (JA-first needs to tell mount from toggle-echo)
   , mExportBlob :: !(Maybe Text)    -- ^ last requested export envelope, for the view to render
   , mImportMsg  :: !(Maybe Text)    -- ^ last import's failure reason, for the view to render
+    -- M3 (task "progress-ui"): captured once at boot alongside 'mLoad'
+    -- (never re-read, never written back) so the corrupt-state banner can
+    -- offer 'Progress.Store.loadRaw''s raw blob for the learner to copy
+    -- by hand -- 'mLoad' only carries the decode FAILURE REASON, not the
+    -- bytes that failed to decode, and nothing else in this Model keeps
+    -- them.
+  , mRawCorrupt :: !(Maybe Text)
   } deriving (Eq)
 
 unDeckId :: DeckId -> Text
@@ -216,10 +224,15 @@ main = do
   -- learner explicitly wipes or imports.
   avail   <- storageAvailable
   loadRes <- loadProgress
+  -- M3 (task "progress-ui"): the raw undecoded blob, for the corrupt-state
+  -- banner's "offer the raw export first" requirement -- see 'mRawCorrupt'.
+  -- Harmless (and simply unused by any view) when 'loadRes' is not
+  -- 'DecodeCorrupt'; reading it never writes anything back.
+  rawBlob <- loadRaw
   prefs   <- loadPrefs
   (_, WallMs wall0) <- readClocks
   let st0 = case loadRes of { DecodeOk s -> s; _ -> emptyProgress }
-  startApp defaultEvents (readerApp sink avail loadRes st0 prefs (dayOf wall0) (parseRoute h))
+  startApp defaultEvents (readerApp sink avail loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
 
 -- | H6: a cold @RExercise@ route (a deep link, or the very first paint --
 -- Miso's own \"hashchange\" DOM event never fires for the page's INITIAL
@@ -234,8 +247,10 @@ main = do
 -- instead of "correctly by coincidence" (a cold load happening to measure
 -- runtime age as prompt age only because the browser's monotonic origin
 -- is page load -- see this task's final report).
-readerApp :: ProgressSink -> Bool -> DecodeResult -> ProgressState -> Prefs -> DayNum -> Route -> App Model Action
-readerApp sink avail loadRes st0 prefs today0 r0 =
+readerApp
+  :: ProgressSink -> Bool -> DecodeResult -> Maybe Text -> ProgressState -> Prefs -> DayNum -> Route
+  -> App Model Action
+readerApp sink avail loadRes rawBlob st0 prefs today0 r0 =
   (component model0 (updateModel sink) viewModel)
     { subs  = [ windowSub "hashchange" emptyDecoder (const HashChanged) ]
     , mount = Just (SetRoute r0)
@@ -245,6 +260,7 @@ readerApp sink avail loadRes st0 prefs today0 r0 =
       { mRoute = r0, mExStates = Map.empty, mExResults = Map.empty, mEventLog = []
       , mProgress = st0, mLoad = loadRes, mStorageOk = avail, mPrefs = prefs
       , mToday = today0, mBooted = False, mExportBlob = Nothing, mImportMsg = Nothing
+      , mRawCorrupt = rawBlob
       }
 
 findExerciseById :: [Deck] -> ExId -> Maybe Exercise
@@ -451,8 +467,8 @@ currentResult m exid st = do
 
 exerciseBodyView :: Model -> Route -> Maybe (View Model Action)
 exerciseBodyView m route = case route of
-  RExercises -> Just (Exercise.viewExerciseIndex exerciseCorpus)
-  RDeck slug -> Just (Exercise.viewDeck exerciseCorpus slug)
+  RExercises -> Just (Exercise.viewExerciseIndex (mProgress m) exerciseCorpus)
+  RDeck slug -> Just (Exercise.viewDeck (mProgress m) exerciseCorpus slug)
   RExercise deckSlug exSlug ->
     let exid   = ExId exSlug
         st     = Map.findWithDefault (initialState exid (MonoMs 0)) (unExId exid) (mExStates m)
@@ -537,5 +553,33 @@ progressJson m = jObj
       Map.partitionWithKey (\k _ -> Map.member k allCorpusPromptIds) (psRecs st)
     liveState = st { psRecs = liveRecs }
 
+-- | M3 (task "progress-ui"): the "View.Exercise"\/"View.Pages" call
+-- sites' handler bundle -- mirrors 'exHandlersFor' exactly. 'phJaFirst' is
+-- built ALREADY NEGATED (the button always dispatches "flip whatever
+-- 'mPrefs' currently says"), so "View.Progress" never needs to know
+-- Main's concrete 'Action' shape to compute the next state, only render
+-- the current one.
+progHandlersFor :: Model -> ProgHandlers Action
+progHandlersFor m = ProgHandlers
+  { phExport  = Prog PExportReq
+  , phImport  = Prog . PImport
+  , phWipe    = Prog PWipe
+  , phJaFirst = Prog (PJaFirst (not (prfJaFirst (mPrefs m))))
+  }
+
+-- | M3: everything "View.Progress" renders from, assembled fresh each
+-- frame straight from the Model -- never stored, never diffed.
+progDataFor :: Model -> ProgData
+progDataFor m = ProgData
+  { pdDecks      = exerciseCorpus
+  , pdProgress   = mProgress m
+  , pdToday      = mToday m
+  , pdLoad       = mLoad m
+  , pdJaFirst    = prfJaFirst (mPrefs m)
+  , pdExportBlob = mExportBlob m
+  , pdImportMsg  = mImportMsg m
+  , pdRawCorrupt = mRawCorrupt m
+  }
+
 viewModel :: props -> Model -> View Model Action
-viewModel _ m = viewRoute ToggleJA exerciseStatsJson (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson m) (exerciseBodyView m (mRoute m)) (mRoute m)
+viewModel _ m = viewRoute ToggleJA (progHandlersFor m) (progDataFor m) exerciseStatsJson (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson m) (exerciseBodyView m (mRoute m)) (mRoute m)

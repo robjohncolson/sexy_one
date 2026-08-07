@@ -46,3 +46,59 @@ try {
     bootStatus.textContent = `Failed to start the SXC-1 Trainer application: ${message}`;
   }
 }
+
+// M3 progress-ui (site/app/View/Progress.hs): two small, Miso-independent
+// DOM behaviours that deliberately never touch Haskell state -- see that
+// module's own Haddock for why no Action/Model field exists (or should
+// exist) for either. Both are event-delegated on `document`, so they
+// keep working across Miso's own route-driven DOM rebuilds without
+// re-registering anything, and both reset naturally on navigation: Miso
+// destroys and recreates the whole #sxc1-home subtree on a route change,
+// so leaving the page always restores btn-progress-wipe-confirm's
+// [hidden] default and empties the import textarea.
+
+// Wipe: an explicit two-step confirm. #btn-progress-wipe-confirm starts
+// [hidden] in the Haskell-rendered markup (see View/Progress.hs) and
+// STAYS that way across unrelated re-renders on its own -- Miso's vdom
+// diff only ever touches a DOM attribute when the two vdom trees being
+// compared actually disagree on it, and nothing in the Model ever
+// represents "wipe armed", so the Haskell side renders `hidden=True`
+// before AND after any of this file's own re-renders, and the diff never
+// revisits it. This toggle is the one and only thing that ever changes
+// it.
+document.addEventListener("click", (event) => {
+  const id = event.target && event.target.id;
+  if (id === "btn-progress-wipe") {
+    const confirmBtn = document.getElementById("btn-progress-wipe-confirm");
+    if (confirmBtn) confirmBtn.hidden = false;
+  } else if (id === "btn-progress-wipe-confirm") {
+    event.target.hidden = true;
+  }
+});
+
+// Import preview: counts "R<TAB>" records (SXC1.Progress.Codec's wire
+// format -- one such line per saved spaced-repetition record) in the
+// pasted text BEFORE the learner submits the import form, so they see
+// what they are about to commit first. Two shapes are accepted, matching
+// SXC1.Progress.Codec.importBlob exactly: a bare wire blob (real tab/
+// newline bytes), or the JSON export envelope (the same wire text
+// escaped as \t/\n inside one "payload" string -- extracted the same way
+// SXC1.Progress.Codec.extractJsonStringField does, without a JSON
+// parser: read up to the next unescaped quote). Advisory only -- the
+// commit itself always re-decodes for real.
+function countPastedRecords(text) {
+  const bareLines = text.split("\n").filter((line) => line.startsWith("R\t")).length;
+  if (bareLines > 0 || text.trim().startsWith("SXC1PROGRESS")) return bareLines;
+  const match = text.match(/"payload":"((?:[^"\\]|\\.)*)"/);
+  if (!match) return 0;
+  return match[1].split("\\n").filter((line) => line.startsWith("R\\t")).length;
+}
+
+document.addEventListener("input", (event) => {
+  if (!event.target || event.target.id !== "sxc1-import-input") return;
+  const preview = document.getElementById("sxc1-import-preview");
+  if (!preview) return;
+  const n = countPastedRecords(event.target.value);
+  preview.textContent =
+    n === 1 ? "1 record found in the pasted text." : `${n} records found in the pasted text.`;
+});

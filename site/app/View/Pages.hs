@@ -29,6 +29,8 @@ import           SXC1.Content.Types     (Doc (docPages), Page (pageBlocks, pageH
 import           SXC1.Route
 
 import qualified View.Blocks            as Blocks
+import           View.Progress          (ProgData (..), ProgHandlers)
+import qualified View.Progress          as Progress
 
 -- | The whole Miso root for the given route: header, the two hidden
 -- stats\/log blobs (M1's own @#sxc1-content-stats@ plus M2's
@@ -42,6 +44,8 @@ import qualified View.Blocks            as Blocks
 -- module free of a Main-import cycle.
 viewRoute
   :: action
+  -> ProgHandlers action        -- ^ M3: export\/import\/wipe\/JA-first action bundle
+  -> ProgData                   -- ^ M3: everything the progress panel and JA-first switch render from
   -> T.Text                     -- ^ #sxc1-exercise-stats JSON
   -> T.Text                     -- ^ #sxc1-event-log JSON
   -> T.Text                     -- ^ #sxc1-prompt-baseline JSON (M2 re-gate: see Main.promptBaselineJson)
@@ -49,28 +53,28 @@ viewRoute
   -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
   -> Route
   -> View model action
-viewRoute toggleAction exStatsJson eventLogJson baselineJson progressJson mExerciseBody route = H.main_ [ P.id_ "app" ]
-  [ headerView route
+viewRoute toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson mExerciseBody route = H.main_ [ P.id_ "app" ]
+  [ headerView ph pd route
   , statsView
   , exerciseStatsView exStatsJson
   , eventLogView eventLogJson
   , promptBaselineView baselineJson
   , progressPayloadView progressJson
-  , routeBody toggleAction mExerciseBody route
+  , routeBody toggleAction ph pd mExerciseBody route
   , footerView
   ]
 
-routeBody :: action -> Maybe (View model action) -> Route -> View model action
-routeBody _   _              RHome              = homeView
-routeBody _   _              (RManual slug)      = tocView slug
-routeBody act _              (RPage slug n ja)    = pageView act slug n ja
-routeBody _   (Just exBody)  RExercises           = exBody
-routeBody _   (Just exBody)  (RDeck _)            = exBody
-routeBody _   (Just exBody)  (RExercise _ _)      = exBody
-routeBody _   Nothing        r@RExercises         = notFoundView (renderRoute r)
-routeBody _   Nothing        r@(RDeck _)          = notFoundView (renderRoute r)
-routeBody _   Nothing        r@(RExercise _ _)    = notFoundView (renderRoute r)
-routeBody _   _              (RNotFound path)     = notFoundView path
+routeBody :: action -> ProgHandlers action -> ProgData -> Maybe (View model action) -> Route -> View model action
+routeBody _   ph pd _             RHome              = homeView ph pd
+routeBody _   _  _  _             (RManual slug)      = tocView slug
+routeBody act _  pd _             (RPage slug n ja)    = pageView act (pdJaFirst pd) slug n ja
+routeBody _   _  _  (Just exBody) RExercises           = exBody
+routeBody _   _  _  (Just exBody) (RDeck _)            = exBody
+routeBody _   _  _  (Just exBody) (RExercise _ _)      = exBody
+routeBody _   _  _  Nothing       r@RExercises         = notFoundView (renderRoute r)
+routeBody _   _  _  Nothing       r@(RDeck _)          = notFoundView (renderRoute r)
+routeBody _   _  _  Nothing       r@(RExercise _ _)    = notFoundView (renderRoute r)
+routeBody _   _  _  _             (RNotFound path)     = notFoundView path
 
 --------------------------------------------------------------------------
 -- Corpus-wide, text-level lookups shared by several views below. None of
@@ -94,10 +98,13 @@ statsJsonText = renderStatsJson corpusSources
 -- Header: brand + route-dependent breadcrumb.
 --------------------------------------------------------------------------
 
-headerView :: Route -> View model action
-headerView route = H.header_ [ P.id_ "sxc1-header" ]
-  ( H.a_ [ P.class_ "brand", P.href_ (ms (renderRoute RHome)) ] [ "SXC-1 Trainer" ]
-  : breadcrumbFor route
+headerView :: ProgHandlers action -> ProgData -> Route -> View model action
+headerView ph pd route = H.header_ [ P.id_ "sxc1-header" ]
+  ( [ H.a_ [ P.class_ "brand", P.href_ (ms (renderRoute RHome)) ] [ "SXC-1 Trainer" ]
+    , Progress.reviewBadgeEl (Progress.dueCountLive pd)
+    ]
+    ++ breadcrumbFor route
+    ++ Progress.jaFirstHeaderEls ph pd route
   )
 
 breadcrumbFor :: Route -> [View model action]
@@ -215,14 +222,16 @@ progressPayloadView t = H.div_ [ P.id_ "sxc1-progress", P.hidden_ True ] [ text 
 -- Home ("#/"): project blurb + one card per manual.
 --------------------------------------------------------------------------
 
-homeView :: View model action
-homeView = H.section_ [ P.id_ "sxc1-home" ]
-  [ H.p_ []
-      [ "An interactive reader for the SXC-1 manuals: browse each translated "
-      , "document page by page, with the original Japanese page a tap away."
-      ]
-  , H.ul_ [ P.class_ "manual-list" ] (map manualCard allDocStats ++ [ trainingCard ])
-  ]
+homeView :: ProgHandlers action -> ProgData -> View model action
+homeView ph pd = H.section_ [ P.id_ "sxc1-home" ]
+  ( [ H.p_ []
+        [ "An interactive reader for the SXC-1 manuals: browse each translated "
+        , "document page by page, with the original Japanese page a tap away."
+        ]
+    , H.ul_ [ P.class_ "manual-list" ] (map manualCard allDocStats ++ [ trainingCard ])
+    ]
+    ++ Progress.progressHomeView ph pd
+  )
 
 -- | The Training entry point (briefs/M2-manifest.json, task
 -- "exercise-ui", item 4): links to "#/x", the exercise index -- reuses
@@ -284,19 +293,23 @@ renderSub slug (p, t) = H.li_ [] [ H.a_ [ P.href_ (ms (renderRoute (RPage slug p
 -- Page ("#/m/<slug>/p/<n>", "+/ja"): the rendered blocks + the JA panel.
 --------------------------------------------------------------------------
 
-pageView :: action -> T.Text -> Int -> Bool -> View model action
-pageView toggleAction slug n ja = case (statsFor slug, lookupDoc slug) of
+pageView :: action -> Bool -> T.Text -> Int -> Bool -> View model action
+pageView toggleAction jaFirst slug n ja = case (statsFor slug, lookupDoc slug) of
   (Just st, Just doc) | n >= 1 && n <= stPages st ->
-    renderPage toggleAction slug (stPages st) ja (docPages doc !! (n - 1))
+    renderPage toggleAction jaFirst slug (stPages st) ja (docPages doc !! (n - 1))
   _ -> notFoundView (slug <> "/p/" <> T.pack (show n))
 
-renderPage :: action -> T.Text -> Int -> Bool -> Page -> View model action
-renderPage toggleAction slug total ja pg =
+-- | @jaFirst@ (M3 owner addendum, item 8) governs ONLY the DOM order of
+-- the JA panel relative to the translated body -- OFF (the default) keeps
+-- the panel after the body, byte-identical to M1\/M2; ON puts it first,
+-- so a phone (which stacks in DOM order; the >=60rem grid below pins the
+-- panel by NAMED AREA regardless of DOM order, so a wide reader's layout
+-- is unaffected either way) shows the original page before the English.
+renderPage :: action -> Bool -> T.Text -> Int -> Bool -> Page -> View model action
+renderPage toggleAction jaFirst slug total ja pg =
   H.article_ articleAttrs
     ( runningHeaderEl
-        ++ [ H.div_ [ P.class_ "page-body", P.id_ (ms ("page-" <> T.pack (show n))) ]
-               (Blocks.renderBlocks slug (pageBlocks pg)) ]
-        ++ jaPanelEl
+        ++ bodyOrderedEls
         ++ [ H.button_ [ P.id_ "btn-ja-toggle", E.onClick toggleAction ]
                [ if ja then "Hide original page" else "Show original page (JA)" ]
            , H.nav_ [ P.class_ "page-nav" ] (navLinks slug n total)
@@ -310,6 +323,13 @@ renderPage toggleAction slug total ja pg =
     runningHeaderEl = case pageHeader pg of
       Just h  -> [ H.p_ [ P.class_ "page-running-header" ] [ text (ms h) ] ]
       Nothing -> []
+
+    pageBodyEl = H.div_ [ P.class_ "page-body", P.id_ (ms ("page-" <> T.pack (show n))) ]
+      (Blocks.renderBlocks slug (pageBlocks pg))
+
+    bodyOrderedEls
+      | ja && jaFirst = jaPanelEl ++ [ pageBodyEl ]
+      | otherwise     = pageBodyEl : jaPanelEl
 
     jaPanelEl
       | not ja    = []

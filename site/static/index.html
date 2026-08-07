@@ -1382,6 +1382,330 @@
   #ex-summary > *:last-child {
     margin-bottom: 0;
   }
+
+  /* =====================================================================
+     M3 progress engine (briefs/M3-manifest.json, task "progress-ui").
+     Purely additive again -- nothing above is restructured. New DOM/CSS
+     surface, identical on every route unless noted:
+
+       #sxc1-header > #sxc1-review-badge   nav-wide due-count badge
+       #sxc1-header > #btn-ja-first        manual routes only (TOC + page)
+
+       "#/" (home), appended after .manual-list:
+         #sxc1-corrupt-banner.progress-banner?  (state == "corrupt")
+           #sxc1-corrupt-raw (readonly textarea)
+         #sxc1-review-queue > ol.queue-list > li.queue-item > a
+           span.queue-deck, span.queue-ex, span.queue-due
+           (or, when empty, a.deck-card[data-tier] "start the next deck")
+         #sxc1-continue > a (or a.deck-card[data-tier])
+         #sxc1-streak
+         #sxc1-retired-note?                    (retired > 0)
+         #sxc1-progress-tools
+           button#btn-progress-export, textarea#sxc1-export-blob
+           form#sxc1-import-form > textarea#sxc1-import-input,
+             p#sxc1-import-preview, button#btn-progress-import[type=submit],
+             p#sxc1-import-error?
+           button#btn-progress-wipe, button#btn-progress-wipe-confirm[hidden]
+             (two-step confirm -- see index.js, not this file)
+
+       "#/x" deck cards and each deck page's own info block both carry
+       .deck-card[data-tier] > span.tier-badge.tier-<tier>,
+                                span.deck-progress, span.deck-requires?
+       "#/x" chapters are now <details class="ex-chapter"> so 52 decks
+       does not become a flat wall on a phone; <summary class=
+       "ex-chapter-title"> carries a span.chapter-progress.
+     ===================================================================== */
+
+  #sxc1-header > #sxc1-review-badge,
+  #sxc1-header > #btn-ja-first {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.7rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  #sxc1-header > #sxc1-review-badge:hover,
+  #sxc1-header > #sxc1-review-badge:focus-visible,
+  #sxc1-header > #btn-ja-first:hover,
+  #sxc1-header > #btn-ja-first:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  #sxc1-header > #btn-ja-first[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--hover-bg);
+    color: var(--accent);
+  }
+
+  /* -------------------------------------------------------------------
+     Exercise index: collapsible chapters (native <details>, no JS).
+     ------------------------------------------------------------------- */
+
+  .ex-chapter-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .ex-chapter-title::-webkit-details-marker {
+    display: none;
+  }
+
+  .ex-chapter-title::before {
+    content: "\25B8";
+    flex: 0 0 auto;
+    margin-right: 0.3rem;
+    color: var(--muted);
+    transition: transform 0.12s ease;
+  }
+
+  .ex-chapter[open] > .ex-chapter-title::before {
+    transform: rotate(90deg);
+  }
+
+  .ex-chapter-title:hover,
+  .ex-chapter-title:focus-visible {
+    color: var(--accent);
+  }
+
+  .chapter-progress {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ex-chapter[open] > .ex-deck-list {
+    margin-top: 1rem;
+  }
+
+  /* -------------------------------------------------------------------
+     Deck cards: tier badge, completion count, prerequisites -- shared by
+     the index's .ex-deck-card and each deck page's own single info block
+     (both also carry .deck-card[data-tier], see "View.Progress").
+     ------------------------------------------------------------------- */
+
+  .deck-card {
+    display: flex;
+  }
+
+  a.deck-card {
+    flex-direction: column;
+  }
+
+  #sxc1-deck > .deck-card {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0 0 1.5rem;
+  }
+
+  .tier-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    width: fit-content;
+  }
+
+  .tier-intro { background: var(--success-bg); color: var(--success); }
+  .tier-core { background: var(--kind-quiz-bg); color: var(--kind-quiz); }
+  .tier-stretch { background: var(--kind-lookup-bg); color: var(--kind-lookup); }
+
+  .deck-progress {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .deck-requires {
+    font-size: 0.78rem;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+
+  /* -------------------------------------------------------------------
+     Home page additions: review queue, continue, streak, retired note,
+     corrupt banner, export/import/wipe.
+     ------------------------------------------------------------------- */
+
+  #sxc1-home > section {
+    margin: 1.75rem 0 0;
+  }
+
+  #sxc1-review-queue,
+  #sxc1-continue,
+  #sxc1-progress-tools {
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+  }
+
+  #sxc1-streak,
+  #sxc1-retired-note {
+    margin: 1.25rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .queue-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .queue-item a {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .queue-item a:hover,
+  .queue-item a:focus-visible {
+    border-color: var(--accent);
+    background: var(--hover-bg);
+  }
+
+  .queue-deck {
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  .queue-ex {
+    font-weight: 700;
+  }
+
+  .queue-due {
+    margin-left: auto;
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    color: var(--danger);
+  }
+
+  #sxc1-continue > a {
+    display: block;
+    font-weight: 700;
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  #sxc1-progress-banner,
+  .progress-banner {
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--danger);
+    border-radius: 0.75rem;
+    background: var(--incorrect-bg);
+    color: var(--text);
+  }
+
+  .progress-banner p {
+    margin: 0 0 0.6rem;
+  }
+
+  .progress-banner p:last-child {
+    margin-bottom: 0;
+  }
+
+  #sxc1-progress-tools h2 {
+    margin: 0 0 0.9rem;
+    font-size: 1.05rem;
+  }
+
+  #sxc1-progress-tools > button,
+  #btn-progress-import {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.6rem 1.1rem;
+    margin: 0 0 0.9rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.6rem;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  #sxc1-progress-tools > #btn-progress-wipe {
+    background: transparent;
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  #sxc1-progress-tools > #btn-progress-wipe-confirm {
+    background: var(--danger);
+    color: var(--accent-contrast);
+    border-color: var(--danger);
+  }
+
+  #sxc1-export-blob,
+  #sxc1-import-input,
+  #sxc1-corrupt-raw {
+    display: block;
+    width: 100%;
+    min-height: 6rem;
+    margin: 0 0 0.9rem;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
+    font-size: 0.82rem;
+    resize: vertical;
+  }
+
+  #sxc1-import-form label {
+    display: block;
+    margin: 0 0 0.4rem;
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+
+  #sxc1-import-preview {
+    margin: 0 0 0.9rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  #sxc1-import-error {
+    margin: 0 0 0.9rem;
+    color: var(--danger);
+    font-size: 0.85rem;
+  }
 </style>
 </head>
 <body>
