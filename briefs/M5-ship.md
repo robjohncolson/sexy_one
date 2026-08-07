@@ -35,6 +35,12 @@ Content:
     continuous FX1 dial (±1 per detent, never 0/127), and the verify grammar
     has no "any value" form; fix needs a grammar extension or re-pointing the
     hook (M4 design finding M4-F1; the device protocol pre-warns the owner).
+11. Hand-confirmed steps that carry a verify hook show the idle sentence
+    ("Device verification is off — confirm manually, or turn it on above.")
+    even while device verification is ON — misleading on M4-F1's step 1,
+    where hand-confirming with the device enabled is the documented path
+    (device-protocol walkthrough finding, 2026-08-07; cosmetic, the protocol
+    tells the owner to ignore it).
 
 Ops:
 8. Revert to workflow Pages deploys when GitHub's deployment queue recovers —
