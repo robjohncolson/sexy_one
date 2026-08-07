@@ -68,3 +68,16 @@ Ship checklist (beyond debt):
 - README/landing polish for strangers arriving at the link.
 - Final whole-project Codex review (all commits since m0; gpt-5.6-sol xhigh),
   followed by the closing deploy.
+
+
+## Post-ship backlog (audit-derived, deliberately deferred; briefs/M5-audit.md)
+
+Minor gaps G2-G6 (one quiz/lookup each): copyright precaution (p.68);
+48kHz/16-bit/15-min sampling spec (p.66); polyphony limits (p.66);
+Caution-level USB rules (p.5); eneloop charging/drain (p.9). Optional list:
+FX1 MASTER PAN firmware note; accessories; QR resources; remaining Caution
+groups; storage/electrical spec rows; pad technique tips; post-resampling
+button state; MIDI-chart negatives quiz. Plus: "flashcard" taxonomy decision
+(implement or drop from docs — zero shipped flashcards, all q-ids are
+type: quiz); D8-class figure-caption fidelity sweep for the remaining
+untranslated charts.
