@@ -36,6 +36,30 @@
    *
    * Headings rendered inside a page carry id="h-<slug>" (styled generically
    * via .page-body h1..h6, no dedicated hook needed).
+   *
+   * M2 (exercise engine) and M3 (progress engine) each add their own DOM
+   * surface, documented by their banner comments further down. M4 (live-
+   * device verification) adds the surface below, styled by the last
+   * section of this file:
+   *   #app > #sxc1-device-state  always [hidden]; never rendered visibly
+   *                               (hidden by the same rule as
+   *                               #sxc1-content-stats above)
+   *   inside article#sxc1-exercise, drills only, and only when Web MIDI
+   *   is available -- never on quizzes or lookups, and a browser without
+   *   Web MIDI renders none of it:
+   *     section#ex-device           the device panel, a single column
+   *       button#btn-device-enable    the ONLY control that ever requests
+   *                                    MIDI permission; label tracks status
+   *       p#device-status             one plain sentence, status-dependent
+   *       select#sel-device-channel   MIDI channel 1..16
+   *       p#device-ports              bound port names, or the
+   *                                    "nothing detected" line
+   *       button#btn-device-use-channel  shown only on a channel mismatch
+   *   p.ex-verify (M2) gains exactly one state class per render:
+   *     .ex-verify-idle             verification off or unsupported;
+   *                                  keeps M2's bare .ex-verify look
+   *     .ex-verify-waiting          armed and listening for the device
+   *     .ex-verify-confirmed        this step was confirmed by the device
    */
 
   :root {
@@ -214,6 +238,7 @@
   /* #sxc1-content-stats carries the machine-readable corpus JSON and must
      never render, under any circumstance. */
   #sxc1-content-stats,
+  #sxc1-device-state,
   [hidden] {
     display: none !important;
   }
@@ -1705,6 +1730,185 @@
     margin: 0 0 0.9rem;
     color: var(--danger);
     font-size: 0.85rem;
+  }
+
+  /* =====================================================================
+     M4 live-device verification (briefs/M4-plan.md section 3.8, manifest
+     task "device-styles"). Purely additive below this line, plus exactly
+     one selector added above: #sxc1-device-state (the always-[hidden]
+     device-state JSON blob, rendered on every route) joins the M1 rule
+     that already hides #sxc1-content-stats rather than gaining a
+     duplicate of it.
+
+     New DOM surface, drill runner only ("#/x/<deck>/<ex>", kind-drill),
+     rendered by the app only when Web MIDI is available AND the exercise
+     carries a verify: hook -- never at boot, never on quizzes or
+     lookups. A browser without Web MIDI renders no #ex-device at all and
+     no verify state beyond .ex-verify-idle, and must look exactly as M3
+     did, so nothing below may restyle an M3-era node:
+
+       section#ex-device               the device panel, a card in the
+                                       runner column (a column at every
+                                       width -- 320px must not overflow)
+         button#btn-device-enable        the ONLY control that ever
+                                          requests MIDI permission; its
+                                          label tracks the status
+         p#device-status                 one plain sentence,
+                                          status-dependent
+         select#sel-device-channel       MIDI channel 1..16
+         p#device-ports                  bound port names, or the
+                                          "nothing detected" line
+         button#btn-device-use-channel   shown only on a channel mismatch
+
+       p.ex-verify (M2) gains exactly one state class per render:
+         .ex-verify-idle        off or unsupported; M2's bare look
+         .ex-verify-waiting     armed and listening for the device
+         .ex-verify-confirmed   this step was confirmed by the device
+     ===================================================================== */
+
+  /* -------------------------------------------------------------------
+     Device panel. A quiet card in the runner column: the drill's one
+     forward action stays the accent-filled Confirm button, so both
+     panel buttons take the outlined (hint-style) treatment and never
+     compete with it. Always a single column; long port names and
+     status sentences wrap (overflow-wrap) instead of widening the
+     page, so the panel stays usable at 320px.
+     ------------------------------------------------------------------- */
+
+  #ex-device {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+    overflow-wrap: anywhere;
+  }
+
+  /* Both buttons get their visible focus indicator from the global
+     a:focus-visible/button:focus-visible outline rule, like every other
+     button in the file. */
+  #btn-device-enable,
+  #btn-device-use-channel {
+    appearance: none;
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.65rem 1.1rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.6rem;
+    background: transparent;
+    color: var(--accent);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+
+  #btn-device-enable:hover,
+  #btn-device-use-channel:hover {
+    background: var(--hover-bg);
+  }
+
+  #device-status {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+
+  #sel-device-channel {
+    align-self: flex-start;
+    min-height: 44px;
+    max-width: 100%;
+    padding: 0.5rem 0.8rem;
+    border: 2px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--card-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+
+  /* A <select>, not a button, so the global button:focus-visible rule
+     misses it; mirror #ex-find-input's focus treatment instead. */
+  #sel-device-channel:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-color: var(--accent);
+  }
+
+  #device-ports {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  /* -------------------------------------------------------------------
+     The three verify-line states. Never colour-only (WCAG 1.4.1): idle
+     stays italic with no glyph, waiting turns upright and gains a
+     leading ellipsis, confirmed gains a leading check mark and bold
+     weight (glyphs follow #ex-feedback's hex-escape convention). Idle
+     deliberately restates M2's bare .ex-verify values and adds nothing
+     else -- a browser without Web MIDI carries this class and must look
+     exactly as M3 did. The state-change transition is disabled under
+     prefers-reduced-motion below.
+     ------------------------------------------------------------------- */
+
+  .ex-verify.ex-verify-idle,
+  .ex-verify.ex-verify-waiting,
+  .ex-verify.ex-verify-confirmed {
+    transition: color 0.12s ease, background 0.12s ease,
+      border-color 0.12s ease;
+  }
+
+  .ex-verify.ex-verify-idle {
+    border-left-color: var(--border);
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .ex-verify.ex-verify-waiting {
+    border-left-color: var(--accent);
+    border-radius: 0 0.4rem 0.4rem 0;
+    background: var(--note-bg);
+    color: var(--text);
+    font-style: normal;
+  }
+
+  .ex-verify.ex-verify-waiting::before {
+    content: "\2026\0020";
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .ex-verify.ex-verify-confirmed {
+    border-left-color: var(--success);
+    border-radius: 0 0.4rem 0.4rem 0;
+    background: var(--success-bg);
+    color: var(--success);
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  .ex-verify.ex-verify-confirmed::before {
+    content: "\2713\0020";
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #btn-device-enable,
+    #btn-device-use-channel,
+    .ex-verify.ex-verify-idle,
+    .ex-verify.ex-verify-waiting,
+    .ex-verify.ex-verify-confirmed {
+      transition: none;
+    }
   }
 </style>
 </head>
