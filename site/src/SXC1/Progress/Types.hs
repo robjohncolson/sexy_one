@@ -27,6 +27,8 @@
 module SXC1.Progress.Types
   ( Grade (..)
   , DayNum (..)
+  , dayCap
+  , addDays
   , Rec (..)
   , SchemaVersion (..)
   , ProgressState (..)
@@ -125,23 +127,42 @@ emptyProgress = ProgressState
 msPerDay :: Integer
 msPerDay = 86400000
 
+-- | The largest day number this engine will ever compute or store --
+-- roughly the year 29379. M3 gate NEW1: the previous clamp was
+-- @maxBound :: Int@, and on wasm32 (32-bit 'Int', M1's NEW8) a due-date
+-- computed as @maxBound + interval@ WRAPPED NEGATIVE -- 'encodeState'
+-- then emitted a negative day the nonnegative-only wire parser skipped
+-- on the way back in, silently dropping the record: a state that could
+-- not round-trip. 'dayCap' leaves five decimal orders of magnitude of
+-- headroom below @maxBound@ (2^31-1 = 2,147,483,647), so
+-- @dayCap + 180@ (the scheduler's own interval cap) cannot overflow,
+-- and 'addDays' below re-clamps anyway.
+dayCap :: Int
+dayCap = 9999999
+
+-- | Overflow-safe day arithmetic: the ONLY way schedule code may add to
+-- a 'DayNum' (M3 gate NEW1). Clamps at 'dayCap'; never wraps.
+addDays :: DayNum -> Int -> DayNum
+addDays (DayNum d) n = DayNum (min dayCap (max 0 d + max 0 n))
+
 -- | Wall-clock epoch milliseconds -> whole UTC days since the epoch,
--- floor-divided. Any non-positive input (a clock that has not yet
--- reached the epoch, or a malformed/negative reading) maps to
--- @DayNum 0@ rather than a negative day -- this project never schedules
--- before "day zero". Clamped into 'Int' range the same way
--- "SXC1.Route".'SXC1.Route.parseDigits' and
--- "SXC1.Exercise.Engine".'SXC1.Exercise.Engine.clampToInt' do (M1's
--- NEW8: 'Int' is 32-bit on wasm32), though in practice a real epoch
--- reading is nowhere near that boundary.
+-- floor-divided, clamped into @[1, 'dayCap']@.
+--
+-- DAY ZERO IS RESERVED (M3 gate NEW4): @DayNum 0@ is the "never set"
+-- sentinel ('emptyProgress''s @psFirstDay@\/@psStreakDay@), so no real
+-- event may land on it -- a non-positive or epoch-day-zero reading maps
+-- to @DayNum 1@. The cost is that an event genuinely stamped during
+-- 1970-01-01 counts as 1970-01-02, which is not a reachable input from
+-- any clock this app reads; the benefit is that "first day recorded" and
+-- "no day ever recorded" can never collide.
 dayOf :: Integer -> DayNum
 dayOf ms
-  | ms <= 0   = DayNum 0
-  | otherwise = DayNum (clampToInt (ms `div` msPerDay))
+  | ms <= 0   = DayNum 1
+  | otherwise = DayNum (max 1 (clampToCap (ms `div` msPerDay)))
   where
-    clampToInt n
-      | n > toInteger (maxBound :: Int) = maxBound
-      | otherwise                       = fromInteger n
+    clampToCap n
+      | n > toInteger dayCap = dayCap
+      | otherwise            = fromInteger n
 
 -- | THE ONLY PLACE an 'Outcome' is interpreted into a spaced-repetition
 -- 'Grade' -- see the module Haddock. Order matters: within 'Correct',

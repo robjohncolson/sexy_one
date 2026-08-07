@@ -127,7 +127,7 @@ applyEvent ev st0 = case pePrompt ev of
         ease'     = clampEase (rcEase existing + easeDelta grade)
         reps'     = if grade == GAgain then 0 else rcReps existing + 1
         lapses'   = rcLapses existing + (if grade == GAgain && rcReps existing > 0 then 1 else 0)
-        due'      = DayNum (unDayNum today + interval')
+        due'      = addDays today interval'  -- M3 gate NEW1: clamped, never wraps
         newRec = Rec
           { rcReps = reps', rcLapses = lapses', rcEase = ease', rcInterval = interval'
           , rcDue = due', rcLastSeen = today, rcSeen = rcSeen existing + 1

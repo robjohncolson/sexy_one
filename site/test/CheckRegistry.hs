@@ -51,11 +51,21 @@ parseRegistry raw = foldr step ([], []) (zip [1 :: Int ..] (T.lines raw))
     step (n, ln) (rows, errs)
       | T.null (T.strip ln) || "#" `T.isPrefixOf` T.strip ln = (rows, errs)
       | otherwise = case T.splitOn "\t" ln of
-          (i : cnt : st : ship : rest)
+          -- M3 gate NEW6: EXACTLY five columns (the note may be empty
+          -- text but its column must exist), and first-shipped must be
+          -- a milestone tag (m0, m1, ...). A four-column row or a
+          -- free-text ship tag is malformed, not leniently accepted.
+          [i, cnt, st, ship, note]
             | Just c <- parseDigits cnt
             , st == "live" || st == "tombstone"
-            -> (RegRow i c st ship (T.intercalate "\t" rest) : rows, errs)
+            , validShipTag ship
+            -> (RegRow i c st ship note : rows, errs)
           _ -> (rows, ("line " <> T.pack (show n) <> ": malformed row") : errs)
+
+validShipTag :: Text -> Bool
+validShipTag s = case T.uncons s of
+  Just ('m', ds) -> not (T.null ds) && T.all (\c -> c >= '0' && c <= '9') ds
+  _              -> False
 
 -- | One corpus exercise as the app sees it: (id, promptCount, deckSlug, chapterTitle).
 data CorpusEx = CorpusEx
@@ -190,6 +200,12 @@ runCheck = do
   corpus <- loadCorpus
   ref <- newIORef []
   record ref 6 "registry file parses with zero malformed rows" (null errs) (T.unpack (T.intercalate "; " errs))
+  -- M3 gate NEW6: the header's sorted-by-id claim is now ENFORCED against
+  -- the rows as read from disk, not a synthetic list.
+  let diskIds = map rrId rows
+  record ref 4 "registry rows are sorted by id ON DISK"
+    (sort diskIds == diskIds)
+    (T.unpack (T.intercalate " " (take 4 [ b | (a, b) <- zip diskIds (drop 1 diskIds), a > b ])))
   forM_ rules $ \(g, rule) -> do
     let vs = rule rows corpus
     record ref g (assertionLabel g ++ " (" ++ show (length corpus) ++ " corpus / " ++ show (length rows) ++ " registry)")

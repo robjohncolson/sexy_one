@@ -72,7 +72,9 @@ executable exercise-check
 executable progress-check
   main-is:          CheckProgress.hs
   hs-source-dirs:   test
-  build-depends:    base < 5, text, containers, sxc1-trainer
+  -- directory: the group-11 purity guard discovers the SXC1.Progress
+  -- module list from disk (M3 gate NEW3) instead of hardcoding it.
+  build-depends:    base < 5, text, containers, directory, sxc1-trainer
   default-language: Haskell2010
   ghc-options:      -O1 -Wall -ferror-spans
 

@@ -1,0 +1,108 @@
+{
+  "task_type": "review",
+  "scope": "Milestone M3 gate review, part 1 of 2: progress core, codec/prefs, Reader split, registry, and 52-deck corpus; commits m2..HEAD",
+  "status": "completed",
+  "verdict": "PART1-BLOCKED",
+  "claim_verdicts": [
+    {
+      "claim": "The scheduler is pure integer arithmetic and replay-deterministic",
+      "verdict": "FAIL AT THE WASM32 BOUNDARY",
+      "evidence": "The current three SXC1.Progress modules contain no Float/Double computation, IO type, Miso import, or clock read; applyEvent derives today only from peAt through dayOf (Types.hs:137-144; Scheduler.hs:121-151). Ordinary-domain grade deltas, intervals, queue ordering, and backward-day behavior match the plan. However, dayOf clamps to maxBound and applyEvent then adds the interval in 32-bit Int, and decoded numeric fields enter unchecked Int multiplication/addition. These paths wrap; see NEW1. The replay reader correctly parses epoch milliseconds into Integer before dayOf (CheckProgress.hs:355-388), but that does not close downstream Int arithmetic."
+    },
+    {
+      "claim": "The codec has a real three-way DecodeResult and a genuinely exercised migration mechanism",
+      "verdict": "PASS, WITH SEMANTIC-BOUNDS CAVEAT",
+      "evidence": "Nonempty malformed/missing headers become DecodeCorrupt, whitespace becomes DecodeEmpty, and v>currentSchema is rejected before success (Codec.hs:167-191,208-224). Unknown and malformed/truncated body records are skipped one line at a time while siblings survive (Codec.hs:150-165; CheckProgress.hs:222-245). migrateWith is retained as a parameterized API; group 8 supplies a test-only v0 step, observes the +100 transformation and version normalization, and separately proves a missing hop is corrupt (CheckProgress.hs:252-268). The decoder does not validate semantic bounds on accepted numeric records, which feeds NEW1, but the requested three-way/version/migration behaviors themselves are real. Preservation of DecodeCorrupt at the codec/load boundary is visible in Store.hs:83-88; the global UI never-overwrite behavior belongs to part 2."
+    },
+    {
+      "claim": "JA-first preferences deliberately fall back, live on a separate key, and default OFF",
+      "verdict": "PASS",
+      "evidence": "Prefs is not part of ProgressState; defaultPrefs is False and malformed/future-header prefs fall back to it (Codec.hs:307-344). The store constants are distinct sxc1.progress and sxc1.prefs keys, wipeProgress removes only the former, and loadPrefs defaults independently (site/app/Progress/Store.hs:54-58,83-112). Group 10 pins false-by-default, both round trips, short/future headers, and unknown preference names (CheckProgress.hs:290-304)."
+    },
+    {
+      "claim": "The 440-row registry protects PromptId stability and has no regeneration backdoor",
+      "verdict": "PASS ON R1-R6 AND PROMPT COUNTS; FORMAT GUARDS PARTIAL",
+      "evidence": "The file has 440 data rows: 435 live and 5 zero-count tombstones; the five retired ids occur nowhere under content/exercises. No writeFile/appendFile/update implementation exists in CheckRegistry; --self-test and --list are the only special arguments, while any other argument runs the read-only check (CheckRegistry.hs:233-242). R1-R6 are separate pure rules and each has a violating synthetic input (lines 86-123,203-229). R3 compares committed rrCount to length(exPrompts) from the app Reader, so it is PromptId rather than bare ExId stability. An independent disk parse in this review counted one prompt for each quiz/lookup and one per drill Step, yielding 435 exercises/550 prompts and zero mismatches against the registry. NEW6 covers unguarded registry-format requirements."
+    },
+    {
+      "claim": "The full course is 52 decks / 435 exercises, uses the closed tier vocabulary, has an acyclic requires graph, excludes tombstones, and is faithful to translations",
+      "verdict": "FAIL ON ONE CONCRETE FAITHFULNESS CHECK",
+      "evidence": "INDEX has 52 deck entries; disk has 435 ## exercise headings (299 quiz, 55 drill, 81 lookup), all 52 files have exactly one tier in intro/core/stretch (14/32/6), and the five tombstones are absent. The 36 requires declarations name existing decks and the inspected graph has no cycle; the validator's reachability implementation is sound (CheckExercises.hs:341-370). Citation spot checks on Guide Book pp.18, 30, 55 and MIDI p.4 found the quoted anchors in rendered source. But q-5-91 uses the generic heading anchor 'Note mapping' while asserting every bank is 16 consecutive notes; the cited committed table contradicts that for Bank C Pad 2. See NEW5."
+    },
+    {
+      "claim": "Reader is the single structural construction path and accepts the M3 2-or-3-digit filenames",
+      "verdict": "PASS",
+      "evidence": "validFileName explicitly accepts exactly two or three leading digits (Reader.hs:95-114), and all 52 course files match. Parse calls readDeckSyn once and takes synDeck rather than reconstructing a Deck (Parse.hs:210-278); the app imports Reader directly. Exercise-check group 17 compares readDeck with parseDeck over every corpus and fixture .ex.md and fails closed if none are found (CheckExercises.hs:1493-1532)."
+    },
+    {
+      "claim": "The registry seeding/count agreement is independent rather than circular",
+      "verdict": "PASS FOR THE CURRENT 435-EXERCISE TREE",
+      "evidence": "The committed checker side is intentionally Reader-derived, but the registry is a static committed input, not regenerated by that checker. The course-merge commit records a separate Python derivation; that script/output is not retained as an artifact, so the historical execution itself is not auditable. Nevertheless, this review independently re-derived counts directly from type:/id:/### Step source lines without Reader and obtained 435 exercises, 550 prompts, and zero registry mismatches. Thus current agreement is real, not two calls to the same Haskell implementation."
+    },
+    {
+      "claim": "Crafted prompt-id text cannot inject sibling wire records",
+      "verdict": "PASS FOR DECODED AND PRODUCTION STATES, API CAVEAT",
+      "evidence": "decodeState splits into lines and accepts R only at exactly eight fields after the tag, so tabs make an R malformed and newlines terminate it; production PromptIds come from validated slug-like ExIds plus #<index> (Reader.hs:581-588, Types.hs:143-144). Thus a wire blob cannot decode a PromptId containing tab/newline. encodeState itself neither validates nor escapes arbitrary Text map keys (Codec.hs:121-132), so manually constructing a ProgressState with control characters remains outside that guarantee; see advisories."
+    }
+  ],
+  "findings": [
+    {
+      "id": "NEW1",
+      "severity": "major",
+      "title": "Wasm32 Int overflow can produce a scheduler state that the codec cannot read back",
+      "location": "site/src/SXC1/Progress/Types.hs:137-144; site/src/SXC1/Progress/Scheduler.hs:85-98,123-144; site/src/SXC1/Progress/Codec.hs:150-165",
+      "scenario": "On wasm32, give applyEvent a peAt whose day quotient exceeds maxBound. dayOf deliberately returns DayNum maxBound; a fresh GEasy then computes due = maxBound + 2 in Int and wraps negative. encodeState emits that negative due, but decodeState uses the nonnegative-only parseDigits and skips the R record, so decodeState (encodeState producedState) loses the prompt. Separately, a syntactically valid imported R row can set interval/ease/reps/seen to 2147483647; the next GGood/GEasy multiplication and counter additions wrap before clamp1_180/clampEase, producing a 1-day/1300-ease record instead of a safely capped result. Use Integer intermediates or validate/clamp decoded fields before arithmetic, and pin the maxBound path on wasm32."
+    },
+    {
+      "id": "NEW2",
+      "severity": "major",
+      "title": "The progress self-test does not pin most of applyEvent's state transition",
+      "location": "site/test/CheckProgress.hs:118-144,161-182",
+      "scenario": "Group 1 observes only ease through applyEvent. Group 3 checks that two identical pure folds compare equal, that four map keys and one completion exist, and that the codec round-trips whatever state the scheduler produced. Changing due' to today, leaving rcSeen unchanged, failing to increment reps/lapses, or writing the wrong rcLastSeen/psFirstDay still leaves those assertions green. nextIntervalDays is tested in isolation, but no assertion proves applyEvent uses its result. This violates the house rule against self-consistent/can-not-fail checks; pin complete Rec values after a short history, including a lapse and completion."
+    },
+    {
+      "id": "NEW3",
+      "severity": "major",
+      "title": "The claimed source-inspection purity/integer guard is trivially bypassable",
+      "location": "site/test/CheckProgress.hs:306-316; briefs/M3-manifest.json:13",
+      "scenario": "Group 11 searches a short case-sensitive substring list. `touch :: IO (); touch = pure ()` needs no forbidden import and passes; `import qualified Miso` does not contain `import Miso`; System.CPUTime or another clock API is unlisted; and adding Double/fromIntegral is not searched at all. It also hardcodes exactly Types/Scheduler/Codec rather than enumerating the directory. The current source is clean by inspection, but the checker does not enforce the advertised invariant or the house requirement for anchored, case-insensitive grep. Add explicit forbidden type/operator/import checks and enumerate every module under SXC1.Progress."
+    },
+    {
+      "id": "NEW4",
+      "severity": "medium",
+      "title": "DayNum 0 is both a valid first day and the unset psFirstDay sentinel",
+      "location": "site/src/SXC1/Progress/Types.hs:115-123,137-144; site/src/SXC1/Progress/Scheduler.hs:106-113,146-148",
+      "scenario": "Fold an event stamped peAt=0: touchFirstDay writes DayNum 0, which is indistinguishable from empty. Fold a later event on day 7 and touchFirstDay overwrites psFirstDay with 7, contradicting the stated 'very first progress event, kept forever' contract. The dayOf tests cover zero, but no integrated first-day assertion exposes the collision. Represent absence explicitly or store an additional initialized bit."
+    },
+    {
+      "id": "NEW5",
+      "severity": "major",
+      "title": "q-5-91 passes on a verbatim heading anchor while its answer contradicts the cited MIDI table",
+      "location": "content/exercises/076-lvl-02.ex.md:30-49; translations/midi.md:120-143; content/exercise-inventory.md:541",
+      "scenario": "The exercise's correct choice says each bank spans 16 consecutive notes, including Bank C 68-83. In the cited committed MIDI p.4 table, Bank C Pad 1 is 68 and Pad 2 is also 68, then Pad 3 is 70; as written, it is not consecutive and note 69 is absent. The anchor is only the rendered heading `Note mapping`, so E-CITE-ANCHOR passes while semantic support fails. This is probably a transcription error in translations/midi.md, but the repository currently presents contradictory learner-facing truth. Correct/verify the table against the source PDF or revise the exercise."
+    },
+    {
+      "id": "NEW6",
+      "severity": "medium",
+      "title": "Registry format invariants are documented but not enforced; the sort self-check is disconnected from disk",
+      "location": "content/id-registry.tsv:3-32; site/test/CheckRegistry.hs:48-58,186-197,203-229",
+      "scenario": "Reorder two real registry rows: runCheck still passes because no rule compares disk order. The self-test named `registry sort order is checkable` only sorts the hardcoded already-sorted cleanRows, so it cannot see a production reorder. Likewise, parseRegistry accepts four columns (empty note), never validates first-shipped as a milestone tag, and no rule requires tombstone promptCount=0; changing a tombstone count to 3 remains green. Enforce these file-format/tombstone invariants against the real rows and add negative controls."
+    },
+    {
+      "id": "NEW7",
+      "severity": "minor",
+      "title": "The export test's quoted character is in exportedAt, not in the payload it claims to exercise",
+      "location": "site/test/CheckProgress.hs:270-288",
+      "scenario": "Group 9 builds fixedHistory with slug-shaped ids and places `\"quoted\"` only in the stamp. The encoded wire payload therefore contains tabs/newlines but no double quote. The assertion label/requirement says a payload containing tabs, newlines and double quotes survives; a regression specific to a quoted payload key is not tested. Construct a test-only ProgressState with a quote in an id, or narrow the claimed contract to valid production ids."
+    }
+  ],
+  "advisories": [
+    "No build, checker binary, sabotage, test, lint, or browser harness was run, per subagent constraints. Historical sabotage claims were assessed from source logic and commit messages, not re-executed.",
+    "Tabs/newlines cannot survive into a decoded PromptId because of line splitting and exact field arity, but encodeState is exported over ProgressState maps keyed by unrestricted Text. If encodeState is intended as a total public wire encoder rather than only an internal encoder for validated content/decoded state, validate or escape identifiers.",
+    "The current requires graph and tier set are sound. The graph checker reports unknown prerequisites separately and its transitive-closure cycle test correctly handles self and multi-node cycles.",
+    "The registry header's provenance paragraph still describes only the original four-deck seed (16 exercises/24 prompts) after the file expanded to 435 live rows. The course-merge commit records the later Python derivation, but updating the header would make current provenance self-contained.",
+    "decodePrefs treats any jaFirst value other than `1` as False rather than explicitly recognizing only 0/1. This is safe-by-default, but a malformed later P line can overwrite an earlier valid True within the same blob."
+  ],
+  "method": "Read-only source/history/data review of m2..HEAD. Used git/rg/sed/awk inspection only; independently parsed corpus id/type/Step lines to cross-check counts. No builds, tests, linters, installs, browser runs, commits, or repository modifications were performed other than writing this required result file.",
+  "final_line": "PART1-BLOCKED — wasm32 overflow can create non-roundtrippable progress (NEW1), core transition/purity guards are not falsifiable enough (NEW2-NEW3), and q-5-91 contradicts its cited translation table (NEW5); also close the day-zero and registry-format gaps (NEW4, NEW6)."
+}

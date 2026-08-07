@@ -27,7 +27,8 @@ module Main (main) where
 
 import           Control.Monad          (forM_, unless)
 import           Data.IORef             (IORef, modifyIORef', newIORef, readIORef)
-import           Data.List              (isInfixOf)
+import           Data.List              (isSuffixOf)
+import           System.Directory       (listDirectory)
 import qualified Data.Map.Strict        as Map
 import           Data.Text              (Text)
 import qualified Data.Text              as T
@@ -36,6 +37,7 @@ import           System.Environment     (getArgs)
 import           System.Exit            (exitFailure)
 import           System.IO              (hPutStrLn, stderr)
 
+import           SXC1.Content.Stats     (jsonEscape)
 import           SXC1.Exercise.Engine   (Outcome (..), ProgressEvent (..))
 import           SXC1.Exercise.Types    (DeckId (..), ExId (..), Kind (..), PromptId (..))
 import           SXC1.Progress.Codec
@@ -55,7 +57,7 @@ record cl g name ok detail = do
             ++ (if ok then "" else " (observed: " ++ take 300 detail ++ ")"))
 
 groupRange :: [Int]
-groupRange = [1 .. 11]
+groupRange = [1 .. 12]
 
 assertionLabel :: Int -> String
 assertionLabel g = case g of
@@ -70,6 +72,7 @@ assertionLabel g = case g of
   9  -> "export/import envelope"
   10 -> "prefs codec + default-OFF safety"
   11 -> "purity guard (source inspection)"
+  12 -> "applyEvent full-transition pins"
   _  -> "?"
 
 --------------------------------------------------------------------------
@@ -211,13 +214,33 @@ group5 cl = do
 
 group6 :: CheckLog -> IO ()
 group6 cl = do
-  record cl 6 "dayOf 0 -> DayNum 0" (dayOf 0 == DayNum 0) (show (dayOf 0))
-  record cl 6 "dayOf negative -> DayNum 0" (dayOf (-5) == DayNum 0) (show (dayOf (-5)))
+  -- NEW4: day zero is the RESERVED unset sentinel; no input reaches it.
+  record cl 6 "dayOf 0 -> DayNum 1 (day zero reserved as sentinel)" (dayOf 0 == DayNum 1) (show (dayOf 0))
+  record cl 6 "dayOf negative -> DayNum 1" (dayOf (-5) == DayNum 1) (show (dayOf (-5)))
   record cl 6 "dayOf 86400000 -> DayNum 1" (dayOf 86400000 == DayNum 1) (show (dayOf 86400000))
   record cl 6 "dayOf 2026-08-07T00:00Z (1785974400000) -> DayNum 20671"
     (dayOf 1785974400000 == DayNum 20671) (show (dayOf 1785974400000))
   record cl 6 "two times on the same UTC day map equal"
     (dayOf (day 20671) == dayOf (toInteger (20671 :: Int) * 86400000 + 82800000)) "same-day times differ"
+  -- NEW1: overflow-domain inputs clamp at dayCap and NEVER wrap.
+  record cl 6 "dayOf huge epoch clamps to dayCap" (dayOf (10 ^ (18 :: Int)) == DayNum dayCap) (show (dayOf (10 ^ (18 :: Int))))
+  record cl 6 "addDays at dayCap stays at dayCap (no wrap)"
+    (addDays (DayNum dayCap) 180 == DayNum dayCap) (show (addDays (DayNum dayCap) 180))
+  -- NEW1 end-to-end: an event at the far clamp still yields a state the
+  -- codec can round-trip -- the exact non-roundtrippable scenario the
+  -- gate demonstrated (negative due emitted, then skipped on decode).
+  let stFar = applyEvent (mkEv (Just "far#1") Correct 1 False 0 (10 ^ (18 :: Int))) emptyProgress
+  case decodeState (encodeState stFar) of
+    DecodeOk st' -> record cl 6 "overflow-domain event round-trips through the codec"
+      (st' == stFar && maybe False ((>= 0) . unDayNum . rcDue) (Map.lookup "far#1" (psRecs st')))
+      "round-tripped state differs or negative due"
+    other -> record cl 6 "overflow-domain event round-trips through the codec" False (resultTag other)
+  -- NEW4 end-to-end: the first-day contract holds even for an epoch-0
+  -- event -- a later event must NOT overwrite psFirstDay.
+  let stZero = applyEvents [ mkEv (Just "z#1") Correct 1 False 0 0
+                           , mkEv (Just "z#1") Correct 1 False 0 (day 7) ] emptyProgress
+  record cl 6 "psFirstDay set by an epoch-0 event survives a later event"
+    (psFirstDay stZero == DayNum 1) (show (psFirstDay stZero))
 
 group7 :: CheckLog -> IO ()
 group7 cl = do
@@ -243,6 +266,9 @@ group7 cl = do
         (not (Map.member "q-1-01#1" (psRecs st)) && Map.member "q-1-02#1" (psRecs st) && Map.lookup "d-1" (psDone st) == Just 2)
         ("recs=" ++ show (Map.keys (psRecs st)))
     other -> record cl 7 "truncated R line (decodes at all)" False (resultTag other)
+
+roundTripEscape :: Text -> Text
+roundTripEscape = jsonUnescape . jsonEscape
 
 resultTag :: DecodeResult -> String
 resultTag DecodeEmpty       = "DecodeEmpty"
@@ -280,6 +306,13 @@ group9 cl = do
   record cl 9 "envelope payload is escaped (no raw newline/tab inside payload field)"
     (not ("\n" `T.isInfixOf` payloadField envelope) && not ("\t" `T.isInfixOf` payloadField envelope))
     (T.unpack (T.take 120 (payloadField envelope)))
+  -- M3 gate NEW7: the previous label claimed quote coverage the payload
+  -- never had (wire text is ids+ints; quotes can only enter via the
+  -- stamp). Honest split: the stamp path (above) carries the quote, and
+  -- the ESCAPER ITSELF is round-tripped here on all five escapes.
+  let gnarly = "a\"b\\c\nd\te\rf" :: Text
+  record cl 9 "jsonUnescape . jsonEscape is identity on all five escapes (quote, backslash, newline, tab, CR)"
+    (roundTripEscape gnarly == gnarly) (T.unpack (roundTripEscape gnarly))
   case importBlob "{\"format\":\"sxc1-progress\"}" of
     DecodeCorrupt _ -> record cl 9 "envelope without payload -> DecodeCorrupt" True ""
     other           -> record cl 9 "envelope without payload -> DecodeCorrupt" False (resultTag other)
@@ -305,15 +338,58 @@ group10 cl = do
 
 group11 :: CheckLog -> IO ()
 group11 cl = do
-  forM_ ["Types", "Scheduler", "Codec"] $ \m -> do
-    src <- readFile ("src/SXC1/Progress/" ++ m ++ ".hs")
-    let nonComment = [ ln | ln <- lines src, not (T.isPrefixOf "--" (T.strip (T.pack ln))) ]
-        offenders = [ ln | ln <- nonComment
-                    , any (`isInfixOf` ln)
-                        [ "import Miso", "getMonotonicTimeNSec", "Data.Time"
-                        , "unsafePerformIO", "Data.IORef", "System.IO.Unsafe" ] ]
-    record cl 11 ("SXC1.Progress." ++ m ++ " has no IO/Miso/clock imports on non-comment lines")
+  -- M3 gate NEW3 hardening: the module list is discovered from disk (a
+  -- new module cannot dodge by not being listed), the scan is
+  -- CASE-INSENSITIVE with comment text stripped per line (not just
+  -- comment-prefixed lines), and the needle list covers qualified Miso
+  -- imports, more clock APIs, and the float/Double family outright.
+  files <- listDirectory "src/SXC1/Progress"
+  let hsFiles = [ f | f <- files, ".hs" `isSuffixOf` f ]
+  record cl 11 "purity guard discovers at least the three known modules from disk"
+    (length hsFiles >= 3) (show hsFiles)
+  forM_ hsFiles $ \f -> do
+    src <- readFile ("src/SXC1/Progress/" ++ f)
+    let codeOf ln = T.toLower (fst (T.breakOn "--" (T.pack ln)))
+        needles = [ "import miso", "import qualified miso"
+                  , "getmonotonictimensec", "data.time", "cputime", "getcurrenttime"
+                  , "unsafeperformio", "data.ioref", "system.io"
+                  , "double", "float", "fromintegral", "realtofrac" ]
+        offenders = [ ln | ln <- lines src, let c = codeOf ln
+                    , any (`T.isInfixOf` c) needles ]
+    record cl 11 ("SXC1.Progress/" ++ f ++ " has no IO/Miso/clock/float reachability on non-comment text")
       (null offenders) (unlines (take 3 offenders))
+
+-- | M3 gate NEW2: pin EVERY field of the transition, not just ease. One
+-- event from fresh, full-Rec equality; then a lapse; then the streak
+-- and first-day state fields.
+group12 :: CheckLog -> IO ()
+group12 cl = do
+  let d10 = dayOf (day 10)
+      st1 = applyEvent (mkEv (Just "t#1") Correct 1 False 0 (day 10)) emptyProgress
+      wantFresh = Rec { rcReps = 1, rcLapses = 0, rcEase = 2600, rcInterval = 2
+                      , rcDue = addDays d10 2, rcLastSeen = d10, rcSeen = 1 }
+  record cl 12 "one GEasy from fresh: FULL Rec equality (reps/lapses/ease/interval/due/lastSeen/seen)"
+    (Map.lookup "t#1" (psRecs st1) == Just wantFresh)
+    (maybe "missing" (\r -> "reps=" ++ show (rcReps r) ++ " ease=" ++ show (rcEase r)
+       ++ " intv=" ++ show (rcInterval r) ++ " due=" ++ show (unDayNum (rcDue r))
+       ++ " last=" ++ show (unDayNum (rcLastSeen r)) ++ " seen=" ++ show (rcSeen r))
+       (Map.lookup "t#1" (psRecs st1)))
+  let st2 = applyEvent (mkEv (Just "t#1") Incorrect 1 False 0 (day 11)) st1
+      wantLapse = Rec { rcReps = 0, rcLapses = 1, rcEase = 2280, rcInterval = 0
+                      , rcDue = dayOf (day 11), rcLastSeen = dayOf (day 11), rcSeen = 2 }
+  record cl 12 "a lapse after one rep: FULL Rec equality (reps reset, lapses+1, ease 2600-320, due today)"
+    (Map.lookup "t#1" (psRecs st2) == Just wantLapse)
+    (maybe "missing" (\r -> "reps=" ++ show (rcReps r) ++ " lapses=" ++ show (rcLapses r)
+       ++ " ease=" ++ show (rcEase r) ++ " due=" ++ show (unDayNum (rcDue r))) (Map.lookup "t#1" (psRecs st2)))
+  record cl 12 "state fields after the two events: streakDay/streakLen/firstDay pinned"
+    (psStreakDay st2 == dayOf (day 11) && psStreakLen st2 == 2 && psFirstDay st2 == d10)
+    ("streak=" ++ show (unDayNum (psStreakDay st2)) ++ "/" ++ show (psStreakLen st2)
+      ++ " first=" ++ show (unDayNum (psFirstDay st2)))
+  let st3 = applyEvent (mkEv Nothing Completed 0 False 0 (day 11)) st2
+  record cl 12 "a promptless Completed changes psDone and NOTHING else"
+    (psDone st3 == Map.insertWith (+) "q-9-99" 1 (psDone st2)
+      && psRecs st3 == psRecs st2 && psStreakLen st3 == psStreakLen st2)
+    "Completed touched more than psDone"
 
 --------------------------------------------------------------------------
 -- --replay: minimal flat-object JSON array reader for #sxc1-event-log
@@ -400,7 +476,7 @@ main = do
     _ -> do
       cl <- CheckLog <$> newIORef []
       group1 cl; group2 cl; group3 cl; group4 cl; group5 cl; group6 cl
-      group7 cl; group8 cl; group9 cl; group10 cl; group11 cl
+      group7 cl; group8 cl; group9 cl; group10 cl; group11 cl; group12 cl
       checks <- readIORef (clChecks cl)
       let totalOk = length [ () | (_, _, True, _) <- checks ]
           total   = length checks

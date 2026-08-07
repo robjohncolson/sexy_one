@@ -38,19 +38,19 @@
 #   learner and must stay distinguishable forever, which requires every
 #   retired id to still be LOOKUP-ABLE here, permanently.
 #
-# Seeded 2026-08-07 (M3 task "id-registry") by running a program built
-# against the real SXC1.Exercise.Reader.readDeck over the checked-in
-# content/exercises/*.ex.md (all 4 decks listed in content/exercises/INDEX,
-# the exact set exe:exercise-check --json reports as "decks":4,
-# "exercises":16, "prompts":24) -- ids and promptCount below are that
-# program's verbatim output, cross-checked against exe:exercise-check
-# --json's per-deck "prompts" totals (7/6/6/5, matching this file's
-# per-deck row sums). Nothing below was hand-typed from memory. The five
-# inventory tombstones (q-1-14, q-1-15, q-1-16, q-3-05, q-3-06) were never
-# authored as content/exercises/ files -- content/exercise-inventory.md
-# already carries them as "(retired)" as of tag m2 -- so they are seeded
-# straight from that file's own tombstone notes (exercise-inventory.md
-# lines 180-182, 301-302).
+# Seeded 2026-08-07 (M3 task "id-registry") from the four shipped M2
+# decks via SXC1.Exercise.Reader.readDeck, then EXPANDED the same day at
+# the M3 course merge to all 52 decks / 435 live ids: prompt counts for
+# the expansion were derived by an INDEPENDENT python parse of the deck
+# files (one prompt per quiz/lookup, one per drill "### Step") and
+# cross-checked against the app's own Reader by exe:registry-check R3 --
+# the two derivations agreeing across all 435 rows is the seeding
+# evidence, per the no-single-implementation house rule. Ids first
+# shipped under m2 keep first-shipped=m2 (16 rows); the other 419 live
+# rows are m3. Nothing was hand-typed from memory. The five inventory
+# tombstones (q-1-14, q-1-15, q-1-16, q-3-05, q-3-06) were never authored
+# as content -- they are seeded straight from
+# content/exercise-inventory.md's own tombstone notes.
 d-1-01	3	live	m2	prep-02
 d-1-02	3	live	m3	prep-02
 d-1-03	2	live	m3	prep-03

@@ -68,6 +68,7 @@ module SXC1.Progress.Codec
   , productionSteps
   , exportBlob
   , importBlob
+  , jsonUnescape
   , Prefs (..)
   , defaultPrefs
   , prefsSchema
