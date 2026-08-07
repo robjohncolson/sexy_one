@@ -31,21 +31,28 @@ step that is *supposed* to do nothing.
    Automated or headless browser windows will not work either: measured
    2026-08-07, a headless browser exposes the MIDI API but always refuses the
    permission.
-2. **Firmware.** MIDI IN/OUT and Control Change arrived in firmware
-   Ver. 1.1.1 (MIDI doc §1, p. 1), and the MIDI doc itself describes
-   Ver. 1.3.0 (MIDI doc §2, p. 2; revision history, p. 5). To check yours:
-   long-press the `EDIT` button to enter the system settings, then scroll down
-   to `FW Version` (view only) — see the User's Guide translation,
-   `translations/guide-book.md`, "FW Version", p. 55. If it is below 1.1.1,
-   update the firmware first (the MIDI doc's own footnote points at the User's
-   Guide for that — §1, p. 1).
+2. **Firmware.** The MIDI doc attributes MIDI IN/OUT and Control Change to
+   firmware Ver. 1.1.1 (§1, p. 1) and itself describes Ver. 1.3.0 (§2, p. 2;
+   revision history, p. 5) — but the first owner run (2026-08-07,
+   `docs/M4-device-evidence.md`) proved a **Ver. 1.0.2** unit already
+   transmits notes and CC perfectly. So: do NOT update firmware just to run
+   this protocol. To check your version: long-press the `EDIT` button to
+   enter the system settings, then scroll down to `FW Version` (view only) —
+   see the User's Guide translation, `translations/guide-book.md`,
+   "FW Version", p. 55. What DOES need 1.1.1+ is the channel-setting menu
+   (next item).
 3. **Cable.** A USB cable that carries **data**. A charge-only cable will
    power the unit but no MIDI port will ever appear.
 4. **Know where the MIDI channel lives** (you will need this in section 5):
-   long-press `EDIT` to enter the system settings, scroll to `MIDI OUT Ch.`,
-   change it with the left/right buttons, press `EDIT` again to exit. Both
-   channels default to 1 and changed values survive power-off (MIDI doc §1.1,
-   p. 1). **Leave it at 1 for now.**
+   long-press `EDIT` to enter the system settings, scroll down past
+   `Disp Bright` to `MIDI IN Ch.` / `MIDI OUT Ch.`, change with the
+   left/right buttons, press `EDIT` again to exit. Both channels default to 1
+   and changed values survive power-off (MIDI doc §1.1, p. 1). **Leave it at
+   1 for now.** If the two MIDI items are simply absent from the list (the
+   list jumps from `Disp Bright` to `APO time`), your firmware predates the
+   setting — measured on Ver. 1.0.2 — and the unit transmits on channel 1,
+   fixed. That is fine: the trainer's default channel is 1; mark section 5
+   **NA** and note your firmware version.
 
 ---
 
@@ -193,27 +200,32 @@ Go to `#/x/pad-07/d-2-09` (or: **Training** → **Part: Pad play** → deck
 FX2**). Enable the device panel if its button offers to. Start a loop playing
 (tap pad `13`) so the steps make sound.
 
-### Step 1 is EXPECTED NOT to auto-confirm (check 7)
+### Step 1: auto-confirm depends on HOW FAR you turn (check 7)
 
-Step 1 asks you to turn the FX1 dial with the `FX1` button unlit, and its line
-reads **"Waiting for the device: CC 16 = 0 or 127 on MIDI channel 1."** That
-hook is watching the dial for the values 0 or 127 — but the dial transmits a
-*continuous* value that starts at 0 and moves by one per click, stopping at
-the ends of the 0–127 range (MIDI doc §4, p. 3). Turning it a few clicks sends
-1, 2, 3… and never lands on the two values the hook wants.
+Step 1 asks you to turn the FX1 dial, and its line reads **"Waiting for the
+device: CC 16 = 0 or 127 on MIDI channel 1."** The dial transmits a
+*continuous* value, one step per click, across the 0–127 range (MIDI doc §4,
+p. 3) — so a few clicks from the middle send 41, 42, 43… and confirm nothing,
+but a full sweep to either END of the range lands on 0 (or 127) and DOES
+auto-confirm. The first owner run proved both behaviours on real hardware
+(`docs/M4-device-evidence.md`).
 
-1. Do the step: turn the FX1 dial a few clicks and watch the effect type
-   change on the unit's display.
+1. Do the step: turn the FX1 dial and watch the effect type change on the
+   unit's display.
 
-   **Expect:** the page stays on **"Waiting for the device: …"** — nothing
-   confirms, no matter how far you turn.
+   **Expect:** a few clicks mid-range — the page stays on "Waiting for the
+   device: …". Sweep the dial fully down (or up) — it auto-confirms.
 
-2. Click **Confirm** under step 1 by hand.
+2. If you stopped mid-range and it did not confirm, click **Confirm** under
+   step 1 by hand.
 
-This is a known, recorded content defect (finding **M4-F1**), already
-scheduled for the next milestone. **Do not report it as a bug** — mark check 7
-PASS when step 1 did *not* auto-confirm. If it ever *does* auto-confirm from a
-few dial clicks, that is the surprise: describe it in the notes.
+Either outcome is a **PASS** for check 7 — just note in the report WHICH
+happened (mid-range no-confirm, endpoint auto-confirm, or both). The step's
+instruction wording is being recalibrated to the real dial behaviour in the
+next milestone (finding **M4-F1**, revised by owner evidence; also note the
+FX1/FX2 *buttons* are on/off toggles — they transmit 127 when switching on
+and 0 when switching off, so a button step only auto-confirms on the
+switching-ON press).
 
 (Small cosmetic quirk, safe to ignore: once you hand-confirm step 1, the grey
 line under it reads "Device verification is off — confirm manually, or turn it

@@ -1,0 +1,115 @@
+{
+  "task_type": "review",
+  "milestone": "M4",
+  "reviewed_commits": [
+    "698fe3c6c302032c365d2bb5e5bad3a73f6a5dde",
+    "693516b02d50b4eb0c8275de47471bb63c8cd0cc"
+  ],
+  "review_method": "Read-only source, documentation, manifest, and commit-history inspection. Per the subagent constraint, no build, test, lint, browser, or milestone verification command was run; coordinator-reported run totals were treated as supplied evidence, not independently reproduced.",
+  "per_finding_verdicts": [
+    {
+      "id": 1,
+      "severity": "HIGH",
+      "title": "In-flight stale-confirm race",
+      "verdict": "FIXED",
+      "evidence": [
+        "site/app/Main.hs:203-223 adds mAttemptGen and documents its attempt/device-session identity; it is initialized at line 370.",
+        "site/app/Main.hs:789-829 increments the generation in the same model update as every Begin/Restart batch; site/app/Main.hs:517-534 increments it before every enable/disable operation and reconciles using the updated model.",
+        "site/app/Main.hs:569-580 routes DConfirm through guardedConfirmIx before the clock read, carrying the device watch's subscribe-time generation or binding a manual click's generation when the action is processed.",
+        "site/app/Main.hs:590-596 re-runs guardedConfirmIx and applies ConfirmStep/Advance inside the same Effect; site/app/Main.hs:611-625 checks the current route/exercise, generation, done state, cursor response state, and cursor prompt id.",
+        "site/app/Main.hs:653-679 keys the reconciled watch by (promptId, generation), removes a mismatched watch, and captures the generation in the device callback. site/app/Main.hs:850-879 sends manual Confirm through the same DConfirm/DApplyConfirm path.",
+        "site/app/Device/Midi.hs:374-388 drops a late handler invocation unless the hub is still DevGranted, providing the requested disabled-hub defense in depth.",
+        "scripts/browser-check.mjs:3441-3466 defines D23-D25; lines 4196-4258 cover same-turn emit/navigation, lines 4261-4346 cover emit-then-Restart and Restart-then-emit, and lines 4348-4449 cover both disable orderings, immediate subscribedCount sampling, and re-enable recovery. The fixture's two-hop schedule and the measured app schedule are explicitly distinguished at lines 4207-4227.",
+        "scripts/browser-check.mjs:3562-3585 maps devConfirmAcrossNav to D23 and devIgnoreGen to D24/D25. The coordinator additionally reports pid-only watch identity, skipped teardown, and skipped reconciliation app sabotages each went red on the intended assertions; those runtime sabotages were not re-run in this review."
+      ],
+      "assessment": "The model mutation is now guarded atomically at DApplyConfirm, and identity survives the asynchronous clock hop. The implementation closes the route, Restart, manual/device duplicate, and enable/disable schedules named by the round-1 finding."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "Milestone command 6 can mask content-check failure",
+      "verdict": "FIXED",
+      "evidence": [
+        "briefs/M4-manifest.json milestone command 6 now begins with set -euo pipefail and runs content-check through tee, so content-check's non-zero status is the pipeline status rather than tee's success.",
+        "site/test/CheckContent.hs:1389-1413 makes a failed or empty group contribute to groupsOk and exits failure whenever the aggregate is incomplete; pipefail therefore closes the original 381/382 false-green path.",
+        "The added ! grep -q \"^FAIL\" is not the decisive protection because CheckContent's group failures are label-prefixed and its subcheck failures are indented (site/test/CheckContent.hs:1394-1399), but the propagated executable status is sufficient for the cited defect."
+      ]
+    },
+    {
+      "id": 3,
+      "severity": "MEDIUM",
+      "title": "D21 permits same-origin MIDI-data egress",
+      "verdict": "NOT-FIXED",
+      "evidence": [
+        "scripts/browser-check.mjs:3665-3676 rejects queries and non-matching paths, but it uses a shape regex rather than an exact inventory or a post-boot request delta. Any query-free request matching vendor/browser_wasi_shim/[A-Za-z0-9._-]+.js or pages/[a-z0-9-]+/page-[0-9]+.webp is accepted even when that file is not one of the shipped assets.",
+        "A hostile MIDI handler can still encode bytes in a same-origin request such as fetch('vendor/browser_wasi_shim/144-36-64.js'); that request passes assetRe and reaches the server even if it returns 404. It can also issue an extra fetch('app.wasm'); repeated requests to an allowed real asset are not compared with a completed-load baseline and therefore pass.",
+        "scripts/browser-check.mjs:1135-1144 and 3562-3585 only red-test fetch('collect?bytes=...'), which exercises the query-string arm and cannot falsify the query-free allowed-shape/repeated-asset cases. The file:// self-test arm is stricter than the HTTP shipping arm, so that sweep does not cover this gap.",
+        "The current application still shows no network-writing primitive under site/app in this source inspection. The unresolved issue is the D21 regression assertion's false-green class, as in round 1."
+      ],
+      "required_fix": "After the document/app asset load has settled, snapshot the request count or exact multiset immediately before MIDI emission and require no additional request after the device interaction, regardless of URL. Add an HTTP-arm negative control using a query-free allowed-looking path or a repeated real asset, and require only D21 to fail."
+    },
+    {
+      "id": 4,
+      "severity": "LOW",
+      "title": "Denied-retry Function leak",
+      "verdict": "FIXED",
+      "evidence": [
+        "site/app/Device/Midi.hs:124-135 stores only the current permission request's settle pair and explains why wrappers are not freed from inside their own invocation.",
+        "site/app/Device/Midi.hs:227-263 frees the previous settled pair before allocating the next request's callbacks, after excluding Pending/Granted and before parking the new pair.",
+        "site/app/Device/Midi.hs:285-297 frees the parked settle callbacks on disable and resets the hub. Repeated denial/retry is therefore bounded to the latest pair instead of accumulating two Functions per denial.",
+        "The coordinator reports five deny/retry cycles were probed leak-free; that runtime probe was not re-run in this constrained review."
+      ]
+    }
+  ],
+  "device_evidence_adequacy": {
+    "ruling": "ADEQUATE",
+    "evidence": [
+      "docs/M4-device-evidence.md:6-13 records the click-gated permission flow and exact real port name SXC-1 MIDI 1.",
+      "docs/M4-device-evidence.md:24-32 records notes 36/48 auto-confirming and demonstrates name-tier selection against a real ALSA decoy port.",
+      "docs/M4-device-evidence.md:34-45 and 67-69 records Note On [144,48,64] and Note Off [128,36,64]/[128,48,64], validating velocity-agnostic matching as load-bearing and the 0x80 non-match rule.",
+      "docs/M4-device-evidence.md:47-65 records CC 16 endpoint reachability, CC 108/109 confirmation, and FX 127/0 toggle behavior; docs/M4-device-evidence.md:92-101 gives the owner-run pass summary and says no device-layer defect was found.",
+      "docs/M4-device-evidence.md:71-90 gives an adequate N/A rationale for the physical channel-mismatch step: firmware 1.0.2 has no channel setting, transmits on fixed channel 1, yet demonstrably provides MIDI OUT. The automated wrong-channel path remains separate evidence."
+    ],
+    "caveat": "The evidence itself is sufficient for the physical-device gate. Its heading still says 'in progress' and the byte-capture subsection still says 'PARTIAL', but those stale labels do not erase the concrete completed measurements; they are included in the documentation finding below."
+  },
+  "new_findings": [
+    {
+      "severity": "MEDIUM",
+      "title": "The independent check-site presence floor still covers only D1-D22, so D23-D25 can be silently unplugged",
+      "evidence": [
+        "scripts/check-site.sh:3113-3122 still defines V6 as D1..D22 and says it counts 22 distinct lines.",
+        "scripts/check-site.sh:3186-3198 uses a regex capped at 22 and passes on exactly 22/22, ignoring D23, D24, and D25 entirely.",
+        "scripts/browser-check.mjs:5110-5121 invokes the D1-D25 suite, but its pass total is accumulated dynamically; scripts/browser-check.mjs:5198-5212 likewise constructs negative passes dynamically from the selector maps. Removing D23-D25 and their three selector entries can therefore reduce the totals while both browser commands remain internally green, exactly the unplugged-check class V6 exists to prevent.",
+        "README.md:403-407 still describes the independent floor as 22 assertions, confirming this was not an intentional D1-D25 floor elsewhere."
+      ],
+      "impact": "The new race regressions are currently exercised, but the milestone's independent anti-unplug invariant does not require them to continue existing. A later deletion of all three checks and their selector entries can false-green the documented gate.",
+      "recommendation": "Extend V6's label, regex, expected distinct count, comments, and documentation to D1-D25; add a fixed floor for the three new negative selectors or the total negative sweep count."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "The physical discoveries were not reconciled into the owner-facing protocol or README",
+      "evidence": [
+        "docs/M4-device-test-protocol.md:34-48 tells owners firmware below 1.1.1 lacks MIDI and must be updated and assumes MIDI OUT Ch. exists; docs/M4-device-evidence.md:71-90 demonstrates MIDI OUT on 1.0.2 and no channel-setting menu.",
+        "docs/M4-device-test-protocol.md:196-216 says d-2-09 step 1 must not auto-confirm and instructs the owner to mark that as PASS; docs/M4-device-evidence.md:49-53 demonstrates that a full dial sweep reaches endpoint 0 and auto-confirms.",
+        "README.md:1085-1094 still calls M4-F1 unreachable and manual-only, directly contradicting the new evidence and briefs/M5-ship.md:34-41.",
+        "docs/M4-device-evidence.md:1 still labels the report 'in progress', and line 34 labels byte capture PARTIAL even though lines 40-45 contain the requested Note On capture and lines 92-101 provide the final verdict."
+      ],
+      "impact": "A hardware owner following the committed protocol can be told to perform an unnecessary firmware update, cannot execute a nonexistent setting, and is instructed to score correct endpoint auto-confirm behavior as the protocol's surprising/non-pass outcome. The public README also states a now-known false limitation.",
+      "recommendation": "Amend the protocol for pre-1.1.1 fixed-channel firmware and the endpoint/toggle observations, revise README's M4-F1 text, and mark the evidence document complete. Preserve M5's content-recalibration follow-up."
+    },
+    {
+      "severity": "LOW",
+      "title": "Published M4 verification and size figures were left at the pre-fix values",
+      "evidence": [
+        "README.md:25-26, 172, 391-405, 816, and 963-964 still say D1-D22 and self-test 130/130; the reviewed suite is D1-D25 and the coordinator reports self-test 133/133.",
+        "README.md:957-959 and 978-985 still publish 925,652 gzip, +34,939 delta, and 74,348 frozen-ceiling headroom; the coordinator reports the optimized shipping artifact at 927,008 gzip, implying +36,295 over the 890,713 baseline and 72,992 below 1,000,000.",
+        ".github/workflows/site.yml:183 also retains the 925,652-byte comment."
+      ],
+      "impact": "The implementation remains under both ceilings, but the repository's public audit trail no longer describes the artifact and assertion suite actually gated."
+    }
+  ],
+  "new_application_layer_defects": "None found in the Main.hs or Device.Midi.hs changes beyond the unresolved D21 assertion gap. Commit 693516b changes only device-evidence documentation.",
+  "coordinator_reported_state": "Accepted as supplied but not rerun: check-site 95/95 result=complete; browser self-test 133/133; negative sweep 32/32 exact; exercise-check 382/382; optimized app.wasm gzip 927,008 <= 932,713, with the frozen 1,000,000 ceiling unchanged.",
+  "verdict": "GATE-BLOCKED",
+  "final_line": "GATE-BLOCKED — D21 still has a query-free/repeated-asset same-origin false-green, the independent check-site floor does not require D23-D25, and the new physical facts have not been reconciled into the owner-facing M4 documentation."
+}

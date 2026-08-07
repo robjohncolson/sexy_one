@@ -1,4 +1,4 @@
-# M4 physical-device evidence (in progress)
+# M4 physical-device evidence (COMPLETE)
 
 Owner-run protocol session, 2026-08-07, local serve of the M4 build
 (unoptimized copy, functionally identical), desktop Chrome, Linux.
@@ -31,7 +31,7 @@ Owner-run protocol session, 2026-08-07, local serve of the M4 build
   ["SXC-1 MIDI 1"] only — selectPorts' name tier discriminated
   correctly against a real decoy.
 
-## Byte capture (protocol §5) — PARTIAL (note-off captured)
+## Byte capture (protocol §5) — COMPLETE (both directions captured)
 
 - lastMessage after a tap-and-release: **[128,36,64]** — a 0x80
   Note OFF, channel 1, note 36, release velocity 64 (the MIDI

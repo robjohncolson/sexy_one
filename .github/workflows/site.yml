@@ -180,7 +180,7 @@ jobs:
       # --detect-features -Oz --converge` + `wasm-tools strip` (the
       # 2026-08-07 Size-ruling amendment adopted at the start of M4;
       # originally `-all -O2`), which brings the final M4 artifact to
-      # 925,652 gzipped bytes, comfortably under budget, and could not be
+      # 927,008 gzipped bytes, comfortably under budget, and could not be
       # made to miscompile under adversarial testing (byte-identical
       # exe:*-check self-test output either way; every headless-browser
       # assertion this project runs green, repeatedly, against the
@@ -312,9 +312,9 @@ jobs:
       # run in which checks FAILED (exit 1) but nothing was SKIPPED still
       # printed result=complete (that marker certifies zero-skips, not
       # zero-fails) and sailed through both greps. The M4 WebMIDI device
-      # assertions (D1..D22, driven through scripts/fake-midi.js inside
+      # assertions (D1..D25, driven through scripts/fake-midi.js inside
       # check-site.sh's browser stages -- see check-site.sh's "device
-      # assertions D1..D22" check) ride this exact path, so the hole is
+      # assertions D1..D25" check) ride this exact path, so the hole is
       # closed here, not merely documented: the step now asserts, in
       # order, (0) check-site.sh's REAL exit status via PIPESTATUS[0],
       # (1) result=complete was printed, (2) zero skipped checks, and
@@ -375,7 +375,7 @@ jobs:
       # evidence a failed run leaves behind -- /tmp/check-site.log is the
       # full teed "Verify site" output, which includes every browser-check
       # line from both served stages (the "ok - D<n>: ..." / "FAIL - ..."
-      # lines of the D1..D22 WebMIDI device suite ride inside it, because
+      # lines of the D1..D25 WebMIDI device suite ride inside it, because
       # check-site.sh tees each browser stage's output to its own stdout),
       # and site/public/index.html (the served shell the device scenarios
       # booted) is already inside the site/public path below. Extending

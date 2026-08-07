@@ -264,7 +264,7 @@ function parseArgs(argv) {
   const opts = {
     url: 'http://127.0.0.1:8123/',
     browser: null,
-    // M4: raised from 45000 -- the run now also carries the 22-assertion
+    // M4: raised from 45000 -- the run now also carries the 25-assertion
     // device suite (a dozen fresh targets), and the bare default budget
     // no longer covered a full real-app run. Purely an upper bound on
     // hangs; it loosens no assertion.
@@ -1132,15 +1132,35 @@ window.__SXC1_BOOTED = true;
     DEV.lastMessage = bytes;
     var m = devDecode(bytes);
     DEV.lastChannel = m ? m.channel : null;
-    // SABOTAGE 'devSameOriginEgress' (-> D21): a hostile handler leaks
-    // the received bytes over a SAME-ORIGIN request carrying a query
-    // string -- exactly the class the pre-fix D21 (cross-origin-only
-    // filter) let through. The request fails on the fixture's file://
-    // page and that is fine: CDP's Network domain still records
-    // requestWillBeSent for it (measured -- see this task's report),
-    // which is all D21's collector reads.
+    // SABOTAGE trio (-> D21, one selector per exfiltration class): a
+    // hostile handler leaks the received MIDI bytes over a SAME-ORIGIN
+    // request. Every one of these fetches fails on the fixture's
+    // file:// page and that is fine: CDP's Network domain still records
+    // requestWillBeSent for each (measured -- see the M4 gate-1 and
+    // gate-2 task reports), which is all D21's post-boot zero-delta
+    // collector reads.
+    //   'devSameOriginEgress'  (gate-1) -- bytes in a QUERY STRING:
+    //     exactly the class the pre-gate-1 D21 (cross-origin-only
+    //     filter) let through, and the class the zero-delta failure
+    //     message still labels separately (d21QueryStringEgress).
+    //   'devShapedPathEgress'  (gate-2) -- query-FREE: the bytes ARE
+    //     the filename of a path matching gate-1's asset-shape
+    //     allowlist (vendor/browser_wasi_shim/<b1>-<b2>-<b3>.js, e.g.
+    //     144-36-64.js for a note-on -- the request reaches the server
+    //     even as a 404), which shape matching can never reject and
+    //     only the zero-delta rule catches.
+    //   'devRepeatAssetEgress' (gate-2) -- query-free AND
+    //     shape-perfect: an extra fetch of the real 'app.wasm' (the
+    //     data rides the request count/timing channel), equally
+    //     invisible to any shape allowlist.
     if (sel('devSameOriginEgress')) {
       try { fetch('collect?bytes=' + bytes.join('-')).catch(function () { /* the request event is what matters */ }); } catch (e) { /* ditto */ }
+    }
+    if (sel('devShapedPathEgress')) {
+      try { fetch('vendor/browser_wasi_shim/' + bytes.join('-') + '.js').catch(function () { /* the request event is what matters */ }); } catch (e) { /* ditto */ }
+    }
+    if (sel('devRepeatAssetEgress')) {
+      try { fetch('app.wasm').catch(function () { /* the request event is what matters */ }); } catch (e) { /* ditto */ }
     }
     if (DEV.watchingPrompt && devMatches(DEV.watchingPrompt, m)) {
       // What the app captures at subscribe time: the promptId AND the
@@ -3459,7 +3479,7 @@ const DEVICE_ASSERTION_NAMES = {
   d18: 'D18: removePort empties ports without crashing and keeps the watch armed; re-adding a port confirms again',
   d19: 'D19: outcome deny -> status "denied", #device-status explains, manual confirm still works',
   d20: 'D20: no fake injected (real headless Chrome) -> enable lands in status "denied" and never confirms (the fake is load-bearing)',
-  d21: 'D21: zero network requests beyond the app\'s own assets across a full device scenario -- same-origin included: every collected request must match the exact asset-path allowlist and carry no query string',
+  d21: 'D21: post-boot zero-delta -- once boot has settled on the drill route, the whole device scenario adds ZERO network requests (no allowlist of any kind; the boot-phase capture itself must be non-empty)',
   d22: 'D22: site/public and site/static contain no fake-midi.js',
   d23: 'D23: in-flight navigation -- matching bytes emitted and the route changed in the SAME JS turn: no confirmation may land once the drill route is gone, and the emit was provably delivered',
   d24: 'D24: in-flight Restart -- matching bytes emitted and #btn-ex-restart clicked in the SAME JS turn: the fresh attempt stays blank (no stale confirm lands on it), and a settled re-emit then confirms it (the generation guard does not over-block)',
@@ -3576,12 +3596,20 @@ const M4_SELECTOR_ASSERTIONS = {
   // maps to two on purpose: dropping the attempt-generation re-check is
   // ONE root cause observable through two in-flight orderings (Restart
   // and disable), the same honest single-root-cause grouping as
-  // 'devPanelAlways' above. 'devSameOriginEgress' is the MEDIUM
-  // finding's required negative control: same-origin egress with a
-  // query string during the device flow must turn exactly D21 red.
+  // 'devPanelAlways' above.
   devConfirmAcrossNav: [DEVICE_ASSERTION_NAMES.d23],
   devIgnoreGen: [DEVICE_ASSERTION_NAMES.d24, DEVICE_ASSERTION_NAMES.d25],
+  // D21's red controls -- one selector per same-origin exfiltration
+  // class (see the sabotage trio's own comment in devOnMessage), each
+  // required to turn exactly D21 red: 'devSameOriginEgress' (gate-1,
+  // query-string), 'devShapedPathEgress' (gate-2, query-free
+  // asset-shaped path) and 'devRepeatAssetEgress' (gate-2, repeated
+  // real asset). The latter two are precisely the requests gate-1's
+  // shape allowlist waved through; only the post-boot zero-delta rule
+  // (T13) rejects all three.
   devSameOriginEgress: [DEVICE_ASSERTION_NAMES.d21],
+  devShapedPathEgress: [DEVICE_ASSERTION_NAMES.d21],
+  devRepeatAssetEgress: [DEVICE_ASSERTION_NAMES.d21],
 };
 
 // Fresh-target factory: everything a device scenario needs, built the
@@ -3590,9 +3618,6 @@ const M4_SELECTOR_ASSERTIONS = {
 // self-test pass).
 function deviceTargetFactoryFor(cdp, deadline, baseUrl) {
   const baseNoHash = baseUrl.replace(/#.*$/, '');
-  const originPrefix = baseNoHash.startsWith('file://')
-    ? 'file://'
-    : baseNoHash.replace(/^(\w+:\/\/[^/]+).*$/, '$1');
   return async function makeDeviceTarget({ preamble = '', injectFake = true, hash = '', network = false }) {
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
@@ -3632,48 +3657,31 @@ function deviceTargetFactoryFor(cdp, deadline, baseUrl) {
       booted,
       evaluate,
       requests,
-      originPrefix,
       baseNoHash,
       close: async () => { try { await cdp.send('Target.closeTarget', { targetId }); } catch { /* best effort */ } },
     };
   };
 }
 
-// M4 gate-1 fix (briefs/M4-codex-gate1.json, MEDIUM finding): D21 used
-// to reject only requests OUTSIDE the app's origin, so a hostile handler
-// could exfiltrate MIDI bytes to the app's OWN origin
-// (fetch('/collect?note=...')) and still pass. The collected request set
-// must instead be a SUBSET of the app's own asset requests, matched by
-// exact path shape:
-//   - NO collected request may carry a query string, ever (no app asset
-//     uses one, and a query string is the natural exfiltration channel);
-//   - under http(s), the request must live under the app's own base URL
-//     and its base-relative path must be one of the complete asset
-//     closure of site/public/: '' (the document), 'index.html',
-//     'index.js', 'app.wasm', 'ghc_wasm_jsffi.js',
-//     'vendor/browser_wasi_shim/<file>.js', or a manual page image
-//     'pages/<slug>/page-<n>.webp' -- plus the browser's OWN
-//     origin-root '/favicon.ico' (browser-initiated, carries no page
-//     data, and cannot carry MIDI bytes without a query string, which
-//     the first rule already rejects);
-//   - under file:// (the self-test fixture), the ONLY legal request is
-//     the fixture document itself.
-// Anything else -- same-origin included -- is an offender. The negative
-// control is the fixture sabotage 'devSameOriginEgress' (a
-// fetch('collect?bytes=...') fired from the message handler), which must
-// turn exactly D21 red in the --self-test-negative sweep.
-function d21Offenders(requests, originPrefix, baseNoHash) {
-  const base = baseNoHash.endsWith('/') ? baseNoHash : `${baseNoHash}/`;
-  const assetRe = /^(|index\.html|index\.js|app\.wasm|ghc_wasm_jsffi\.js|vendor\/browser_wasi_shim\/[A-Za-z0-9._-]+\.js|pages\/[a-z0-9-]+\/page-[0-9]+\.webp)$/;
-  return requests.filter((u) => {
-    if (typeof u !== 'string') return true;
-    if (u.includes('?')) return true;
-    if (originPrefix === 'file://') return u !== baseNoHash;
-    if (u === `${originPrefix}/favicon.ico`) return false;
-    if (u === baseNoHash) return false;
-    if (!u.startsWith(base)) return true;
-    return !assetRe.test(u.slice(base.length));
-  });
+// M4 gate-2 fix (briefs/M4-codex-gate2.json, finding 3): gate-1's
+// version of this helper allowlisted asset-path SHAPES, which still let
+// a hostile handler exfiltrate MIDI bytes query-free -- either encoded
+// as the FILENAME of an asset-shaped path
+// (fetch('vendor/browser_wasi_shim/144-36-64.js') matched the shape
+// regex and reached the server even as a 404), or as extra fetches of a
+// REAL asset (repeated 'app.wasm' requests, the count/timing channel).
+// There is no allowlist of any kind anymore: D21's enforcement is now
+// the POST-BOOT ZERO-DELTA in T13 (zero new requestWillBeSent events
+// across the whole device-scenario window -- measured to hold with
+// nothing browser-initiated in the window either, favicon.ico included,
+// so NOTHING is permitted). This helper only LABELS the query-string
+// subset of an offending scenario-window delta so the failure message
+// names the classic exfiltration channel explicitly; it grants nothing
+// a pass. The file:// self-test arm's semantics are preserved by the
+// same rule: the fixture's boot capture is exactly its own document
+// (the anti-vacuity floor), and its scenario window allows nothing.
+function d21QueryStringEgress(scenarioRequests) {
+  return scenarioRequests.filter((u) => typeof u !== 'string' || u.includes('?'));
 }
 
 async function readDeviceStateJson(evaluate) {
@@ -4167,27 +4175,67 @@ async function runDeviceAssertions(makeTarget, report, cfg) {
 
   // --- T13: the Network domain armed across a full device scenario --
   // D21 (privacy: MIDI bytes never leave the browser). -------------------
+  // M4 gate-2 fix (briefs/M4-codex-gate2.json, finding 3): POST-BOOT
+  // ZERO-DELTA, replacing gate-1's asset-shape allowlist (see
+  // d21QueryStringEgress's comment for the two query-free channels the
+  // allowlist still passed). Window boundaries: the collector is armed
+  // from target creation; everything the app legitimately requests
+  // (document, index.js, ghc_wasm_jsffi.js, app.wasm, wasi shims, page
+  // images) belongs to BOOTING the already-rendered drill route, so
+  // after makeTarget's own __SXC1_BOOTED wait the harness additionally
+  // waits for the request stream to go QUIET (no new requestWillBeSent
+  // for 700ms, capped) and snapshots the count -- scenario start. The
+  // whole device scenario (enable click, grant, emit, confirm, settle)
+  // then runs, and scenario end is after the confirm settles; the delta
+  // over the snapshot must be EMPTY -- no shapes, no exceptions, and no
+  // favicon allowance. Measured (this task's report): headless Chrome
+  // fetches /favicon.ico exactly ONCE per fresh profile, browser-
+  // initiated right after the FIRST page load in that profile (the T1
+  // target's -- long before this network-armed target exists), and the
+  // event is never attributed to THIS target's session: its boot
+  // capture holds exactly the app's own asset requests and its scenario
+  // delta is empty. Even a hypothetically session-attributed favicon
+  // fires at load completion, inside the quiescence wait, so it would
+  // land in the boot capture -- never the scenario window -- which is
+  // why NOTHING is permitted there. Anti-vacuity stays on the BOOT-phase
+  // capture (bootCount >= 1: the collector demonstrably sees traffic --
+  // measured to hold for the file:// fixture's own document request too)
+  // since the scenario window now expects zero. Red controls: the
+  // 'devSameOriginEgress' / 'devShapedPathEgress' /
+  // 'devRepeatAssetEgress' sabotage trio, each of which must turn
+  // exactly this assertion red in the --self-test-negative sweep.
   {
     const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route, network: true });
     if (!t.booted) {
       report(N.d21, false, 'network-armed target did not boot');
     } else {
+      let bootCount = t.requests.length;
+      {
+        const settleDeadline = Date.now() + 8000;
+        let quietSince = Date.now();
+        while (Date.now() < settleDeadline && Date.now() - quietSince < 700) {
+          await sleep(120);
+          if (t.requests.length !== bootCount) {
+            bootCount = t.requests.length;
+            quietSince = Date.now();
+          }
+        }
+      }
       await devClick(t.evaluate, '#btn-device-enable');
       await waitDeviceState(t.evaluate, `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`, 6000);
       await t.evaluate(fakeEmitExpr(cfg.drill.good));
       await waitDeviceState(t.evaluate, `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)})`, 6000);
       await sleep(400);
-      // M4 gate-1 (MEDIUM finding): subset-of-own-assets, not merely
-      // same-origin -- see d21Offenders. Anti-vacuity: the collector saw
-      // at least the document's own navigation request (measured to hold
-      // for file:// fixtures too), so an empty offender list can never
-      // mean "nothing was collected".
-      const offenders = d21Offenders(t.requests, t.originPrefix, t.baseNoHash);
-      const sawAny = t.requests.length;
+      const scenarioRequests = t.requests.slice(bootCount);
+      const queryStringEgress = d21QueryStringEgress(scenarioRequests);
       report(
         N.d21,
-        offenders.length === 0 && sawAny >= 1,
-        { requestCount: sawAny, base: t.baseNoHash, offenders: offenders.slice(0, 5) },
+        scenarioRequests.length === 0 && bootCount >= 1,
+        { bootRequestCount: bootCount,
+          scenarioRequestCount: scenarioRequests.length,
+          queryStringEgress: queryStringEgress.slice(0, 5),
+          scenarioRequests: scenarioRequests.slice(0, 5),
+          base: t.baseNoHash },
       );
     }
     await t.close();
@@ -5155,7 +5203,7 @@ async function runSelfTest(opts, negative) {
 
   let outcome;
   try {
-    // M4: the self-test now also runs the 22-assertion device suite
+    // M4: the self-test now also runs the 25-assertion device suite
     // (see runOneSelfTestPass), which multiplies the fresh-target count;
     // the default 45s budget was tuned for the pre-M4 pass, so the floor
     // is raised here the same way the negative sweep already raises its

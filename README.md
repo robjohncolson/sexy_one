@@ -23,7 +23,7 @@ difference is one always-hidden `#sxc1-device-state` diagnostics node). See
 and [`briefs/M4-manifest.json`](briefs/M4-manifest.json) for the task-by-task
 breakdown. `check-site.sh` now runs **95 checks** (up from M3's 80), and the
 headless-browser driver asserts **157 assertions per served stage** — including
-the D1–D22 WebMIDI device suite, driven entirely through a committed fake with no
+the D1–D25 WebMIDI device suite, driven entirely through a committed fake with no
 hardware in the loop (see [Verification](#verification)); the one thing automation
 cannot produce, a walk with the real unit in hand, has its own owner's checklist
 in [`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md).
@@ -169,7 +169,7 @@ compiling five executables — `exe:app`, `exe:content-check`, `exe:exercise-che
 `exe:progress-check` and `exe:registry-check` — instead of M1's three) took 27 s at
 M3's close; `check-site.sh` ran all 95 checks — including both the origin-root and
 GitHub-Pages-sub-path browser sweeps of all 108 page routes, the two M3 checker
-binaries, the storage-refused simulation and the D1–D22 WebMIDI device suite — and
+binaries, the storage-refused simulation and the D1–D25 WebMIDI device suite — and
 printed `check-site: result=complete`; and `serve-site.sh` served
 `site/public/index.html` over plain HTTP with a `200`. This quickstart builds the plain,
 **unoptimized** `app.wasm` (`build-site.sh`'s own default); see
@@ -389,7 +389,7 @@ the Web MIDI surface, not a string inside the driver — which `scripts/browser-
 pre-loads into a **freshly created** CDP target with
 `Page.addScriptToEvaluateOnNewDocument`, so it is installed before the app boots and the
 app's own feature detection sees it as the genuine article. Twenty-two assertions
-(D1–D22) drive the full matrix through it: grant, deny and API-absent outcomes,
+(D1–D25) drive the full matrix through it: grant, deny and API-absent outcomes,
 hot-plug and unplug, multi-port binding, exactly-once confirmation, and the negative
 controls that keep a green run honest — a **wrong CC**, a **wrong CC value**, a
 **wrong channel** and a **wrong note** must each be *delivered* and must each *fail* to
@@ -401,8 +401,8 @@ and never confirm — because real headless Chrome denies the permission, a posi
 result anywhere else in the suite can only have come from the fake's scripted
 messages, never from the real API by accident. All of this sits inside
 `check-site.sh`'s ordinary gate (**95 checks** as of M4): the browser driver asserts
-**157 assertions per served stage** (**130** in `node scripts/browser-check.mjs
---self-test`), and a named check-site check independently counts the 22 distinct
+**160 assertions per served stage** (**133** in `node scripts/browser-check.mjs
+--self-test`), and a named check-site check independently counts the 25 distinct
 `ok - D<n>` lines in the root stage's captured output — so silently unplugging the
 device suite from the driver turns check-site red even while the browser stages
 themselves stay green. `check-site.sh` also carries M4-specific structural checks: the
@@ -813,7 +813,7 @@ casio-sxc1/
 │   ├── check-site.sh            structural + content + headless-browser checks
 │   ├── browser-check.mjs        the zero-npm-deps CDP driver check-site.sh calls
 │   ├── fake-midi.js             the committed Web MIDI fake browser-check.mjs
-│   │                             pre-loads for the D1-D22 device suite (test
+│   │                             pre-loads for the D1-D25 device suite (test
 │   │                             harness only -- never shipped to site/public/)
 │   ├── extract-pages.sh         manual PDF -> page image/text extraction (scratch)
 │   └── render-page-images.sh    manual PDF -> committed site/static/pages/*.webp
@@ -954,14 +954,14 @@ Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), M4, against the 
 | Warm build, unoptimized (nothing changed) | <1s |
 | Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time; `-Oz --converge` iterates to a fixed point, so it costs more than M3's `-O2` ~5s: the `wasm-opt` pass alone measures ≈11s on this machine) | ~15s |
 | `app.wasm`, unoptimized default build (`build-site.sh`, no flags; measured at M3's close — M4 ships only the optimized flavour, and grew, so this is still *over* the ceiling) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
-| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M4 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `925652`) | 2,637,389 bytes raw / **925,652 bytes gzipped** |
-| M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json` `m3_final_gzip_bytes`) | **+34,939 bytes** — inside M4's 42,000-byte budget and under the task-local 932,713-byte ceiling (`briefs/M4-budget.json`) |
-| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 74,348 bytes of headroom remain |
+| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M4 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `927008`) | 2,643,909 bytes raw / **927,008 bytes gzipped** |
+| M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json` `m3_final_gzip_bytes`) | **+36,295 bytes** — inside M4's 42,000-byte budget and under the task-local 932,713-byte ceiling (`briefs/M4-budget.json`) |
+| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 72,992 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
 | `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,206,204 bytes (≈12.2 MB) |
-| `check-site.sh`, full run (**95** checks, both browser sweeps of 108 routes, **157** browser assertions per served stage incl. the D1–D22 device suite) | ≈49s |
-| `node scripts/browser-check.mjs --self-test` | **130/130** assertions |
+| `check-site.sh`, full run (**95** checks, both browser sweeps of 108 routes, **160** browser assertions per served stage incl. the D1–D25 device suite) | ≈49s |
+| `node scripts/browser-check.mjs --self-test` | **133/133** assertions |
 | `exe:progress-check --self-test` | **84/84** checks |
 | `exe:registry-check` (real tree) / `--self-test` | **8/8** (435 corpus / 440 registry) / **16/16** |
 | `exe:exercise-check` real-content / `--self-test` / `--fixtures` / `--list-codes` | 0 issues / **382/382** (incl. the **110**-assertion M4 group grounding `SXC1.Midi.Spec` against `translations/midi.md`) / **55/55** fixtures / 52 codes |
@@ -975,14 +975,14 @@ size-ledger comment independently records. The current `--detect-features -Oz
 probe built the same tree twice and measured zero inter-build variance (890,713 bytes
 both times), while a later re-run of the same optimize pipeline against the final M4
 tree reproduced the shipping artifact to within **5 gzipped bytes** (925,657 vs the
-shipped 925,652). The table therefore reports the shipping artifact's own measured
+shipped 927,008). The table therefore reports the shipping artifact's own measured
 number — the bytes actually sitting at `site/public/app.wasm` are what `check-site.sh`
 measures and what deploys. `app.wasm` grew from M2's 978,969-byte
 gzipped baseline mainly for two reasons: the course grew from 4 decks/16 exercises to
 52 decks/435 exercises (embedded content costs ≈0.3456 gzip bytes per raw byte of
 `.ex.md`), and the M3 progress engine (`SXC1.Progress.*`, `Progress/Store.hs`,
 `View/Progress.hs`) added roughly another 34 KB gzipped; M4's device layer
-(`site/app/Device/Midi.hs`, `SXC1.Midi.Spec`, the device panel) added the **+34,939**
+(`site/app/Device/Midi.hs`, `SXC1.Midi.Spec`, the device panel) added the **+36,295**
 gzipped bytes recorded above. See
 [Status](#status) for the full size story and why CI now builds the `--optimize`d
 flavour. `site/public/` stays well inside GitHub Pages' 1 GB artifact limit either way.
@@ -1082,13 +1082,16 @@ verification design M4 implements — the Miso-DSL-only FFI route, the single
 explicit-click permission path, the fake-MIDI verification strategy, and the design
 probe's measured findings.
 
-**Known issue (M4-F1).** `d-2-09` step 1's hook, `verify: cc 16 0,127`, is unreachable
-in practice: CC 16 is the SXC-1's continuous FX1 *dial* (±1 per detent, never the 0/127
-pair the momentary buttons send), and the `verify:` grammar has no "any value" form —
-so that one step can only ever be confirmed manually (which always works; see
-[Device verification](#device-verification)). Found by M4's design probe
-(`briefs/M4-plan.md` §8), deliberately not "fixed" in M4 (the content corpus and
-validator are frozen for the milestone), and deferred to M5 as
+**Known issue (M4-F1, revised by owner evidence).** `d-2-09` step 1's hook,
+`verify: cc 16 0,127`, watches the SXC-1's continuous FX1 *dial* (CC 16). M4's design
+probe predicted the hook unreachable (±1 per detent, never 0/127); the first
+physical-device run (2026-08-07, [`docs/M4-device-evidence.md`](docs/M4-device-evidence.md))
+proved that prediction wrong at the extremes — the dial's range ENDPOINTS emit 0/127,
+so a full sweep auto-confirms while mid-range clicks confirm nothing. The same run
+characterized the FX *buttons* as on/off toggles (127 on switching on, 0 on switching
+off), so a `cc 108 127`-style button hook only fires on the switching-ON press.
+Deliberately not "fixed" in M4 (the content corpus and validator are frozen for the
+milestone); the step wording/hook recalibration is deferred to M5 as
 [`briefs/M5-ship.md`](briefs/M5-ship.md) item 10;
-[`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md) pre-warns the
-hardware owner that this step auto-confirming would be the *surprising* outcome.
+[`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md) tells the
+hardware owner either outcome is a PASS and asks them to record which occurred.

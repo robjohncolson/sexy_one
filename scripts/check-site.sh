@@ -262,8 +262,8 @@ Checks performed, in order:
      noDeviceVerifier gone; a live dvWatch call site; SXC1.Midi.Table
      unreachable from exe:app) and V7 (every route and DOM id named by
      docs/M4-device-test-protocol.md exists in the tree, with extraction
-     anti-vacuity floors) are all unconditional. V6 (the 22 WebMIDI
-     device assertions D1..D22 actually ran and passed inside check 7's
+     anti-vacuity floors) are all unconditional. V6 (the 25 WebMIDI
+     device assertions D1..D25 actually ran and passed inside check 7's
      root browser run) lives on the BROWSER axis: skipped via skip()
      under --skip-browser, so a skipped run still counts it and the
      TOTAL never changes.
@@ -1135,7 +1135,7 @@ else
 fi
 
 # --- V3: the harness fake exists and carries its whole driver surface -----
-# scripts/fake-midi.js is the committed, reviewable fake behind the D1..D22
+# scripts/fake-midi.js is the committed, reviewable fake behind the D1..D25
 # browser assertions. It must exist, parse, and name every driver member
 # the sabotage sweep depends on -- a fake that silently lost setOutcome or
 # emit would turn the whole device suite vacuous.
@@ -3021,7 +3021,7 @@ start_server() {
 # report exactly two named checks: "$health_label" and "$browser_label".
 # M4 (task "verification", V6): the stage's browser output is also teed
 # into a temp capture and its path left in LAST_BROWSER_STAGE_LOG, so the
-# V6 check below can prove the D1..D22 device suite actually ran INSIDE
+# V6 check below can prove the D1..D25 device suite actually ran INSIDE
 # the root run (an unplugged suite would leave checks 7/8 green while the
 # device assertions silently stopped existing -- the exact
 # can't-fail-anymore class this project keeps re-finding).
@@ -3110,16 +3110,20 @@ ROOT_HEALTH_LABEL="root dev server serves the on-disk index.html byte-for-byte"
 ROOT_BROWSER_LABEL="browser check at the origin root (http://127.0.0.1:<port>/)"
 SUBPATH_HEALTH_LABEL="sub-path dev server serves the on-disk index.html byte-for-byte"
 SUBPATH_BROWSER_LABEL="browser check at a GitHub-Pages-style sub-path (AUTHORITATIVE deployability check)"
-# M4 (task "verification", V6): the D1..D22 WebMIDI device assertions are
+# M4 (task "verification", V6): the D1..D25 WebMIDI device assertions are
 # part of scripts/browser-check.mjs's ordinary full run (checks 7/8), on
 # fresh CDP targets with scripts/fake-midi.js injected. This named check
 # proves they actually RAN AND PASSED inside check 7's root run, by
-# counting the 22 distinct "ok - D<n>: ..." report lines in that stage's
+# counting the 25 distinct "ok - D<n>: ..." report lines in that stage's
 # captured output -- so silently unplugging the device suite from the
-# browser driver turns this red even while checks 7/8 stay green. On the
-# EXISTING browser axis: skipped via skip() (counted, conspicuous, TOTAL
-# unchanged), never via any new flag.
-DEVICE_SUITE_LABEL="device assertions D1..D22 ran and passed inside check 7's root browser run (WebMIDI suite driven through scripts/fake-midi.js)"
+# browser driver turns this red even while checks 7/8 stay green. M4
+# gate-2 fix (briefs/M4-codex-gate2.json, new finding 1): the floor was
+# left at D1..D22 when gate-1 added D23/D24/D25, so those three could be
+# silently unplugged while everything stayed green -- the exact
+# unplugged-check class V6 exists to prevent; the floor is now D1..D25.
+# On the EXISTING browser axis: skipped via skip() (counted, conspicuous,
+# TOTAL unchanged), never via any new flag.
+DEVICE_SUITE_LABEL="device assertions D1..D25 ran and passed inside check 7's root browser run (WebMIDI suite driven through scripts/fake-midi.js)"
 
 if [ "$SKIP_BROWSER" -eq 1 ]; then
   echo "SKIPPED -- browser checks (requested via --skip-browser or SXC1_SKIP_BROWSER=1)"
@@ -3184,18 +3188,18 @@ else
     fi
 
     # V6 (M4, task "verification") -- see DEVICE_SUITE_LABEL's comment
-    # above. 22 DISTINCT passing device-assertion lines must appear in
+    # above. 25 DISTINCT passing device-assertion lines must appear in
     # check 7's root-stage capture; a failed assertion prints "FAIL - Dn:"
     # instead and is therefore missing from this count, so V6 goes red
     # both when the suite is unplugged and when any of its members fail.
     DEVICE_SUITE_OK_COUNT=0
     if [ -n "${ROOT_BROWSER_STAGE_LOG:-}" ] && [ -s "$ROOT_BROWSER_STAGE_LOG" ]; then
-      DEVICE_SUITE_OK_COUNT="$(grep -oE '^ok - D([1-9]|1[0-9]|2[0-2]): ' "$ROOT_BROWSER_STAGE_LOG" | sort -u | wc -l | tr -d ' ')"
+      DEVICE_SUITE_OK_COUNT="$(grep -oE '^ok - D([1-9]|1[0-9]|2[0-5]): ' "$ROOT_BROWSER_STAGE_LOG" | sort -u | wc -l | tr -d ' ')"
     fi
-    if [ "$DEVICE_SUITE_OK_COUNT" -eq 22 ]; then
-      ok "$DEVICE_SUITE_LABEL (observed: 22/22 distinct D-assertions reported ok in the root stage)"
+    if [ "$DEVICE_SUITE_OK_COUNT" -eq 25 ]; then
+      ok "$DEVICE_SUITE_LABEL (observed: 25/25 distinct D-assertions reported ok in the root stage)"
     else
-      fail "$DEVICE_SUITE_LABEL (observed: $DEVICE_SUITE_OK_COUNT of 22 distinct D-assertions reported ok in the root stage -- the device suite failed, or never ran at all)"
+      fail "$DEVICE_SUITE_LABEL (observed: $DEVICE_SUITE_OK_COUNT of 25 distinct D-assertions reported ok in the root stage -- the device suite failed, or never ran at all)"
     fi
   fi
 fi
