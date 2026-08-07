@@ -278,10 +278,13 @@ resultTag (DecodeCorrupt r) = "DecodeCorrupt: " ++ T.unpack r
 group8 :: CheckLog -> IO ()
 group8 cl = do
   let base = emptyProgress { psStreakLen = 7 }
-      testSteps n = if n == 0 then Just (\st -> st { psStreakLen = psStreakLen st + 100 }) else Nothing
+      testSteps n
+        | n == 0    = Just (\st -> st { psStreakLen = psStreakLen st + 100 })
+        | n == 1    = Just (\st -> st { psStreakLen = psStreakLen st + 1000 })
+        | otherwise = Nothing
   case migrateWith testSteps 0 base of
     DecodeOk st -> do
-      record cl 8 "migrateWith applies the step chain" (psStreakLen st == 107) ("streakLen " ++ show (psStreakLen st))
+      record cl 8 "migrateWith applies the FULL step chain (0->1->2)" (psStreakLen st == 1107) ("streakLen " ++ show (psStreakLen st))
       record cl 8 "migration normalises psVersion to currentSchema"
         (psVersion st == SchemaVersion currentSchema) "version not normalised"
     other -> record cl 8 "migrateWith applies the step chain" False (resultTag other)
@@ -292,6 +295,16 @@ group8 cl = do
   case migrate 0 base of
     DecodeCorrupt _ -> record cl 8 "productionSteps has no v0 step (schema-0 blob is corrupt today)" True ""
     other           -> record cl 8 "productionSteps has no v0 step (schema-0 blob is corrupt today)" False (resultTag other)
+  -- The REAL v1->v2 production migration (M3 gate NEW12's schema bump):
+  -- a v1 blob (3-field M line, no lastPrompt) decodes as current-schema
+  -- state with psLastPrompt defaulted "" -- the mechanism's first
+  -- genuine production use.
+  let v1blob = "SXC1PROGRESS\t1\nM\t3\t2\t1\nR\tq-1-01#1\t1\t0\t2500\t1\t3\t2\t1\n"
+  case decodeState v1blob of
+    DecodeOk st -> record cl 8 "a real v1 blob migrates to v2 (lastPrompt defaults empty, records intact)"
+      (psVersion st == SchemaVersion currentSchema && psLastPrompt st == "" && Map.member "q-1-01#1" (psRecs st))
+      ("version/lastPrompt/recs: " ++ show (psLastPrompt st))
+    other -> record cl 8 "a real v1 blob migrates to v2 (lastPrompt defaults empty, records intact)" False (resultTag other)
 
 group9 :: CheckLog -> IO ()
 group9 cl = do

@@ -103,10 +103,17 @@ data ProgressState = ProgressState
   , psStreakDay :: !DayNum
   , psStreakLen :: !Int
   , psFirstDay  :: !DayNum
+    -- | Schema v2 (M3 gate NEW12): the PromptId of the most recently
+    -- graded prompt, empty when none -- what "continue where you left
+    -- off" points at. Day-granularity 'rcLastSeen' cannot break
+    -- same-day ties (Map order picked an arbitrary prompt); this field
+    -- can. v1 blobs migrate with it empty (the UI falls back to the
+    -- day heuristic once, then the first graded event fills it).
+  , psLastPrompt :: !Text
   } deriving Eq
 
 -- | A learner who has never done anything. NOTE: 'psVersion' is
--- hardcoded to @SchemaVersion 1@ here rather than referencing
+-- hardcoded to @SchemaVersion 2@ here rather than referencing
 -- "SXC1.Progress.Codec".'SXC1.Progress.Codec.currentSchema' -- 'Codec'
 -- imports 'Types', so the reverse import would be a cycle. The two
 -- literals (this one, and 'SXC1.Progress.Codec.currentSchema') must be
@@ -116,12 +123,13 @@ data ProgressState = ProgressState
 -- 'SXC1.Progress.Codec.currentSchema'.
 emptyProgress :: ProgressState
 emptyProgress = ProgressState
-  { psVersion   = SchemaVersion 1
+  { psVersion   = SchemaVersion 2
   , psRecs      = Map.empty
   , psDone      = Map.empty
   , psStreakDay = DayNum 0
   , psStreakLen = 0
   , psFirstDay  = DayNum 0
+  , psLastPrompt = ""
   }
 
 msPerDay :: Integer

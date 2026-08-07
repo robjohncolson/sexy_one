@@ -137,6 +137,7 @@ applyEvent ev st0 = case pePrompt ev of
          { psRecs      = Map.insert pidTxt newRec (psRecs st1)
          , psStreakDay = streakDay'
          , psStreakLen = streakLen'
+         , psLastPrompt = pidTxt  -- v2 (NEW12): true last-activity pointer
          }
   Nothing
     | peOutcome ev == Completed ->

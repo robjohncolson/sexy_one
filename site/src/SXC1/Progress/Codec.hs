@@ -104,7 +104,7 @@ tshow = T.pack . show
 --------------------------------------------------------------------------
 
 currentSchema :: Int
-currentSchema = 1
+currentSchema = 2
 
 magicProgress :: Text
 magicProgress = "SXC1PROGRESS"
@@ -124,7 +124,8 @@ encodeState st = T.unlines (headerLine : mLine : rLines ++ dLines)
   where
     headerLine = T.intercalate "\t" [magicProgress, tshow currentSchema]
     mLine = T.intercalate "\t"
-      [ "M", tshow (unDayNum (psStreakDay st)), tshow (psStreakLen st), tshow (unDayNum (psFirstDay st)) ]
+      [ "M", tshow (unDayNum (psStreakDay st)), tshow (psStreakLen st), tshow (unDayNum (psFirstDay st))
+      , psLastPrompt st ]  -- v2: lastPrompt column (may be empty; slug-shaped, tab-free)
     rLines = [ rLine pid rc | (pid, rc) <- Map.toList (psRecs st) ]
     rLine pid rc = T.intercalate "\t"
       [ "R", pid, tshow (rcReps rc), tshow (rcLapses rc), tshow (rcEase rc), tshow (rcInterval rc)
@@ -141,20 +142,25 @@ data BodyAcc = BodyAcc
   { baStreakDay :: !DayNum
   , baStreakLen :: !Int
   , baFirstDay  :: !DayNum
+  , baLastPrompt :: !Text
   , baRecs      :: !(Map Text Rec)
   , baDone      :: !(Map Text Int)
   }
 
 emptyBodyAcc :: BodyAcc
-emptyBodyAcc = BodyAcc (DayNum 0) 0 (DayNum 0) Map.empty Map.empty
+emptyBodyAcc = BodyAcc (DayNum 0) 0 (DayNum 0) "" Map.empty Map.empty
 
 parseBodyLine :: BodyAcc -> Text -> BodyAcc
 parseBodyLine acc line
   | T.null (T.strip line) = acc
   | otherwise = case tagFields line of
+      -- v1 M line: three fields (lastPrompt stays ""); v2: four.
       ("M", [sdTxt, slTxt, fdTxt])
         | Just sd <- parseDigits sdTxt, Just sl <- parseDigits slTxt, Just fd <- parseDigits fdTxt
         -> acc { baStreakDay = DayNum sd, baStreakLen = sl, baFirstDay = DayNum fd }
+      ("M", [sdTxt, slTxt, fdTxt, lp])
+        | Just sd <- parseDigits sdTxt, Just sl <- parseDigits slTxt, Just fd <- parseDigits fdTxt
+        -> acc { baStreakDay = DayNum sd, baStreakLen = sl, baFirstDay = DayNum fd, baLastPrompt = lp }
       ("R", [pid, repsT, lapT, easeT, intT, dueT, lastT, seenT])
         | Just reps <- parseDigits repsT, Just lap <- parseDigits lapT, Just ease <- parseDigits easeT
         , Just intv <- parseDigits intT, Just due <- parseDigits dueT, Just lastSeen <- parseDigits lastT
@@ -187,6 +193,7 @@ decodeState raw
                   , psStreakDay = baStreakDay acc
                   , psStreakLen = baStreakLen acc
                   , psFirstDay  = baFirstDay acc
+                  , psLastPrompt = baLastPrompt acc
                   }
             in migrate v st
         _ -> DecodeCorrupt "missing or malformed SXC1PROGRESS header"
@@ -222,6 +229,7 @@ migrate = migrateWith productionSteps
 -- exercised by tests already written against 'migrateWith' generically
 -- rather than the invention of the mechanism at that point.
 productionSteps :: Int -> Maybe (ProgressState -> ProgressState)
+productionSteps 1 = Just id  -- v1 -> v2: psLastPrompt joins, defaulted "" by the body parser
 productionSteps _ = Nothing
 
 --------------------------------------------------------------------------

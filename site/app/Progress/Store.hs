@@ -87,8 +87,15 @@ loadProgress = do
     Just blob -> decodeState (fromMisoString blob)
     Nothing   -> DecodeEmpty
 
-saveProgress :: ProgressState -> IO ()
-saveProgress st = void (bridge "set" [storageKey, ms (encodeState st)])
+-- | M3 gate NEW9: returns whether the WRITE actually succeeded (the
+-- bridge's set returns 1\/0 from its own try\/catch) -- quota can run
+-- out or storage be revoked long after the boot probe passed, and a
+-- discarded failure is silent history loss. Main degrades to
+-- storage-unavailable mode on the first False.
+saveProgress :: ProgressState -> IO Bool
+saveProgress st = do
+  r <- fromJSValUnchecked =<< bridge "set" [storageKey, ms (encodeState st)]
+  pure (r == Just (1 :: Int))
 
 -- | Removes ONLY the progress key -- never 'prefsKey' (the module
 -- Haddock's separate-key asymmetry).
@@ -108,5 +115,8 @@ loadPrefs = do
     Just blob -> decodePrefs (fromMisoString blob)
     Nothing   -> defaultPrefs
 
-savePrefs :: Prefs -> IO ()
-savePrefs p = void (bridge "set" [prefsKey, ms (encodePrefs p)])
+-- | Same NEW9 contract as 'saveProgress'.
+savePrefs :: Prefs -> IO Bool
+savePrefs p = do
+  r <- fromJSValUnchecked =<< bridge "set" [prefsKey, ms (encodePrefs p)]
+  pure (r == Just (1 :: Int))

@@ -89,6 +89,7 @@ data ProgData = ProgData
   , pdExportBlob :: Maybe Text
   , pdImportMsg  :: Maybe Text
   , pdRawCorrupt :: Maybe Text  -- ^ the undecoded blob, for the corrupt banner's own export
+  , pdStorageOk  :: !Bool       -- ^ NEW9: False = refused/lost storage; the notice below renders
   }
 
 unDeckId :: DeckId -> Text
@@ -266,7 +267,8 @@ jaFirstHeaderEls ph pd route
 
 progressHomeView :: ProgHandlers action -> ProgData -> [View model action]
 progressHomeView ph pd =
-  corruptBannerEls (pdLoad pd) (pdRawCorrupt pd)
+  storageNoteEls (pdStorageOk pd)
+  ++ corruptBannerEls (pdLoad pd) (pdRawCorrupt pd)
   ++ precedenceOrdered
   ++ streakEls
   ++ retiredEls
@@ -331,6 +333,19 @@ continueEls pd = [ H.section_ [ P.id_ "sxc1-continue" ] continueBody ]
       Nothing -> case nextUnstartedDeck pd of
         Just d  -> [ deckPointerEl "Get started: " d ]
         Nothing -> [ H.a_ [ P.href_ (ms (renderRoute RExercises)) ] [ "Browse the training decks" ] ]
+
+-- | NEW9: the explicit refused-mode notice. Renders when storage probed
+-- unavailable at boot OR a later write failed (quota, revocation): the
+-- trainer keeps working fully, but nothing outlives the tab, and the
+-- learner deserves to know that rather than discover it tomorrow.
+storageNoteEls :: Bool -> [View model action]
+storageNoteEls True  = []
+storageNoteEls False =
+  [ H.div_ [ P.id_ "sxc1-storage-note", P.class_ "progress-banner" ]
+      [ H.strong_ [] [ "Progress is not being saved. " ]
+      , text "This browser is refusing storage (private mode, exhausted quota, or storage disabled), so everything works but nothing survives closing the tab. Use Export below to copy your progress out before you leave."
+      ]
+  ]
 
 corruptBannerEls :: DecodeResult -> Maybe Text -> [View model action]
 corruptBannerEls (DecodeCorrupt reason) mRaw =

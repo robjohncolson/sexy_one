@@ -1,0 +1,129 @@
+{
+  "task_type": "review",
+  "scope": "Milestone M3 gate review, part 2 of 2: app wiring, UI, browser harness, shell gate, CI, README, size ruling, and global verdict for committed range m2..HEAD",
+  "status": "completed",
+  "verdict": "GATE-BLOCKED",
+  "claim_verdicts": [
+    {
+      "claim": "DecodeCorrupt enforces the never-overwrite rule end to end until explicit wipe/import",
+      "verdict": "PASS FOR THE CLAIMED DECODECORRUPT PATH",
+      "evidence": "Startup retains the DecodeResult in mLoad, progressWritable rejects DecodeCorrupt, and the only ordinary event save is gated by that predicate (site/app/Main.hs:220-235,323-330,414-432). Valid import and explicit wipe are the only operations that clear corrupt mode (Main.hs:340-354). The real-browser assertion is genuinely meaningful: it installs unique garbage, reloads, answers a real quiz, reloads again, and requires exact byte equality plus the still-visible banner (scripts/browser-check.mjs:2305-2335). This passes source review. It does not rescue the wider storage-failure behavior in NEW9: a post-probe write refusal is not a DecodeCorrupt path."
+    },
+    {
+      "claim": "JA-first is a mount/fresh-navigation default and never fights the explicit page toggle",
+      "verdict": "PASS",
+      "evidence": "mBooted distinguishes mount from the hashchange echo; freshPage compares slug/page and redirects only a plain fresh route (Main.hs:281-304). ToggleJA first commits the opposite route locally and then changes the hash, so the echo sees the same slug/page and does not redirect it back (lines 308-315). Fresh next/previous-page navigation changes page number and re-applies the preference. Cold plain deep links redirect, /ja deep links do not loop, same-page history/toggle transitions are retained, and manual-TOC preference changes do not invent a page redirect. The harness polls the settled post-reload /ja state and checks both persisted value and DOM order, then verifies hide-stays-hidden and reappearance only after moving page (browser-check.mjs:2345-2412)."
+    },
+    {
+      "claim": "The JS-side storage bridge is load-bearing, guarded, has no direct Haskell localStorage access, and supplies the refused-mode UX",
+      "verdict": "PARTIAL FAIL",
+      "evidence": "The bridge is installed at index.js:22-34 before the first top-level await/wasm instantiation at lines 39-57, so ordering is correct and the real storage-refused run would fail if it moved below boot. All bridge methods catch on the JS side. Current Haskell has no direct localStorage/Miso.Storage use, and check-site's case-insensitive source-tree guard enumerates .hs files and permits the bridge name only in Progress/Store.hs (scripts/check-site.sh:817-903). However, the visible refused-mode UX and write-result handling are absent; see NEW9."
+    },
+    {
+      "claim": "The 15 M3 browser assertions and exact 23-failure negative bookkeeping are non-vacuous and independently falsifiable",
+      "verdict": "FAIL",
+      "evidence": "The list does contain 15 ordinary M3 assertion names, and expectedToFail contains exactly 23 names total (8 inherited plus those 15), while rejecting unexpected failures (browser-check.mjs:2151-2172,2998-3052). The accounting is exact, but it is not equivalent to mutation-specific falsifiability: one global SABOTAGE flag introduces many simultaneous faults and several assertions fail through a different conjunct or a broken precondition. NEW10 gives concrete weakenings that the negative run would still accept. In addition, the review-badge assertion is exercised only after a wipe at due=0; see NEW11."
+    },
+    {
+      "claim": "CI's --optimize build is load-bearing, checks the artifact that ships, preserves workflow gates, and removing continue-on-error is non-weakening",
+      "verdict": "PASS",
+      "evidence": "The workflow builds with ./scripts/build-site.sh --optimize, then check-site measures and drives that same site/public/app.wasm, and only afterward uploads site/public (site.yml:170-206,303-317). The fixed 1,000,000-byte check has no optimized carve-out (check-site.sh:948-979). Retained ledger evidence records committed-tree unoptimized results at 1,094,331/1,097,058 and optimized results at 907,575-908,037, so the flag is demonstrably load-bearing. The m2..HEAD workflow diff preserves triggers, permissions, cache policy, build concurrency, deploy condition/permissions/concurrency, and adds timed direct checker runs. The removed continue-on-error was on the final if:failure() debug upload; an earlier failure already determines job failure, so removal cannot make a previously ungated defect pass (site.yml:319-338)."
+    },
+    {
+      "claim": "#sxc1-progress values are truthful projections of real persisted/model state",
+      "verdict": "FAIL",
+      "evidence": "records/retired and live due/queue are mechanically computed from mProgress and the current corpus partition (Main.hs:533-554), not constants. But state is sourced from mLoad, described as the startup result, and ordinary grading changes mProgress/saves it without updating mLoad (lines 155-159,414-432). Thus a fresh DecodeEmpty model can contain and save one record while emitting state=empty; corrupt mode can emit in-memory record/due/queue counts even though the stored key remains undecodable and untouched. The harness reloads before inspecting the answered state, masking the first contradiction. NEW8 covers this directly; NEW13 covers stale due/queue after a midnight with no new event."
+    },
+    {
+      "claim": "Continue where you left off is an honest persisted resume point",
+      "verdict": "FAIL",
+      "evidence": "The persisted record stores only rcLastSeen day. On the overwhelmingly normal case of two or more prompts studied on the same UTC day, mostRecentPromptId keeps the first Map.toList entry on ties, i.e. the lexicographically smallest PromptId, not the last event (View/Progress.hs:172-188,323-330). The internal comment acknowledges day granularity but incorrectly says nothing depends on the tie; the Continue link immediately does. README does not disclose the limitation. See NEW12."
+    },
+    {
+      "claim": "The coordinator's storage sub-budget deviation and shipping-artifact accounting are sound",
+      "verdict": "ACCEPTED AS A POLICY OVERRIDE, NOT AS SUB-BUDGET COMPLIANCE",
+      "evidence": "The storage commit openly records 991,784 versus its 982,000 task budget. That acceptance check was missed and must not be rewritten as met. Nevertheless, the coordinator's wasm-opt ruling commit predates storage-sink, keeps the global 1,000,000 ceiling unchanged, rejects the raise-ceiling alternative, and makes the optimized artifact both the verified and uploaded artifact. At 908,037 bytes it has about 91,963 bytes headroom and is smaller than M2. This is a deliberate pipeline/artifact decision supported by behavioral checks, not a post-hoc silent tripwire increase. It is not a global blocker by itself."
+    },
+    {
+      "claim": "README accurately documents the shipped Part 2 behavior",
+      "verdict": "FAIL ON REFUSED UX AND CONTINUE SEMANTICS; OTHERWISE SUBSTANTIALLY ACCURATE",
+      "evidence": "Schema, migration, export/import, privacy, bridge ordering, separate prefs, CI optimization, and fixed ceiling are accurately described. But README:906-910 tells learners to look for a storage-unavailable state in the progress panel when no visible notice exists, and it never explains that Continue cannot identify the last same-day activity. README:491-495 also generalizes a successful boot-time probe into 'nothing is saved' under all storage throwing, while later set failures are discarded and still reported available=true (NEW9)."
+    }
+  ],
+  "findings": [
+    {
+      "id": "NEW8",
+      "severity": "major",
+      "title": "The progress payload can report state=empty while a real record is already in memory and saved",
+      "location": "site/app/Main.hs:155-159,327-330,414-432,533-554; scripts/browser-check.mjs:2229-2250",
+      "scenario": "Start with no sxc1.progress key. Startup sets mLoad=DecodeEmpty and mProgress=emptyProgress. Grade one prompt: applyExActions puts the new Rec in mProgress and saveProgress writes it, but mLoad remains DecodeEmpty. Before reload, #sxc1-progress therefore emits {state:'empty',records:1}. In corrupt read-only mode the mismatch is stronger: grading adds transient records/due/queue to mProgress while the exact corrupt disk bytes stay untouched, so fields documented as stored-record state describe unsaved memory. The harness reloads immediately after the answer; startup then decodes the saved blob as DecodeOk, so it never observes this inconsistent model. Make the payload's state represent current progress/storage state explicitly, and pin the immediate post-answer frame."
+    },
+    {
+      "id": "NEW9",
+      "severity": "major",
+      "title": "Storage availability is a one-shot probe; later write failures are discarded and no explicit refused-mode notice exists",
+      "location": "site/static/index.js:22-34; site/app/Progress/Store.hs:78-112; site/app/Main.hs:155-159,323-357,414-432,533-547; site/app/View/Progress.hs:83-92,267-274; README.md:491-495,906-910",
+      "scenario": "Let the tiny boot probe succeed, then make localStorage.setItem('sxc1.progress', fullBlob) throw because quota was exhausted, storage was revoked, or the real blob no longer fits. The bridge correctly returns 0, but saveProgress/savePrefs discard that return, mStorageOk remains True forever, the model/payload claim available=true, and the learner sees no warning while their new work is not persisted. Even when the boot probe itself fails, available=false exists only in hidden #sxc1-progress: ProgData carries no availability field and progressHomeView renders no notice, contradicting the explicit-notice acceptance criterion and README troubleshooting text. Return success from set/del, transition the model to unavailable on failure, render an accessible notice, and extend the real-browser check to a probe-succeeds/write-fails scenario."
+    },
+    {
+      "id": "NEW10",
+      "severity": "major",
+      "title": "The 23-exact negative sweep is a megamutant and does not prove several assertion predicates are present",
+      "location": "scripts/browser-check.mjs:720-728,975-1015,1024-1075,1116-1140,2151-2172,2998-3052",
+      "scenario": "One SABOTAGE boolean simultaneously changes record counts, payload jaFirst, scheduler interval, preference persistence, corrupt writes, corrupt-banner rendering, panel behavior, tier, and inherited exercise behavior. Consequently, weaken exportWipeImportRestores by deleting its Rec identity/value comparison: the negative sweep still gets the expected failure from records+1. Delete rawAfterAnswer===CORRUPT_TEXT from corruptNeverOverwritten: it still fails because the same sabotage suppresses the banner. The jaFirstSurvivesWipe negative case never establishes the required persisted-on precondition because the same sabotage skips the preceding save. Exact set bookkeeping only proves that 23 labels are false under one compound broken world; use isolated mutation modes (or per-assertion fixture parameters) so each assertion fails for the behavior named in its label."
+    },
+    {
+      "id": "NEW11",
+      "severity": "major",
+      "title": "The only review badge/payload assertion runs after wiping progress, so hardcoded-zero due and an empty queue pass",
+      "location": "scripts/browser-check.mjs:2385-2395,2414-2434; site/app/Main.hs:541-546; site/app/View/Progress.hs:130-141,267-321",
+      "scenario": "The D2 setup wipes all progress, and no prompt is graded afterward. Section E then compares the badge to payload.due, so the real-app state is Review 0 versus due 0. An implementation that hardcodes both to zero, never renders a due item, returns the wrong queue order/link, or excludes all live records passes. The self-test's +1 badge sabotage shows only that equality can be made false; it does not make the real path nonzero. Import or create one due live record plus one future and one retired record, independently predict due=1 and the exact queue id/link/order, and assert both DOM and payload values."
+    },
+    {
+      "id": "NEW12",
+      "severity": "major",
+      "title": "Continue where you left off usually selects an arbitrary same-day prompt, not the last activity",
+      "location": "site/app/View/Progress.hs:172-188,323-330; briefs/M3-plan.md:672-673",
+      "scenario": "Study prompts z-ex#1 and then a-ex#1 on the same day (or vice versa), close/reload, and return home. Both records have the same rcLastSeen DayNum; Map.toList is key-ordered and the fold keeps the first entry on ties, so Continue points to the lexicographically smallest id regardless of actual event order. Multiple prompts per study day are normal, making the advertised resume point routinely wrong. Persist a last-activity PromptId/sequence/timestamp, or relabel and document the weaker deterministic same-day behavior. The limitation is acknowledged only in an internal comment and is not honestly documented to learners."
+    },
+    {
+      "id": "NEW13",
+      "severity": "medium",
+      "title": "Due and queue state stays on yesterday until a new graded event or reload occurs",
+      "location": "site/app/Main.hs:155-160,220-235,414-432,533-554",
+      "scenario": "Open the app shortly before UTC midnight with an item due tomorrow, leave the tab open, and navigate home after midnight without grading anything. mToday was captured at startup and only advances from peAt values in later events; route changes do not refresh it and there is no midnight timer. #sxc1-progress and the visible badge/queue therefore omit the newly due item until the learner answers something or reloads. Refresh today at navigation/render through an action or schedule a UTC-midnight update, and test the day transition with an injected clock."
+    }
+  ],
+  "part1_integration": {
+    "source": "briefs/M3-codex-part1.json",
+    "verdict": "PART1-BLOCKED",
+    "blocking_findings": [
+      "NEW1 (major): wasm32 Int overflow can create a progress state whose encoded negative due is dropped by decodeState",
+      "NEW2 (major): applyEvent's actual Rec/done/first-day transitions are mostly unpinned",
+      "NEW3 (major): the purity/integer source guard is trivially bypassable",
+      "NEW5 (major): q-5-91 contradicts the cited committed MIDI table",
+      "NEW4 (medium): DayNum 0 collides with the unset first-day sentinel",
+      "NEW6 (medium): registry disk-order, milestone-vocabulary, and tombstone-count invariants are not enforced"
+    ],
+    "nonblocking_part1_note": "NEW7 is minor but should still be corrected: its quote lives in the export stamp rather than the payload whose quoting contract the test names."
+  },
+  "consolidated_blocking_list": [
+    "Part 1 NEW1: wasm32 overflow/non-roundtrippable progress",
+    "Part 1 NEW2-NEW3: scheduler transition and purity claims lack adequate falsifiable enforcement",
+    "Part 1 NEW5: learner-facing exercise contradicts its citation",
+    "Part 1 NEW4 and NEW6: first-day sentinel and registry-format contract gaps",
+    "Part 2 NEW8: #sxc1-progress emits contradictory storage state",
+    "Part 2 NEW9: silent post-probe persistence loss and missing refused-mode notice",
+    "Part 2 NEW10-NEW11: compound negative sabotage and zero-due path do not validate critical browser assertions",
+    "Part 2 NEW12: Continue does not identify the last same-day activity",
+    "Part 2 NEW13: long-lived tabs show stale due/queue state across midnight"
+  ],
+  "advisories": [
+    "The #/r route named in M3-plan does not exist; the queue is on Home and the storage task explicitly allowed using the existing route set because SXC1.Route was out of scope. I do not treat this as a blocker by itself.",
+    "The source guard is useful current-tree defense in depth but remains a substring inspection, not proof that no computed JS property can reach localStorage. Current Haskell source is clean by direct inspection.",
+    "The optimized-shipping decision is accepted, but reports should continue to say that storage-sink missed its original 982,000 task budget rather than retroactively replacing that acceptance result.",
+    "During this review, concurrent uncommitted changes appeared in site/src/SXC1/Progress, site/test/CheckProgress.hs, and site/sxc1-trainer.cabal that reference Part 1 fixes. The requested scope is commits m2..HEAD, so those uncommitted edits were excluded from the global verdict and were not verified."
+  ],
+  "method": "Read-only inspection of Part 1's JSON, committed m2..HEAD source/history/diffs, current app/view/static code, browser harness, check-site/build scripts, workflow, README, PLAN/M3 plan/manifest, retained size ledger, and the existing optimized artifact size. Per subagent constraints, no builds, tests, linters, browser runs, sabotage runs, or git commits were performed. The only written file is this required result JSON.",
+  "final_line": "GATE-BLOCKED — Part 1's committed blockers remain, and Part 2 adds contradictory progress state, silent persistence loss with no refused-mode notice, non-specific/vacuous browser coverage, a normally wrong Continue target, and stale midnight due state. CI optimization and the exact DecodeCorrupt/JA-first paths themselves are sound."
+}

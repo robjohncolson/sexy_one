@@ -205,6 +205,9 @@ data ProgressOp
   | PImport Text        -- ^ learner submitted import text
   | PWipe               -- ^ learner confirmed a wipe
   | PJaFirst Bool       -- ^ learner flipped the JA-first reader preference
+  | PSetToday DayNum    -- ^ NEW13: today refreshed from a real wall reading on navigation
+  | PStorageLost        -- ^ NEW9: a write failed after boot; storage is no longer trusted
+  | PSaved ProgressState -- ^ NEW8: a save landed; DecodeEmpty graduates to DecodeOk
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
@@ -302,6 +305,11 @@ updateModel sink = \case
       _ -> modify (\m -> m { mRoute = r, mBooted = True })
     beginIfNeeded r
     io_ (scrollIntoView "app")
+    -- NEW13: mToday was captured once at startup and previously only
+    -- advanced from later events' own peAt -- an open tab crossing UTC
+    -- midnight kept yesterday's due/queue until something was graded.
+    -- Every navigation now refreshes it from a real wall reading.
+    io (do { (_, WallMs w) <- readClocks; pure (Prog (PSetToday (dayOf w))) })
 
   Prog op -> handleProg op
 
@@ -342,7 +350,11 @@ handleProg op = case op of
       modify (\m -> m { mProgress = st, mLoad = DecodeOk st
                       , mImportMsg = Nothing, mExportBlob = Nothing })
       writable <- gets mStorageOk
-      io_ (if writable then saveProgress st else pure ())
+      if writable
+        then io $ do
+          okW <- saveProgress st
+          pure (if okW then NoOp else Prog PStorageLost)
+        else pure ()
     DecodeCorrupt reason -> modify (\m -> m { mImportMsg = Just reason })
     DecodeEmpty -> modify (\m -> m { mImportMsg = Just "import text was empty" })
   PWipe -> do
@@ -354,7 +366,16 @@ handleProg op = case op of
     io_ wipeProgress
   PJaFirst b -> do
     modify (\m -> m { mPrefs = Prefs b })
-    io_ (savePrefs (Prefs b))
+    -- NEW9: a failed prefs write degrades to storage-unavailable mode
+    -- (visible in the payload/notice) instead of being discarded.
+    io $ do
+      okW <- savePrefs (Prefs b)
+      pure (if okW then NoOp else Prog PStorageLost)
+  PSetToday d -> modify (\m -> m { mToday = max (mToday m) d })
+  PStorageLost -> modify (\m -> m { mStorageOk = False })
+  PSaved st -> modify (\m -> case mLoad m of
+    DecodeEmpty -> m { mLoad = DecodeOk st }
+    _           -> m)
 
 -- | On first navigation to an exercise (no state recorded for it yet),
 -- seed a fresh attempt with a real wall-clock reading. Never re-fires
@@ -429,7 +450,16 @@ applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
       , mToday     = max (mToday m) today'
       })
     io_ (mapM_ (sinkRecord sink) evsAll)
-    io_ (if writable && not (null evsAll) then saveProgress prog1 else pure ())
+    -- NEW8: the first successful save of real progress moves the load
+    -- state from DecodeEmpty to DecodeOk, so #sxc1-progress can never
+    -- report state=empty while records exist and are persisted. NEW9: a
+    -- FAILED save (quota, revocation -- the bridge returns 0) degrades
+    -- to storage-unavailable mode instead of being silently discarded.
+    if writable && not (null evsAll)
+      then io $ do
+        okW <- saveProgress prog1
+        pure (if okW then Prog (PSaved prog1) else Prog PStorageLost)
+      else pure ()
   where
     recordResult ev acc = case pePrompt ev of
       Nothing  -> acc
@@ -579,6 +609,7 @@ progDataFor m = ProgData
   , pdExportBlob = mExportBlob m
   , pdImportMsg  = mImportMsg m
   , pdRawCorrupt = mRawCorrupt m
+  , pdStorageOk  = mStorageOk m
   }
 
 viewModel :: props -> Model -> View Model Action
