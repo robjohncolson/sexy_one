@@ -63,9 +63,10 @@ browser without Web MIDI the app looks and behaves exactly as M3 did (the only D
 difference is one always-hidden `#sxc1-device-state` diagnostics node). See
 [`briefs/M4-plan.md`](briefs/M4-plan.md) for the design this milestone implements
 and [`briefs/M4-manifest.json`](briefs/M4-manifest.json) for the task-by-task
-breakdown. `check-site.sh` now runs **95 checks** (up from M3's 80), and the
-headless-browser driver asserts **160 assertions per served stage** — including
-the D1–D25 WebMIDI device suite, driven entirely through a committed fake with no
+breakdown. `check-site.sh` now runs **99 checks** (up from M3's 80; 96 at M4's
+close, +3 M5 cardinality/floor checks), and the headless-browser driver asserts
+**175 assertions per served stage** (a pinned floor) — including
+the D1–D27 device suite, driven entirely through a committed fake with no
 hardware in the loop (see [Verification](#verification)); the one thing automation
 cannot produce, a walk with the real unit in hand, has its own owner's checklist
 in [`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md).
@@ -209,9 +210,9 @@ already-installed toolchain and returned in well under a second; a from-scratch
 `site/dist-newstyle` build (package store still warm from the toolchain install; now
 compiling five executables — `exe:app`, `exe:content-check`, `exe:exercise-check`,
 `exe:progress-check` and `exe:registry-check` — instead of M1's three) took 27 s at
-M3's close; `check-site.sh` ran all 95 checks — including both the origin-root and
+M3's close; `check-site.sh` ran all 99 checks — including both the origin-root and
 GitHub-Pages-sub-path browser sweeps of all 108 page routes, the two M3 checker
-binaries, the storage-refused simulation and the D1–D25 WebMIDI device suite — and
+binaries, the storage-refused simulation and the D1–D27 device suite — and
 printed `check-site: result=complete`; and `serve-site.sh` served
 `site/public/index.html` over plain HTTP with a `200`. This quickstart builds the plain,
 **unoptimized** `app.wasm` (`build-site.sh`'s own default); see
@@ -442,9 +443,9 @@ flow in a target with *no* fake injected at all, and requires it to land in "den
 and never confirm — because real headless Chrome denies the permission, a positive
 result anywhere else in the suite can only have come from the fake's scripted
 messages, never from the real API by accident. All of this sits inside
-`check-site.sh`'s ordinary gate (**95 checks** as of M4): the browser driver asserts
-**160 assertions per served stage** (**133** in `node scripts/browser-check.mjs
---self-test`), and a named check-site check independently counts the 25 distinct
+`check-site.sh`'s ordinary gate (**99 checks** as of M5): the browser driver asserts
+**175 assertions per served stage** (**141** in `node scripts/browser-check.mjs
+--self-test`), and a named check-site check independently counts the 27 distinct
 `ok - D<n>` lines in the root stage's captured output — so silently unplugging the
 device suite from the driver turns check-site red even while the browser stages
 themselves stay green. `check-site.sh` also carries M4-specific structural checks: the
@@ -996,14 +997,15 @@ Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), M4, against the 
 | Warm build, unoptimized (nothing changed) | <1s |
 | Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time; `-Oz --converge` iterates to a fixed point, so it costs more than M3's `-O2` ~5s: the `wasm-opt` pass alone measures ≈11s on this machine) | ~15s |
 | `app.wasm`, unoptimized default build (`build-site.sh`, no flags; measured at M3's close — M4 ships only the optimized flavour, and grew, so this is still *over* the ceiling) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
-| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M4 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `927008`) | 2,643,909 bytes raw / **927,008 bytes gzipped** |
-| M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json` `m3_final_gzip_bytes`) | **+36,295 bytes** — inside M4's 42,000-byte budget and under the task-local 932,713-byte ceiling (`briefs/M4-budget.json`) |
-| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 72,992 bytes of headroom remain |
+| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M5 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `933305`) | 2,662,016 bytes raw / **933,305 bytes gzipped** |
+| M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json`; M4 closed at 927,008) | **+36,295 bytes** — inside M4's 42,000-byte budget |
+| M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
+| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 66,695 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,206,204 bytes (≈12.2 MB) |
-| `check-site.sh`, full run (**95** checks, both browser sweeps of 108 routes, **160** browser assertions per served stage incl. the D1–D25 device suite) | ≈49s |
-| `node scripts/browser-check.mjs --self-test` | **133/133** assertions |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,234,536 bytes (≈12.2 MB) |
+| `check-site.sh`, full run (**99** checks, both browser sweeps of 108 routes, **175** browser assertions per served stage incl. the D1–D27 device suite) | ≈65s |
+| `node scripts/browser-check.mjs --self-test` | **141/141** assertions |
 | `exe:progress-check --self-test` | **84/84** checks |
 | `exe:registry-check` (real tree) / `--self-test` | **8/8** (435 corpus / 440 registry) / **16/16** |
 | `exe:exercise-check` real-content / `--self-test` / `--fixtures` / `--list-codes` | 0 issues / **382/382** (incl. the **110**-assertion M4 group grounding `SXC1.Midi.Spec` against `translations/midi.md`) / **55/55** fixtures / 52 codes |

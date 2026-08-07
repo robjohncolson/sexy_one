@@ -3861,9 +3861,10 @@ const DEVICE_ASSERTION_NAMES = {
   // M5 a11y pass: a DEVICE confirm advances the cursor with no user
   // click to carry focus, so the advance-focus wiring must run on that
   // path too (D26); and the device panel's controls carry their SR
-  // names/live regions (D27). Deliberately D26/D27, OUTSIDE check-site's
-  // V6 floor regex (D1..D25) -- V6's 25-distinct-lines count is a frozen
-  // M4 contract this task may not widen from here.
+  // names/live regions (D27). Numbered D26/D27 as M5 additions; the
+  // check-site V6 floor was widened to D1..D27 at the M5 final gate
+  // (finding M5-R1-1), so unplugging either now turns V6 red like any
+  // other D-assertion.
   d26: 'D26: a DEVICE confirm advance moves focus to the next .ex-step (document.activeElement lands on #ex-step-2, never <body>)',
   d27: 'D27: device panel SR labels -- #sel-device-channel carries an aria-label accessible name; #device-status and the .ex-verify line are aria-live=polite',
 };

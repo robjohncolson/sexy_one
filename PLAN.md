@@ -168,6 +168,9 @@ Resolved:
   rename executed in M5).
 - Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).
 - GitHub repo (2026-08-06, owner-confirmed): **public**, `robjohncolson/sexy_one`.
-  Pages via Actions workflow; `ENABLE_PAGES=true` repo variable set. Site will
-  live at https://robjohncolson.github.io/sexy_one/ — the sub-path the M0
-  checker validates against.
+  Site lives at https://robjohncolson.github.io/sexy_one/ — the sub-path the M0
+  checker validates against. Pages was ORIGINALLY via Actions workflow with
+  `ENABLE_PAGES=true`; since the queue wedged (deploy-path note above) the
+  CURRENT state is legacy `gh-pages`-branch deploys with `ENABLE_PAGES=false` —
+  the deploy-path note is authoritative; M5 debt item 8 probes the workflow
+  path at ship time.

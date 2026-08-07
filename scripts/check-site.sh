@@ -255,13 +255,19 @@ Checks performed, in order:
      from briefs/M4-manifest.json, on the EXISTING axes only -- no new
      skip flag. V1, V2, V8 (size/budget: the frozen ceiling constant
      asserted in this script's own source; then, per the coordinator's
-     2026-08-08 M5 re-scope ruling recorded in briefs/M5-budget.json,
-     V2 measures the artifact against THAT file's task_local_ceiling_
-     bytes (= m4_final + m5_reserve) printing the observed gzip and its
-     delta from m4_final_gzip_bytes, and V8 checks the M5 budget's own
-     arithmetic, the fresh artifact against the M5 window, AND that
-     briefs/M4-budget.json still stands unchanged as the M4 historical
-     record), V3/V4 (the
+     2026-08-08 M5 re-scope ruling -- whose three authorized numbers
+     are PINNED AS LITERALS in this script (M5_M4_FINAL=927008,
+     M5_RESERVE=60000, M5_TASK_CEILING=987008; M5 final-review fix,
+     briefs/M5-codex-final1.json finding M5-R1-2: the mutable
+     briefs/M5-budget.json may not raise its own authorized reserve) --
+     V2 measures the artifact against the PINNED task-local ceiling
+     (= pinned m4_final + pinned m5_reserve) printing the observed gzip
+     and its delta from the pinned m4_final, and V8 checks that
+     briefs/M5-budget.json MATCHES the three pinned values exactly
+     (a doctored file fails even when internally consistent), the M5
+     budget's own arithmetic, the fresh artifact against the M5 window,
+     AND that briefs/M4-budget.json still stands unchanged as the M4
+     historical record), V3/V4 (the
      scripts/fake-midi.js harness fake exists, parses, names every
      driver member, and is NEVER shipped into site/public or
      site/static), V5 (the seven M4 structural invariants over site/app,
@@ -271,11 +277,29 @@ Checks performed, in order:
      noDeviceVerifier gone; a live dvWatch call site; SXC1.Midi.Table
      unreachable from exe:app) and V7 (every route and DOM id named by
      docs/M4-device-test-protocol.md exists in the tree, with extraction
-     anti-vacuity floors) are all unconditional. V6 (the 25 WebMIDI
-     device assertions D1..D25 actually ran and passed inside check 7's
-     root browser run) lives on the BROWSER axis: skipped via skip()
-     under --skip-browser, so a skipped run still counts it and the
-     TOTAL never changes.
+     anti-vacuity floors) are all unconditional. V6 (the 27 WebMIDI
+     device assertions D1..D27 actually ran and passed inside check 7's
+     root browser run -- D26/D27 are the M5 a11y device assertions,
+     pulled INSIDE the floor by the M5 final-review fix for
+     briefs/M5-codex-final1.json finding M5-R1-1; the old D1..D25 floor
+     let them be silently unplugged) lives on the BROWSER axis: skipped
+     via skip() under --skip-browser, so a skipped run still counts it
+     and the TOTAL never changes.
+  19. M5 CARDINALITY CONTRACT (briefs/M5-codex-final1.json, M5-R1-1):
+     (a) the root and sub-path browser stages must EACH report a final
+     "browser-check: N/N assertions passed" line with N >=
+     M5_BROWSER_ASSERT_FLOOR (175). These are FLOORS, never equalities
+     -- future additions must not break them, and RAISING THE FLOOR IS
+     PART OF ADDING ASSERTIONS. Only meaningful on full fixture inputs:
+     skipped via skip() under --skip-browser (stage never ran) and
+     under --skip-content (the browser stages lawfully run fewer
+     assertions without the content/exercise fixtures -- see check 17).
+     (b) this script's own final TOTAL must equal the pinned
+     M5_CHECK_TOTAL constant (see the reporting helpers below),
+     unconditionally -- skip() counts toward TOTAL, so the pin holds on
+     skip runs too, and a deleted check turns the gate red instead of
+     silently shrinking the total. ADDING OR REMOVING ANY CHECK
+     REQUIRES A VISIBLE EDIT TO THE PIN.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -418,6 +442,36 @@ skip() {
 info() {
   echo "info - $1"
 }
+
+# ---------------------------------------------------------------------------
+# M5 CARDINALITY CONTRACT PINS (M5 final-review fix, briefs/
+# M5-codex-final1.json finding M5-R1-1). Every total in this gate used to be
+# DYNAMICALLY ACCUMULATED -- ok()/fail()/skip() above for check-site's own
+# total, report() inside scripts/browser-check.mjs for the browser stages --
+# so a deleted check or an unplugged browser assertion produced a SMALLER
+# all-green run instead of a failure. These two constants pin the
+# cardinalities, in the same frozen-literal style as
+# WASM_GZIP_CEILING_BYTES:
+#
+#   M5_CHECK_TOTAL         the exact final TOTAL this script must report,
+#                          asserted by the last check before the summary
+#                          (that check counts itself). skip() increments
+#                          TOTAL exactly like ok()/fail(), so this pin
+#                          holds on --skip-browser/--skip-content runs
+#                          too. ADDING (or removing) A CHECK REQUIRES A
+#                          VISIBLE EDIT TO THIS PIN -- that is the point.
+#   M5_BROWSER_ASSERT_FLOOR  the minimum "N/N assertions passed" total
+#                          each of the two full browser stages (root and
+#                          sub-path, checks 7/8) must report on a full
+#                          run. A FLOOR, never an equality: future
+#                          assertion additions must not break it, and
+#                          RAISING THE FLOOR IS PART OF ADDING
+#                          ASSERTIONS (leave it behind and the new
+#                          assertions are exactly as unpluggable as
+#                          D26/D27 were before this fix).
+# ---------------------------------------------------------------------------
+M5_CHECK_TOTAL=99
+M5_BROWSER_ASSERT_FLOOR=175
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -1054,44 +1108,48 @@ fi
 # m4_budget) was an M4-SCOPED construct; M4 closed at m4_final = 927,008
 # gzip, and the M4 budget's 60,000-byte reserve was held under the frozen
 # 1,000,000 ceiling explicitly FOR M5's polish. The M5 window is therefore
-# task_local_ceiling_bytes = m4_final + m5_reserve = 987,008, recorded in
-# briefs/M5-budget.json -- without this re-point, the M5 tree (932,087,
-# 626 bytes under the old M4 ceiling) would false-block the a11y pass. V2
-# measures the artifact at --dir against the M5 window and prints the
-# delta from m4_final_gzip_bytes so growth across the M5 waves stays
-# visible in every log. briefs/M4-budget.json is preserved UNCHANGED as
-# the M4 historical record -- V8 below still checks its internal
-# arithmetic. As before: THE SHIPPING ARTIFACT IS build-site.sh
-# --optimize's OUTPUT (PLAN.md "Size ruling" + its 2026-08-07 amendment:
-# wasm-opt --detect-features -Oz --converge); a plain unoptimized build
-# correctly fails both check 13 and this check, because that artifact is
-# not what ships.
+# task_local_ceiling_bytes = m4_final + m5_reserve = 987,008 -- without
+# this re-point, the M5 tree (932,087, 626 bytes under the old M4 ceiling)
+# would false-block the a11y pass. V2 measures the artifact at --dir
+# against the M5 window and prints the delta from m4_final so growth
+# across the M5 waves stays visible in every log. briefs/M4-budget.json is
+# preserved UNCHANGED as the M4 historical record -- V8 below still checks
+# its internal arithmetic. As before: THE SHIPPING ARTIFACT IS
+# build-site.sh --optimize's OUTPUT (PLAN.md "Size ruling" + its
+# 2026-08-07 amendment: wasm-opt --detect-features -Oz --converge); a
+# plain unoptimized build correctly fails both check 13 and this check,
+# because that artifact is not what ships.
+#
+# M5 final-review fix (briefs/M5-codex-final1.json, finding M5-R1-2): V2
+# and V8 used to READ m4_final/m5_reserve/task_local_ceiling from the
+# mutable briefs/M5-budget.json -- so the budget file could raise its own
+# authorized reserve (e.g. reserve 72,992 + ceiling 1,000,000 keeps the
+# formula true and everything green while the coordinator-authorized M5
+# ceiling silently grew by 12,992 bytes). The ruling's three numbers are
+# therefore PINNED HERE AS LITERALS, in the same frozen-constant style as
+# WASM_GZIP_CEILING_BYTES above: COORDINATOR-RULING CONSTANTS (2026-08-08
+# M5 re-scope ruling) -- moving ANY of them is a coordinator decision,
+# never a task's, and now requires a visible edit to this script instead
+# of an edit to the JSON the checks were supposed to be constraining.
+# briefs/M5-budget.json remains the human-readable RECORD of the ruling;
+# V8 below asserts that record MATCHES these pins exactly, so a doctored
+# file fails even when it is internally consistent.
+M5_M4_FINAL=927008
+M5_RESERVE=60000
+M5_TASK_CEILING=987008
 M4_BUDGET_JSON="$REPO_ROOT/briefs/M4-budget.json"
 M5_BUDGET_JSON="$REPO_ROOT/briefs/M5-budget.json"
-M5_BUDGET_FIELDS=""
-if [ -f "$M5_BUDGET_JSON" ] && command -v python3 >/dev/null 2>&1; then
-  M5_BUDGET_FIELDS="$(python3 -c '
-import json, sys
-d = json.load(open(sys.argv[1], encoding="utf-8"))
-print(d["task_local_ceiling_bytes"], d["m4_final_gzip_bytes"],
-      d["m5_reserve_bytes"], d["ceiling_bytes"], d["m5_entry_gzip_bytes"])
-' "$M5_BUDGET_JSON" 2>/dev/null || true)"
-fi
-M5_TASK_CEILING=""; M5_M4_FINAL=""; M5_RESERVE=""; M5_CEILING_FIELD=""; M5_ENTRY=""
-if [ -n "$M5_BUDGET_FIELDS" ]; then
-  read -r M5_TASK_CEILING M5_M4_FINAL M5_RESERVE M5_CEILING_FIELD M5_ENTRY <<< "$M5_BUDGET_FIELDS"
-fi
-V2_LABEL="app.wasm gzip is under briefs/M5-budget.json's task_local_ceiling_bytes (the M5 task-local budget = m4_final + m5_reserve; the shipping artifact is build-site.sh --optimize's output per PLAN.md's Size ruling)"
-if [ -n "$M5_BUDGET_FIELDS" ] && [ -f "$WASM_FILE" ]; then
+V2_LABEL="app.wasm gzip is under the PINNED M5 task-local ceiling M5_TASK_CEILING=987008 (= pinned m4_final 927008 + pinned m5_reserve 60000, coordinator-ruling constants in this script's own source -- briefs/M5-budget.json only RECORDS them, V8 asserts it matches; the shipping artifact is build-site.sh --optimize's output per PLAN.md's Size ruling)"
+if [ -f "$WASM_FILE" ]; then
   M5_DELTA=$((WASM_GZIP_BYTES - M5_M4_FINAL))
-  info "M5 budget: app.wasm gzip observed=$WASM_GZIP_BYTES bytes; task_local_ceiling_bytes=$M5_TASK_CEILING; delta from m4_final_gzip_bytes ($M5_M4_FINAL) = $M5_DELTA bytes"
+  info "M5 budget: app.wasm gzip observed=$WASM_GZIP_BYTES bytes; pinned task ceiling=$M5_TASK_CEILING; delta from pinned m4_final ($M5_M4_FINAL) = $M5_DELTA bytes"
   if [ "$WASM_GZIP_BYTES" -le "$M5_TASK_CEILING" ]; then
-    ok "$V2_LABEL (observed: $WASM_GZIP_BYTES of $M5_TASK_CEILING bytes; delta from m4_final_gzip_bytes=$M5_M4_FINAL is $M5_DELTA bytes; headroom $((M5_TASK_CEILING - WASM_GZIP_BYTES)) bytes)"
+    ok "$V2_LABEL (observed: $WASM_GZIP_BYTES of $M5_TASK_CEILING bytes; delta from pinned m4_final=$M5_M4_FINAL is $M5_DELTA bytes; headroom $((M5_TASK_CEILING - WASM_GZIP_BYTES)) bytes)"
   else
-    fail "$V2_LABEL (observed: $WASM_GZIP_BYTES bytes, OVER task_local_ceiling_bytes=$M5_TASK_CEILING by $((WASM_GZIP_BYTES - M5_TASK_CEILING)) bytes; delta from m4_final_gzip_bytes=$M5_M4_FINAL is $M5_DELTA bytes)"
+    fail "$V2_LABEL (observed: $WASM_GZIP_BYTES bytes, OVER the pinned M5_TASK_CEILING=$M5_TASK_CEILING by $((WASM_GZIP_BYTES - M5_TASK_CEILING)) bytes; delta from pinned m4_final=$M5_M4_FINAL is $M5_DELTA bytes)"
   fi
 else
-  fail "$V2_LABEL (observed: briefs/M5-budget.json missing/unparseable, python3 missing, or app.wasm missing)"
+  fail "$V2_LABEL (observed: app.wasm missing)"
 fi
 
 # --- V8: both budget files cohere (M5 re-scope, same 2026-08-08 ruling ----
@@ -1099,6 +1157,12 @@ fi
 # still stands ------------------------------------------------------------
 # The fresh measurement, like V2's, is of the OPTIMIZED shipping artifact
 # at --dir:
+#   (a0) M5 (final-review fix, briefs/M5-codex-final1.json M5-R1-2): the
+#       file's m4_final_gzip_bytes, m5_reserve_bytes and
+#       task_local_ceiling_bytes must EQUAL the coordinator-ruling
+#       literals pinned above (M5_M4_FINAL/M5_RESERVE/M5_TASK_CEILING) --
+#       an internally consistent but doctored file (e.g. reserve 70000,
+#       ceiling 997008) fails HERE, on the literal mismatch;
 #   (a) M5: task_local_ceiling_bytes is exactly m4_final_gzip_bytes +
 #       m5_reserve_bytes -- a doctored ceiling cannot license anything
 #       the formula does not;
@@ -1121,7 +1185,7 @@ fi
 #       clause (d), retired by the re-scope ruling: the M5 tree sat 626
 #       bytes under the M4-scoped ceiling and would have false-blocked
 #       the a11y pass).
-V8_LABEL="briefs/M5-budget.json coheres (task_local_ceiling_bytes == m4_final + m5_reserve; ceiling_bytes==1000000; fresh optimized-artifact gzip within [m4_final-3000, task_local_ceiling_bytes]) and briefs/M4-budget.json still stands as the M4 historical record (authorised:true; task_local == min(940000, m3_final+m4_budget); ceiling_bytes==1000000; |m3_final - second_build| <= 3000)"
+V8_LABEL="briefs/M5-budget.json MATCHES the pinned coordinator-ruling constants (m4_final==927008, m5_reserve==60000, task_local_ceiling==987008 -- M5-R1-2: a doctored file fails even when internally consistent) and coheres (task_local_ceiling_bytes == m4_final + m5_reserve; ceiling_bytes==1000000; fresh optimized-artifact gzip within [m4_final-3000, task_local_ceiling_bytes]) and briefs/M4-budget.json still stands as the M4 historical record (authorised:true; task_local == min(940000, m3_final+m4_budget); ceiling_bytes==1000000; |m3_final - second_build| <= 3000)"
 if [ -f "$M5_BUDGET_JSON" ] && [ -f "$M4_BUDGET_JSON" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
   V8_OUT="$(python3 -c '
 import json, sys
@@ -1132,12 +1196,19 @@ except Exception as e:
     print("FAIL could not parse a budget file: %s" % e)
     raise SystemExit
 observed = int(sys.argv[3])
+pin_final, pin_res, pin_task = int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])
 problems = []
 try:
     m5_task = int(m5["task_local_ceiling_bytes"])
     m5_final = int(m5["m4_final_gzip_bytes"])
     m5_res = int(m5["m5_reserve_bytes"])
     m5_ceil = int(m5["ceiling_bytes"])
+    if m5_final != pin_final:
+        problems.append("M5-budget.json m4_final_gzip_bytes=%d does not match the pinned coordinator ruling M5_M4_FINAL=%d -- the record was doctored" % (m5_final, pin_final))
+    if m5_res != pin_res:
+        problems.append("M5-budget.json m5_reserve_bytes=%d does not match the pinned coordinator ruling M5_RESERVE=%d -- the budget file may not raise its own authorized reserve" % (m5_res, pin_res))
+    if m5_task != pin_task:
+        problems.append("M5-budget.json task_local_ceiling_bytes=%d does not match the pinned coordinator ruling M5_TASK_CEILING=%d -- the record was doctored" % (m5_task, pin_task))
     want = m5_final + m5_res
     if m5_task != want:
         problems.append("M5 task_local_ceiling_bytes=%d is not m4_final+m5_reserve=%d" % (m5_task, want))
@@ -1169,10 +1240,10 @@ except KeyError as e:
 if problems:
     print("FAIL " + "; ".join(problems))
 else:
-    print("OK M5 formula holds (task ceiling %d = %d+%d, ceiling_bytes=1000000), fresh gzip %d in [%d, %d]; M4 record intact (task ceiling %d = min(940000, %d+%d), authorised, variance |%d-%d|<=3000)"
-          % (m5_task, m5_final, m5_res, observed, m5_final - 3000, m5_task,
+    print("OK M5 record matches the pinned ruling (m4_final=%d, reserve=%d, task ceiling=%d), formula holds (task ceiling %d = %d+%d, ceiling_bytes=1000000), fresh gzip %d in [%d, %d]; M4 record intact (task ceiling %d = min(940000, %d+%d), authorised, variance |%d-%d|<=3000)"
+          % (pin_final, pin_res, pin_task, m5_task, m5_final, m5_res, observed, m5_final - 3000, m5_task,
              m4_task, m4_m3, m4_b, m4_m3, m4_second))
-' "$M5_BUDGET_JSON" "$M4_BUDGET_JSON" "$WASM_GZIP_BYTES" 2>&1)" || true
+' "$M5_BUDGET_JSON" "$M4_BUDGET_JSON" "$WASM_GZIP_BYTES" "$M5_M4_FINAL" "$M5_RESERVE" "$M5_TASK_CEILING" 2>&1)" || true
   case "$V8_OUT" in
     "OK "*) ok "$V8_LABEL (${V8_OUT#OK })" ;;
     *)      fail "$V8_LABEL (observed: ${V8_OUT#FAIL })" ;;
@@ -1182,7 +1253,7 @@ else
 fi
 
 # --- V3: the harness fake exists and carries its whole driver surface -----
-# scripts/fake-midi.js is the committed, reviewable fake behind the D1..D25
+# scripts/fake-midi.js is the committed, reviewable fake behind the D1..D27
 # browser assertions. It must exist, parse, and name every driver member
 # the sabotage sweep depends on -- a fake that silently lost setOutcome or
 # emit would turn the whole device suite vacuous.
@@ -3104,10 +3175,12 @@ start_server() {
 # report exactly two named checks: "$health_label" and "$browser_label".
 # M4 (task "verification", V6): the stage's browser output is also teed
 # into a temp capture and its path left in LAST_BROWSER_STAGE_LOG, so the
-# V6 check below can prove the D1..D25 device suite actually ran INSIDE
+# V6 check below can prove the D1..D27 device suite actually ran INSIDE
 # the root run (an unplugged suite would leave checks 7/8 green while the
 # device assertions silently stopped existing -- the exact
-# can't-fail-anymore class this project keeps re-finding).
+# can't-fail-anymore class this project keeps re-finding), and the M5
+# cardinality-contract checks below can hold each stage's own
+# "N/N assertions passed" summary to the M5_BROWSER_ASSERT_FLOOR.
 LAST_BROWSER_STAGE_LOG=""
 run_browser_stage() {
   local serve_dir="$1" on_disk_index="$2" url_path="$3" health_label="$4" browser_label="$5" browser_path="$6"
@@ -3193,20 +3266,59 @@ ROOT_HEALTH_LABEL="root dev server serves the on-disk index.html byte-for-byte"
 ROOT_BROWSER_LABEL="browser check at the origin root (http://127.0.0.1:<port>/)"
 SUBPATH_HEALTH_LABEL="sub-path dev server serves the on-disk index.html byte-for-byte"
 SUBPATH_BROWSER_LABEL="browser check at a GitHub-Pages-style sub-path (AUTHORITATIVE deployability check)"
-# M4 (task "verification", V6): the D1..D25 WebMIDI device assertions are
+# M4 (task "verification", V6): the D1..D27 WebMIDI device assertions are
 # part of scripts/browser-check.mjs's ordinary full run (checks 7/8), on
 # fresh CDP targets with scripts/fake-midi.js injected. This named check
 # proves they actually RAN AND PASSED inside check 7's root run, by
-# counting the 25 distinct "ok - D<n>: ..." report lines in that stage's
+# counting the 27 distinct "ok - D<n>: ..." report lines in that stage's
 # captured output -- so silently unplugging the device suite from the
 # browser driver turns this red even while checks 7/8 stay green. M4
 # gate-2 fix (briefs/M4-codex-gate2.json, new finding 1): the floor was
 # left at D1..D22 when gate-1 added D23/D24/D25, so those three could be
 # silently unplugged while everything stayed green -- the exact
-# unplugged-check class V6 exists to prevent; the floor is now D1..D25.
+# unplugged-check class V6 exists to prevent. M5 final-review fix
+# (briefs/M5-codex-final1.json, finding M5-R1-1): the SAME mistake was
+# then repeated -- M5's a11y device assertions D26/D27 were left OUTSIDE
+# the D1..D25 floor, so they too could be silently unplugged; the floor
+# is now D1..D27 and MUST grow every time a D-assertion is added.
 # On the EXISTING browser axis: skipped via skip() (counted, conspicuous,
 # TOTAL unchanged), never via any new flag.
-DEVICE_SUITE_LABEL="device assertions D1..D25 ran and passed inside check 7's root browser run (WebMIDI suite driven through scripts/fake-midi.js)"
+DEVICE_SUITE_LABEL="device assertions D1..D27 ran and passed inside check 7's root browser run (WebMIDI suite driven through scripts/fake-midi.js; D26/D27 are the M5 a11y device assertions)"
+# M5 cardinality contract (briefs/M5-codex-final1.json, M5-R1-1), browser
+# half -- see usage() check 19 and the M5_BROWSER_ASSERT_FLOOR pin near the
+# reporting helpers. Each full browser stage's own dynamically accumulated
+# total is held to a pinned FLOOR, so deleting a block of assertions (e.g.
+# the whole T17 D26/D27 scenario) can no longer just produce a smaller
+# all-green run. Floors, never equalities: raising the floor is part of
+# adding assertions. Skipped conspicuously (via skip(), TOTAL unchanged)
+# under --skip-browser (the stages never ran) AND under --skip-content
+# (without the content/exercise fixtures the stages lawfully run fewer
+# assertions -- see check 17's fallback note in usage()).
+ROOT_CARDINALITY_LABEL="M5 cardinality contract: root browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
+SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
+
+# Parse one stage's captured output for its final "browser-check: N/M
+# assertions passed" summary line and enforce the contract: the line must
+# exist, every assertion must have passed (N == M), and the total must be
+# at or above the pinned floor.
+browser_stage_assertion_floor() {
+  local log="$1" label="$2"
+  local line="" bs_passed="" bs_total=""
+  if [ -n "$log" ] && [ -s "$log" ]; then
+    line="$(grep -E '^browser-check: [0-9]+/[0-9]+ assertions passed$' "$log" | tail -n1)"
+  fi
+  if [ -z "$line" ]; then
+    fail "$label (observed: no 'browser-check: N/M assertions passed' summary line in the stage capture -- the stage never ran to its summary)"
+    return
+  fi
+  bs_passed="$(printf '%s\n' "$line" | sed -E 's|^browser-check: ([0-9]+)/([0-9]+) assertions passed$|\1|')"
+  bs_total="$(printf '%s\n' "$line" | sed -E 's|^browser-check: ([0-9]+)/([0-9]+) assertions passed$|\2|')"
+  if [ "$bs_passed" = "$bs_total" ] && [ "$bs_total" -ge "$M5_BROWSER_ASSERT_FLOOR" ]; then
+    ok "$label (observed: $bs_passed/$bs_total assertions passed, floor $M5_BROWSER_ASSERT_FLOOR)"
+  else
+    fail "$label (observed: $bs_passed/$bs_total assertions passed -- not all passed, or the total fell below the $M5_BROWSER_ASSERT_FLOOR floor: assertions were removed/unplugged from the suite)"
+  fi
+}
 
 if [ "$SKIP_BROWSER" -eq 1 ]; then
   echo "SKIPPED -- browser checks (requested via --skip-browser or SXC1_SKIP_BROWSER=1)"
@@ -3216,13 +3328,18 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$SUBPATH_BROWSER_LABEL"
   skip "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation)"
   skip "$DEVICE_SUITE_LABEL"
+  skip "$ROOT_CARDINALITY_LABEL"
+  skip "$SUBPATH_CARDINALITY_LABEL"
 else
   if ! BROWSER_PATH="$(resolve_browser)"; then
     fail "$ROOT_HEALTH_LABEL (observed: no browser found -- set SXC1_BROWSER, install Chrome/Chromium, or pass --skip-browser)"
     fail "$ROOT_BROWSER_LABEL"
     fail "$SUBPATH_HEALTH_LABEL (observed: no browser found -- set SXC1_BROWSER, install Chrome/Chromium, or pass --skip-browser)"
     fail "$SUBPATH_BROWSER_LABEL"
+    fail "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation) (observed: no browser found, the stage never ran)"
     fail "$DEVICE_SUITE_LABEL (observed: no browser found, the suite never ran)"
+    fail "$ROOT_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
+    fail "$SUBPATH_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
   else
     # Check 7: ordinary root-served smoke test.
     run_browser_stage "$DIR" "$DIR/index.html" "/" "$ROOT_HEALTH_LABEL" "$ROOT_BROWSER_LABEL" "$BROWSER_PATH"
@@ -3240,6 +3357,7 @@ else
     mkdir -p "$SUBPATH_DIR"
     cp -R "$DIR"/. "$SUBPATH_DIR"/
     run_browser_stage "$SUBPATH_TMP" "$SUBPATH_DIR/index.html" "/sub/path/" "$SUBPATH_HEALTH_LABEL" "$SUBPATH_BROWSER_LABEL" "$BROWSER_PATH"
+    SUBPATH_BROWSER_STAGE_LOG="$LAST_BROWSER_STAGE_LOG"
     rm -rf "$SUBPATH_TMP"
     unregister_temp_dir "$SUBPATH_TMP"
 
@@ -3264,37 +3382,111 @@ else
     # lets python serve the bundle with NO subshell and NO cd, so $! IS
     # the python process and killing it actually stops the server. The
     # check itself is unchanged.
-    python3 -m http.server "$STORAGE_PORT" --bind 127.0.0.1 --directory "$DIR" >/dev/null 2>&1 &
-    STORAGE_SRV_PID=$!
-    SERVER_PIDS+=("$STORAGE_SRV_PID")
-    sleep 1
-    set +e
-    "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-storage-refused --url "http://127.0.0.1:$STORAGE_PORT/" >/dev/null 2>&1
-    STORAGE_REFUSED_RC=$?
-    set -e
-    kill "$STORAGE_SRV_PID" >/dev/null 2>&1 || true
-    wait "$STORAGE_SRV_PID" 2>/dev/null || true
-    if [ "$STORAGE_REFUSED_RC" -eq 0 ]; then
-      ok "$STORAGE_REFUSED_LABEL"
+    #
+    # M5 final-review fix (briefs/M5-codex-final1.json, finding M5-R1-3):
+    # this stage used to start python on the fixed derived port, sleep 1,
+    # and probe -- never proving the server it probed was ITS OWN child.
+    # A stale/foreign listener on PORT+7 (exactly where item 12's leaked
+    # orphans sat) would win the bind race, the fresh python child would
+    # exit, and the browser check would run against the WRONG bytes --
+    # possibly an older, passing bundle masking a current storage
+    # regression. Now, like the ordinary stages: (1) an already-occupied
+    # port is REJECTED outright (FAIL, never a silent probe of somebody
+    # else's server); (2) the child must come up within the same
+    # wait_for_port budget the ordinary stages get; (3)
+    # verify_server_healthy proves the child is still alive (kill -0)
+    # AND that /index.html fetched through the port byte-matches the
+    # on-disk $DIR/index.html it is supposed to serve. Mismatch or dead
+    # child = FAIL, not skip. The item-12 direct-child kill+wait cleanup
+    # is preserved intact on every path that started the child.
+    if port_in_use "$STORAGE_PORT"; then
+      fail "$STORAGE_REFUSED_LABEL (observed: port $STORAGE_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port (a leaked http.server?) or pass a different --port)"
     else
-      fail "$STORAGE_REFUSED_LABEL (browser-check --check-storage-refused exit $STORAGE_REFUSED_RC)"
+      python3 -m http.server "$STORAGE_PORT" --bind 127.0.0.1 --directory "$DIR" >/dev/null 2>&1 &
+      STORAGE_SRV_PID=$!
+      SERVER_PIDS+=("$STORAGE_SRV_PID")
+      STORAGE_SRV_VERIFIED=0
+      if ! wait_for_port "$STORAGE_PORT" 15; then
+        fail "$STORAGE_REFUSED_LABEL (observed: this stage's own python http.server (pid $STORAGE_SRV_PID) never came up on port $STORAGE_PORT within 15s)"
+      elif ! verify_server_healthy "$STORAGE_SRV_PID" "$STORAGE_PORT" "/index.html" "$DIR/index.html"; then
+        fail "$STORAGE_REFUSED_LABEL (observed: the listener on port $STORAGE_PORT is not provably this stage's own child serving '$DIR' -- child dead, /index.html unfetchable, or served bytes do not match the on-disk index.html (M5-R1-3); browser check not run)"
+      else
+        STORAGE_SRV_VERIFIED=1
+      fi
+      if [ "$STORAGE_SRV_VERIFIED" -eq 1 ]; then
+        set +e
+        "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-storage-refused --url "http://127.0.0.1:$STORAGE_PORT/" >/dev/null 2>&1
+        STORAGE_REFUSED_RC=$?
+        set -e
+        if [ "$STORAGE_REFUSED_RC" -eq 0 ]; then
+          ok "$STORAGE_REFUSED_LABEL"
+        else
+          fail "$STORAGE_REFUSED_LABEL (browser-check --check-storage-refused exit $STORAGE_REFUSED_RC)"
+        fi
+      fi
+      kill "$STORAGE_SRV_PID" >/dev/null 2>&1 || true
+      wait "$STORAGE_SRV_PID" 2>/dev/null || true
     fi
 
-    # V6 (M4, task "verification") -- see DEVICE_SUITE_LABEL's comment
-    # above. 25 DISTINCT passing device-assertion lines must appear in
-    # check 7's root-stage capture; a failed assertion prints "FAIL - Dn:"
-    # instead and is therefore missing from this count, so V6 goes red
-    # both when the suite is unplugged and when any of its members fail.
+    # V6 (M4, task "verification"; floor widened to D1..D27 by the M5
+    # final-review fix, briefs/M5-codex-final1.json M5-R1-1) -- see
+    # DEVICE_SUITE_LABEL's comment above. 27 DISTINCT passing
+    # device-assertion lines must appear in check 7's root-stage capture;
+    # a failed assertion prints "FAIL - Dn:" instead and is therefore
+    # missing from this count, so V6 goes red both when the suite is
+    # unplugged and when any of its members fail. The fail message NAMES
+    # the missing assertion(s), not just the count.
     DEVICE_SUITE_OK_COUNT=0
+    DEVICE_SUITE_SEEN=""
     if [ -n "${ROOT_BROWSER_STAGE_LOG:-}" ] && [ -s "$ROOT_BROWSER_STAGE_LOG" ]; then
-      DEVICE_SUITE_OK_COUNT="$(grep -oE '^ok - D([1-9]|1[0-9]|2[0-5]): ' "$ROOT_BROWSER_STAGE_LOG" | sort -u | wc -l | tr -d ' ')"
+      DEVICE_SUITE_SEEN="$(grep -oE '^ok - D([1-9]|1[0-9]|2[0-7]): ' "$ROOT_BROWSER_STAGE_LOG" | grep -oE 'D[0-9]+' | sort -u)"
+      DEVICE_SUITE_OK_COUNT="$(printf '%s' "$DEVICE_SUITE_SEEN" | grep -c '^D' || true)"
     fi
-    if [ "$DEVICE_SUITE_OK_COUNT" -eq 25 ]; then
-      ok "$DEVICE_SUITE_LABEL (observed: 25/25 distinct D-assertions reported ok in the root stage)"
+    if [ "$DEVICE_SUITE_OK_COUNT" -eq 27 ]; then
+      ok "$DEVICE_SUITE_LABEL (observed: 27/27 distinct D-assertions reported ok in the root stage)"
     else
-      fail "$DEVICE_SUITE_LABEL (observed: $DEVICE_SUITE_OK_COUNT of 25 distinct D-assertions reported ok in the root stage -- the device suite failed, or never ran at all)"
+      DEVICE_SUITE_MISSING=""
+      for dn in $(seq 1 27); do
+        if ! printf '%s\n' "$DEVICE_SUITE_SEEN" | grep -qx "D$dn"; then
+          DEVICE_SUITE_MISSING="$DEVICE_SUITE_MISSING D$dn"
+        fi
+      done
+      fail "$DEVICE_SUITE_LABEL (observed: $DEVICE_SUITE_OK_COUNT of 27 distinct D-assertions reported ok in the root stage; missing:${DEVICE_SUITE_MISSING:- <none>} -- the device suite failed, or was (partly) unplugged and never ran)"
+    fi
+
+    # M5 cardinality contract, browser half (briefs/M5-codex-final1.json,
+    # M5-R1-1) -- see ROOT_CARDINALITY_LABEL's comment above. Only
+    # meaningful on full fixture inputs: under --skip-content the stages
+    # lawfully run fewer assertions (check 17's fallback), so the floor is
+    # skipped conspicuously there -- via skip(), TOTAL unchanged -- and CI,
+    # which forbids skips, still gets the binding floor on every gate run.
+    if [ "$SKIP_CONTENT" -eq 1 ]; then
+      skip "$ROOT_CARDINALITY_LABEL (only enforced on full fixture inputs -- --skip-content lawfully runs fewer browser assertions)"
+      skip "$SUBPATH_CARDINALITY_LABEL (only enforced on full fixture inputs -- --skip-content lawfully runs fewer browser assertions)"
+    else
+      browser_stage_assertion_floor "${ROOT_BROWSER_STAGE_LOG:-}" "$ROOT_CARDINALITY_LABEL"
+      browser_stage_assertion_floor "${SUBPATH_BROWSER_STAGE_LOG:-}" "$SUBPATH_CARDINALITY_LABEL"
     fi
   fi
+fi
+
+# ===========================================================================
+# M5 CARDINALITY CONTRACT, self half (briefs/M5-codex-final1.json, finding
+# M5-R1-1): check-site's own final TOTAL -- with this very check counted --
+# must equal the pinned M5_CHECK_TOTAL (see the pin's comment near the
+# reporting helpers). CI checks exit status, result=complete, zero skips
+# and zero FAIL lines, but the total itself was only ever dynamically
+# accumulated -- so a deleted check produced a smaller all-green run. This
+# is the LAST check on every path, unconditional (never skipped: skip()
+# increments TOTAL exactly like ok()/fail(), so the pin holds -- and is
+# enforced -- on --skip-browser/--skip-content runs too, which is the
+# skip-axis TOTAL-preservation property made load-bearing).
+# ===========================================================================
+M5_FINAL_TOTAL_WITH_THIS=$((TOTAL + 1))
+if [ "$M5_FINAL_TOTAL_WITH_THIS" -eq "$M5_CHECK_TOTAL" ]; then
+  ok "M5 cardinality contract: check-site's own final check total is exactly the pinned M5_CHECK_TOTAL=$M5_CHECK_TOTAL (this check included; adding or removing ANY check requires a visible edit to the pin)"
+else
+  fail "M5 cardinality contract: check-site's own final check total is exactly the pinned M5_CHECK_TOTAL=$M5_CHECK_TOTAL (observed: $M5_FINAL_TOTAL_WITH_THIS with this check included -- a check was added or removed without a visible edit to the pin)"
 fi
 
 # ===========================================================================

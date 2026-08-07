@@ -1,0 +1,162 @@
+{
+  "task_type": "review",
+  "review_round": "M5 final whole-project review, round 1",
+  "reviewed_base": "m4",
+  "reviewed_head": "bdfac0d3859c80589ebcd190e7bcc0689393a783",
+  "overall_verdict": "GATE-BLOCKED",
+  "summary": "The M5 product changes are generally careful: the content corrections, reader-debt fixes, privacy boundary, accessibility implementation, CI PIPESTATUS handling, and fixed 987,008-byte arithmetic all inspect cleanly. The closing gate is not yet trustworthy, however. M5 added assertions without cardinality floors, V2/V8 let the budget ledger increase its own reserve, and the storage-refused stage can test a stale server after a fixed-port collision. The public README also still presents M4 gate and artifact figures as the current figures for an M5 ship candidate.",
+  "verified_state_treatment": "Accepted the coordinator-supplied green executions and physical-device ruling as evidence; per the read-only/no-verification constraint, no build, test, lint, browser run, network probe, or live-URL check was performed in this review.",
+  "findings": [
+    {
+      "id": "M5-R1-1",
+      "severity": "HIGH",
+      "blocks_ship": true,
+      "title": "The closing gate has no M5 cardinality contract, and D26/D27 are explicitly outside the only browser-assertion floor",
+      "scopes": [
+        "A6",
+        "Bc",
+        "Bd"
+      ],
+      "locations": [
+        "scripts/browser-check.mjs:3861-3868",
+        "scripts/browser-check.mjs:4916-4977",
+        "scripts/browser-check.mjs:7040-7051",
+        "scripts/check-site.sh:395-415",
+        "scripts/check-site.sh:3180-3188",
+        "scripts/check-site.sh:3196-3209",
+        "scripts/check-site.sh:3283-3295",
+        "scripts/check-site.sh:3327-3341",
+        ".github/workflows/site.yml:336-354"
+      ],
+      "evidence": "The source says D26/D27 are deliberately outside V6's D1-D25 regex. The ordinary browser driver reports success whenever passed == its dynamically accumulated total, and check-site treats its zero exit as sufficient; V6 then requires only the 25 older lines. Removing the T17 block that reports D26/D27 therefore yields a smaller all-green browser run instead of a failure. The standalone negative sweep knows about the two checks, but CI does not invoke either browser self-test mode. The same structural problem exists one level up: check-site's 96 total is accumulated only through ok/fail/skip, and CI checks exit, result=complete, zero skips, and zero FAIL lines without requiring 96/96. Deleting M5's new 15c check would simply produce a smaller successful total.",
+      "failure_scenario": "Delete scripts/browser-check.mjs:4916-4977. The real stages can report 173/173 and exit zero; V6 still sees D1-D25 and passes; check-site still prints result=complete. Independently, delete the new top-level cwd-robust check and the gate can fall from 96 to 95 while every CI guard remains green.",
+      "recommendation": "Add a closing-M5 cardinality contract: pin 96 top-level checks, pin the full root/subpath browser-stage total of 175 under the full fixture inputs, and grow V6 or add a sibling M5 floor that requires distinct D1-D27 lines. Keep the M4 historical 25-line statement as history, not as the final gate ceiling. This answers the prompt's D26/D27 question directly: the exclusion is not sound for the ship gate; the protected floor must grow."
+    },
+    {
+      "id": "M5-R1-2",
+      "severity": "HIGH",
+      "blocks_ship": true,
+      "title": "V2/V8 let M5-budget.json increase the reserve that is supposed to constrain it",
+      "scopes": [
+        "A4",
+        "Bc",
+        "Bd"
+      ],
+      "locations": [
+        "briefs/M5-budget.json:4-9",
+        "scripts/check-site.sh:1070-1094",
+        "scripts/check-site.sh:1124-1151"
+      ],
+      "evidence": "The ruling fixes m4_final_gzip_bytes=927008, m5_reserve_bytes=60000, and task_local_ceiling_bytes=987008. V2 reads all three from that same mutable JSON. V8 proves only task == final + reserve, ceiling_bytes == 1000000, and that the artifact lies in a range derived from those mutable values; it never pins the ruling's 927008, 60000, or 987008 values.",
+      "failure_scenario": "Change m5_reserve_bytes from 60000 to 72992 and task_local_ceiling_bytes from 987008 to 1000000. The formula still holds, the supplied 933305-byte artifact remains inside V8's range, V1's outer 1000000 constant is untouched, and V2/V8 stay green even though the coordinator-authorized M5 ceiling was raised by 12992 bytes.",
+      "recommendation": "Pin the three authorized M5 values independently of the ledger being validated, just as V1 self-pins the frozen outer constant. An exact literal check in check-site, or a comparison against an immutable/tagged ruling artifact, is sufficient. Continue measuring the fresh artifact against 987008."
+    },
+    {
+      "id": "M5-R1-3",
+      "severity": "MEDIUM",
+      "blocks_ship": true,
+      "title": "The storage-refused check can silently run against a stale server after a fixed-port collision",
+      "scopes": [
+        "A4",
+        "Bd"
+      ],
+      "locations": [
+        "scripts/check-site.sh:3039-3067",
+        "scripts/check-site.sh:3256-3280"
+      ],
+      "evidence": "The ordinary stages already establish server ownership by requiring the child to be alive and byte-matching the served index to the intended on-disk file. The storage-refused stage instead starts python on fixed PORT+7, sleeps, and launches the browser without checking child liveness, port ownership, or bytes. This is especially concrete here because the fixed leak recorded old orphan servers at port 8130, exactly the default PORT+7 value.",
+      "failure_scenario": "A prior http.server is already listening on PORT+7 and serves an older passing SXC bundle. The new python child exits on bind failure, but browser-check connects to the old listener and can pass; kill/wait then operate on the exited child. A current storage regression is masked by the stale artifact.",
+      "recommendation": "Start this stage through the existing port-probing server helper and call verify_server_healthy against DIR/index.html before browser-check. At minimum, reject an occupied port, prove kill -0 on the child, wait for readiness, and byte-match the response. Preserve the new direct-child kill+wait cleanup."
+    },
+    {
+      "id": "M5-R1-4",
+      "severity": "MEDIUM",
+      "blocks_ship": true,
+      "title": "README's advertised current verification and shipping measurements stop at M4",
+      "scopes": [
+        "A5",
+        "Ba"
+      ],
+      "locations": [
+        "README.md:37-48",
+        "README.md:50-71",
+        "README.md:426-455",
+        "README.md:986-1009"
+      ],
+      "evidence": "The developer landing directs readers to Measured figures for current sizes, counts, and timings, but Status and Verification still say 95 check-site checks, 160 browser assertions, D1-D25, and 133 browser self-test assertions. The measured table calls the M4 927008-byte wasm the shipping artifact and reports 72992 bytes of outer-ceiling headroom. The supplied HEAD facts are 96 checks, 175 assertions with D1-D27, 141 self-test assertions, 37 negative passes, and a 933305-byte optimized artifact (66695 bytes of outer-ceiling headroom, 53703 under the M5 ceiling).",
+      "failure_scenario": "After M5 is declared shipped, a stranger following the README's explicit current-figures link receives the previous milestone's gate and artifact state, and the verification explanation omits the newly shipping D26/D27 coverage.",
+      "recommendation": "Add an M5 status entry and update the current verification/measured rows to the supplied HEAD figures, clearly retaining any M4 values only as historical baselines. Include the deliberate self-test-negative result if it remains part of the claimed evidence."
+    },
+    {
+      "id": "M5-R1-5",
+      "severity": "LOW",
+      "blocks_ship": false,
+      "title": "PLAN.md carries mutually exclusive current GitHub Pages deployment states",
+      "scopes": [
+        "Ba"
+      ],
+      "locations": [
+        "PLAN.md:123-129",
+        "PLAN.md:166-173",
+        ".github/workflows/site.yml:393-410",
+        "README.md:967-984"
+      ],
+      "evidence": "The deploy-path ruling, workflow, and README say ENABLE_PAGES is deliberately false and legacy gh-pages is current. The Resolved list says Pages is via Actions and ENABLE_PAGES=true. Both cannot describe the same current state.",
+      "recommendation": "Remove or date-qualify the stale Resolved entry. This LOW is documentation/operations debt and does not independently block ship; place it in the post-ship backlog if it is not folded into the README correction pass."
+    }
+  ],
+  "scope_A_verdicts": {
+    "A1": {
+      "verdict": "PASS",
+      "assessment": "The SEXY ONE rename is present in the HTML title, runtime brand, README landing, and PLAN decision (site/static/index.html:6; site/app/View/Pages.hs:103-106; README.md:1-18; PLAN.md:10-11). The verify-line branch now distinguishes granted-but-not-watching from verification-off and keeps the manual path truthful (site/app/View/Exercise.hs:398-454). No new defect found."
+    },
+    "A2": {
+      "verdict": "PASS",
+      "assessment": "The audit records 220/235 topics and zero major gaps (briefs/M5-audit.md:7-21), identifies D1-D12 (lines 38-57), and the reviewed correction files implement the requested changes, including the G1 OFF-before-connect safety step (content/exercises/018-prep-02.ex.md:80-90) and measured d-2-09 endpoint/toggle hooks (content/exercises/036-pad-07.ex.md:23-50). No teaches-falsehoods-class defect was found in the M5 edits."
+    },
+    "A3": {
+      "verdict": "PASS",
+      "assessment": "Pages-column linkification is structurally scoped and range-bounded (site/src/SXC1/Content/Markdown.hs:646-674); blank-gap list continuation requires the same base indent and ordered-number continuation (site/src/SXC1/Content/Markdown.hs:787-820); breadcrumbs choose the first same-page section then the containing fallback (site/src/SXC1/Content/Outline.hs:98-125). The corpus/synthetic/contrast pins in CheckContent groups 23-25 are non-vacuous (site/test/CheckContent.hs:1450-1533,1535-1661,1664-1742)."
+    },
+    "A4": {
+      "verdict": "BLOCKED",
+      "assessment": "The direct-child kill+wait fix, cwd probe, structural inventory binding, current 927008+60000=987008 arithmetic, frozen 1000000 ceiling, result marker, and CI PIPESTATUS capture inspect correctly. M5-R1-2 and M5-R1-3 prevent acceptance of the harness wave: the task-local budget is self-authorizing and the storage stage lacks server identity."
+    },
+    "A5": {
+      "verdict": "BLOCKED",
+      "assessment": "The two-sentence landing, live-link values, owners/developers split, privacy language, and prominent non-affiliation notice are strong and match the inspected code. M5-R1-4 blocks the final README because the document explicitly advertises current figures while retaining M4's gate and artifact state."
+    },
+    "A6": {
+      "verdict": "BLOCKED-ON-GATE-INTEGRITY",
+      "assessment": "No runtime a11y/mobile defect was found: programmatic targets use tabindex=-1 (site/app/View/Exercise.hs:238-243,359-365,478-481), advance/restart focus is route-guarded and Begin is excluded (site/app/Main.hs:789-868), live regions/labels are present (site/app/View/Exercise.hs:415-454,497-506), the phone header is scrollable (site/static/index.html:785-815), and the overflow predicate uses device width plus a right-edge scan (scripts/browser-check.mjs:6955-7035). Acceptance is blocked by M5-R1-1 because the newly shipping assertions can disappear while the gate stays green."
+    },
+    "A7": {
+      "verdict": "PASS",
+      "assessment": "G2-G6, the optional audit gaps, flashcard-taxonomy decision, and figure-caption sweep are explicitly recorded as post-ship work (briefs/M5-ship.md:73-83). The zero-flashcard mismatch is therefore known LOW debt, not a newly discovered ship blocker."
+    }
+  },
+  "scope_B_verdicts": {
+    "Ba": {
+      "verdict": "BLOCKED",
+      "assessment": "The core public claims are supported: runtime assets are local/relative, progress uses localStorage, MIDI remains in memory/hidden diagnostics, and non-affiliation is visible on every route. Both published URL strings agree across README and PLAN. M5-R1-4 makes the claimed current README measurements stale, and M5-R1-5 records a nonblocking PLAN deployment-state contradiction. Live availability itself was accepted from the coordinator rather than network-tested."
+    },
+    "Bb": {
+      "verdict": "PASS",
+      "assessment": "No learner-data or MIDI egress path was found. The boot loader's runtime fetch is the same-origin ./app.wasm asset request (site/static/index.js:46-53); learner state goes only through the guarded localStorage bridge under sxc1.progress/sxc1.prefs (site/static/index.js:14-34; site/app/Progress/Store.hs:53-80); MIDI bytes remain in HubState/model diagnostics and are neither stored nor sent (site/app/Device/Midi.hs:18-23,390-407). Export/import is an explicit copy/paste textarea surface with pure text decoding, not an automatic transfer (site/app/View/Progress.hs:370-425). The owner-accepted translation exposure is accurately disclosed in PLAN.md:18-20 and the notice is prominent in README.md:25-35 and every-route footer site/app/View/Pages.hs:383-391. This is a source/privacy assessment, not legal advice."
+    },
+    "Bc": {
+      "verdict": "BLOCKED",
+      "assessment": "result=complete correctly means zero skipped axes, failures still exit nonzero, and CI captures PIPESTATUS[0] before checking marker/skips/FAIL lines (scripts/check-site.sh:3327-3341; .github/workflows/site.yml:336-354). The supplied 96/96 result and 933305 < 987008 < 1000000 measurements are arithmetically sound. M5-R1-1 shows 96 and 175/D27 are not structurally protected; M5-R1-2 shows 987008 is not independently protected."
+    },
+    "Bd": {
+      "verdict": "BLOCKED",
+      "assessment": "The inspected new assertions use meaningful anti-vacuity evidence: trusted CDP keyboard events, delivered-device-message checks, route guards, device-width overflow comparison, and right-edge scanning. The three remaining false-green paths are M5-R1-1 (assertions/check deleted and totals shrink), M5-R1-2 (budget fields co-edited), and M5-R1-3 (stale server wins the fixed port). No new double-escaped-regex, tee-masked-exit, asset-shape allowlist, or naive scrollWidth predicate was found."
+    },
+    "Be": {
+      "verdict": "PASS",
+      "assessment": "No new teaches-falsehoods-class content defect was found. The twelve audit defects, adjacent FX1 wording, G1 safety step, and measured d-2-09 behavior are corrected. G2-G6 and optional coverage wishes remain explicitly nonblocking post-ship debt; this review does not re-litigate adjudicated milestone content or elevate coverage wishes into ship blockers."
+    }
+  },
+  "method": "Read-only inspection of all nine commits in m4..HEAD, their 30-file diff, current runtime/privacy paths, export/import codec and UI, M5 content corrections, reader/parser changes and pins, accessibility/mobile implementation and browser assertions, check-site accounting/budget/server stages, CI gating, README/PLAN/M5 briefs, and existing M4 device-evidence references. No product file was modified; only this required result JSON was created. No commits were made.",
+  "final_line": "GATE-BLOCKED — the final gate does not pin its 96-check or 175-assertion M5 cardinalities and leaves D26/D27 outside V6; M5-budget.json can raise its own authorized reserve; storage-refused can pass against a stale fixed-port server; and README still advertises M4 gate/artifact figures as current for the M5 ship candidate."
+}
