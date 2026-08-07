@@ -162,28 +162,32 @@ jobs:
       # poppler-utils and either cwebp or python3-pil, neither of which
       # this workflow installs) and commit the result.
       #
-      # site/public ends up about 12.8 MB (currently ~3.3 MB app.wasm +
+      # site/public ends up about 12.2 MB (currently ~2.6 MB app.wasm +
       # ~49 KB ghc_wasm_jsffi.js from the OPTIMIZED build below, plus
       # ~9.4 MB of committed page images) -- well inside GitHub Pages'
       # 1 GB artifact limit.
       #
       # --optimize (M3 "Size ruling", PLAN.md, coordinator, 2026-08-07;
-      # wired here by task "docs-and-ci"): THE SHIPPING ARTIFACT IS THE
-      # wasm-opt BUILD. The full 52-deck/435-exercise course does not fit
-      # under check-site.sh's WASM_GZIP_CEILING_BYTES=1000000 unoptimized
-      # -- measured on this tree, the plain default build gzips app.wasm
-      # to roughly 1,094,000-1,097,000 bytes (OVER the ceiling; run
-      # without --optimize locally and check-site.sh's size check will
-      # fail on exactly this). `wasm-opt -all -O2` + `wasm-tools strip`
-      # (build-site.sh's OWN --optimize flag, unmodified by this
-      # workflow -- see scripts/build-site.sh) brings that down to
-      # roughly 907,600-908,000 bytes, comfortably under budget, and
-      # could not be made to miscompile under adversarial testing
-      # (byte-identical exe:*-check self-test output either way; every
-      # headless-browser assertion this project runs green, repeatedly,
-      # against the optimized artifact -- see scripts/check-site.sh's own
-      # WASM_GZIP_CEILING_BYTES comment and its `--optimized` flag, which
-      # reproduces this exact pipeline on demand for local verification).
+      # wired here by task "docs-and-ci"; flags amended for M4 -- see
+      # below): THE SHIPPING ARTIFACT IS THE wasm-opt BUILD. The full
+      # 52-deck/435-exercise course does not fit under check-site.sh's
+      # WASM_GZIP_CEILING_BYTES=1000000 unoptimized -- measured at M3's
+      # close, the plain default build gzips app.wasm to roughly
+      # 1,094,000-1,097,000 bytes (OVER the ceiling; run without
+      # --optimize locally and check-site.sh's size check will fail on
+      # exactly this). build-site.sh's OWN --optimize flag (unmodified by
+      # this workflow -- see scripts/build-site.sh) now runs `wasm-opt
+      # --detect-features -Oz --converge` + `wasm-tools strip` (the
+      # 2026-08-07 Size-ruling amendment adopted at the start of M4;
+      # originally `-all -O2`), which brings the final M4 artifact to
+      # 925,652 gzipped bytes, comfortably under budget, and could not be
+      # made to miscompile under adversarial testing (byte-identical
+      # exe:*-check self-test output either way; every headless-browser
+      # assertion this project runs green, repeatedly, against the
+      # optimized artifact -- see scripts/check-site.sh's own
+      # WASM_GZIP_CEILING_BYTES comment; its `--optimized` flag
+      # demonstrates an optimize-then-strip pass on a disposable copy,
+      # still with the M3-era `-all -O2` recipe).
       #
       # build-site.sh's OWN default stays unoptimized (OPTIMIZE=0 there,
       # unchanged) -- a bare local `./scripts/build-site.sh` is still the
@@ -300,14 +304,52 @@ jobs:
       # actually 0 by check-site.sh's own accounting, not merely by its
       # marker's say-so. Either one alone is exactly the can't-fail shape
       # this gate round was lost to; both together is not.
+      #
+      # M4 (task "docs-and-ci", wave-3b exit-masking ruling): the M3 shape
+      # of this step had a real hole neither NEW7 assertion covered.
+      # GitHub's default run shell is `bash -e {0}` -- -e but NO pipefail
+      # -- so `check-site.sh | tee` took its exit status from tee, and a
+      # run in which checks FAILED (exit 1) but nothing was SKIPPED still
+      # printed result=complete (that marker certifies zero-skips, not
+      # zero-fails) and sailed through both greps. The M4 WebMIDI device
+      # assertions (D1..D22, driven through scripts/fake-midi.js inside
+      # check-site.sh's browser stages -- see check-site.sh's "device
+      # assertions D1..D22" check) ride this exact path, so the hole is
+      # closed here, not merely documented: the step now asserts, in
+      # order, (0) check-site.sh's REAL exit status via PIPESTATUS[0],
+      # (1) result=complete was printed, (2) zero skipped checks, and
+      # (3) belt-and-braces, zero "FAIL - " lines in the log. There is
+      # deliberately NO way to skip the device checks in CI: no
+      # continue-on-error, no `|| true`, no conditional -- and a run with
+      # SXC1_SKIP_BROWSER=1 (or --skip-browser) prints
+      # result=structural-only, which assertion (1) rejects.
+      #
+      # Chrome availability, stated explicitly rather than implied: the
+      # ubuntu-latest runner image ships Google Chrome preinstalled, and
+      # check-site.sh's resolve_browser finds it there -- the browser
+      # stages (which now include the device suite) have run on this
+      # runner since M0 with no install step. M4 needs no Chrome version
+      # bump: the only CDP surface it added on top of the existing driver
+      # is Page.addScriptToEvaluateOnNewDocument and Target.createTarget,
+      # both long-standing CDP commands available in every Chrome the
+      # runner image has ever shipped.
       - name: Verify site
         timeout-minutes: 30
         run: |
           ./scripts/check-site.sh | tee /tmp/check-site.log
+          rc="${PIPESTATUS[0]}"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::check-site.sh exited $rc -- one or more checks failed; the tee pipe must never mask this exit (M4 wave-3b ruling)"
+            exit "$rc"
+          fi
           grep -q 'check-site: result=complete' /tmp/check-site.log \
             || { echo "::error::browser verification did not run (no result=complete marker) -- a silently skipped axis is a CI failure"; exit 1; }
           if grep -qE '\([1-9][0-9]* skipped\)' /tmp/check-site.log; then
             echo "::error::check-site.sh skipped one or more checks even though result=complete was printed -- NEW7 guard tripped, this should be impossible"
+            exit 1
+          fi
+          if grep -q '^FAIL' /tmp/check-site.log; then
+            echo "::error::check-site.sh printed a FAIL line despite exit 0 and result=complete -- belt-and-braces guard tripped, this should be impossible"
             exit 1
           fi
 
@@ -328,6 +370,16 @@ jobs:
       # cannot un-gate anything: the job's pass/fail outcome was always decided
       # by the earlier failing step, never by whether this best-effort
       # debug-artifact upload itself succeeded.
+      #
+      # M4 (task "docs-and-ci"): the upload now also carries the DEVICE
+      # evidence a failed run leaves behind -- /tmp/check-site.log is the
+      # full teed "Verify site" output, which includes every browser-check
+      # line from both served stages (the "ok - D<n>: ..." / "FAIL - ..."
+      # lines of the D1..D22 WebMIDI device suite ride inside it, because
+      # check-site.sh tees each browser stage's output to its own stdout),
+      # and site/public/index.html (the served shell the device scenarios
+      # booted) is already inside the site/public path below. Extending
+      # THIS step, not adding a second upload, per the M4 manifest.
       - name: Upload debug artifact on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -336,18 +388,22 @@ jobs:
           path: |
             site/public
             site/dist-newstyle/**/*.log
+            /tmp/check-site.log
 
   # ----------------------------------------------------------------------
   # This job stays inert until the repository variable ENABLE_PAGES is
-  # explicitly set to 'true'. The GitHub repository does not exist yet:
-  # its name and visibility are still open with the owner (PLAN.md open
-  # question 1), and GitHub Pages requires a public repo on a free
-  # account. Gating on an explicit opt-in variable (rather than assuming
-  # Pages is configured) is safe under either outcome and needs no code
-  # change when the decision lands -- unset (the default) means the job
-  # is skipped and `main` stays green; once the owner makes the repo
-  # public, enables Pages with the GitHub Actions source, and sets
-  # ENABLE_PAGES=true as a repository variable, pushes to main deploy.
+  # explicitly set to 'true'. As of M4 (see PLAN.md's "Deploy-path note"
+  # and README.md's Deployment section) that variable is DELIBERATELY
+  # false: the repository is public and Pages is configured, but the
+  # workflow Pages queue wedged (repeated deployment_queued timeouts), so
+  # the site currently deploys via the legacy gh-pages branch
+  # (build_type=legacy), refreshed manually after a local build+verify.
+  # Do not re-enable this job here -- that is a coordinator decision:
+  # flipping ENABLE_PAGES=true (and setting the Pages source back to
+  # build_type=workflow) is all it would take, with no workflow change,
+  # because the build job above already produces and verifies the
+  # optimized, under-ceiling artifact on every push. Unset/false means
+  # this job is skipped and `main` stays green.
   # ----------------------------------------------------------------------
   deploy:
     needs: build

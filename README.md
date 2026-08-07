@@ -7,6 +7,27 @@ This is an unofficial fan project and is **not affiliated with Casio**.
 
 ## Status
 
+**M4 (live-device verification).** The trainer can now confirm a drill step by
+watching the learner perform it on the real hardware: with a Casio SXC-1 connected
+over USB-MIDI, clicking **Enable device verification** on a drill page asks the
+browser for (sysex-free) MIDI access, and a step that carries a `verify:` hook
+confirms itself the moment the matching message arrives — see
+[Device verification](#device-verification) below for the guarantees, which are the
+point: strictly progressive enhancement, Chromium-only, off until the learner
+clicks, manual confirmation still the default first-class path everywhere, and
+MIDI data never leaving the browser. M1's reader, M2's engine and M3's course,
+progress persistence and spaced repetition are unchanged and fully intact — on any
+browser without Web MIDI the app looks and behaves exactly as M3 did (the only DOM
+difference is one always-hidden `#sxc1-device-state` diagnostics node). See
+[`briefs/M4-plan.md`](briefs/M4-plan.md) for the design this milestone implements
+and [`briefs/M4-manifest.json`](briefs/M4-manifest.json) for the task-by-task
+breakdown. `check-site.sh` now runs **95 checks** (up from M3's 80), and the
+headless-browser driver asserts **157 assertions per served stage** — including
+the D1–D22 WebMIDI device suite, driven entirely through a committed fake with no
+hardware in the loop (see [Verification](#verification)); the one thing automation
+cannot produce, a walk with the real unit in hand, has its own owner's checklist
+in [`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md).
+
 **M3 (full course + memory).** The site is now a reader, a trainer, *and* a spaced-
 repetition study tool. M1's manual reader and M2's exercise engine are unchanged and
 fully intact; M3 adds the rest of the course content, persists progress across visits,
@@ -45,14 +66,20 @@ simulating a throwing `localStorage` in a real headless-Chrome run (see below).
 
 **Sizing.** M3's course growth (52 decks of embedded content plus the progress engine)
 does not fit under `check-site.sh`'s frozen 1,000,000-byte gzip ceiling in the
-*unoptimized* default build — measured on this tree, `./scripts/build-site.sh` (no
-flags) produces an `app.wasm` that gzips to roughly **1,094,000–1,097,000 bytes**
+*unoptimized* default build — measured at M3's close, `./scripts/build-site.sh` (no
+flags) produced an `app.wasm` that gzips to roughly **1,094,000–1,097,000 bytes**
 (run-to-run jitter of a few KB; consistently ~94–97 KB over budget). Per `PLAN.md`'s
 "Size ruling" (2026-08-07, coordinator decision, explicitly flagged for Codex scrutiny
 at the M3 gate), **the shipping artifact is the `wasm-opt`-optimized build**:
-`./scripts/build-site.sh --optimize` runs `wasm-opt -all -O2` then `wasm-tools strip` on
-`app.wasm`, and measures **907,575–908,037 bytes gzipped** on this tree — comfortably
-under the ceiling, and smaller than M2's entire footprint. `.github/workflows/site.yml`
+`./scripts/build-site.sh --optimize` runs `wasm-opt` then `wasm-tools strip` on
+`app.wasm`. The exact `wasm-opt` flags are `--detect-features -Oz --converge` (a
+2026-08-07 amendment to the Size ruling, adopted at the start of M4: the original
+`-all -O2` left too little headroom for M4's budget, and `-all` at `-Oz` emitted an
+experimental heap-type encoding shipping V8 rejects — see the comment at the
+`wasm-opt` call in `scripts/build-site.sh`); at M3's close, under the original
+`-all -O2` flags, the optimized artifact measured **907,575–908,037 bytes gzipped**,
+and the current M4 figure is in [Measured figures](#measured-figures) — either way
+comfortably under the ceiling, and smaller than M2's entire footprint. `.github/workflows/site.yml`
 now builds with `--optimize` for exactly this reason (see
 [Deployment](#deployment)); `./scripts/build-site.sh`'s own default stays unoptimized
 (`--optimize` remains opt-in, never assumed) so local iteration stays fast, and
@@ -61,14 +88,17 @@ now builds with `--optimize` for exactly this reason (see
 wasm-opt lever was adopted only after empirical scrutiny: the M3 designer could not make
 it miscompile (byte-identical `exe:*-check --self-test` output either way, and the real
 optimized app has passed every headless-browser assertion this project runs, repeatedly).
-`./scripts/check-site.sh --optimized` reproduces this exact pipeline on demand, against
-a *copy* of whatever is at `--dir` (never mutating the original), and re-runs the entire
-check suite against it — see that flag's own `--help` text for the full story.
+`./scripts/check-site.sh --optimized` demonstrates an optimize-then-strip pass on
+demand, against a *copy* of whatever is at `--dir` (never mutating the original), and
+re-runs the entire check suite against it, using the same `--detect-features -Oz
+--converge` flags as the shipping build (aligned with the Size-ruling amendment at M4's
+close); see that flag's own `--help` text for the full story.
 
-`check-site.sh` now runs **80 checks** (up from M2's 71), including the two new checker
-binaries below, the `--optimized` mode just described, and a "storage refused" check
-that simulates a throwing `localStorage` in a real headless-Chrome run and asserts the
-app still boots and reports `available=false` rather than dying at boot.
+`check-site.sh` grew to **80 checks** at M3's close (up from M2's 71; **95** as of M4 —
+see above), including the two new checker binaries below, the `--optimized` mode just
+described, and a "storage refused" check that simulates a throwing `localStorage` in a
+real headless-Chrome run and asserts the app still boots and reports `available=false`
+rather than dying at boot.
 
 **The two new checker binaries.** `exe:progress-check` (the pure spaced-repetition core:
 scheduler, codec, migration mechanism) passes **69/69** self-test assertions across 11
@@ -81,13 +111,12 @@ are documented in detail below.
 a step doesn't silently orphan a learner's saved progress — see
 [Progress, spaced repetition and the id registry](#progress-spaced-repetition-and-the-id-registry).
 
-One thing this milestone still deliberately leaves undone, already seamed for M4 rather
-than left as an open design question: **device verification is not implemented** — a
-drill's self-check is confirmed by the learner clicking a button, not by reading the
-SXC-1 itself over WebMIDI. `site/app/Main.hs` still wires an explicit no-op
-`DeviceVerifier` (`noDeviceVerifier`) so M4 has a seam to fill rather than a design to
-invent; no WebMIDI call and no device permission request exists anywhere in this
-milestone's code.
+One thing M3 still deliberately left undone, already seamed rather than left as an open
+design question, is exactly what M4 has now filled: **device verification**. M3 wired an
+explicit no-op `DeviceVerifier` (`noDeviceVerifier`) in `site/app/Main.hs` so M4 would
+have a seam to fill rather than a design to invent; M4's `site/app/Device/Midi.hs` now
+provides the real WebMIDI-backed implementation behind that same seam — see the M4
+entry at the top of this section and [Device verification](#device-verification) below.
 
 ## Prerequisites
 
@@ -133,14 +162,15 @@ git clone <repo> && cd casio-sxc1
 ```
 
 Every command above has been run, in this order, on this machine, as part of building
-and verifying M3: `install-toolchain.sh` recognised the already-installed toolchain and
-returned in well under a second; a from-scratch `site/dist-newstyle` build (package
-store still warm from the toolchain install; now compiling five executables —
-`exe:app`, `exe:content-check`, `exe:exercise-check`, `exe:progress-check` and
-`exe:registry-check` — instead of M1's three) took 27 s; `check-site.sh` ran all 80
-checks — including both the origin-root and GitHub-Pages-sub-path browser sweeps of all
-108 page routes plus the two new checker binaries and the storage-refused simulation —
-in under 30 s and printed `check-site: result=complete`; and `serve-site.sh` served
+and verifying M3, and re-run end to end for M4: `install-toolchain.sh` recognised the
+already-installed toolchain and returned in well under a second; a from-scratch
+`site/dist-newstyle` build (package store still warm from the toolchain install; now
+compiling five executables — `exe:app`, `exe:content-check`, `exe:exercise-check`,
+`exe:progress-check` and `exe:registry-check` — instead of M1's three) took 27 s at
+M3's close; `check-site.sh` ran all 95 checks — including both the origin-root and
+GitHub-Pages-sub-path browser sweeps of all 108 page routes, the two M3 checker
+binaries, the storage-refused simulation and the D1–D22 WebMIDI device suite — and
+printed `check-site: result=complete`; and `serve-site.sh` served
 `site/public/index.html` over plain HTTP with a `200`. This quickstart builds the plain,
 **unoptimized** `app.wasm` (`build-site.sh`'s own default); see
 [Status](#status)/[Deployment](#deployment) for why CI instead builds with `--optimize`.
@@ -286,6 +316,48 @@ gap:
    embedded copy read out of `#sxc1-exercise-stats` in the live DOM must all agree, or
    `check-site.sh` fails red instead of silently shipping a stale or miscounted build.
 
+## Device verification
+
+<a id="device-verification"></a>
+
+New in M4: when a drill step instructs an action the SXC-1 reports over MIDI — press
+the `A` bank button, tap pad 1 — the trainer can watch the learner do it on the real
+unit and confirm the step automatically, with no click. **37** drill steps across the
+course carry a `verify:` hook (e.g. `verify: cc 80 127`, `verify: pad 1 bank A`); the
+six seed hooks live in the drills at `#/x/pad-01/d-2-01`, `#/x/pad-03/d-2-02` and
+`#/x/pad-07/d-2-09`. Every fact the matcher relies on — CC numbers, note numbers,
+channels — comes from [`translations/midi.md`](translations/midi.md), the SXC-1's own
+MIDI implementation chart. What follows is stated as guarantees, not goals; each one is
+enforced by a named check (see [Verification](#verification)):
+
+- **Progressive enhancement, Chromium-only.** Web MIDI exists in Chromium-family
+  browsers (desktop Chrome or Edge) only. On Firefox, Safari, or anything else without
+  it, the device panel never renders and the app looks and behaves exactly as M3 did —
+  the only DOM difference on such a browser is the always-hidden `#sxc1-device-state`
+  diagnostics node.
+- **Off until the learner clicks.** `navigator.requestMIDIAccess` is called from
+  exactly one place in the whole codebase, reachable only from the explicit
+  **Enable device verification** button (`#btn-device-enable`) on a drill page — never
+  at boot, never from feature detection. The browser suite proves both directions:
+  zero permission requests before the click (D3), exactly one after it (D5).
+- **Manual confirmation is and remains the default path.** The ordinary **Confirm**
+  button works identically in every device state — unsupported, denied, granted,
+  device unplugged mid-drill — and no drill can ever be blocked by MIDI. Device
+  confirmation is a convenience layered on top of the M2/M3 engine, never a gate.
+- **No sysex.** MIDI access is requested with `{sysex: false}` — a structural check
+  proves that is the only shape the call site can take — and system-exclusive
+  messages are dropped at decode. The fake harness records every request's `sysex`
+  flag, so a sysex request anywhere would turn the suite red.
+- **MIDI data never leaves the browser.** Received bytes live in the app's state and
+  the hidden `#sxc1-device-state` node and go nowhere else: no fetch, no storage, no
+  console output, and nothing added to the M3 progress wire format or its sink. A CDP
+  network assertion (D21) watches an entire device scenario end to end and requires
+  zero network requests beyond the app's own assets.
+
+Have the actual hardware? [`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md)
+is the owner's fifteen-minute walk through the feature with a real SXC-1 in hand — the
+one piece of M4 evidence the automated suite below cannot produce.
+
 ## Verification
 
 `check-site.sh` computes the same corpus statistics (character/line/page counts,
@@ -308,6 +380,37 @@ the file directly) sees the new ones, and check 11 goes red instead of silently 
 stale content. The same captured JSON is also handed to the browser driver via
 `--expect-json`, so the headless-browser assertions are checked against numbers derived
 from the source of truth rather than constants baked into the test harness.
+
+**How the device checks are tested without a device.** Real headless Chrome exposes
+`navigator.requestMIDIAccess` but always **rejects** the permission request, so nothing
+in this harness can ever be granted real MIDI access. The device suite therefore runs
+against [`scripts/fake-midi.js`](scripts/fake-midi.js) — a committed, reviewable fake of
+the Web MIDI surface, not a string inside the driver — which `scripts/browser-check.mjs`
+pre-loads into a **freshly created** CDP target with
+`Page.addScriptToEvaluateOnNewDocument`, so it is installed before the app boots and the
+app's own feature detection sees it as the genuine article. Twenty-two assertions
+(D1–D22) drive the full matrix through it: grant, deny and API-absent outcomes,
+hot-plug and unplug, multi-port binding, exactly-once confirmation, and the negative
+controls that keep a green run honest — a **wrong CC**, a **wrong CC value**, a
+**wrong channel** and a **wrong note** must each be *delivered* and must each *fail* to
+confirm the step. Delivery is proven, not assumed: the fake's `emit` returns the number
+of handlers actually invoked, so "did not confirm" can never be confused with "nobody
+was listening". The **no-fake control** (D20) matters most: it runs the same enable
+flow in a target with *no* fake injected at all, and requires it to land in "denied"
+and never confirm — because real headless Chrome denies the permission, a positive
+result anywhere else in the suite can only have come from the fake's scripted
+messages, never from the real API by accident. All of this sits inside
+`check-site.sh`'s ordinary gate (**95 checks** as of M4): the browser driver asserts
+**157 assertions per served stage** (**130** in `node scripts/browser-check.mjs
+--self-test`), and a named check-site check independently counts the 22 distinct
+`ok - D<n>` lines in the root stage's captured output — so silently unplugging the
+device suite from the driver turns check-site red even while the browser stages
+themselves stay green. `check-site.sh` also carries M4-specific structural checks: the
+fake exists and names its whole driver surface, the fake is **never** shipped (no
+`fake-midi.js` under `site/public/` or `site/static/`), `requestMIDIAccess` has exactly
+one call site (in `site/app/Device/Midi.hs`) carrying `sysex: False`, no network-egress
+primitive appears anywhere in `site/app/`, and the frozen size ceiling and M4 budget
+file are intact and authorised.
 
 ## Progress, spaced repetition and the id registry
 
@@ -701,12 +804,17 @@ casio-sxc1/
 ├── README.md                    this file
 ├── PLAN.md                      master project plan and milestone roadmap
 ├── briefs/                      per-milestone design briefs and task manifests
+├── docs/                        owner-facing documents: M4-device-test-protocol.md,
+│                                 the real-hardware device-verification test walk
 ├── scripts/
 │   ├── install-toolchain.sh     one-time GHC-wasm toolchain install ($HOME/.ghc-wasm)
 │   ├── build-site.sh            site/app + site/src + site/static -> site/public/
 │   ├── serve-site.sh            python3 -m http.server on 127.0.0.1
 │   ├── check-site.sh            structural + content + headless-browser checks
 │   ├── browser-check.mjs        the zero-npm-deps CDP driver check-site.sh calls
+│   ├── fake-midi.js             the committed Web MIDI fake browser-check.mjs
+│   │                             pre-loads for the D1-D22 device suite (test
+│   │                             harness only -- never shipped to site/public/)
 │   ├── extract-pages.sh         manual PDF -> page image/text extraction (scratch)
 │   └── render-page-images.sh    manual PDF -> committed site/static/pages/*.webp
 ├── site/
@@ -717,9 +825,11 @@ casio-sxc1/
 │   ├── src/                     SXC1.* -- the miso-free content/route/exercise library;
 │   │                             SXC1/Progress/{Types,Scheduler,Codec}.hs -- the pure
 │   │                             spaced-repetition core (no IO, no Miso, no clock reads)
-│   ├── app/                     the Miso app (Main.hs, View/, Exercises/, Progress/) --
-│   │                             depends on the library; Progress/Store.hs is the one
-│   │                             module allowed to touch localStorage
+│   ├── app/                     the Miso app (Main.hs, View/, Exercises/, Progress/,
+│   │                             Device/) -- depends on the library; Progress/Store.hs
+│   │                             is the one module allowed to touch localStorage;
+│   │                             site/app/Device/ (Midi.hs) is M4's WebMIDI hub, the
+│   │                             only place navigator.requestMIDIAccess is ever called
 │   ├── test/                    CheckContent.hs, CheckExercises.hs, CheckProgress.hs,
 │   │                             CheckRegistry.hs -- the four corpus/engine validators
 │   │                             (exe:content-check, exe:exercise-check,
@@ -828,42 +938,56 @@ change is needed to re-enable workflow deploys — only the coordinator's variab
 and, per the deploy-path note, setting the Pages source back to `build_type=workflow`.
 Until then, every push still builds and verifies the site on CI — only the publish step
 is gated, and the currently-live deployment is refreshed manually via the branch path
-above.
+above. The same built `site/public/` bundle is also deployed to Vercel (project
+`sexy-one`), at <https://sexy-one-gray.vercel.app/>.
 
 ## Measured figures
 
-Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), M3, against the full
-52-deck/435-exercise course:
+<a id="measured-figures"></a>
+
+Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), M4, against the full
+52-deck/435-exercise course (rows not re-measured for M4 say so):
 
 | Metric | Value |
 |---|---|
-| Cold build (`site/dist-newstyle` absent, package store warm; 5 executables) | 27s |
+| Cold build (`site/dist-newstyle` absent, package store warm; 5 executables; measured at M3's close) | 27s |
 | Warm build, unoptimized (nothing changed) | <1s |
-| Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time) | ~5s |
-| `app.wasm`, unoptimized default build (`build-site.sh`, no flags) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
-| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — the shipping artifact) | ≈3,238,550 bytes raw / **907,575–908,037 bytes gzipped** |
+| Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time; `-Oz --converge` iterates to a fixed point, so it costs more than M3's `-O2` ~5s: the `wasm-opt` pass alone measures ≈11s on this machine) | ~15s |
+| `app.wasm`, unoptimized default build (`build-site.sh`, no flags; measured at M3's close — M4 ships only the optimized flavour, and grew, so this is still *over* the ceiling) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
+| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M4 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `925652`) | 2,637,389 bytes raw / **925,652 bytes gzipped** |
+| M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json` `m3_final_gzip_bytes`) | **+34,939 bytes** — inside M4's 42,000-byte budget and under the task-local 932,713-byte ceiling (`briefs/M4-budget.json`) |
+| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 74,348 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` | 12,799,585 bytes (≈12.8 MB) |
-| `check-site.sh`, full run (**80** checks, both browser sweeps of 108 routes, 120 browser assertions) | ≈29s |
-| `exe:progress-check --self-test` | **69/69** checks, 11 groups |
-| `exe:registry-check` (real tree) / `--self-test` | **7/7** (435 corpus / 440 registry) / **15/15** |
-| `exe:exercise-check` real-content / `--self-test` / `--fixtures` / `--list-codes` | 0 issues / **272/272** / **55/55** fixtures / 52 codes |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,206,204 bytes (≈12.2 MB) |
+| `check-site.sh`, full run (**95** checks, both browser sweeps of 108 routes, **157** browser assertions per served stage incl. the D1–D22 device suite) | ≈49s |
+| `node scripts/browser-check.mjs --self-test` | **130/130** assertions |
+| `exe:progress-check --self-test` | **84/84** checks |
+| `exe:registry-check` (real tree) / `--self-test` | **8/8** (435 corpus / 440 registry) / **16/16** |
+| `exe:exercise-check` real-content / `--self-test` / `--fixtures` / `--list-codes` | 0 issues / **382/382** (incl. the **110**-assertion M4 group grounding `SXC1.Midi.Spec` against `translations/midi.md`) / **55/55** fixtures / 52 codes |
 
-The two `app.wasm` gzip ranges above are ranges, not single numbers, deliberately: this
-project observed a few hundred bytes of run-to-run jitter across otherwise-identical
-rebuilds (e.g. two `--optimize` runs on an unchanged tree measured 907,575 and 908,037),
-which `scripts/check-site.sh`'s own size-ledger comment independently records too — never
-enough to cross the ceiling either way on this tree, but real, so this table reports what
-was actually observed rather than a single cherry-picked run. `app.wasm` grew from M2's
-978,969-byte gzipped baseline mainly for two reasons: the course grew from 4 decks/16
-exercises to 52 decks/435 exercises (embedded content costs ≈0.3456 gzip bytes per raw
-byte of `.ex.md`), and the M3 progress engine (`SXC1.Progress.*`, `Progress/Store.hs`,
-`View/Progress.hs`) added roughly another 34 KB gzipped. See
+The *unoptimized* `app.wasm` gzip figure above is a range, not a single number,
+deliberately: this project observed a few hundred bytes of run-to-run jitter across
+otherwise-identical rebuilds under M3's `-all -O2` optimize flags too (two runs on an
+unchanged tree measured 907,575 and 908,037), which `scripts/check-site.sh`'s own
+size-ledger comment independently records. The current `--detect-features -Oz
+--converge` pipeline is far tighter but not perfectly bit-stable either: M4's wave-0
+probe built the same tree twice and measured zero inter-build variance (890,713 bytes
+both times), while a later re-run of the same optimize pipeline against the final M4
+tree reproduced the shipping artifact to within **5 gzipped bytes** (925,657 vs the
+shipped 925,652). The table therefore reports the shipping artifact's own measured
+number — the bytes actually sitting at `site/public/app.wasm` are what `check-site.sh`
+measures and what deploys. `app.wasm` grew from M2's 978,969-byte
+gzipped baseline mainly for two reasons: the course grew from 4 decks/16 exercises to
+52 decks/435 exercises (embedded content costs ≈0.3456 gzip bytes per raw byte of
+`.ex.md`), and the M3 progress engine (`SXC1.Progress.*`, `Progress/Store.hs`,
+`View/Progress.hs`) added roughly another 34 KB gzipped; M4's device layer
+(`site/app/Device/Midi.hs`, `SXC1.Midi.Spec`, the device panel) added the **+34,939**
+gzipped bytes recorded above. See
 [Status](#status) for the full size story and why CI now builds the `--optimize`d
 flavour. `site/public/` stays well inside GitHub Pages' 1 GB artifact limit either way.
 
-`--optimize` (`wasm-opt -O2` + `wasm-tools strip`) remains **off by default** in
+`--optimize` (`wasm-opt --detect-features -Oz --converge` + `wasm-tools strip`) remains **off by default** in
 `build-site.sh` itself — `wasm-opt` is the one step in this pipeline that could in
 principle silently miscompile GHC's output, so a plain local build never depends on it,
 and this project's own definition of done never assumed it. What changed in M3 is what
@@ -873,10 +997,12 @@ the whole course is embedded, and the M3 designer's adversarial testing — byte
 checker `--self-test` output whether the app was optimized or not, and every
 headless-browser assertion this project runs passing repeatedly against the optimized
 artifact — found no evidence of miscompilation on this codebase.
-`./scripts/check-site.sh --optimized` reproduces the exact optimize-then-strip pipeline
-on demand, against a disposable copy, for local re-verification; `check-site.sh` itself
-re-validates `app.wasm`'s exports and behaviour regardless of which build produced the
-file actually sitting at `site/public/app.wasm`.
+`./scripts/check-site.sh --optimized` demonstrates an optimize-then-strip pass on
+demand, against a disposable copy, for local re-verification (it still applies the
+M3-era `-all -O2` recipe rather than the amended shipping flags — see
+[Status](#status)); `check-site.sh` itself re-validates `app.wasm`'s exports and
+behaviour regardless of which build produced the file actually sitting at
+`site/public/app.wasm`.
 
 ## Troubleshooting
 
@@ -915,6 +1041,18 @@ file actually sitting at `site/public/app.wasm`.
   [Progress, spaced repetition and the id registry](#progress-spaced-repetition-and-the-id-registry)).
   Copy the raw text out of the banner (or Export, if the app can still read enough to
   offer it) before choosing to wipe.
+- **Device verification shows "denied" in a local headless-Chrome run** — correct,
+  expected behaviour, not a bug: headless Chrome *always* denies the Web MIDI
+  permission, so any run without `scripts/fake-midi.js` injected lands in "denied".
+  That is exactly why the automated suite pre-loads the fake (and why its no-fake
+  control D20 requires "denied" — see [Verification](#verification)). To exercise the
+  granted path by hand you need a real, headed Chrome or Edge; to exercise it with the
+  real hardware, follow
+  [`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md).
+- **No device panel in Firefox or Safari** — absent by design, not broken: those
+  browsers have no Web MIDI at all, so the device feature never renders there
+  (progressive enhancement, see [Device verification](#device-verification)). The app
+  looks and behaves exactly as M3 did; manual confirmation covers every drill.
 
 ## Copyright
 
@@ -939,4 +1077,18 @@ full-course-and-memory design this milestone implements — the reader/validator
 INDEX-driven embedding that made room for the course, the integer SM-2 scheduler and
 versioned storage codec, and the measured size-reduction levers (including the
 `wasm-opt` adoption `PLAN.md`'s "Size ruling" section formalises as a coordinator
-decision).
+decision); and [`briefs/M4-plan.md`](briefs/M4-plan.md) for the live-device
+verification design M4 implements — the Miso-DSL-only FFI route, the single
+explicit-click permission path, the fake-MIDI verification strategy, and the design
+probe's measured findings.
+
+**Known issue (M4-F1).** `d-2-09` step 1's hook, `verify: cc 16 0,127`, is unreachable
+in practice: CC 16 is the SXC-1's continuous FX1 *dial* (±1 per detent, never the 0/127
+pair the momentary buttons send), and the `verify:` grammar has no "any value" form —
+so that one step can only ever be confirmed manually (which always works; see
+[Device verification](#device-verification)). Found by M4's design probe
+(`briefs/M4-plan.md` §8), deliberately not "fixed" in M4 (the content corpus and
+validator are frozen for the milestone), and deferred to M5 as
+[`briefs/M5-ship.md`](briefs/M5-ship.md) item 10;
+[`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md) pre-warns the
+hardware owner that this step auto-confirming would be the *surprising* outcome.

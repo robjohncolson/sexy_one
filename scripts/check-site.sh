@@ -91,10 +91,9 @@ Options:
                    without --expect-exercise-json/--exercise-fixture (the
                    M2 exercise-engine browser assertions simply do not run
                    in that case -- see check 17 below).
-  --optimized      BUILD THE LEVER, DO NOT PULL IT (PLAN.md "Size ruling"
-                   is the coordinator's call, not this flag's): re-derives
-                   an optimized+stripped COPY of the artifact already at
-                   --dir by running \`wasm-opt -all -O2\` then
+  --optimized      Re-derives an optimized+stripped COPY of the artifact
+                   already at --dir by running \`wasm-opt --detect-features
+                   -Oz --converge\` then
                    \`wasm-tools strip\` on a copy of app.wasm (never the
                    original -- the unoptimized artifact this invocation
                    was pointed at is left untouched), reports both gzip
@@ -105,11 +104,11 @@ Options:
                    code. Requires wasm-opt and wasm-tools on PATH (the
                    toolchain env is sourced automatically, same as the
                    content-checker below). Does NOT change what a plain
-                   \`check-site.sh\` (no --optimized) checks, and does NOT
-                   change build-site.sh's own --optimize default (still
-                   off -- see OPTIMIZE=0 there). Adopting wasm-opt as the
-                   default shipping build is a coordinator/CI decision
-                   (task "docs-and-ci"), not this flag's.
+                   \`check-site.sh\` (no --optimized) checks. The flags
+                   match build-site.sh --optimize -- the SHIPPING build
+                   per PLAN.md's Size ruling and its 2026-08-07
+                   amendment -- so this flag reproduces the shipping
+                   pipeline on an unoptimized input.
   --port N         TCP port to try first for the dev server used by the
                    browser checks (default: 8123, env SXC1_PORT). If busy,
                    the next free port is used instead.
@@ -558,8 +557,8 @@ if [ "$OPTIMIZED" -eq 1 ]; then
   mkdir -p "$OPT_DIR"
   cp -R "$DIR"/. "$OPT_DIR"/
 
-  echo "check-site: --optimized -- running wasm-opt -all -O2 then wasm-tools strip on a COPY of '$DIR/app.wasm' (the original is untouched)"
-  if ! wasm-opt -all -O2 "$OPT_DIR/app.wasm" -o "$OPT_DIR/app.opt.wasm"; then
+  echo "check-site: --optimized -- running wasm-opt --detect-features -Oz --converge then wasm-tools strip on a COPY of '$DIR/app.wasm' (the original is untouched; same flags as build-site.sh --optimize, the shipping build)"
+  if ! wasm-opt --detect-features -Oz --converge "$OPT_DIR/app.wasm" -o "$OPT_DIR/app.opt.wasm"; then
     echo "check-site: --optimized -- wasm-opt failed; the artifact at '$DIR' was never modified" >&2
     exit 1
   fi
