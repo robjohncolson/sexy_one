@@ -436,6 +436,20 @@ group12 cl = do
           ++ " done=" ++ show (Map.lookup "huge-d" (psDone st)))
       Nothing -> record cl 12 hostileName False "record dropped"
     other -> record cl 12 hostileName False (resultTag other)
+  -- Round-4 NEW16: the THREE-FIELD v1 M arm clamps too -- a schema-1
+  -- hostile blob exercises the v1 parse arm plus the real v1->v2
+  -- migration path, so stripping the clamps from only the v1 arm
+  -- (leaving v2's intact) goes red here, not silently green.
+  let hostileV1 = "SXC1PROGRESS\t1\nM\t2000000000\t2000000000\t2000000000\n"
+      hostileV1Name = "hostile v1 blob clamps via the three-field M arm (and migrates)"
+  case decodeState hostileV1 of
+    DecodeOk st -> record cl 12 hostileV1Name
+      (unDayNum (psStreakDay st) == dayCap && psStreakLen st == 1000000
+        && unDayNum (psFirstDay st) == dayCap && psLastPrompt st == ""
+        && psVersion st == SchemaVersion 2)
+      ("streakDay=" ++ show (unDayNum (psStreakDay st)) ++ " len=" ++ show (psStreakLen st)
+        ++ " first=" ++ show (unDayNum (psFirstDay st)))
+    other -> record cl 12 hostileV1Name False (resultTag other)
   -- Round-3 addDays totality: DayNum(..) is exported, so the contract
   -- must hold for ARBITRARY Ints, not just decoded ones -- maxBound + 1
   -- previously wrapped on wasm32 before the clamp could see it.

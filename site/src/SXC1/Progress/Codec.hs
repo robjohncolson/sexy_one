@@ -22,9 +22,13 @@
 -- > R <TAB> promptId <TAB> reps <TAB> lapses <TAB> ease <TAB> interval <TAB> due <TAB> lastSeen <TAB> seen
 -- > D <TAB> exerciseId <TAB> completions
 --
--- Unknown leading tags are SKIPPED, not rejected, so a newer schema's
--- extra record types degrade to \"ignored\" in an older build rather
--- than discarding a whole history. Integers are parsed with
+-- WITHIN a blob whose HEADER version this build understands (at most
+-- 'currentSchema'), unknown leading tags are SKIPPED, not rejected --
+-- one unrecognized or malformed record degrades to \"ignored\" rather
+-- than discarding a whole history. That lenience never crosses schema
+-- versions: a header version above 'currentSchema' is 'DecodeCorrupt'
+-- outright (see below and 'migrateWith'), never partially read via
+-- tag-skipping. Integers are parsed with
 -- "SXC1.Route".'SXC1.Route.parseDigits' (never @read@).
 --
 -- THE THREE-WAY 'DecodeResult' SPLIT IS LOAD-BEARING. A learner's

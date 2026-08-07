@@ -1,0 +1,44 @@
+{
+  "task_type": "review",
+  "reviewed_commit": "108c7b8d773a8dade23672136df189c24367cc07",
+  "verdict": "GATE-BLOCKED",
+  "summary": "The production changes for NEW6, the exhaustive R/D hostile clamps, addDays totality, and both M-line decode arms are present and correct. The gate is not clear because Codec.hs still contains the exact future-schema/tag-skipping contradiction NEW15 was meant to remove, and the new hostile M test exercises only the four-field v2 arm, leaving the three-field v1 arm's clamps without the claimed falsifiability coverage.",
+  "per_item_verdicts": [
+    {
+      "item": 1,
+      "id": "NEW6",
+      "verdict": "FIXED",
+      "evidence": "site/test/CheckRegistry.hs:58-67 now accepts a parsed tombstone only when c == 0 via `st == \"live\" || c == 0`. The self-test at lines 247-251 supplies one nonzero tombstone and one zero-count tombstone and requires exactly one parsed row plus exactly one parse error; removing the condition makes that assertion red."
+    },
+    {
+      "item": 2,
+      "id": "NEW1-VERIFICATION",
+      "verdict": "FIXED",
+      "evidence": "site/test/CheckProgress.hs:423-438 constructs hostile R, D, and four-field M records and exactly pins all seven R numeric fields (reps, lapses, ease, interval, due, lastSeen, seen), the D completion count, all three M numeric fields, and lastPrompt. The existing full-state encode/decode equality at lines 174-185 also round-trips a nonempty lastPrompt produced by fixedHistory. This structurally closes the prior lapses/seen/D assertion gap. The coordinator-reported sabotage results were accepted as supplied and were not rerun under the read-only subagent constraint."
+    },
+    {
+      "item": 3,
+      "id": "NEW1-ADDDAYS",
+      "verdict": "FIXED",
+      "evidence": "site/src/SXC1/Progress/Types.hs:157-159 clamps d and n independently into [0, dayCap] before addition. The intermediate sum is at most 19,999,998, safely below wasm32 Int maxBound, and the outer min caps the result. site/test/CheckProgress.hs:439-447 pins maxBound in the left operand, right operand, and both operands, plus a negative-day case."
+    },
+    {
+      "item": 4,
+      "id": "NEW16",
+      "verdict": "PRODUCTION-FIXED-VERIFICATION-INCOMPLETE",
+      "production_evidence": "site/src/SXC1/Progress/Codec.hs:154-170 applies clampDay to streakDay/firstDay and min 1000000 to streakLen in both the three-field v1 M arm and the four-field v2 M arm. Because parseDigits admits only nonnegative Int values, the resulting day range is [0, dayCap]; bumpStreak's lastDay+1 and len+1 are then safely bounded.",
+      "verification_gap": "The hostile input at site/test/CheckProgress.hs:423 is schema 2 and has a four-field M line, so it exercises only the four-field arm at Codec.hs:168-170. The v1 migration test at CheckProgress.hs:302-307 uses small values (3,2,1). Removing any or all M clamps only from the three-field arm therefore leaves the asserted tests green. The statement that the same hostile pins cover both arms is not established."
+    },
+    {
+      "item": 5,
+      "id": "NEW15",
+      "verdict": "PARTIALLY-FIXED",
+      "fixed_evidence": "README.md:327-353 now consistently says current schema 2, distinguishes understood-header lenience from fail-closed newer headers, and describes productionSteps 1 = Just id. Codec.hs:224-253 likewise no longer says productionSteps is empty and accurately describes the real v1-to-v2 step.",
+      "remaining_contradiction": "The Codec.hs module-level wire-format Haddock at lines 25-27 still says unknown tags are skipped so `a newer schema's extra record types degrade to ignored in an older build rather than discarding a whole history`. That is contradicted immediately by lines 35-36 and by migrateWith at lines 235-241: a header version above currentSchema is DecodeCorrupt before any parsed body is returned. The statement must be scoped to a header version the build understands, as README now does."
+    }
+  ],
+  "no_new_defects_ruling": "No new production defect was found in the latest commit's focused code changes. The v1-arm test gap and stale Codec module prose are incomplete verification/documentation fixes, not newly introduced runtime defects.",
+  "coordinator_state_ruling": "The supplied progress-check 83/83, registry-check 8/8 plus 16/16, check-site 80/80 complete, and 912430-byte gzip result were accepted as reported. No tests, lint, builds, or verification commands were run.",
+  "method": "Read-only inspection of git log -1, git show/diff for commit 108c7b8, the named production files, focused test assertions, README wire-format section, Codec Haddock, and the round-3 gate report. No source edits or commits were made; only this required result JSON was written.",
+  "final_line": "GATE-BLOCKED — NEW15 still has a future-schema/tag-skipping contradiction in Codec.hs, and NEW16's three-field v1 M clamp remains outside the claimed hostile-test coverage."
+}
