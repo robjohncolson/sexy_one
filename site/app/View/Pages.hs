@@ -128,23 +128,19 @@ pageBreadcrumb slug st outline n =
   where
     manualCrumb = H.a_ [ P.href_ (ms (renderRoute (RManual slug))) ] [ text (ms (stTitle st)) ]
 
-    -- | The section considered "current" for page @n@. NEW1's fix made
-    -- @secEndPage >= secPage@ an invariant of 'SXC1.Content.Outline', which
-    -- means a page carrying two-or-more section-level headings
-    -- (startup-guide pp. 1\/2\/3\/4\/10\/14, midi p.2, oss p.11 -- see
-    -- @briefs\/M1-fixes-3-triage.md@'s NEW1 writeup; guide-book has none)
-    -- is now genuinely ambiguous for "the current section" rather than
-    -- accidentally resolving one way. The rule: the LAST section (in
-    -- source order) whose heading is on page @n@ or earlier -- i.e. the
-    -- most recently opened section governs its own page and every page up
-    -- to the next section change. This is deterministic, total (front
-    -- matter before the first section resolves to 'Nothing' without
-    -- crashing), and it reproduces exactly what the app already showed
-    -- before this round's outline fix (startup-guide p.10 -> "Try
-    -- sampling", p.14 -> "Trademarks") -- we are formalising the existing
-    -- observable behaviour, not changing it.
+    -- | The section considered "current" for page @n@ -- M5 item 3 (M1
+    -- final sign-off advisory 1): 'breadcrumbSectionForPage' names the
+    -- FIRST section starting on page @n@ when one does (the section at
+    -- the top of the page, where a TOC click to this page actually
+    -- lands -- the route carries only the page, so the co-located
+    -- sections of startup-guide pp. 10\/14, midi p.2 and oss p.11 are
+    -- otherwise indistinguishable here), falling back to the containing
+    -- section (last at or before @n@) on mid-span pages. Deterministic
+    -- and total (front matter before the first section resolves to
+    -- 'Nothing' without crashing); pinned for the cited pages in
+    -- @test\/CheckContent.hs@ group 25 and in the browser suite.
     msec :: Maybe Section
-    msec = lastSectionAtOrBefore n (outSections outline)
+    msec = breadcrumbSectionForPage n (outSections outline)
 
     mgroup :: Maybe Group
     mgroup = case (outGroups outline, msec) of
@@ -175,17 +171,6 @@ pageBreadcrumb slug st outline n =
                 ]
 
     crumbSep = text " / "
-
--- | See 'pageBreadcrumb''s @msec@ for the rule this implements: the last
--- section (by source order, which 'outSections' is always in) whose
--- 'secPage' does not exceed @n@. A single left-to-right fold, so it is
--- total over the empty list and never inspects 'secEndPage'.
-lastSectionAtOrBefore :: Int -> [Section] -> Maybe Section
-lastSectionAtOrBefore n = foldl' step Nothing
-  where
-    step acc s
-      | secPage s <= n = Just s
-      | otherwise      = acc
 
 --------------------------------------------------------------------------
 -- #sxc1-content-stats: always [hidden]; never rendered visibly.

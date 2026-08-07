@@ -12,6 +12,7 @@ module SXC1.Content.Outline
   , Group (..)
   , Outline (..)
   , buildOutline
+  , breadcrumbSectionForPage
   ) where
 
 import qualified Data.Map.Strict       as Map
@@ -93,6 +94,35 @@ buildOutline raw = Outline secLevel sections groups partTitles
     groups
       | length partIdxs >= 2 = Just (buildGroups sections partIdxs runningHeaderByPage)
       | otherwise            = Nothing
+
+-- | M5 item 3 (M1 final sign-off advisory 1): the section a PAGE-level
+-- breadcrumb should name. The route ('SXC1.Route.RPage') carries only
+-- the page number -- TOC links are @#\/m\/\<slug\>\/p\/\<n\>@ with no
+-- section fragment -- so on a page carrying two-or-more co-located
+-- section headings (startup-guide pp. 10\/14, midi p. 2, oss p. 11) the
+-- breadcrumb cannot know WHICH co-located section a TOC click targeted.
+-- The old rule named the LAST section at or before the page, so a TOC
+-- click on \"Try applying an effect\" (startup-guide p. 10) landed on a
+-- page whose breadcrumb said \"Try sampling\" -- the one section on
+-- that page the reader is guaranteed NOT to be looking at, since the
+-- page OPENS with the first co-located section. The rule here: if any
+-- section STARTS on page @n@, name the FIRST one (source order --
+-- 'outSections' is always in source order) -- that is the section at
+-- the top of the page, where every TOC click to this page actually
+-- lands; otherwise (a mid-span page) name the section the page is
+-- inside, i.e. the last section whose own page is at or before @n@.
+-- Total: a page before the first section resolves to 'Nothing'.
+breadcrumbSectionForPage :: Int -> [Section] -> Maybe Section
+breadcrumbSectionForPage n = go Nothing
+  where
+    -- One left-to-right pass: the FIRST section whose page IS @n@ wins
+    -- outright; otherwise the LAST section starting before @n@ is
+    -- carried as the fallback.
+    go acc []         = acc
+    go acc (s : rest)
+      | secPage s == n = Just s
+      | secPage s < n  = go (Just s) rest
+      | otherwise      = go acc rest
 
 nth :: Int -> [a] -> Maybe a
 nth i xs

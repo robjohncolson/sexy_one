@@ -277,8 +277,18 @@ Scanned left to right; **longest/most-specific marker first**:
 5. `*…*` → `Em`.
 6. `<br>` (case-insensitive, optional `/`) → `Break`.
 7. `p. N`, `p.N`, `pp. N-M`, `pp. N–M` → `PageRef` **only when `1 ≤ N ≤ docPages`**;
-   otherwise plain text. This is what makes the guide book's Index and its ~40 internal
+   otherwise plain text. This is what makes the guide book's ~40 internal
    cross-references navigable, and it is the shape M2 will reuse to cite pages.
+   *(Corrected in M5, debt item 1 / A4: this rule alone never made the Index
+   navigable — the Index's pp. 69–70 cite pages as bare numbers and comma/en-dash
+   lists with no `p.`/`pp.` marker, so rule 7 never matched them. The M5 fix adds
+   the deferred table-cell-scoped companion rule: inside a table column whose
+   header cell is exactly `Pages` — a structural marker unique to the Index's 11
+   tables — a body cell consisting entirely of page numbers and ranges (`13`,
+   `52-53`, `9, 12, 55, 63, 66`) becomes `PageRef`s, each bounded by the same
+   `1 ≤ N ≤ docPages` check. Together the two rules make the Index and the
+   internal cross-references navigable; pinned in `test/CheckContent.hs` group 23
+   and in the browser suite's p.69 index-link assertion.)*
 8. Anything else accumulates into `Str`.
 
 A `Para` whose inline list is exactly one `Placeholder` is promoted to a `Figure` block.

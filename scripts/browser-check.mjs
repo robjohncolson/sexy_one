@@ -6121,6 +6121,57 @@ async function main() {
       })()`);
       report('guide-book p.15 has a p.17 cross-reference link', crossRef === true, crossRef);
 
+      // -- 8b (M5 item 1 / A4). Index linkification: the guide book's Index
+      // (p.69) cites pages as BARE numbers and comma/dash lists, which the
+      // global p./pp. grammar never matched; the table-cell-scoped
+      // "Pages"-column rule must turn them into real a.page-ref links --
+      // the DOM half of plan 4.6 rule 7's "makes the Index navigable"
+      // claim (the model half is content-check group 23). Pins one bare
+      // number ("Auto trigger" -> 29), one range ("Auto chop" 52-53 ->
+      // its first page, 52), and that the page's index tables carry a
+      // substantial number of links (p.69 alone holds >100 of the Index's
+      // 262 citations).
+      await goto('#/m/guide-book/p/69', '#page-69');
+      const indexLinks = await evaluate(`(() => {
+        const links = Array.from(document.querySelectorAll('#page-69 table a.page-ref'));
+        const hrefs = links.map((a) => a.getAttribute('href'));
+        return {
+          total: links.length,
+          hasBare29: hrefs.includes('#/m/guide-book/p/29'),
+          hasRange52: hrefs.includes('#/m/guide-book/p/52'),
+        };
+      })()`);
+      report(
+        'guide-book p.69 index table cells are linkified (bare "29" and range "52-53" render as page links)',
+        Boolean(indexLinks) && indexLinks.hasBare29 === true && indexLinks.hasRange52 === true && indexLinks.total > 100,
+        indexLinks,
+      );
+
+      // -- 8c (M5 item 3). Breadcrumb on co-located-section pages: the route
+      // carries only the page number, so the breadcrumb must name the FIRST
+      // section starting on the page (the one at the top, where a TOC click
+      // lands) -- not the LAST, which is what the pre-M5 rule showed
+      // (startup-guide p.10 said "Try sampling", p.14 said "Trademarks").
+      // The four pages pinned here are exactly the debt note's examples;
+      // the selection rule itself is pinned in content-check group 25.
+      for (const c of [
+        { hash: '#/m/startup-guide/p/10', ready: '#page-10', want: 'Try applying an effect', reject: 'Try sampling' },
+        { hash: '#/m/startup-guide/p/14', ready: '#page-14', want: 'Operating precautions', reject: 'Trademarks' },
+        { hash: '#/m/midi/p/2', ready: '#page-2', want: '2. Product information', reject: '3. MIDI implementation chart' },
+        { hash: '#/m/oss/p/11', ready: '#page-11', want: 'MIT', reject: 'MICROSOFT AZURE RTOS' },
+      ]) {
+        await goto(c.hash, c.ready);
+        const crumb = await evaluate(`(() => {
+          const el = document.querySelector('#sxc1-header nav');
+          return el ? el.textContent : null;
+        })()`);
+        report(
+          `breadcrumb on ${c.hash} names the first section starting on the page ("${c.want}", not "${c.reject}")`,
+          typeof crumb === 'string' && crumb.includes(c.want) && !crumb.includes(c.reject),
+          crumb,
+        );
+      }
+
       // -- 9. FULL SWEEP (NEW6 browser half): every page route is visited in
       // its '/ja' form -- rendering #sxc1-page exactly as before AND
       // genuinely decoding that page's original-page image (img.decode(),

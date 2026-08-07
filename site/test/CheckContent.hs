@@ -48,7 +48,7 @@ import           System.IO             (hPutStrLn, hSetEncoding, hSetNewlineMode
 import           SXC1.Content.Corpus   (corpusSources, docs, glossarySource)
 import           SXC1.Content.Markdown (LineShape (..), classifyLine, countStrictTableSeparators,
                                          dedupeSlugs, headingLineOf, mkDoc, orderedItemOf,
-                                         parseBlocksEngineWith)
+                                         pagesCellInlines, parseBlocksEngineWith)
 import           SXC1.Content.Outline
 import           SXC1.Content.Stats
 import           SXC1.Content.Types
@@ -91,6 +91,9 @@ assertionLabel 19 = "19. A6: anchor-supply invariant fixture (nested heading bef
 assertionLabel 20 = "20. A7 guard: ordered-list numbers consecutive-ascending; fragment census pinned"
 assertionLabel 21 = "21. NEW11: OrderedShape/BulletShape dishonest-classifier fixtures (list-branch progress evidence)"
 assertionLabel 22 = "22. NEW12: groupsOk vacuity guard (permanent negative-control demo)"
+assertionLabel 23 = "23. M5 item 1 (A4): index 'Pages' cells linkified via the table-cell-scoped rule"
+assertionLabel 24 = "24. M5 item 2 (A7): lists no longer fragment -- corpus-wide adjacency + pinned p.28 structure"
+assertionLabel 25 = "25. M5 item 3: page breadcrumb names the first section starting on the page"
 assertionLabel n = show n ++ ". ?"
 
 --------------------------------------------------------------------------
@@ -912,12 +915,26 @@ corpusCensus = [ (docSlug d, censusOf d) | d <- docs ]
 --    the actual hard, always-true cross-check; the loose-golden
 --    comparison is intentionally NOT asserted for startup-guide\/midi
 --    because it would be asserting a false equality.
+-- M5 (items 1 and 2) DELIBERATELY MOVED four census dimensions, re-pinned
+-- here from a fresh @--census@ run (see the M5 reader-debt report):
+--
+--  * numberedBlocks 45\/20\/4\/34 -> 23\/9\/1\/13 and bulletsBlocks
+--    105\/26\/0\/12 -> 105\/26\/0\/7: the A7 list-grouping fix
+--    ('SXC1.Content.Markdown.parseList''s blank-gap continuation) merges
+--    what used to be N single-item fragments into one list block.
+--    numberedItems\/bulletsItems are UNCHANGED for all four documents --
+--    the merge regroups exactly the same items, never drops or invents
+--    one -- which is why those pins did not move.
+--  * pageRefs (guide-book only) 57 -> 319: the A4 index linkification
+--    (table-cell-scoped @Pages@-column rule, group 23) turns the Index's
+--    262 bare page citations into real 'PageRef' inlines. The other
+--    three documents have no @Pages@ column and did not move.
 censusGoldenTable :: [(Text, Census)]
 censusGoldenTable =
-  [ ("guide-book",    Census 187 178 20 45 53 105 322 57 12)
-  , ("startup-guide", Census  50  35  4 20 28  26  87  6  8)
-  , ("midi",           Census   7   4  6  4  4   0   0  0  0)
-  , ("oss",            Census   5   0  0 34 34  12  17  0  0)
+  [ ("guide-book",    Census 187 178 20 23 53 105 322 319 12)
+  , ("startup-guide", Census  50  35  4  9 28  26  87   6  8)
+  , ("midi",           Census   7   4  6  1  4   0   0   0  0)
+  , ("oss",            Census   5   0  0 13 34   7  17   0  0)
   ]
 
 censusChecks :: [Check]
@@ -1117,13 +1134,17 @@ a6Checks =
   ]
 
 --------------------------------------------------------------------------
--- 20. A7 GUARD ONLY (ruled M5; 'gatherChildren'\/'collect' in
--- "SXC1.Content.Markdown" UNCHANGED). A SOURCE-LEVEL assertion that
--- every ordered list's numbers are consecutive-ascending, so a future
--- translation using the lazy \"1. \/ 1. \/ 1.\" idiom turns red instead
--- of silently mis-rendering. Also pins the current list\/fragment census
--- (group 15's Numbered counts) so an eventual M5 grouping fix is a
--- deliberate, visible change rather than a silent one.
+-- 20. A7 GUARD (M2's consecutive-numbering tripwire -- NEVER weakened).
+-- A SOURCE-LEVEL assertion that every ordered list's numbers are
+-- consecutive-ascending, so a future translation using the lazy
+-- \"1. \/ 1. \/ 1.\" idiom turns red instead of silently mis-rendering.
+-- This raw-text guard is untouched by M5 item 2's grouping fix (it scans
+-- source lines, not parsed blocks) and keeps passing unchanged. The
+-- fragment census pinned alongside it now pins the MERGED block counts:
+-- the grouping fix in 'SXC1.Content.Markdown.parseList' ('collect''s
+-- blank-gap continuation) landed in M5, exactly the "deliberate, visible
+-- change" this pin existed to force -- see group 24 for the new
+-- corpus-wide no-fragmentation assertions.
 --------------------------------------------------------------------------
 
 rawOrderedMarkers :: Text -> [(Int, Int)]
@@ -1173,9 +1194,11 @@ a7GuardDemoChecks =
       ("violations=" ++ show (consecutiveAscendingViolations a7SabotageFixtureRaw) ++ " (want at least one)")
   ]
 
--- | The current list\/fragment census -- pins group 15's Numbered block
--- count explicitly under the A7 label too, so an eventual M5 grouping
--- fix changes THIS number on purpose.
+-- | The current list census -- pins group 15's Numbered block count
+-- explicitly under the A7 label too. M5 item 2's grouping fix changed
+-- these numbers ON PURPOSE (45\/20\/4\/34 -> 23\/9\/1\/13, via
+-- 'censusGoldenTable') -- exactly the deliberate, visible change this
+-- pin existed to force.
 a7FragmentCensusChecks :: [Check]
 a7FragmentCensusChecks =
   [ mkCheck 20 ("ordered-fragment-census/" ++ T.unpack slug)
@@ -1311,6 +1334,414 @@ new12GuardChecks =
   ]
 
 --------------------------------------------------------------------------
+-- 23. M5 item 1 (A4): the deferred table-cell-scoped index rule. The
+-- guide book's Index (pp. 69-70) cites pages as BARE numbers and
+-- comma\/dash lists that 4.6 rule 7's @p.@\/@pp.@ grammar never matched.
+-- 'SXC1.Content.Markdown.parseTable' now linkifies body cells of any
+-- table column whose HEADER is exactly @Pages@ -- a structural marker
+-- unique to the Index's eleven tables -- via
+-- 'SXC1.Content.Markdown.pagesCellInlines', bounded by the same
+-- @1 <= n <= docPages@ check as rule 7. These checks pin (a) exact cell
+-- shapes on both index pages, (b) the corpus-wide table-cell 'PageRef'
+-- counts (nonzero for guide-book, EXACTLY zero for the other three
+-- documents -- the scope guard: no settings value, CC number or year in
+-- any other table was touched), (c) the cell grammar's accept\/reject
+-- boundary, and (d) a fixture demonstrating that the SAME numeric cell
+-- text is linkified under a @Pages@ header and left alone under any
+-- other header.
+--------------------------------------------------------------------------
+
+topBlocksOnPage :: Text -> Int -> [Block]
+topBlocksOnPage slug pn =
+  case [ p | d <- docs, docSlug d == slug, p <- docPages d, pageNumber p == pn ] of
+    (p : _) -> pageBlocks p
+    []      -> []
+
+-- | Every 'PageRef' in an inline list, descending into 'Strong'\/'Em'.
+inlineRefs :: [Inline] -> [(Int, Text)]
+inlineRefs = concatMap one
+  where
+    one i = case i of
+      PageRef n t -> [(n, t)]
+      Strong xs   -> inlineRefs xs
+      Em xs       -> inlineRefs xs
+      _           -> []
+
+-- | 'PageRef's inside TABLE CELLS only (header and body), anywhere in a
+-- document -- the census dimension the index rule moves, and the scope
+-- guard's zero for every non-index document.
+tableCellRefCount :: Doc -> Int
+tableCellRefCount d = sum [ cellRefs b | b <- docAllBlocks d ]
+  where
+    cellRefs (Table mHeader rows) =
+      length (inlineRefs (concat (maybe [] id mHeader) ++ concat (concat rows)))
+    cellRefs _ = 0
+
+-- | The concatenated plain text of a cell's inlines (Term cells are
+-- plain 'Str' text in the corpus).
+cellStrText :: [Inline] -> Text
+cellStrText inls = T.concat [ t | Str t <- inls ]
+
+-- | The second (\"Pages\") cell of the index row whose Term cell starts
+-- with the given text, looked up across the top-level tables of the
+-- given guide-book page.
+indexPagesCellFor :: Int -> Text -> Maybe [Inline]
+indexPagesCellFor pn term = firstOf
+  [ cell
+  | Table _ rows <- topBlocksOnPage "guide-book" pn
+  , (termCell : cell : _) <- rows
+  , term `T.isPrefixOf` cellStrText termCell
+  ]
+
+indexPinnedCellChecks :: [Check]
+indexPinnedCellChecks =
+  [ mkCheck 23 name (got == Just want) ("got=" ++ show got ++ " want=" ++ show (Just want))
+  | (name, pn, term, want) <-
+      [ ( "index/p69/auto-chop-range", 69, "Auto chop"
+        , [PageRef 52 "52-53"] )
+      , ( "index/p69/auto-power-off-comma-list", 69, "Auto Power Off"
+        , [ PageRef 9 "9", Str ", ", PageRef 12 "12", Str ", ", PageRef 55 "55"
+          , Str ", ", PageRef 63 "63", Str ", ", PageRef 66 "66" ] )
+      , ( "index/p70/android-comma-list", 70, "Android"
+        , [PageRef 56 "56", Str ", ", PageRef 67 "67"] )
+      , ( "index/p70/casio-sampler-app-range", 70, "CASIO Sampler App"
+        , [PageRef 56 "56-60"] )
+      ]
+  , let got = indexPagesCellFor pn term
+  ]
+
+-- | Tables carrying a @Pages@ header column, per page of a document --
+-- the STRUCTURAL scope of the index rule. In the corpus this is exactly
+-- the Index's 11 tables (guide-book pp. 69-70) and nothing anywhere
+-- else, which is what makes the column-label rule safe: no other
+-- document even contains a column the rule could fire on.
+pagesHeaderTablesByPage :: Doc -> [(Int, Int)]
+pagesHeaderTablesByPage d =
+  [ (pageNumber p, count)
+  | p <- docPages d
+  , let count = length [ () | Table (Just hdr) _ <- flattenBlocks (pageBlocks p)
+                            , any ((== "Pages") . cellStrText) hdr ]
+  , count > 0
+  ]
+
+indexRefCountChecks :: [Check]
+indexRefCountChecks =
+  -- Total 'PageRef's inside table cells, per document. guide-book was 10
+  -- BEFORE this rule (ordinary @p. N@ citations inside tables) and the
+  -- Index adds exactly 262; startup-guide's 6 (all its 'PageRef's sit in
+  -- tables) predate the rule and are untouched by it -- see the
+  -- pages-column scope pins below for why the rule cannot fire there.
+  [ mkCheck 23 ("index/table-cell-pagerefs/" ++ T.unpack (docSlug d))
+      (got == want)
+      (show got ++ " (want " ++ show want ++ ")")
+  | d <- docs
+  , let got  = tableCellRefCount d
+        want = case docSlug d of
+                 "guide-book"    -> 272
+                 "startup-guide" -> 6
+                 _               -> 0
+  ]
+  -- The Index's own contribution, pinned in isolation: the two index
+  -- pages' table cells carry exactly 262 'PageRef's (pre-rule: 0).
+  ++ [ mkCheck 23 "index/p69-p70-table-cell-pagerefs"
+         (indexPageRefTotal == 262)
+         (show indexPageRefTotal ++ " (want 262)")
+     ]
+  -- STRUCTURAL SCOPE: @Pages@-header tables exist ONLY on guide-book
+  -- pp. 69-70 (the 10 kana-row tables and the single A-Z table), and in
+  -- no other document at all -- so the rule has nothing to fire on
+  -- outside the Index.
+  ++ [ mkCheck 23 ("index/pages-header-tables/" ++ T.unpack (docSlug d))
+         (got == want)
+         (show got ++ " (want " ++ show want ++ ")")
+     | d <- docs
+     , let got  = pagesHeaderTablesByPage d
+           want = if docSlug d == "guide-book" then [(69, 10), (70, 1)] else []
+     ]
+  where
+    indexPageRefTotal =
+      sum [ length (inlineRefs (concat (concat rows)))
+          | pn <- [69, 70]
+          , Table _ rows <- topBlocksOnPage "guide-book" pn
+          ]
+
+-- | The cell grammar's boundary, pinned against guide-book's own page
+-- count (71): what must linkify, and -- the years\/quantities guard --
+-- what must be left alone.
+indexCellGrammarChecks :: [Check]
+indexCellGrammarChecks =
+  [ mkCheck 23 ("index/cell-grammar/" ++ name) (got == want)
+      ("got=" ++ show got ++ " want=" ++ show want)
+  | (name, input, want) <-
+      [ ("single",            "13",       Just [PageRef 13 "13"])
+      , ("comma-list",        "9, 12",    Just [PageRef 9 "9", Str ", ", PageRef 12 "12"])
+      , ("hyphen-range",      "52-53",    Just [PageRef 52 "52-53"])
+      , ("en-dash-range",     "52\x2013\&53", Just [PageRef 52 "52\x2013\&53"])
+      , ("upper-bound-in",    "71",       Just [PageRef 71 "71"])
+      , ("upper-bound-out",   "72",       Nothing)
+      , ("zero-out",          "0",        Nothing)
+      , ("year-not-a-page",   "2026",     Nothing)
+      , ("descending-range",  "53-52",    Nothing)
+      , ("range-end-out",     "70-72",    Nothing)
+      , ("trailing-junk",     "13a",      Nothing)
+      , ("prose",             "see 13",   Nothing)
+      , ("empty",             "",         Nothing)
+      ]
+  , let got = pagesCellInlines 71 input
+  ]
+
+-- | Column-label scoping: the SAME cell text (@2@, in range for this
+-- two-page fixture) is linkified under a @Pages@ header and left plain
+-- under a @Value@ header.
+indexScopeFixtureRaw :: Text
+indexScopeFixtureRaw = T.unlines
+  [ "# Index Scope Fixture"
+  , "<!-- page 1 -->"
+  , "## Two tables"
+  , ""
+  , "| Term | Value |"
+  , "|---|---|"
+  , "| Foo | 2 |"
+  , ""
+  , "| Term | Pages |"
+  , "|---|---|"
+  , "| Foo | 2 |"
+  , "<!-- page 2 -->"
+  , "Second page, so 2 is a valid page number."
+  ]
+
+indexScopeFixtureTables :: [[[[Inline]]]]
+indexScopeFixtureTables =
+  [ rows | Table _ rows <- topBlocks ]
+  where
+    topBlocks = case docPages (mkDoc "index-scope-fixture" indexScopeFixtureRaw) of
+      (p : _) -> pageBlocks p
+      []      -> []
+
+indexScopeFixtureChecks :: [Check]
+indexScopeFixtureChecks =
+  [ mkCheck 23 "index/scope-fixture/value-column-stays-plain"
+      (case indexScopeFixtureTables of
+         (valueRows : _) -> concatMap (inlineRefs . concat) valueRows == []
+         _               -> False)
+      ("tables=" ++ show indexScopeFixtureTables)
+  , mkCheck 23 "index/scope-fixture/pages-column-linkified"
+      (case indexScopeFixtureTables of
+         (_ : pagesRows : _) -> concatMap (inlineRefs . concat) pagesRows == [(2, "2")]
+         _                    -> False)
+      ("tables=" ++ show indexScopeFixtureTables)
+  ]
+
+--------------------------------------------------------------------------
+-- 24. M5 item 2 (A7): the list-grouping fix.
+-- 'SXC1.Content.Markdown.parseList' ('collect''s blank-gap continuation)
+-- now merges blank-separated same-list items -- the corpus's normal
+-- shape for items carrying indented children -- into ONE
+-- 'Numbered'\/'Bullets' block instead of N single-item fragments.
+-- (a) CORPUS-WIDE FRAGMENTATION WITNESS: no sibling [Block] list
+-- anywhere in any of the four documents (page top level, preamble,
+-- 'Quote' bodies, list-item children, recursively) contains two
+-- ADJACENT list blocks of the same type -- exactly the shape
+-- fragmentation produces (blank lines emit no block, so a fragmented
+-- list is adjacent same-type siblings).
+-- (b) the detector itself is proven capable of firing, on synthetic
+-- block lists at every nesting position (the group-16\/22 pattern).
+-- (c) a known previously-fragmenting location -- guide-book p.28, the
+-- page 'gatherChildren''s own Haddock cites -- is pinned to its exact
+-- merged structure. Item-count conservation is already pinned by group
+-- 15 (numberedItems\/bulletsItems did not move).
+-- M2's consecutive-numbering guard (group 20) is untouched and still
+-- passing; the fragment-census pins there and in group 15 were
+-- re-pinned to the merged counts in the same change (45\/20\/4\/34 ->
+-- 23\/9\/1\/13 numbered, 105\/26\/0\/12 -> 105\/26\/0\/7 bullets).
+--------------------------------------------------------------------------
+
+-- | Adjacent same-type sibling list pairs in one block list, recursing
+-- into every nested sibling list ('Quote' bodies and item children).
+-- Each hit is described by the shared constructor name.
+adjacentListViolations :: [Block] -> [String]
+adjacentListViolations bs =
+  [ tagOf a | (a, b) <- zip bs (drop 1 bs), sameListType a b ]
+    ++ concatMap nested bs
+  where
+    sameListType (Numbered _ _) (Numbered _ _) = True
+    sameListType (Bullets _)    (Bullets _)    = True
+    sameListType _              _              = False
+
+    tagOf (Numbered _ _) = "Numbered/Numbered"
+    tagOf _              = "Bullets/Bullets"
+
+    nested b = case b of
+      Quote inner      -> adjacentListViolations inner
+      Bullets items     -> concatMap (adjacentListViolations . liChildren) items
+      Numbered _ items   -> concatMap (adjacentListViolations . liChildren) items
+      _                  -> []
+
+listAdjacencyChecks :: [Check]
+listAdjacencyChecks =
+  [ mkCheck 24 ("list-adjacency/" ++ T.unpack (docSlug d))
+      (null viols)
+      (show (length viols) ++ " adjacent same-type sibling list pair(s): " ++ show (take 5 viols))
+  | d <- docs
+  , let viols =
+          [ "preamble:" ++ v | v <- adjacentListViolations (docPreamble d) ]
+            ++ [ "p" ++ show (pageNumber p) ++ ":" ++ v
+               | p <- docPages d, v <- adjacentListViolations (pageBlocks p) ]
+  ]
+
+-- | Detector capability (the group-16\/22 pattern): synthetic sibling
+-- lists at every nesting position the corpus walk visits must fire, and
+-- the one adjacency the model legitimately allows (different types)
+-- must not.
+listAdjacencyDetectorChecks :: [Check]
+listAdjacencyDetectorChecks =
+  [ mkCheck 24 ("list-adjacency-detector/" ++ name)
+      (adjacentListViolations input `lengthIs` want)
+      ("violations=" ++ show (adjacentListViolations input) ++ " (want " ++ show want ++ ")")
+  | (name, input, want) <-
+      [ ("fires-on-top-level-numbered-pair",  [numbered1, numbered2],                        1)
+      , ("fires-on-top-level-bullets-pair",   [bullets1, bullets1],                          1)
+      , ("fires-inside-a-quote",              [Quote [numbered1, numbered2]],                1)
+      , ("fires-inside-item-children",        [Bullets [ListItem [] [numbered1, numbered2]]], 1)
+      , ("silent-on-mixed-types",             [numbered1, bullets1],                         0)
+      , ("silent-on-separated-lists",         [numbered1, Para [Str "x"], numbered2],        0)
+      ]
+  ]
+  where
+    numbered1 = Numbered 1 [ListItem [Str "a"] []]
+    numbered2 = Numbered 2 [ListItem [Str "b"] []]
+    bullets1  = Bullets [ListItem [Str "c"] []]
+    lengthIs xs n = length xs == n
+
+-- | Constructor spine, for exact-structure pins.
+blockTag :: Block -> String
+blockTag b = case b of
+  Heading {}  -> "Heading"
+  Para {}     -> "Para"
+  Figure {}   -> "Figure"
+  Bullets {}  -> "Bullets"
+  Numbered {} -> "Numbered"
+  Quote {}    -> "Quote"
+  Table {}    -> "Table"
+  Unparsed {} -> "Unparsed"
+
+-- | Guide-book p.28 ("Getting ready to start sampling"), the measured
+-- previously-fragmenting location: pre-fix it parsed as TWO adjacent
+-- single-item 'Numbered' blocks; now it must be ONE two-item block with
+-- each item's blank-separated indented children still nested under the
+-- right item.
+p28StructureChecks :: [Check]
+p28StructureChecks =
+  [ mkCheck 24 "p28/top-level-spine"
+      (map blockTag p28Blocks == ["Para", "Heading", "Numbered", "Para", "Bullets", "Figure", "Quote"])
+      ("spine=" ++ show (map blockTag p28Blocks))
+  , mkCheck 24 "p28/single-two-item-numbered-start-1"
+      (case p28Numbered of
+         [Numbered start items] -> start == 1 && length items == 2
+         _                       -> False)
+      ("numbered blocks on p28: " ++ show (map blockTag p28Numbered)
+        ++ " starts/items=" ++ show [ (s, length its) | Numbered s its <- p28Numbered ])
+  , mkCheck 24 "p28/item1-children-spine"
+      (case p28Items of
+         (i1 : _) -> map blockTag (liChildren i1) == ["Figure", "Figure", "Quote"]
+                       && not (null (liContent i1))
+         _        -> False)
+      ("item1 children=" ++ show (map (map blockTag . liChildren) p28Items))
+  , mkCheck 24 "p28/item2-children-spine"
+      (case p28Items of
+         (_ : i2 : _) -> map blockTag (liChildren i2) == ["Figure", "Bullets"]
+                           && [ length its | Bullets its <- liChildren i2 ] == [1]
+                           && not (null (liContent i2))
+         _            -> False)
+      ("item2 children=" ++ show (map (map blockTag . liChildren) p28Items))
+  ]
+  where
+    p28Blocks   = topBlocksOnPage "guide-book" 28
+    p28Numbered = [ b | b@(Numbered _ _) <- p28Blocks ]
+    p28Items    = concat [ items | Numbered _ items <- p28Numbered ]
+
+--------------------------------------------------------------------------
+-- 25. M5 item 3: 'SXC1.Content.Outline.breadcrumbSectionForPage'. The
+-- route carries only the page number (TOC links are
+-- @#\/m\/\<slug\>\/p\/\<n\>@ -- see "SXC1.Route"), so on a
+-- co-located-sections page the breadcrumb names the FIRST section
+-- starting on the page (the one at the top, where every TOC click to
+-- that page lands), falling back to the containing section on mid-span
+-- pages. Pinned for the four pages the debt note cites, with the OLD
+-- rule (last section at or before the page) kept here as a permanent
+-- contrast oracle -- the group-16\/17 pattern -- plus invariance pins
+-- for the pages where old and new agree, and totality at the front
+-- edge. The rendered breadcrumb DOM is asserted for the same four pages
+-- in scripts\/browser-check.mjs (the layer that renders it).
+--------------------------------------------------------------------------
+
+-- | The OLD breadcrumb rule (View.Pages' pre-M5 @lastSectionAtOrBefore@),
+-- reproduced ONLY as this group's contrast oracle.
+oldBreadcrumbSectionForPage :: Int -> [Section] -> Maybe Section
+oldBreadcrumbSectionForPage n = foldl step Nothing
+  where
+    step acc s
+      | secPage s <= n = Just s
+      | otherwise      = acc
+
+crumbTitleBy :: (Int -> [Section] -> Maybe Section) -> Text -> Int -> Maybe Text
+crumbTitleBy rule slug n = do
+  raw <- lookup slug corpusSources
+  fmap secTitle (rule n (outSections (buildOutline raw)))
+
+breadcrumbChecks :: [Check]
+breadcrumbChecks =
+  -- (a) the four cited co-located pages: new rule names the FIRST
+  -- section starting on the page...
+  [ mkCheck 25 ("breadcrumb/" ++ name)
+      (crumbTitleBy breadcrumbSectionForPage slug pn == Just want)
+      ("got=" ++ show (crumbTitleBy breadcrumbSectionForPage slug pn) ++ " want=" ++ show (Just want))
+  | (name, slug, pn, want) <-
+      [ ("startup-guide/p10-first-co-located", "startup-guide", 10, "Try applying an effect")
+      , ("startup-guide/p14-first-co-located", "startup-guide", 14, "Operating precautions")
+      , ("midi/p2-first-co-located",           "midi",           2, "2. Product information")
+      , ("oss/p11-first-co-located",           "oss",           11, "MIT")
+      ]
+  ]
+  -- (b) ...and the OLD rule demonstrably named the LAST one on exactly
+  -- those pages (the debt note's observed wrong breadcrumbs), so the
+  -- rule change is permanently observable here.
+  ++ [ mkCheck 25 ("breadcrumb-old-rule/" ++ name)
+         (crumbTitleBy oldBreadcrumbSectionForPage slug pn == Just wrong)
+         ("old rule got=" ++ show (crumbTitleBy oldBreadcrumbSectionForPage slug pn)
+           ++ " (want " ++ show (Just wrong) ++ " -- this is the bug the new rule fixes)")
+     | (name, slug, pn, wrong) <-
+         [ ("startup-guide/p10-named-last", "startup-guide", 10, "Try sampling")
+         , ("startup-guide/p14-named-last", "startup-guide", 14, "Trademarks")
+         , ("midi/p2-named-last",           "midi",           2, "3. MIDI implementation chart")
+         , ("oss/p11-named-last",           "oss",           11, "MICROSOFT AZURE RTOS")
+         ]
+     ]
+  -- (c) invariance where the rules agree: a mid-span page (no section
+  -- starts) keeps the containing section, a single-section-start page
+  -- keeps that section, and the trailing page keeps the last section.
+  ++ [ mkCheck 25 ("breadcrumb-invariant/" ++ name)
+         (newT == Just want && newT == oldT)
+         ("new=" ++ show newT ++ " old=" ++ show oldT ++ " want=" ++ show (Just want))
+     | (name, slug, pn, want) <-
+         [ ("startup-guide/p11-mid-span",      "startup-guide", 11, "Try sampling")
+         , ("startup-guide/p12-single-start",  "startup-guide", 12, "Try deleting and editing sounds")
+         , ("startup-guide/p15-trailing-page", "startup-guide", 15, "Trademarks")
+         ]
+     , let newT = crumbTitleBy breadcrumbSectionForPage slug pn
+           oldT = crumbTitleBy oldBreadcrumbSectionForPage slug pn
+     ]
+  -- (d) totality at the front edge: a page before any section, and the
+  -- empty outline, both resolve to Nothing.
+  ++ [ mkCheck 25 "breadcrumb-total/page-before-first-section"
+         (breadcrumbSectionForPage 1 [Section 2 "later" 3 []] == Nothing)
+         (show (breadcrumbSectionForPage 1 [Section 2 "later" 3 []]))
+     , mkCheck 25 "breadcrumb-total/empty-outline"
+         (breadcrumbSectionForPage 1 [] == Nothing)
+         (show (breadcrumbSectionForPage 1 []))
+     ]
+
+--------------------------------------------------------------------------
 -- main
 --------------------------------------------------------------------------
 
@@ -1385,7 +1816,15 @@ runChecks verboseMode = do
           ++ a7FragmentCensusChecks
           ++ new11Checks
           ++ new12GuardChecks
-      maxGroup = 22 :: Int
+          ++ indexPinnedCellChecks
+          ++ indexRefCountChecks
+          ++ indexCellGrammarChecks
+          ++ indexScopeFixtureChecks
+          ++ listAdjacencyChecks
+          ++ listAdjacencyDetectorChecks
+          ++ p28StructureChecks
+          ++ breadcrumbChecks
+      maxGroup = 25 :: Int
   forM_ [1 .. maxGroup] $ \g -> do
     let inGroup = filter ((== g) . chkGroup) allChecks
         passed  = length (filter chkOk inGroup)

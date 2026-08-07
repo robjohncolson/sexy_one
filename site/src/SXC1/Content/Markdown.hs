@@ -32,6 +32,7 @@ module SXC1.Content.Markdown
   , dedupeSlugs
     -- * Inline parsing (exposed for reuse/testing)
   , parseInline
+  , pagesCellInlines
     -- * The block-parsing engine and its test seam (A1; see the "Block
     -- grammar" section below for the full account)
   , LineShape (..)
@@ -642,14 +643,75 @@ isJustT :: Maybe a -> Bool
 isJustT (Just _) = True
 isJustT Nothing  = False
 
+-- | M5 item 1 (A4, the deferred table-cell-scoped index rule): the guide
+-- book's Index (pp. 69-70) cites pages as BARE numbers and comma\/dash
+-- lists (@13@, @52-53@, @9, 12, 55, 63, 66@) with no @p.@\/@pp.@ marker,
+-- so 4.6 rule 7's global citation grammar never matched them. The scope
+-- for the deferred rule is identified STRUCTURALLY, not by hardcoded page
+-- numbers: a table column whose HEADER cell is exactly @Pages@ is a
+-- page-citation column, and each of its body cells that consists
+-- ENTIRELY of a page-number list (see 'pagesCellInlines') is linkified,
+-- bounded by the same @1 <= n <= docPages@ check as rule 7. In the
+-- corpus, @Pages@ as a column header occurs ONLY in the Index's eleven
+-- tables (verified by @test\/CheckContent.hs@ group 23, which pins zero
+-- table-cell 'PageRef's for the other three documents); a numeric cell
+-- under any other header (a settings value, a MIDI CC number, a year)
+-- is never touched, and a @Pages@-column cell that is not a pure page
+-- list falls back to the ordinary inline grammar untouched.
 parseTable :: Int -> [Text] -> Block
 parseTable pageCount rows = case (rows, map splitRowCells rows) of
   ((_ : sepLine : _), (headerCells : _ : bodyCellRows)) | isTableSeparator sepLine ->
     let header = if all T.null headerCells
                    then Nothing
                    else Just (map (parseInline pageCount) headerCells)
-    in Table header (map (map (parseInline pageCount)) bodyCellRows)
+        pagesMask = map (== "Pages") headerCells
+        parseCell isPages cell
+          | isPages
+          , Just inls <- pagesCellInlines pageCount cell = inls
+          | otherwise = parseInline pageCount cell
+        parseRow cells = zipWith parseCell (pagesMask ++ repeat False) cells
+    in Table header (map parseRow bodyCellRows)
   (_, cellRows) -> Table Nothing (map (map (parseInline pageCount)) cellRows)
+
+-- | Parse a whole index-table \"Pages\" cell as a page-number list:
+-- one or more items separated by commas (optional spaces after each
+-- comma, preserved verbatim as 'Str' separators), where an item is
+-- either a single page number (@13@) or an ascending range joined by
+-- @-@\/@\x2013@ (@52-53@, @27\x201334@). Every number -- including a
+-- range's END -- must satisfy @1 <= n <= pageCount@; a range links to
+-- its first page with the full range as display text, exactly like 4.6
+-- rule 7's @pp. N-M@. Returns 'Nothing' unless the ENTIRE cell matches
+-- (after stripping outer whitespace), so a year (@2026@ -- out of
+-- range), a descending or malformed range, trailing junk (@13a@) or
+-- prose all fall back to the caller's ordinary inline parse. Only
+-- 'parseTable' (for @Pages@-header columns) and tests call this.
+pagesCellInlines :: Int -> Text -> Maybe [Inline]
+pagesCellInlines pageCount cell0 = items (T.strip cell0)
+  where
+    inRange n = n >= 1 && n <= pageCount
+
+    items t = do
+      (ref, rest) <- item t
+      if T.null rest
+        then Just [ref]
+        else do
+          rest1 <- T.stripPrefix "," rest
+          let (spaces, rest2) = T.span (== ' ') rest1
+          fmap (\xs -> ref : Str ("," <> spaces) : xs) (items rest2)
+
+    item t = do
+      (n1, rest1) <- parseDecimal t
+      if not (inRange n1)
+        then Nothing
+        else case T.uncons rest1 of
+          Just (c, rest2) | c == '-' || c == '\x2013' -> do
+            (n2, rest3) <- parseDecimal rest2
+            if inRange n2 && n2 >= n1
+              then Just (PageRef n1 (spanText t rest3), rest3)
+              else Nothing
+          _ -> Just (PageRef n1 (spanText t rest1), rest1)
+
+    spanText whole rest = T.take (T.length whole - T.length rest) whole
 
 splitRowCells :: Text -> [Text]
 splitRowCells l = map T.strip (dropLast (dropFirst raw))
@@ -689,8 +751,8 @@ parseList pageCount kind lns0@(first : _) = (blk, remaining)
       OrderedK -> (\(i, num, r) -> (i, Just num, r)) <$> orderedItemOf x
       BulletK  -> (\(i, r) -> (i, Nothing, r)) <$> bulletItemOf x
 
-    collect [] curStart accItems = (curStart, reverse accItems, [])
-    collect (x : xs) curStart accItems = case matchAt x of
+    collect [] curStart _mPrev accItems = (curStart, reverse accItems, [])
+    collect (x : xs) curStart mPrev accItems = case matchAt x of
       Just (ind, mNum, rest) | ind == baseIndent ->
         let (childLines, xs')  = gatherChildren xs threshold
             childBlocks         = if null childLines
@@ -721,10 +783,47 @@ parseList pageCount kind lns0@(first : _) = (blk, remaining)
             curStart'           = case curStart of
                                      Nothing -> mNum
                                      s       -> s
-        in collect xs' curStart' (item : accItems)
+        in collect xs' curStart' mNum (item : accItems)
+      -- A7 (M5 item 2, the list-grouping fix): a run of blank lines does
+      -- NOT end the list when the very next non-blank line is this same
+      -- list's own next item -- a same-kind marker at exactly
+      -- @baseIndent@ whose number (ordered lists only) CONTINUES the
+      -- numbering (@previous + 1@). The old behaviour stopped 'collect'
+      -- at the first blank-then-marker gap, so every blank-separated
+      -- item -- the corpus's normal shape for items carrying indented
+      -- children (measured fact: guide-book p.28) -- opened a brand-new
+      -- single-item 'Numbered'\/'Bullets' block: numbering still
+      -- RENDERED correctly (each fragment carried its own start number)
+      -- but the semantics\/a11y were wrong, N sibling one-item lists
+      -- instead of one N-item list. 4.5's separation note ("lists are
+      -- separated from a following paragraph by a blank line and a
+      -- return to column 0") is preserved exactly: a blank line followed
+      -- by anything OTHER than the list's own continuation (a paragraph,
+      -- a heading, a different-indent marker, an ordered marker that
+      -- restarts or skips numbering) still ends the list. The
+      -- numbering-continuation requirement is what keeps a deliberate
+      -- restart ("3." then a fresh "1.") two separate lists rather than
+      -- silently renumbering the second one.
+      _ | not (null accItems)
+        , Just rest' <- blankGapContinuation (x : xs)
+        -> collect rest' curStart mPrev accItems
       _ -> (curStart, reverse accItems, x : xs)
+      where
+        blankGapContinuation input = case span isBlankLine input of
+          ((_ : _), rest@(y : _))
+            | Just (ind, mNum, _) <- matchAt y
+            , ind == baseIndent
+            , continuesNumbering mNum
+            -> Just rest
+          _ -> Nothing
 
-    (mStart, items, remaining) = collect lns0 Nothing []
+        continuesNumbering mNum = case kind of
+          BulletK  -> True
+          OrderedK -> case (mPrev, mNum) of
+            (Just p, Just n) -> n == p + 1
+            _                -> False
+
+    (mStart, items, remaining) = collect lns0 Nothing Nothing []
     blk = case kind of
       OrderedK -> Numbered (fromMaybe 1 mStart) items
       BulletK  -> Bullets items
