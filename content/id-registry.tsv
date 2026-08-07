@@ -1,0 +1,74 @@
+# content/id-registry.tsv -- SXC-1 Trainer PromptId-stability registry (M3)
+#
+# One row per exercise id EVER minted (live or retired), TAB-separated,
+# sorted by id. '#' comments and blank lines are ignored. Read by
+# exe:registry-check (site/test/CheckRegistry.hs) via SXC1.Exercise.Reader,
+# the same structural reader exe:app links, so the registry is always
+# checked against exactly what a learner's browser sees.
+#
+# COLUMNS
+#   1. exercise-id    the ExId (SXC1.Exercise.Types.ExId), e.g. "q-1-03".
+#   2. promptCount    length (exPrompts ex) for a live row -- the number of
+#                      distinct PromptIds this exercise mints
+#                      ("<exercise-id>#<1-based index>", see
+#                      SXC1.Exercise.Types.promptIdFor). Always 0 for a
+#                      tombstone row: a retired id mints no prompts.
+#   3. status         "live"      -- the id names an exercise that exists in
+#                                    content/exercises/ right now.
+#                      "tombstone" -- the id is retired; it MUST NOT exist in
+#                                    content/exercises/ (exe:registry-check's
+#                                    R5 fails if it does).
+#   4. first-shipped  the milestone tag (m2, m3, ...) this id (or, for a
+#                      tombstone, the row itself) first appeared under.
+#   5. note           free text. For a live row, the deck it belongs to.
+#                      For a tombstone, WHY it was retired and what replaces
+#                      it (an id, or "none" if nothing replaces it).
+#
+# THE TOMBSTONE PROCESS (mirrors content/exercise-inventory.md's own
+# never-renumber rule, line 7 of that file):
+#   An exercise id is NEVER deleted from this registry, and an id is NEVER
+#   reused for a different exercise later. When an exercise is retired, its
+#   row is NOT removed -- it is flipped in place from "live" to "tombstone",
+#   its promptCount is set to 0, and its note is updated to say why it was
+#   retired and which id (if any) replaces it. This is what lets M3's
+#   localStorage progress layer, on loading a saved record whose PromptId's
+#   exercise-id resolves to a tombstone row, report "this exercise was
+#   retired, see <replacement>" instead of treating the record as silently
+#   corrupt: "retired" and "corrupt" are different failure modes for a
+#   learner and must stay distinguishable forever, which requires every
+#   retired id to still be LOOKUP-ABLE here, permanently.
+#
+# Seeded 2026-08-07 (M3 task "id-registry") by running a program built
+# against the real SXC1.Exercise.Reader.readDeck over the checked-in
+# content/exercises/*.ex.md (all 4 decks listed in content/exercises/INDEX,
+# the exact set exe:exercise-check --json reports as "decks":4,
+# "exercises":16, "prompts":24) -- ids and promptCount below are that
+# program's verbatim output, cross-checked against exe:exercise-check
+# --json's per-deck "prompts" totals (7/6/6/5, matching this file's
+# per-deck row sums). Nothing below was hand-typed from memory. The five
+# inventory tombstones (q-1-14, q-1-15, q-1-16, q-3-05, q-3-06) were never
+# authored as content/exercises/ files -- content/exercise-inventory.md
+# already carries them as "(retired)" as of tag m2 -- so they are seeded
+# straight from that file's own tombstone notes (exercise-inventory.md
+# lines 180-182, 301-302).
+d-1-01	3	live	m2	preparation-power
+d-2-01	3	live	m2	pad-play-banks
+d-2-02	3	live	m2	pad-play-sounds
+d-2-09	3	live	m2	pad-play-performance
+l-1-04	1	live	m2	preparation-power
+l-1-05	1	live	m2	preparation-power
+l-2-01	1	live	m2	pad-play-sounds
+l-2-03	1	live	m2	pad-play-performance
+l-2-05	1	live	m2	pad-play-banks
+q-1-03	1	live	m2	preparation-power
+q-1-08	1	live	m2	preparation-power
+q-1-14	0	tombstone	m2	retired: pure-identification duplicate; absorbed by q-0-21 (PHONE jack, Chapter 0)
+q-1-15	0	tombstone	m2	retired: pure-identification duplicate; absorbed by q-0-22 (LINE OUT jack, Chapter 0)
+q-1-16	0	tombstone	m2	retired: pure-identification duplicate; absorbed by q-0-29 (built-in speaker, Chapter 0)
+q-2-01	1	live	m2	pad-play-banks
+q-2-07	1	live	m2	pad-play-banks
+q-2-12	1	live	m2	pad-play-sounds
+q-2-17	1	live	m2	pad-play-sounds
+q-2-19	1	live	m2	pad-play-performance
+q-3-05	0	tombstone	m2	retired: pure-identification duplicate; absorbed by q-0-28 (INPUT SELECT positions, Chapter 0)
+q-3-06	0	tombstone	m2	retired: pure-identification duplicate; absorbed by q-0-28 (INPUT SELECT position-to-source mapping, Chapter 0)
