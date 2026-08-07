@@ -22,7 +22,7 @@ difference is one always-hidden `#sxc1-device-state` diagnostics node). See
 [`briefs/M4-plan.md`](briefs/M4-plan.md) for the design this milestone implements
 and [`briefs/M4-manifest.json`](briefs/M4-manifest.json) for the task-by-task
 breakdown. `check-site.sh` now runs **95 checks** (up from M3's 80), and the
-headless-browser driver asserts **157 assertions per served stage** — including
+headless-browser driver asserts **160 assertions per served stage** — including
 the D1–D25 WebMIDI device suite, driven entirely through a committed fake with no
 hardware in the loop (see [Verification](#verification)); the one thing automation
 cannot produce, a walk with the real unit in hand, has its own owner's checklist
@@ -388,7 +388,7 @@ against [`scripts/fake-midi.js`](scripts/fake-midi.js) — a committed, reviewab
 the Web MIDI surface, not a string inside the driver — which `scripts/browser-check.mjs`
 pre-loads into a **freshly created** CDP target with
 `Page.addScriptToEvaluateOnNewDocument`, so it is installed before the app boots and the
-app's own feature detection sees it as the genuine article. Twenty-two assertions
+app's own feature detection sees it as the genuine article. Twenty-five assertions
 (D1–D25) drive the full matrix through it: grant, deny and API-absent outcomes,
 hot-plug and unplug, multi-port binding, exactly-once confirmation, and the negative
 controls that keep a green run honest — a **wrong CC**, a **wrong CC value**, a
@@ -973,9 +973,11 @@ unchanged tree measured 907,575 and 908,037), which `scripts/check-site.sh`'s ow
 size-ledger comment independently records. The current `--detect-features -Oz
 --converge` pipeline is far tighter but not perfectly bit-stable either: M4's wave-0
 probe built the same tree twice and measured zero inter-build variance (890,713 bytes
-both times), while a later re-run of the same optimize pipeline against the final M4
-tree reproduced the shipping artifact to within **5 gzipped bytes** (925,657 vs the
-shipped 927,008). The table therefore reports the shipping artifact's own measured
+both times), while later repeat runs of the same optimize pipeline against evolving M4
+trees measured small deltas against their contemporaneous artifacts — **5 gzipped
+bytes** on one probe, **441** on the milestone cold rebuild — so expect any fresh
+rebuild to land within roughly half a kilobyte of the number below, not on it
+exactly. The table therefore reports the shipping artifact's own measured
 number — the bytes actually sitting at `site/public/app.wasm` are what `check-site.sh`
 measures and what deploys. `app.wasm` grew from M2's 978,969-byte
 gzipped baseline mainly for two reasons: the course grew from 4 decks/16 exercises to

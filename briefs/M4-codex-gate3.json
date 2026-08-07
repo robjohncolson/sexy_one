@@ -1,0 +1,98 @@
+{
+  "task_type": "review",
+  "milestone": "M4",
+  "round": 3,
+  "reviewed_commit": "e8f0dd6cc2fd58b8e696cac8892da5a000e35c4e",
+  "review_method": "Read-only inspection of commit e8f0dd6, the round-2 verdict, and the affected current files. Per the subagent constraint, no build, browser run, test, lint, or other verification command was run; coordinator-reported runtime totals are identified as supplied evidence rather than independently reproduced.",
+  "per_item_verdicts": [
+    {
+      "id": 1,
+      "title": "D21 query-free/repeated-asset same-origin egress residual",
+      "verdict": "FIXED",
+      "evidence": [
+        "scripts/browser-check.mjs:3622-3639 creates and attaches the fresh target, enables Network, registers the session-scoped requestWillBeSent collector, and only then navigates to the scenario URL, so boot traffic is captured before the app loads.",
+        "scripts/browser-check.mjs:3666-3684 removes the old asset-shape allowlist semantics. d21QueryStringEgress only labels query-bearing offenders for diagnostics and is not consulted as a permission rule.",
+        "scripts/browser-check.mjs:4176-4239 waits after __SXC1_BOOTED until the request stream has been quiet for 700 ms (8 s cap), snapshots bootCount, runs enable/grant/emit/confirmation, and passes D21 only when the post-snapshot request slice is empty and bootCount is nonzero.",
+        "scripts/browser-check.mjs:1135-1164 implements the three distinct exfiltration sabotages: query-string same-origin fetch, query-free asset-shaped path carrying the received bytes, and an extra app.wasm fetch. scripts/browser-check.mjs:3602-3612 maps each selector to D21 alone.",
+        "The source maps 17 M4 selector passes; together with clean, legacy-all, and the 15 M3 selectors this yields the stated 34-pass sweep. The coordinator reports all 34/34 caught exactly their mapped assertions. That run was not repeated here."
+      ],
+      "assessment": "The round-2 false-green classes are closed. No same-origin URL, path shape, or repeated real asset is permitted after the settled boot snapshot; all become nonzero scenario deltas. The bootCount >= 1 floor proves the collector observed the target's boot request stream."
+    },
+    {
+      "id": 2,
+      "title": "V6 floor gap for D23-D25",
+      "verdict": "FIXED",
+      "evidence": [
+        "scripts/check-site.sh:3113-3126 now defines V6 and its label as D1..D25 and explicitly describes the former D1..D22 unplug gap.",
+        "scripts/check-site.sh:3190-3203 extracts only anchored ok lines matching D1 through D25, de-duplicates them, and requires exactly 25; its failure text reports '<count> of 25 distinct D-assertions'.",
+        "The stale D1..D22 comments in scripts/check-site.sh and scripts/browser-check.mjs were updated to D1..D25 in the touched regions. The workflow comments at .github/workflows/site.yml:315-317 and 378 were updated as well.",
+        "The coordinator reports the D25-unplug red control failed V6 with 24 of 25 distinct assertions before exact reversal. That control was not repeated here."
+      ],
+      "assessment": "D23-D25 can no longer be removed while satisfying the independent check-site presence floor."
+    },
+    {
+      "id": 3,
+      "title": "Documentation and published-figure reconciliation",
+      "verdict": "PARTIALLY-FIXED",
+      "fixed_evidence": [
+        "docs/M4-device-test-protocol.md:34-55 now explicitly says not to update firmware merely to run the protocol, records working MIDI OUT on firmware 1.0.2, and describes the observed Disp Bright -> APO time jump when the channel menu is absent.",
+        "docs/M4-device-test-protocol.md:203-228 correctly describes mid-range no-confirm, endpoint auto-confirm, either outcome as PASS, and the FX buttons' 127/0 toggle edges.",
+        "README.md:1085-1097 revises M4-F1 to the measured endpoint behavior, documents the FX toggle behavior, and links both the owner evidence and M5 item 10.",
+        "docs/M4-device-evidence.md:1 and 34 are now marked COMPLETE.",
+        "The principal measured table and workflow comment now publish 2,643,909 raw, 927,008 gzip, +36,295 delta, 72,992 frozen-ceiling headroom, D1-D25, 160 served-stage assertions, and 133/133 self-test."
+      ],
+      "remaining_defects": [
+        "README.md:25 still says 157 assertions per served stage, contradicting README.md:404 and the supplied correct total of 160.",
+        "README.md:391 says 'Twenty-two assertions (D1-D25)', an internally impossible count introduced by changing only the range.",
+        "README.md:977-978 claims the re-run was within 5 gzip bytes while giving 925,657 versus 927,008, which differ by 1,351 bytes. The commit updated only the shipping side of the comparison.",
+        "docs/M4-device-test-protocol.md:302-304 and the report row at line 321 still tell the owner that check 7 is the expected no-auto-confirm outcome, contradicting the either-outcome rule at lines 222-228 and failing to let the copied report accurately record endpoint auto-confirm.",
+        "docs/M4-device-test-protocol.md:21-23 still refers to a step 'supposed to do nothing', another stale description of the now-revised endpoint behavior.",
+        "docs/M4-device-test-protocol.md:293 still tells an owner with no detected port to require firmware >=1.1.1, contradicting the same document's evidence-backed statement that firmware 1.0.2 transmits MIDI correctly.",
+        "docs/M4-device-test-protocol.md:54 says an owner whose channel menu is absent should mark section 5 NA, but the channel check is section 6/check 10; section 5 is the d-2-09 FX walk."
+      ],
+      "assessment": "The substantive discoveries were added, but the owner-facing protocol and README are not reconciled end to end. The copied report can still score the newly proven endpoint behavior incorrectly, and several published figures are self-contradictory. This leaves the round-2 documentation blocker open."
+    }
+  ],
+  "device_evidence_ruling": {
+    "verdict": "ADEQUATE-COMPLETE",
+    "evidence": [
+      "docs/M4-device-evidence.md:8-13 records the exact port name SXC-1 MIDI 1 and the click-gated permission/binding flow.",
+      "docs/M4-device-evidence.md:24-32 records pad 1/pad 13 auto-confirms and discrimination against the real ALSA decoy port Midi Through Port-0.",
+      "docs/M4-device-evidence.md:15-20, 47-65, and 94-100 record CC auto-confirms, the endpoint correction to M4-F1, 127/0 FX toggle edges, one-shot semantics, and hookless manual confirmation.",
+      "docs/M4-device-evidence.md:34-45 and 67-69 capture Note On and Note Off bytes with velocity 64 in both directions and explain why velocity-agnostic matching and rejection of 0x80 as a press are load-bearing.",
+      "docs/M4-device-evidence.md:71-90 records the full settings-list scroll, firmware 1.0.2, absence of MIDI IN/OUT channel items, fixed channel 1, and continued automated coverage of the mismatch UI.",
+      "docs/M4-device-evidence.md:92-101 provides a complete owner-run pass summary and reports no device-layer defect."
+    ],
+    "assessment": "This is sufficient physical-device evidence for the M4 gate. The channel test is legitimately N/A on the measured firmware; it is not missing evidence for the implementation because the mismatch behavior remains covered by D10 in the automated suite."
+  },
+  "new_findings": [
+    {
+      "id": "NEW1",
+      "severity": "LOW",
+      "title": "The README size-reproducibility sentence became arithmetically false",
+      "location": "README.md:977-978",
+      "scenario": "Commit e8f0dd6 changed the stated shipping artifact from 925,652 to 927,008 but left the comparison run at 925,657 and retained 'within 5 gzipped bytes'. The displayed values differ by 1,351, so the public reproducibility claim no longer supports itself.",
+      "recommendation": "Replace the comparison-run measurement and delta with the actual post-change rerun, or remove the within-5 claim if no corresponding measurement exists."
+    },
+    {
+      "id": "NEW2",
+      "severity": "LOW",
+      "title": "Partial count edits introduced new internal contradictions in the README",
+      "location": "README.md:25-26, 391-405",
+      "scenario": "The commit changed D1-D22 to D1-D25 while leaving 157 at the status summary and the spelled-out 'Twenty-two'. The same document later gives the correct 160 and 25, so readers now receive mutually exclusive gate totals.",
+      "recommendation": "Change 157 to 160 and 'Twenty-two' to 'Twenty-five', then search the whole affected documentation set for the superseded figures."
+    },
+    {
+      "id": "NEW3",
+      "severity": "MEDIUM",
+      "title": "The new absent-channel-menu instruction points owners at the wrong section",
+      "location": "docs/M4-device-test-protocol.md:46-55, 196, 252",
+      "scenario": "The added 1.0.2 branch tells the owner to mark section 5 N/A, but section 5 is the FX drill and the unperformable channel-mismatch test is section 6/check 10. An owner following the literal instruction can skip valid FX evidence and still encounter an impossible channel-setting step.",
+      "recommendation": "Say 'mark section 6 / check 10 N/A' and repeat the conditional N/A instruction at the start of the channel-check section."
+    }
+  ],
+  "new_code_or_workflow_defects": "None found in the e8f0dd6 changes to scripts/browser-check.mjs, scripts/check-site.sh, or .github/workflows/site.yml. The newly identified defects are documentation changes or incomplete documentation reconciliation.",
+  "coordinator_reported_state": "Accepted as supplied, not rerun: check-site 95/95 result=complete; browser self-test 133/133; negative sweep 34/34 exact; artifact unchanged at 927,008 gzip with no site/** changes in e8f0dd6.",
+  "verdict": "GATE-BLOCKED",
+  "final_line": "GATE-BLOCKED — D21 and the D1-D25 V6 floor are fixed, and the physical-device evidence is adequate, but the round-2 documentation blocker remains: the owner report still contradicts the either-outcome rule, the firmware troubleshooting guidance contradicts the 1.0.2 evidence, the absent-menu N/A instruction names the wrong section, and README contains stale/arithmetically false published figures."
+}

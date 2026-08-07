@@ -43,7 +43,7 @@ step that is *supposed* to do nothing.
    (next item).
 3. **Cable.** A USB cable that carries **data**. A charge-only cable will
    power the unit but no MIDI port will ever appear.
-4. **Know where the MIDI channel lives** (you will need this in section 5):
+4. **Know where the MIDI channel lives** (you will need this in section 6):
    long-press `EDIT` to enter the system settings, scroll down past
    `Disp Bright` to `MIDI IN Ch.` / `MIDI OUT Ch.`, change with the
    left/right buttons, press `EDIT` again to exit. Both channels default to 1
@@ -51,8 +51,8 @@ step that is *supposed* to do nothing.
    1 for now.** If the two MIDI items are simply absent from the list (the
    list jumps from `Disp Bright` to `APO time`), your firmware predates the
    setting — measured on Ver. 1.0.2 — and the unit transmits on channel 1,
-   fixed. That is fine: the trainer's default channel is 1; mark section 5
-   **NA** and note your firmware version.
+   fixed. That is fine: the trainer's default channel is 1; mark section 6's
+   check 10 **NA** and note your firmware version.
 
 ---
 
@@ -290,7 +290,7 @@ current step always works — device verification can never block a drill.
 
 | Symptom | What to do |
 |---|---|
-| The ports line reads "No MIDI input detected — check the USB cable and that the unit is on." | Check the unit is powered on and the logo has cleared; swap in a USB cable you know carries data (a charge-only cable never shows a port); try another USB socket; confirm firmware is at least Ver. 1.1.1 (section 0). Then simply unplug and replug — the page notices hot-plug by itself, no reload needed. Meanwhile the Confirm button always works; no drill can be blocked by MIDI. |
+| The ports line reads "No MIDI input detected — check the USB cable and that the unit is on." | Check the unit is powered on and the logo has cleared; swap in a USB cable you know carries data (a charge-only cable never shows a port); try another USB socket; check your firmware version (section 0) -- but note MIDI OUT is proven to work as far back as Ver. 1.0.2, so an old version alone does not explain a missing port. Then simply unplug and replug — the page notices hot-plug by itself, no reload needed. Meanwhile the Confirm button always works; no drill can be blocked by MIDI. |
 | The browser never asked for permission, or the status line reads "The browser denied MIDI access. Confirm each step manually, or re-grant access in your browser's site settings and try again." | Make sure this is desktop Chrome or Edge in a normal window — Firefox and Safari have no Web MIDI, and headless or automated windows always deny it. Then click **Retry device access**; if it stays denied, click the icon at the left of the address bar, open the site settings, set MIDI to Allow, reload the page, and enable again. Meanwhile the Confirm button always works; no drill can be blocked by MIDI. |
 | The page confirms a step you did not perform, or confirms on the wrong action. | Note exactly what you pressed and what confirmed, in the report's notes — that is a real finding we want. Remember the trainer listens for one step at a time, so a press meant for a later step does nothing until that step is current. Meanwhile the Confirm button always works; no drill can be blocked by MIDI. |
 | Nothing happens at all when you press buttons or tap pads. | Check the status line reads "Device verification is on, listening on MIDI channel 1." (if not, enable it); check a port is bound (first row); run the channel check (section 6) in case the unit transmits on another channel — the "Received MIDI on channel …" sentence plus the offered **Use channel** button fixes that in one click. If it stays silent, finish the drill manually and say so in the notes. The Confirm button always works; no drill can be blocked by MIDI. |
@@ -300,7 +300,8 @@ current step always works — device verification can never block a drill.
 ## 8. Your report — copy, fill in, send back
 
 PASS means "it behaved exactly as this document said it would" (so check 7 is
-a PASS when d-2-09 step 1 did **not** auto-confirm). Use NA for anything you
+a PASS for EITHER dial outcome — mid-range no-confirm or endpoint
+auto-confirm — as long as you note which happened). Use NA for anything you
 could not attempt.
 
 ```text
@@ -318,7 +319,8 @@ Captured lastMessage bytes (verbatim, e.g. [144,36,127]):
  4. d-2-02 step 1 auto-confirmed on pad 1 ......................... PASS / FAIL / NA
  5. d-2-02 step 2 auto-confirmed on pad 13 ........................ PASS / FAIL / NA
  6. Byte capture copied above ..................................... PASS / FAIL / NA
- 7. d-2-09 step 1 did NOT auto-confirm from the dial (expected) ... PASS / FAIL / NA
+ 7. d-2-09 step 1: mid-range no-confirm / endpoint auto-confirm
+    (either is expected -- note which in Notes) ................... PASS / FAIL / NA
  8. d-2-09 step 2 auto-confirmed when FX1 was pressed ............. PASS / FAIL / NA
  9. d-2-09 step 3 auto-confirmed when FX2 was pressed ............. PASS / FAIL / NA
 10. Channel check: mismatch shown, Use channel 3 worked, restored . PASS / FAIL / NA
