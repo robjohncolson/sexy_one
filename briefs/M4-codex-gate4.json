@@ -1,0 +1,48 @@
+{
+  "task_type": "review",
+  "milestone": "M4",
+  "round": 4,
+  "reviewed_commit": "fd0a12abc92f6c5895608bfb2d74b888f1547045",
+  "review_method": "Read-only inspection of fd0a12a and the affected documentation. Per the subagent constraint, no tests, lint checks, builds, browser runs, or artifact remeasurement were performed.",
+  "per_item_verdicts": [
+    {
+      "id": 1,
+      "title": "README served-stage assertion count",
+      "verdict": "PASS",
+      "evidence": "README.md:25 now says 160 assertions per served stage, matching README.md:404. The stale 157 figure is removed by fd0a12a."
+    },
+    {
+      "id": 2,
+      "title": "README D-suite spelled-out assertion count",
+      "verdict": "PASS",
+      "evidence": "README.md:391-392 now says Twenty-five assertions (D1-D25). The count and inclusive range agree."
+    },
+    {
+      "id": 3,
+      "title": "README size reproducibility arithmetic",
+      "verdict": "PASS",
+      "evidence": "README.md:974-981 now reports the measured deltas rather than falsely comparing stale and current artifacts: the earlier probe was 925,657 versus its contemporaneous 925,652 artifact, a 5-byte delta; the milestone cold rebuild was 926,093 versus that contemporaneous 925,652 artifact, a 441-byte delta. It tells readers to expect roughly half a kilobyte of fresh-rebuild variance and no longer pairs 925,657 with 927,008 under a within-5-bytes claim. The current 927,008 shipping number remains separately and clearly identified at README.md:957."
+    },
+    {
+      "id": 4,
+      "title": "Physical-device protocol reconciliation",
+      "verdict": "PASS",
+      "evidence": [
+        "docs/M4-device-test-protocol.md:54-55 directs an owner whose channel menu is absent to mark section 6's check 10 NA.",
+        "docs/M4-device-test-protocol.md:302-305 says check 7 passes for either mid-range no-confirm or endpoint auto-confirm, provided the owner notes which occurred.",
+        "docs/M4-device-test-protocol.md:322-323 gives the copied report the same two accepted check-7 outcomes and asks which occurred.",
+        "docs/M4-device-test-protocol.md:293 no longer demands firmware 1.1.1 when no port appears; it cites proven MIDI OUT operation on firmware 1.0.2 and correctly says old firmware alone does not explain a missing port."
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Regression and commit-scope check",
+      "verdict": "PASS-WITH-SCOPE-NOTE",
+      "evidence": "No new substantive defect was found in the requested fd0a12a documentation changes. The commit has no code, workflow, or site-artifact changes, so the accepted prior functional and physical-evidence verdicts are unaffected. Contrary to the prompt's literal two-file premise, git diff-tree shows three paths: README.md modified, docs/M4-device-test-protocol.md modified, and briefs/M4-codex-gate3.json added. The added JSON is explicitly a historical round-3 review of e8f0dd6 and is the cited input to this round; it does not introduce a current-state contradiction or a gate defect."
+    }
+  ],
+  "prior_verdicts": "UNCHANGED: round-1 findings 1-4 FIXED; D21 zero-delta FIXED; V6 D1-D25 floor FIXED; physical-device evidence ADEQUATE-COMPLETE.",
+  "verified_state": "ACCEPTED AS SUPPLIED, NOT RERUN: check-site 95/95 result=complete; browser 133/133; negative sweep 34/34 exact; artifact 927,008 gzip. fd0a12a contains no site/** change.",
+  "verdict": "GATE-CLEAR",
+  "final_line": "GATE-CLEAR"
+}

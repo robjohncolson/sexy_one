@@ -54,7 +54,7 @@ Ops:
 8. Revert to workflow Pages deploys when GitHub's deployment queue recovers —
    set ENABLE_PAGES=true, PUT build_type=workflow, retire the manual gh-pages
    procedure (PLAN.md deploy-path note).
-9. Site title decision — "SXC-1 Trainer" vs "SEXY ONE" (owner).
+9. Site title decision — RESOLVED 2026-08-08: owner chose **SEXY ONE**; rename the header, <title>, README landing, and any view/string mentions (keep "SXC-1 trainer" as descriptive prose where it aids search).
 
 Ship checklist (beyond debt):
 - Full a11y pass (keyboard-only exercise completion, focus management on

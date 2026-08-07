@@ -166,6 +166,8 @@ against the exact -Oz artifact before adoption; the behavioral-net argument
 from the original ruling is unchanged.
 
 Resolved:
+- Site title (2026-08-08, owner-confirmed): **SEXY ONE** (M5 item 9 closed;
+  rename executed in M5).
 - Codex model slug = `gpt-5.6-sol`, reasoning `xhigh` (2026-08-06).
 - GitHub repo (2026-08-06, owner-confirmed): **public**, `robjohncolson/sexy_one`.
   Pages via Actions workflow; `ENABLE_PAGES=true` repo variable set. Site will
