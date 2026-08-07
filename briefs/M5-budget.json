@@ -1,0 +1,14 @@
+{
+  "measured_at": "2026-08-08",
+  "tree": "580738804c9e252b4da1bda63762f198192248bc",
+  "m4_final_gzip_bytes": 927008,
+  "m5_entry_gzip_bytes": 932087,
+  "ceiling_bytes": 1000000,
+  "m5_reserve_bytes": 60000,
+  "task_local_ceiling_bytes": 987008,
+  "ruling": "Coordinator, 2026-08-08: M4's task_local_ceiling_bytes (932,713 = m3_final + m4_budget) was an M4-scoped construct; M4 closed at 927,008 gzip. The M4 budget's 60,000-byte reserve_bytes was held under the frozen 1,000,000 ceiling explicitly FOR M5's polish, so M5's task-local ceiling = m4_final + 60,000 = 987,008. The frozen WASM_GZIP_CEILING_BYTES=1000000 is untouched and remains the outer tripwire. check-site's V2/V8 budget checks re-point at this file for the M5 window; M4-budget.json is preserved unchanged as the M4 historical record.",
+  "evidence": [
+    "m4_final: gzip of the m4-tagged deploy artifact (deployed and live-verified 2026-08-07).",
+    "m5_entry: gzip after the M5 reader-debt wave (this tree) -- 932,087, which is 626 bytes under the M4-scoped 932,713 and would false-block the M5 a11y pass without this ruling."
+  ]
+}

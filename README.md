@@ -1,10 +1,51 @@
-# SEXY ONE — SXC-1 Trainer
+# SEXY ONE — a Casio SXC-1 trainer
 
-**SEXY ONE** is an interactive English-language training course for the
-[Casio SXC-1](https://www.casio.com/) portable standalone sampler.
-The app is a Haskell/[Miso](https://haskell-miso.org/)
-application compiled to WebAssembly and served as static files — no server component.
-This is an unofficial fan project and is **not affiliated with Casio**.
+**SEXY ONE** is an unofficial English trainer and complete fan translation of the
+manuals for the [Casio SXC-1](https://www.casio.com/), a portable standalone sampler
+Casio sells only in Japan. Everything runs in your browser — the site is static files
+with no server, no account and no analytics, and nothing you do in it ever leaves
+your machine.
+
+**Use it now:**
+
+- <https://robjohncolson.github.io/sexy_one/> (GitHub Pages)
+- <https://sexy-one-gray.vercel.app/> (Vercel mirror — the same bundle)
+
+In your first minute you can read any page of the four manuals in English with the
+original Japanese page right beside it, start the guided course of quizzes, drills
+and lookups (every one cites the manual page it teaches), or — in desktop Chrome or
+Edge — connect an SXC-1 over USB, click **Enable device verification** on a drill,
+and watch steps confirm themselves as you perform them on the real hardware.
+
+## For SXC-1 owners
+
+The manual reader keeps the original Japanese page one click away at all times, and
+a "Japanese first" reading preference makes the reader open the original page before
+the English translation — useful if you read Japanese and want the translation as
+the aid rather than the text. Your course progress lives only in your own browser;
+**Export/Import** on the progress panel produces a small text blob you can copy by
+hand to move your history to another device, and that blob is the *only* way
+progress ever travels anywhere. Device verification — the trainer confirming drill
+steps by watching your real SXC-1 over USB-MIDI — is optional and off until you
+click **Enable device verification** on a drill page; it needs a Chromium browser
+(desktop Chrome or Edge — Firefox and Safari have no Web MIDI, and the trainer works
+fully there with manual confirmation), and received MIDI data never leaves the
+browser. The translations are a fan effort: this project is **not affiliated with,
+endorsed by, or sponsored by Casio**, and original manual content remains
+© CASIO COMPUTER CO., LTD. — see [Copyright](#copyright).
+
+## For developers
+
+The app is written in Haskell with [Miso](https://haskell-miso.org/) and compiled to
+WebAssembly by GHC's wasm backend; the manuals and exercise decks are embedded into
+the wasm at compile time, so the whole deployment is static files — zero servers,
+working unchanged at any sub-path or served locally. The project runs on a
+check-suite culture: nearly every claim in this README is enforced by a named check
+in `./scripts/check-site.sh`, which computes the content statistics three
+independent ways and drives the built site in headless Chrome before anything ships.
+Start with [Prerequisites](#prerequisites) and [Build](#build) to build it yourself,
+[Verification](#verification) for how the checks work, and
+[Measured figures](#measured-figures) for current sizes, counts and timings.
 
 ## Status
 
