@@ -58,6 +58,10 @@ parseRegistry raw = foldr step ([], []) (zip [1 :: Int ..] (T.lines raw))
           [i, cnt, st, ship, note]
             | Just c <- parseDigits cnt
             , st == "live" || st == "tombstone"
+            -- NEW6 (round-3): a tombstone MUST carry promptCount 0 --
+            -- a retired id mints no prompts; a nonzero count on a
+            -- tombstone row is malformed, not leniently accepted.
+            , st == "live" || c == 0
             , validShipTag ship
             -> (RegRow i c st ship note : rows, errs)
           _ -> (rows, ("line " <> T.pack (show n) <> ": malformed row") : errs)
@@ -240,6 +244,12 @@ selfTest = do
   let (rs, es) = parseRegistry "# c\nq-1-01\t1\tlive\tm2\tdeck\nbroken row\nq-1-02\t2\tlive\tm2\tdeck\n"
   record ref 6 "malformed registry row reported without losing siblings"
     (length rs == 2 && length es == 1) ("rows " ++ show (length rs) ++ " errs " ++ show (length es))
+  -- M3 gate NEW6 (round-3): a tombstone with a NONZERO promptCount is
+  -- malformed at parse -- proven able to fire, not just claimed.
+  let (rsT, esT) = parseRegistry "q-1-14\t3\ttombstone\tm3\tretired\nq-1-15\t0\ttombstone\tm3\tretired\n"
+  record ref 6 "nonzero-count tombstone row is malformed (zero-count one still parses)"
+    (length rsT == 1 && length esT == 1 && rrId (head rsT) == "q-1-15")
+    ("rows " ++ show (length rsT) ++ " errs " ++ show (length esT))
   record ref 4 "registry sort order is checkable (sorted ids compare equal)"
     (sort (map rrId cleanRows) == map rrId cleanRows) "synthetic rows unsorted"
   finish ref

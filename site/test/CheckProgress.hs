@@ -414,18 +414,37 @@ group12 cl = do
     (psDone st3 == Map.insertWith (+) "q-9-99" 1 (psDone st2)
       && st3 { psDone = psDone st2 } == st2)
     "Completed touched a field other than psDone"
-  -- M3 re-gate NEW1 residual: an imported blob carrying absurd (but
-  -- Int-parseable) values is clamped into semantic domains on decode --
-  -- the scheduler can then never overflow an Int multiply from them.
-  let hostileR = "SXC1PROGRESS\t2\nM\t1\t1\t1\t\nR\thuge#1\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\n"
+  -- M3 re-gate NEW1 residual (extended round-3): an imported blob
+  -- carrying absurd (but Int-parseable) values is clamped into semantic
+  -- domains on decode -- EVERY numeric field is pinned exactly (R's
+  -- seven, D's count, M's three -- NEW16), so no single clamp can be
+  -- removed without a red here, and the scheduler can never overflow an
+  -- Int multiply (or bumpStreak's +1) from imported data.
+  let hostileR = "SXC1PROGRESS\t2\nM\t2000000000\t2000000000\t2000000000\tx#1\nR\thuge#1\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\nD\thuge-d\t2000000000\n"
+      hostileName = "hostile imported values clamp to semantic domains (all R/D/M fields pinned)"
   case decodeState hostileR of
     DecodeOk st -> case Map.lookup "huge#1" (psRecs st) of
-      Just rc -> record cl 12 "hostile imported values clamp to semantic domains (ease<=3000, interval<=180, days<=dayCap)"
-        (rcEase rc == 3000 && rcInterval rc == 180 && unDayNum (rcDue rc) == dayCap
-          && unDayNum (rcLastSeen rc) == dayCap && rcReps rc == 1000000)
-        ("ease=" ++ show (rcEase rc) ++ " intv=" ++ show (rcInterval rc) ++ " due=" ++ show (unDayNum (rcDue rc)))
-      Nothing -> record cl 12 "hostile imported values clamp to semantic domains (ease<=3000, interval<=180, days<=dayCap)" False "record dropped"
-    other -> record cl 12 "hostile imported values clamp to semantic domains (ease<=3000, interval<=180, days<=dayCap)" False (resultTag other)
+      Just rc -> record cl 12 hostileName
+        (rcReps rc == 1000000 && rcLapses rc == 1000000 && rcEase rc == 3000
+          && rcInterval rc == 180 && unDayNum (rcDue rc) == dayCap
+          && unDayNum (rcLastSeen rc) == dayCap && rcSeen rc == 1000000
+          && Map.lookup "huge-d" (psDone st) == Just 1000000
+          && unDayNum (psStreakDay st) == dayCap && psStreakLen st == 1000000
+          && unDayNum (psFirstDay st) == dayCap && psLastPrompt st == "x#1")
+        ("ease=" ++ show (rcEase rc) ++ " lap=" ++ show (rcLapses rc)
+          ++ " seen=" ++ show (rcSeen rc) ++ " streakLen=" ++ show (psStreakLen st)
+          ++ " done=" ++ show (Map.lookup "huge-d" (psDone st)))
+      Nothing -> record cl 12 hostileName False "record dropped"
+    other -> record cl 12 hostileName False (resultTag other)
+  -- Round-3 addDays totality: DayNum(..) is exported, so the contract
+  -- must hold for ARBITRARY Ints, not just decoded ones -- maxBound + 1
+  -- previously wrapped on wasm32 before the clamp could see it.
+  record cl 12 "addDays is total on all of Int (maxBound operands clamp, never wrap)"
+    (addDays (DayNum maxBound) 1 == DayNum dayCap
+      && addDays (DayNum 1) maxBound == DayNum dayCap
+      && addDays (DayNum maxBound) maxBound == DayNum dayCap
+      && addDays (DayNum (-5)) 3 == DayNum 3)
+    (show (unDayNum (addDays (DayNum maxBound) 1)))
 
 walkHs :: FilePath -> IO [FilePath]
 walkHs dir = do

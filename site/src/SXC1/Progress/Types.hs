@@ -149,9 +149,14 @@ dayCap :: Int
 dayCap = 9999999
 
 -- | Overflow-safe day arithmetic: the ONLY way schedule code may add to
--- a 'DayNum' (M3 gate NEW1). Clamps at 'dayCap'; never wraps.
+-- a 'DayNum' (M3 gate NEW1). TOTAL on all of 'Int' (round-3 residual):
+-- each operand is clamped into @[0, 'dayCap']@ BEFORE the add -- the sum
+-- of two capped operands tops out near 2x10^7, far inside even wasm32's
+-- 32-bit 'Int' -- so the contract holds for any caller-supplied values
+-- (the 'DayNum' constructor is exported), not just decoded ones.
 addDays :: DayNum -> Int -> DayNum
-addDays (DayNum d) n = DayNum (min dayCap (max 0 d + max 0 n))
+addDays (DayNum d) n =
+  DayNum (min dayCap (min dayCap (max 0 d) + min dayCap (max 0 n)))
 
 -- | Wall-clock epoch milliseconds -> whole UTC days since the epoch,
 -- floor-divided, clamped into @[1, 'dayCap']@.

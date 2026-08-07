@@ -1,0 +1,65 @@
+{
+  "task_type": "review",
+  "reviewed_commit": "09576262ca9d02d23f46f8f6ddaa7072968cad40",
+  "verdict": "GATE-BLOCKED",
+  "summary": "The production fixes for the R/D decode domains, promptless-Completed isolation, recursive IO-token guard, failed-wipe handling, and last-activity Continue behavior are present. The gate is not clear: NEW6's required tombstone-count parse guard is absent; NEW15 remains internally contradictory and leaves the browser mini-codec falsely claiming an exact schema-v2 mirror while emitting schema v1; and NEW1's added hostile test does not pin all claimed clamps. The prior addDays totality residual also remains, and this review found a related accepted-M-line overflow path in bumpStreak.",
+  "per_residual_verdicts": [
+    {
+      "id": "NEW1",
+      "verdict": "PARTIALLY-FIXED",
+      "production_ruling": "Codec.hs:171-184 correctly clamps every accepted R record field used by scheduler arithmetic: reps/lapses/seen to 1000000, ease to Scheduler.easeMin/easeMax, interval to 0..180, and due/lastSeen to dayCap; D counts are capped at 1000000. With interval<=180 and ease<=3000, the largest GEasy multiplication is 180*3000*13=7020000, safely inside wasm32 Int, and the capped counters can be incremented safely. This closes the production imported-R overflow scenario.",
+      "verification_gap": "CheckProgress.hs:420-428 does not do what the prompt claims. Its hostile R row sets all seven numeric values to 2000000000, but the predicate checks only reps, ease, interval, due, and lastSeen. It does not pin rcLapses or rcSeen, contains no hostile D row, and therefore does not pin the D cap. Regressions removing any of those three clamps remain green.",
+      "remaining_round2_residual": "Types.hs:151-154 still advertises addDays as overflow-safe and never wrapping, but computes max 0 d + max 0 n in Int before min dayCap. Because DayNum(..) and addDays are exported, addDays (DayNum maxBound) 1 still wraps on wasm32. Current app-originated and decoded R callers are now bounded, but the stated total API contract from the round-2 ruling was not fixed.",
+      "related_finding": "See NEW16: accepted M-line streak metadata is still unbounded and can overflow bumpStreak."
+    },
+    {
+      "id": "NEW2",
+      "verdict": "FIXED",
+      "evidence": "CheckProgress.hs:409-416 requires the expected psDone insertion and compares st3 with psDone rolled back against st2 using full ProgressState Eq. Any change to version, recs, streak fields, first day, last prompt, or another done entry fails. Lines 407-408 separately pin psLastPrompt after grading."
+    },
+    {
+      "id": "NEW3",
+      "verdict": "FIXED-FOR-THE-IDENTIFIED-BYPASSES",
+      "evidence": "CheckProgress.hs:361 and 430-437 recursively discover .hs files below src/SXC1/Progress. Lines 366-377 lowercase code before an inline -- comment, tokenize it, and reject the exact io token in addition to the existing forbidden substrings. A nested .hs module and bare touch :: IO () are both covered. This remains a source guard rather than a formal reachability proof, but the two round-2 bypasses are closed."
+    },
+    {
+      "id": "NEW6",
+      "verdict": "NOT-FIXED",
+      "evidence": "CheckRegistry.hs:58-62 accepts a five-column row whenever count parses, status is live or tombstone, and ship is valid. There is no condition requiring c == 0 when st == tombstone. r3CountDrift still examines live rows only, and selfTest has no nonzero-tombstone parser case. A row such as q-1-14<TAB>3<TAB>tombstone<TAB>m3<TAB>retired therefore parses and passes the tombstone-count contract. CheckRegistry.hs was not changed by 0957626 despite the commit message claiming tombstone hardening."
+    },
+    {
+      "id": "NEW9",
+      "verdict": "FIXED",
+      "evidence": "Store.hs:99-106 changes wipeProgress to IO Bool and returns the bridge del result. Main.hs:361-372 dispatches PWipedOk only on True; only PWipedOk clears mProgress/mLoad/export/import state. False dispatches PStorageLost, which changes only mStorageOk to False at line 381, retaining the existing progress/load model and truthfully degrading storage availability."
+    },
+    {
+      "id": "NEW14",
+      "verdict": "FIXED",
+      "evidence": "CheckProgress.hs:407-408 pins psLastPrompt. Browser section F at browser-check.mjs:2906-2928 grades the lookup first and quiz second after a wipe, then requires #sxc1-continue to contain the quiz id and exclude the lookup id. The lookup id sorts before the quiz id, so the old same-day Map scan fails by construction. The fixture resets firstSinceWipe/lastAnswered on each wipe (1408-1413), records first and last activity (1493-1503), substitutes firstSinceWipe only for continueMatchesLast (1513-1519), and maps that selector to only this assertion (3180-3189). This is consistent with the coordinator-reported exact 17-pass negative sweep."
+    },
+    {
+      "id": "NEW15",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "README.md:327-330 now shows schema 2 and the four-field M body, and lines 420-422 show envelope schema 2. Codec.hs:20-23 and 240-247 now describe the four-field M line and production v1->v2 step. However README.md:346-351 still says productionSteps is empty, schema 1 is the only shipped schema, and schema 2 has not yet been invented. Codec.hs:223-228 likewise still says productionSteps is empty at v1 and v2 is only future pressure. The README's lines 336-348 also continue to blur unknown-record skipping with the separately fail-closed future-header rule, contradicting its explicit DecodeCorrupt statement later at lines 365-371.",
+      "fixture_residual": "The round-2 NEW15 ruling explicitly required the browser fixture either to model schema v2/lastPrompt or be labelled as an intentional v1 migration fixture. browser-check.mjs:949-977 still says it mirrors Codec exactly while encodeProgWire emits SXC1PROGRESS 1, writes the three-field v1 M line, parses only f.length===4, and carries no lastPrompt. Elsewhere the fixture reports envelope/payload schema 2. The newly added Continue tracker lives separately in sessionStorage, so this contradiction remains rather than becoming an honest v1 migration fixture."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "NEW16",
+      "severity": "medium",
+      "title": "Accepted M-line metadata can still overflow bumpStreak and break codec round-trip",
+      "location": "site/src/SXC1/Progress/Codec.hs:158-164; site/src/SXC1/Progress/Scheduler.hs:163-169",
+      "scenario": "Both v1 and v2 M arms accept streakDay, streakLen, and firstDay up to maxBound without semantic clamps. On wasm32, import an otherwise valid blob with streakDay equal to yesterday and streakLen=2147483647, then grade a prompt today. bumpStreak's consecutive-day arm evaluates len + 1, wraps to -2147483648, and encodeState emits a negative M field. On reload parseDigits rejects that M line, dropping streak day/length, first day, and lastPrompt together. A huge imported streakDay also makes lastDay + 1 wrap and can select the wrong forward/backward-day branch.",
+      "recommendation": "Clamp accepted M days to [0,dayCap] and streakLen to a safe counter cap, then add an exact hostile-M transition and round-trip assertion. Make addDays use an Integer intermediate or clamp operands before addition as well."
+    }
+  ],
+  "backward_story_ruling": {
+    "verdict": "STANDS: ACCEPTABLE FAIL-CLOSED",
+    "evidence": "The schema-1 implementation before the v2 change had currentSchema=1 and migrateWith returned DecodeCorrupt whenever v>currentSchema. Although its body fold could skip the four-field M line and accumulate R/D rows, those rows were never returned as DecodeOk. Main retained the raw bytes, progressWritable rejected writes after DecodeCorrupt, and only explicit learner import/wipe could replace/delete the key. Thus old builds do not partially read v2, but they fail closed without history overwrite; the learner must reopen with a v2-capable build."
+  },
+  "no_new_defects_ruling": "No new production defect was found in the changed R/D clamp, isolation guard, recursive purity guard, wipe-result, or Continue paths themselves. NEW16 is an older, newly identified M-line domain hole left adjacent to NEW1, not a regression introduced by 0957626. The newly added hostile test and documentation changes are incomplete as detailed above.",
+  "coordinator_state_ruling": "The supplied coordinator results (progress 82/82, registry 8/8 plus 15/15, browser 108/108, exact negative 17/17, check-site 80/80 complete, and 911130-byte gzip) are accepted as reported and are consistent with the inspected happy paths. They cannot establish the missing tombstone rule because the production parser lacks it, and the existing hostile assertion structurally cannot detect omitted lapses/seen/D clamps. Per the subagent constraint, no command was rerun.",
+  "method": "Read-only inspection of git show 0957626, the round-2 review, relevant current source/tests/docs/harness, and the pre-v2 codec/Main implementation. No builds, tests, lint, browser runs, verification commands, installs, commits, or source patches were performed. The only written file is this required result JSON.",
+  "final_line": "GATE-BLOCKED — NEW6 is still unfixed; NEW15 remains contradictory and leaves the mini-codec on an unlabeled schema-v1 wire; NEW1's claimed exact hostile coverage is incomplete, its addDays totality residual remains, and accepted M metadata can still overflow bumpStreak (NEW16)."
+}

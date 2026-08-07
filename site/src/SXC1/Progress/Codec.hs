@@ -151,17 +151,23 @@ data BodyAcc = BodyAcc
 emptyBodyAcc :: BodyAcc
 emptyBodyAcc = BodyAcc (DayNum 0) 0 (DayNum 0) "" Map.empty Map.empty
 
+clampDay :: Int -> DayNum
+clampDay = DayNum . min dayCap
+
 parseBodyLine :: BodyAcc -> Text -> BodyAcc
 parseBodyLine acc line
   | T.null (T.strip line) = acc
   | otherwise = case tagFields line of
-      -- v1 M line: three fields (lastPrompt stays ""); v2: four.
+      -- v1 M line: three fields (lastPrompt stays ""); v2: four. NEW16:
+      -- the metadata fields clamp into their semantic domains exactly
+      -- like the R fields below -- an imported streakDay near maxBound
+      -- would otherwise overflow bumpStreak's +1 on wasm32.
       ("M", [sdTxt, slTxt, fdTxt])
         | Just sd <- parseDigits sdTxt, Just sl <- parseDigits slTxt, Just fd <- parseDigits fdTxt
-        -> acc { baStreakDay = DayNum sd, baStreakLen = sl, baFirstDay = DayNum fd }
+        -> acc { baStreakDay = clampDay sd, baStreakLen = min 1000000 sl, baFirstDay = clampDay fd }
       ("M", [sdTxt, slTxt, fdTxt, lp])
         | Just sd <- parseDigits sdTxt, Just sl <- parseDigits slTxt, Just fd <- parseDigits fdTxt
-        -> acc { baStreakDay = DayNum sd, baStreakLen = sl, baFirstDay = DayNum fd, baLastPrompt = lp }
+        -> acc { baStreakDay = clampDay sd, baStreakLen = min 1000000 sl, baFirstDay = clampDay fd, baLastPrompt = lp }
       -- M3 re-gate NEW1 (residual): every ACCEPTED numeric field is
       -- clamped into its semantic domain on decode -- an imported blob
       -- can carry any Int-sized value parseDigits admits, and an
@@ -221,11 +227,11 @@ decodeState raw
 -- current. A hop with no step in the table is 'DecodeCorrupt' (the
 -- history cannot be silently dropped). THE PARAMETERISATION IS THE WHOLE
 -- POINT: production code always calls 'migrate' (= @migrateWith
--- 'productionSteps'@, empty at v1 since there is nothing to migrate from
--- yet), but the self-test drives 'migrateWith' directly with a TEST-ONLY
--- step table over a synthetic schema-0 state, so the migration chain is
--- genuinely exercised now rather than only once a v2 is invented under
--- pressure.
+-- 'productionSteps'@, which since v2 carries its first real step), but
+-- the self-test also drives 'migrateWith' directly with a TEST-ONLY step
+-- table over a synthetic schema-0 state -- the mechanism was genuinely
+-- exercised before any production step existed, which is why v1 -> v2
+-- needed no new machinery.
 migrateWith :: (Int -> Maybe (ProgressState -> ProgressState)) -> Int -> ProgressState -> DecodeResult
 migrateWith stepTable v st
   | v > currentSchema  = DecodeCorrupt ("schema version " <> tshow v <> " is newer than this build supports (max " <> tshow currentSchema <> ")")

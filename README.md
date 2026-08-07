@@ -333,22 +333,24 @@ D <TAB> exerciseId <TAB> completions
 The schema version lives **inside the first line of the payload itself**, not in the
 storage key name or anywhere external to the blob — so a copied blob (see Export/import
 below) is fully self-describing: nothing outside the text you copy is needed to read it
-back, on this device or another one. Unknown leading tags (a record type a newer schema
-introduced) are **skipped, not rejected**, so an older build of the app degrades
-gracefully to "ignored" on a record type it doesn't understand instead of refusing the
-whole blob; the same is true of a truncated or malformed individual `R`/`D`/`M` line —
-only that one record is dropped, never its siblings.
+back, on this device or another one. *Within a blob whose header version this build
+understands*, unknown leading tags are **skipped, not rejected** — as is a truncated or
+malformed individual `R`/`D`/`M` line: only that one record is dropped, never its
+siblings. That lenience never applies across schema versions: a blob whose **header**
+declares a version newer than the build's `currentSchema` is `DecodeCorrupt` outright
+(fail-closed, see below), never partially read via tag-skipping.
 
 **The migration story.** `SXC1.Progress.Codec.migrateWith` walks a decoded version `v`
 forward, `v -> v+1 -> ... -> currentSchema` (currently `2`; the v1 -> v2 step added the M line's `lastPrompt` column for "continue where you left off"), applying one step per hop
 from a step table; a hop with no registered step is `DecodeCorrupt`, never a silently
 dropped history. Migration is forward-only by construction — there is no downgrade path,
-by design, since an older build encountering a newer schema version it cannot even
-partially understand is exactly the "unknown tags are skipped" case above, not a
-migration. `productionSteps` is empty today (schema 1 is the only schema that has ever
-shipped), but the mechanism itself is already exercised by `exe:progress-check`'s
-self-test using a synthetic schema-0 blob and a test-only step table — not left
-untested until a schema 2 is invented under pressure.
+by design: an older build encountering a newer schema version fails closed
+(`DecodeCorrupt`, the header rule above), it does not attempt a partial read.
+`productionSteps` carries its first real production step: v1 → v2 is the identity
+(the body parser already defaults `lastPrompt` to empty for a three-field v1 M line),
+registered as `productionSteps 1 = Just id`. The mechanism itself was exercised by
+`exe:progress-check`'s self-test (synthetic schema-0 blob, test-only step table) since
+before v2 existed, which is why the first real migration needed no new machinery.
 
 **The corrupt-state promise.** Decoding a stored blob yields one of three outcomes, and
 the three-way split is load-bearing:
