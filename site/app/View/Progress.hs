@@ -170,19 +170,21 @@ chapterDoneCount prog ds =
 nextUnstartedDeck :: ProgData -> Maybe Deck
 nextUnstartedDeck pd = find (\d -> fst (deckDoneCount (pdProgress pd) d) == 0) (pdDecks pd)
 
--- | The prompt with the latest 'rcLastSeen' day -- the best "most recent
--- event" proxy available from PERSISTED state: 'Rec' only carries day
--- granularity (see "SXC1.Progress.Types"), not a raw timestamp, and the
--- in-memory 'mEventLog' Main.hs keeps for the live event feed is never
--- persisted (it is empty again on every fresh page load, exactly when
--- "continue where you left off" matters most). A tie (same day) keeps
--- whichever 'Map.toList' happens to visit first -- a total, deterministic
--- order over 'Text' keys, just not a promise about WHICH same-day item
--- wins, which nothing here depends on.
+-- | M3 gate NEW12: schema v2's 'psLastPrompt' IS the last graded prompt
+-- -- a true last-activity pointer, persisted, no same-day ambiguity.
+-- The day-granularity 'rcLastSeen' scan below survives ONLY as the
+-- fallback for a state migrated from a v1 blob whose 'psLastPrompt' is
+-- still empty (one page-load's worth of history: the next graded event
+-- fills the real pointer). The fallback's same-day tie keeps whichever
+-- 'Map.toList' visits first -- deterministic, documented, and no longer
+-- the primary path.
 mostRecentPromptId :: ProgressState -> Maybe Text
-mostRecentPromptId st = case Map.toList (psRecs st) of
-  []       -> Nothing
-  (p0 : ps) -> Just (fst (foldl' newer p0 ps))
+mostRecentPromptId st
+  | not (T.null (psLastPrompt st))
+  , Map.member (psLastPrompt st) (psRecs st) = Just (psLastPrompt st)
+  | otherwise = case Map.toList (psRecs st) of
+      []       -> Nothing
+      (p0 : ps) -> Just (fst (foldl' newer p0 ps))
   where
     newer a (pid, rc)
       | unDayNum (rcLastSeen rc) > unDayNum (rcLastSeen (snd a)) = (pid, rc)
