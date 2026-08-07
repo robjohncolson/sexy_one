@@ -49,6 +49,15 @@ Start with [Prerequisites](#prerequisites) and [Build](#build) to build it yours
 
 ## Status
 
+**M5 (ship).** The closing milestone: the SEXY ONE rename, a full content audit
+(94% topic coverage, twelve citation defects found and fixed, hooks recalibrated
+to measured hardware behavior), the M1-era reader debts paid (Index linkified,
+list fragmentation fixed, breadcrumbs corrected), keyboard-only completion and
+screen-reader labels with focus management on advance, a mobile sweep that
+caught a clipped control, and the gate hardened to **99 checks** with pinned
+cardinality floors (175 assertions per browser stage, D1–D27). The figures
+below are the M5 ship state; the milestone entries that follow are historical.
+
 **M4 (live-device verification).** The trainer can now confirm a drill step by
 watching the learner perform it on the real hardware: with a Casio SXC-1 connected
 over USB-MIDI, clicking **Enable device verification** on a drill page asks the
@@ -63,10 +72,10 @@ browser without Web MIDI the app looks and behaves exactly as M3 did (the only D
 difference is one always-hidden `#sxc1-device-state` diagnostics node). See
 [`briefs/M4-plan.md`](briefs/M4-plan.md) for the design this milestone implements
 and [`briefs/M4-manifest.json`](briefs/M4-manifest.json) for the task-by-task
-breakdown. `check-site.sh` now runs **99 checks** (up from M3's 80; 96 at M4's
-close, +3 M5 cardinality/floor checks), and the headless-browser driver asserts
-**175 assertions per served stage** (a pinned floor) — including
-the D1–D27 device suite, driven entirely through a committed fake with no
+breakdown. `check-site.sh` reached **95 checks** at M4's close (up from M3's 80;
+now 99 — see the M5 entry above), and the headless-browser driver asserts
+**160 assertions per served stage** at that point (now a pinned 175-assertion
+floor incl. the D1–D27 suite) — the device suite driven entirely through a committed fake with no
 hardware in the loop (see [Verification](#verification)); the one thing automation
 cannot produce, a walk with the real unit in hand, has its own owner's checklist
 in [`docs/M4-device-test-protocol.md`](docs/M4-device-test-protocol.md).
@@ -205,12 +214,12 @@ git clone <repo> && cd casio-sxc1
 ```
 
 Every command above has been run, in this order, on this machine, as part of building
-and verifying M3, and re-run end to end for M4: `install-toolchain.sh` recognised the
+and verifying M3, and re-run end to end for M4 and again at M5's close: `install-toolchain.sh` recognised the
 already-installed toolchain and returned in well under a second; a from-scratch
 `site/dist-newstyle` build (package store still warm from the toolchain install; now
 compiling five executables — `exe:app`, `exe:content-check`, `exe:exercise-check`,
 `exe:progress-check` and `exe:registry-check` — instead of M1's three) took 27 s at
-M3's close; `check-site.sh` ran all 99 checks — including both the origin-root and
+M3's close; `check-site.sh` ran all 99 checks (the M5 total) — including both the origin-root and
 GitHub-Pages-sub-path browser sweeps of all 108 page routes, the two M3 checker
 binaries, the storage-refused simulation and the D1–D27 device suite — and
 printed `check-site: result=complete`; and `serve-site.sh` served
@@ -431,8 +440,9 @@ against [`scripts/fake-midi.js`](scripts/fake-midi.js) — a committed, reviewab
 the Web MIDI surface, not a string inside the driver — which `scripts/browser-check.mjs`
 pre-loads into a **freshly created** CDP target with
 `Page.addScriptToEvaluateOnNewDocument`, so it is installed before the app boots and the
-app's own feature detection sees it as the genuine article. Twenty-five assertions
-(D1–D25) drive the full matrix through it: grant, deny and API-absent outcomes,
+app's own feature detection sees it as the genuine article. Twenty-seven assertions
+(D1–D27; D26/D27 are M5's focus-management and screen-reader additions) drive the
+full matrix through it: grant, deny and API-absent outcomes,
 hot-plug and unplug, multi-port binding, exactly-once confirmation, and the negative
 controls that keep a green run honest — a **wrong CC**, a **wrong CC value**, a
 **wrong channel** and a **wrong note** must each be *delivered* and must each *fail* to
@@ -856,7 +866,7 @@ casio-sxc1/
 │   ├── check-site.sh            structural + content + headless-browser checks
 │   ├── browser-check.mjs        the zero-npm-deps CDP driver check-site.sh calls
 │   ├── fake-midi.js             the committed Web MIDI fake browser-check.mjs
-│   │                             pre-loads for the D1-D25 device suite (test
+│   │                             pre-loads for the D1-D27 device suite (test
 │   │                             harness only -- never shipped to site/public/)
 │   ├── extract-pages.sh         manual PDF -> page image/text extraction (scratch)
 │   └── render-page-images.sh    manual PDF -> committed site/static/pages/*.webp
@@ -988,8 +998,9 @@ above. The same built `site/public/` bundle is also deployed to Vercel (project
 
 <a id="measured-figures"></a>
 
-Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), M4, against the full
-52-deck/435-exercise course (rows not re-measured for M4 say so):
+Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), at M5's close,
+against the full 52-deck/435-exercise course (rows measured at an earlier
+milestone's close say so):
 
 | Metric | Value |
 |---|---|
