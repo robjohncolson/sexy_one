@@ -17,8 +17,8 @@
 -- @'T.splitOn' \"\\t\"@ fold with strictly fewer failure modes than
 -- linking a JSON parser would have.
 --
--- > SXC1PROGRESS <TAB> <schemaVersion>
--- > M <TAB> streakDay <TAB> streakLen <TAB> firstDay
+-- > SXC1PROGRESS <TAB> <schemaVersion>          -- currently 2
+-- > M <TAB> streakDay <TAB> streakLen <TAB> firstDay <TAB> lastPrompt   -- v2; v1 had no lastPrompt
 -- > R <TAB> promptId <TAB> reps <TAB> lapses <TAB> ease <TAB> interval <TAB> due <TAB> lastSeen <TAB> seen
 -- > D <TAB> exerciseId <TAB> completions
 --
@@ -82,6 +82,7 @@ import           Data.Text              (Text)
 import qualified Data.Text              as T
 
 import           SXC1.Content.Stats     (jsonEscape)
+import           SXC1.Progress.Scheduler (easeMax, easeMin)
 import           SXC1.Progress.Types
 import           SXC1.Route             (parseDigits)
 
@@ -161,14 +162,26 @@ parseBodyLine acc line
       ("M", [sdTxt, slTxt, fdTxt, lp])
         | Just sd <- parseDigits sdTxt, Just sl <- parseDigits slTxt, Just fd <- parseDigits fdTxt
         -> acc { baStreakDay = DayNum sd, baStreakLen = sl, baFirstDay = DayNum fd, baLastPrompt = lp }
+      -- M3 re-gate NEW1 (residual): every ACCEPTED numeric field is
+      -- clamped into its semantic domain on decode -- an imported blob
+      -- can carry any Int-sized value parseDigits admits, and an
+      -- unclamped interval/ease would overflow the scheduler's Int
+      -- multiplies (interval * ease) on wasm32 exactly like the
+      -- max-day path did. Clamping (not rejecting) preserves history.
       ("R", [pid, repsT, lapT, easeT, intT, dueT, lastT, seenT])
         | Just reps <- parseDigits repsT, Just lap <- parseDigits lapT, Just ease <- parseDigits easeT
         , Just intv <- parseDigits intT, Just due <- parseDigits dueT, Just lastSeen <- parseDigits lastT
         , Just seen <- parseDigits seenT
-        -> acc { baRecs = Map.insert pid (Rec reps lap ease intv (DayNum due) (DayNum lastSeen) seen) (baRecs acc) }
+        -> let cnt  = min 1000000
+               day' = DayNum . min dayCap
+               rec' = Rec (cnt reps) (cnt lap)
+                          (max easeMin (min easeMax ease))
+                          (max 0 (min 180 intv))
+                          (day' due) (day' lastSeen) (cnt seen)
+           in acc { baRecs = Map.insert pid rec' (baRecs acc) }
       ("D", [eid, nTxt])
         | Just n <- parseDigits nTxt
-        -> acc { baDone = Map.insert eid n (baDone acc) }
+        -> acc { baDone = Map.insert eid (min 1000000 n) (baDone acc) }
       _ -> acc
 
 -- | Decode one stored progress blob. Empty\/whitespace-only input is
@@ -224,10 +237,11 @@ migrateWith stepTable v st
 migrate :: Int -> ProgressState -> DecodeResult
 migrate = migrateWith productionSteps
 
--- | The real, shipped migration steps. Empty at schema 1: there is
--- nothing to migrate from yet. Adding a v2 is a one-line change here,
--- exercised by tests already written against 'migrateWith' generically
--- rather than the invention of the mechanism at that point.
+-- | The real, shipped migration steps. First production use at v2
+-- (M3 gate NEW12): v1 -> v2 adds 'psLastPrompt', which the body parser
+-- already defaults to empty for a three-field v1 M line, so the step is
+-- the identity -- the mechanism, exercised generically by tests since
+-- v1, carried its first real migration without modification.
 productionSteps :: Int -> Maybe (ProgressState -> ProgressState)
 productionSteps 1 = Just id  -- v1 -> v2: psLastPrompt joins, defaulted "" by the body parser
 productionSteps _ = Nothing

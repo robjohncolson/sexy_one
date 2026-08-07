@@ -41,7 +41,6 @@ module Progress.Store
   , savePrefs
   ) where
 
-import           Control.Monad        (void)
 import           Data.Text            (Text)
 
 import           Miso                 (JSVal, fromJSValUnchecked, jsg, (#))
@@ -98,9 +97,13 @@ saveProgress st = do
   pure (r == Just (1 :: Int))
 
 -- | Removes ONLY the progress key -- never 'prefsKey' (the module
--- Haddock's separate-key asymmetry).
-wipeProgress :: IO ()
-wipeProgress = void (bridge "del" [storageKey])
+-- Haddock's separate-key asymmetry). M3 re-gate NEW9 (residual):
+-- returns the bridge's real delete result -- a wipe that silently
+-- failed must not let the app pretend the key is gone.
+wipeProgress :: IO Bool
+wipeProgress = do
+  r <- fromJSValUnchecked =<< bridge "del" [storageKey]
+  pure (r == Just (1 :: Int))
 
 -- | The undecoded blob as stored, for the corrupt-state export path.
 loadRaw :: IO (Maybe Text)

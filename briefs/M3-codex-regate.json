@@ -1,0 +1,129 @@
+{
+  "task_type": "review",
+  "reviewed_head": "7ca440c",
+  "scope": "Focused M3 gate re-review of the fixes in 838a776, 0c9f555, 018d332, and 7ca440c, with the directly relevant prior app/view/storage context inspected read-only",
+  "verdict": "GATE-BLOCKED",
+  "summary": "The fix series materially improves every area it touches, and NEW4, NEW5, NEW7, NEW8, NEW10, NEW11, NEW12, and NEW13 are closed in their production paths. The gate nevertheless remains blocked. NEW1's ordinary huge-timestamp case is fixed, but its second, production-reachable imported-record overflow case remains; NEW2's new group is not a full ProgressState/completion pin and missed the subsequently added psLastPrompt field; NEW3 still permits plain Prelude IO and nested modules; NEW6 still does not enforce tombstone promptCount=0; and NEW9 still discards delete failures. In addition, the schema-v2 resume fix has no behavioral test of the actual last-prompt/Continue path, and the schema documentation plus the browser fixture still describe or implement schema v1.",
+  "per_finding_verdicts": [
+    {
+      "id": "NEW1",
+      "severity": "major",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "site/src/SXC1/Progress/Types.hs:138-173 adds dayCap=9999999, maps dayOf into [1,dayCap], and site/src/SXC1/Progress/Scheduler.hs:130 uses addDays. CheckProgress.hs:225-237 pins the 10^18-ms clamp and codec round trip, so the original max-day timestamp path is fixed. The original finding also covered decoded numeric fields, however, and that path is unchanged: Codec.hs:164-168 accepts every nonnegative Int-sized reps/lapses/ease/interval/seen value; Scheduler.hs:90-98,127-133 multiplies and increments those Ints before clamping. On wasm32, importing an R record with reps=ease=interval=seen=2147483647 and grading it GGood makes interval*ease wrap, reps+1 and seen+1 wrap negative, and the next encode/decode drops the R row because parseDigits rejects the negative fields. addDays itself is also not total as documented: Types.hs:154 evaluates max 0 d + max 0 n before min dayCap, so arbitrary exported DayNum/Int inputs can wrap even though the scheduler's timestamp-derived caller is bounded."
+    },
+    {
+      "id": "NEW2",
+      "severity": "major",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "site/test/CheckProgress.hs:378-400 now pins complete Rec equality for a fresh GEasy and a subsequent lapse, plus streakDay/streakLen/firstDay. That closes most of the original gap. The assertion labelled 'Completed changes psDone and NOTHING else' at lines 401-405 compares only psDone, psRecs, and psStreakLen; changes to psVersion, psStreakDay, psFirstDay, or psLastPrompt pass. The graded-state assertion also predates schema v2 and never checks psLastPrompt. Deleting Scheduler.hs:140's psLastPrompt assignment leaves group 12 green, while group 3 merely round-trips the self-consistently wrong state. The promised full transition/isolation pin is therefore still incomplete."
+    },
+    {
+      "id": "NEW3",
+      "severity": "major",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "site/test/CheckProgress.hs:352-373 implements the named improvements: listDirectory discovery, lower-casing, per-line '--' stripping, and needles for qualified Miso, CPU/current-time names, Double/Float/fromIntegral/realToFrac. Two original bypasses remain. Prelude exports IO, so adding 'touch :: IO (); touch = pure ()' to a Progress module contains none of the needles and passes. listDirectory is non-recursive and filters only immediate .hs children, so src/SXC1/Progress/Internal/Clock.hs is invisible. Thus the current three flat modules are clean, but the advertised no-IO/every-module invariant is not enforced."
+    },
+    {
+      "id": "NEW4",
+      "severity": "medium",
+      "verdict": "FIXED",
+      "evidence": "site/src/SXC1/Progress/Types.hs:156-173 reserves DayNum 0, maps nonpositive and epoch-day-zero input to DayNum 1, clamps the upper end, and documents the historical-date cost. Scheduler.hs:106-113 can now use zero unambiguously as the unset sentinel. CheckProgress.hs:217-243 pins dayOf 0/negative and the epoch-0-then-day-7 first-day contract."
+    },
+    {
+      "id": "NEW5",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "content/exercises/076-lvl-02.ex.md:37-53 now asks for bank starting notes rather than claiming all banks are consecutive. The correct option states only A/B/C/D starts; the Why explicitly identifies Bank C pad 2's duplicate 68, missing 69, preserved printed-table misprint, and tells sequencer users to verify against hardware."
+    },
+    {
+      "id": "NEW6",
+      "severity": "medium",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "site/test/CheckRegistry.hs:48-68 accepts exactly five columns and only m followed by digits; lines 196-208 check the real disk order rather than a pre-sorted synthetic list. content/id-registry.tsv:41-53 now records the four-deck seed, 52-deck/435-live expansion, independent Python derivation, Reader cross-check, and five tombstones. The original tombstone invariant is still only prose: r3CountDrift at lines 110-115 checks live rows only, and no rule rejects RegRow id 3 'tombstone' 'm3' note. Changing a tombstone's promptCount from 0 to 3 still parses and passes R1-R6. The self-test at lines 239-244 also does not retain negative cases for four columns, a bad ship tag, or unsorted input; the coordinator's reported sabotage runs establish those two behaviors externally, not as durable checker self-tests."
+    },
+    {
+      "id": "NEW7",
+      "severity": "minor",
+      "verdict": "FIXED",
+      "evidence": "site/test/CheckProgress.hs:309-328 retains the envelope round trip with the quote honestly located in exportedAt, and separately checks jsonUnescape . jsonEscape identity on one value containing quote, backslash, newline, tab, and carriage return. The label now states exactly what the assertion exercises."
+    },
+    {
+      "id": "NEW8",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "site/app/Main.hs:202-210 adds PSaved; applyExActions waits for saveProgress's Bool and dispatches PSaved only on success at lines 453-461; and handleProg changes DecodeEmpty to DecodeOk at lines 376-378. progressJson still derives the state tag from mLoad at lines 563-578, so a successful first persistence no longer remains tagged empty. A failed first write instead keeps the disk truth empty and is disambiguated by available=false through NEW9."
+    },
+    {
+      "id": "NEW9",
+      "severity": "major",
+      "verdict": "PARTIALLY-FIXED",
+      "evidence": "site/app/Progress/Store.hs:90-98 and 118-122 return the bridge's set result from saveProgress/savePrefs. Main.hs:348-378 and 453-461 propagate failed import, preference, and grading writes through PStorageLost to mStorageOk=False. View/Progress.hs:339-350 renders #sxc1-storage-note with an explicit refused-mode explanation and points to Export below. The residual destructive write path is still silent: Store.hs:100-103 keeps wipeProgress :: IO () and voids bridge 'del', while Main.hs:360-366 unconditionally reports an empty load/model and leaves mStorageOk unchanged. If the boot probe succeeded but removeItem is later refused, Wipe appears successful even though the old progress key reappears on reload. There is also no retained real-browser probe-succeeds/then-set-fails assertion; --check-storage-refused covers boot-time refusal only."
+    },
+    {
+      "id": "NEW10",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "scripts/browser-check.mjs:3117-3132 defines 14 M3 selectors, with only jaFirstPersist intentionally mapping to two separately reported assertions. Lines 3553-3623 run clean, legacy-all, and each selector as 16 distinct browser passes; each pass requires every mapped assertion to be false and every unmapped result to remain true. Phase bookkeeping and re-establishment around lines 838-892,1106-1134,1187-1239, and 2702-2768 isolate the previously contaminated persistence/wipe cases. The M2-only legacy-all pass remains a megamutant by explicit scope, assessed below."
+    },
+    {
+      "id": "NEW11",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "scripts/browser-check.mjs:2792-2863 now answers the wiped-fresh quiz incorrectly, waits for payload.due>=1, compares the badge to that nonzero due, and requires a .queue-item link to the exact exercise before wiping. It then observes the due>=1 to due=0/empty transition. The reviewBadgeMatchesDue selector hardcodes the badge to zero at lines 1243-1257, so the old hardcoded-zero badge is caught on the nonzero pre-wipe state. The post-wipe and queue-link conjuncts are executed but are not independently sabotaged; that is a valid nonblocking hardening gap rather than the original vacuous-zero defect."
+    },
+    {
+      "id": "NEW12",
+      "severity": "major",
+      "verdict": "FIXED",
+      "evidence": "site/src/SXC1/Progress/Codec.hs:106-107 sets currentSchema=2; lines 122-134 encode lastPrompt in M; lines 153-168 parse both three- and four-field M records; and lines 224-233 provide the real 1->2 step. Types.hs:99-132 adds/defaults psLastPrompt, Scheduler.hs:136-141 records each graded prompt, and View/Progress.hs:173-191 prefers that pointer while retaining the day scan for empty/missing v1-derived pointers. CheckProgress.hs:298-307 feeds a real schema-1 blob through production migration and checks version 2, empty lastPrompt, and intact R data. NEW14 records the missing behavioral regression test; the current production implementation itself is correct."
+    },
+    {
+      "id": "NEW13",
+      "severity": "medium",
+      "verdict": "FIXED",
+      "evidence": "site/app/Main.hs:202-209 adds PSetToday; every SetRoute schedules a fresh readClocks wall reading at lines 284-312; and lines 374-375 update mToday with max for monotone behavior. Navigation after UTC midnight therefore refreshes due/queue state without requiring a grade or reload."
+    }
+  ],
+  "backward_story_ruling": {
+    "verdict": "ACCEPTABLE-FAIL-CLOSED; PREMISE-CORRECTION",
+    "ruling": "An old schema-1 build does parse body lines before migration, and its three-field M arm skips the new four-field M while R/D rows accumulate. But those accumulated rows are never returned to the app: the old migrate guard sees header version 2 > currentSchema 1 and returns DecodeCorrupt. The old Main then keeps the original bytes, enters read-only corrupt mode, and does not overwrite them. This is safe degradation with no history loss, though it is not partial backward readability and the user must reopen the blob in a v2-capable build. That policy matches the explicit future-version DecodeCorrupt contract, so the wire choice itself is not a gate finding. README.md:336-372 currently gives contradictory explanations of this behavior and is covered by NEW15."
+  },
+  "honest_gap_rulings": [
+    {
+      "gap": "legacy-all does not individually select the eight M2-era assertion names",
+      "verdict": "ACCEPTED-FOR-THIS-M3-FOCUSED-FIX",
+      "ruling": "The 14 M3 points are individually selectable and exact. legacy-all preserves prior M2 coverage but retains the old masking risk for those eight names; this is explicit, unchanged, and outside NEW10's M3 isolation scope. It should be split before an M2 assertion is materially edited."
+    },
+    {
+      "gap": "jaFirstPersist is one selector mapped to two assertions",
+      "verdict": "ACCEPTED",
+      "ruling": "Both assertions consume the same skipped-write/post-reload state, but they are separate result records and the pass requires both to fail. Hardcoding or deleting either assertion's own predicate makes that expected result pass and the selector run fail bookkeeping, so the grouping does not recreate cross-assertion masking."
+    },
+    {
+      "gap": "the post-wipe half of reviewBadgeMatchesDue lacks a dedicated sabotage",
+      "verdict": "VALID-NONBLOCKING-GAP",
+      "ruling": "The clean and real-app flows genuinely execute the transition and assert due, badge, and queue are zero/empty afterward, so the old vacuous precondition is gone. However, the named selector only hardcodes the pre-wipe badge; deleting the post-wipe conjunct, or the queue-link conjunct, would not make that selector pass. Add narrowly phased queue-link and post-wipe mutations if the house rule is intended to apply to every conjunct rather than every top-level assertion."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "NEW14",
+      "severity": "major",
+      "title": "The schema-v2 last-activity/Continue fix has no behavioral regression test",
+      "location": "site/src/SXC1/Progress/Scheduler.hs:136-141; site/app/View/Progress.hs:173-191,327-337; site/test/CheckProgress.hs:174-185,375-405; scripts/browser-check.mjs:2464-2488",
+      "scenario": "Remove Scheduler's psLastPrompt assignment, or change mostRecentPromptId back to the old rcLastSeen/Map scan. The production app again chooses the lexicographically first same-day prompt. CheckProgress group 3 still round-trips its now-self-consistent empty pointer, group 12 never inspects psLastPrompt, the v1 migration test correctly expects an empty pointer, and the browser assertion catalogue contains no Continue assertion. The reported 80/80 core checks, 14 M3 selector passes, and real-app browser suite can therefore remain green while NEW12's user-visible defect returns.",
+      "recommendation": "Pin psLastPrompt after two same-day events in reverse lexical order, round-trip it, and drive Home in the real app to require #sxc1-continue links to the second event's exercise. Add a selector that breaks only the pointer or Continue preference."
+    },
+    {
+      "id": "NEW15",
+      "severity": "medium",
+      "title": "Schema-v2 shipped while canonical wire documentation and the self-test fixture remained on schema v1",
+      "location": "README.md:325-351,415-430; site/src/SXC1/Progress/Codec.hs:20-28,205-233; scripts/browser-check.mjs:949-977,1218-1239",
+      "scenario": "README still documents a three-field M line, currentSchema=1, an empty productionSteps table, and a schema:1 export envelope. Codec's module/migration Haddocks make the same stale three-field/empty-step claims. The browser fixture says it mirrors the codec exactly but emits SXC1PROGRESS 1 and a three-field M record while separately reporting payload.schema=2; it has no lastPrompt field. A maintainer following the docs or relying on the fixture receives contradictory wire guidance, and schema-v2/Continue regressions are outside the fixture's negative sweep.",
+      "recommendation": "Update README and Codec Haddocks to schema 2/M lastPrompt/production 1->2, explicitly describe old-build DecodeCorrupt behavior, and either teach the browser fixture schema v2/lastPrompt or label it as a deliberately v1 migration fixture."
+    }
+  ],
+  "coordinator_state_ruling": "The reported 80/80 progress, 8/8 plus 15/15 registry, 55-fixture exercise, 80/80 check-site, 128/128 real-app browser, and 911380-byte gzip results are consistent with the inspected code and establish the current happy paths. They do not exercise the residual imported-max-Int, plain-IO/nested-module, tombstone-count, failed-delete, or lastPrompt/Continue regression scenarios above. Per the subagent constraint, none of those commands were rerun.",
+  "method": "Read-only inspection of the two prior review JSON files, git history/diffs for the scoped fix commits, and current affected production, test, content, registry, harness, and documentation files. No builds, tests, lint, browser runs, sabotage runs, installs, or commits were performed. The only written file is this required result JSON.",
+  "final_line": "GATE-BLOCKED — NEW1 still permits wasm32 overflow and non-roundtrippable state from accepted imported record values; NEW2/NEW3 remain materially bypassable verification guards; NEW6 still does not enforce zero-count tombstones; NEW9 still reports failed deletes as successful wipes; and NEW14 leaves the schema-v2 Continue fix able to regress with all cited gates green."
+}

@@ -25,10 +25,10 @@
 -- binary requires).
 module Main (main) where
 
-import           Control.Monad          (forM_, unless)
+import           Control.Monad          (forM, forM_, unless)
 import           Data.IORef             (IORef, modifyIORef', newIORef, readIORef)
 import           Data.List              (isSuffixOf)
-import           System.Directory       (listDirectory)
+import           System.Directory       (doesDirectoryExist, listDirectory)
 import qualified Data.Map.Strict        as Map
 import           Data.Text              (Text)
 import qualified Data.Text              as T
@@ -356,20 +356,26 @@ group11 cl = do
   -- CASE-INSENSITIVE with comment text stripped per line (not just
   -- comment-prefixed lines), and the needle list covers qualified Miso
   -- imports, more clock APIs, and the float/Double family outright.
-  files <- listDirectory "src/SXC1/Progress"
-  let hsFiles = [ f | f <- files, ".hs" `isSuffixOf` f ]
+  -- Recursive walk (re-gate NEW3 residual: a module hidden in a
+  -- subdirectory must not dodge discovery).
+  hsFiles <- walkHs "src/SXC1/Progress"
   record cl 11 "purity guard discovers at least the three known modules from disk"
     (length hsFiles >= 3) (show hsFiles)
   forM_ hsFiles $ \f -> do
-    src <- readFile ("src/SXC1/Progress/" ++ f)
+    src <- readFile f
     let codeOf ln = T.toLower (fst (T.breakOn "--" (T.pack ln)))
         needles = [ "import miso", "import qualified miso"
                   , "getmonotonictimensec", "data.time", "cputime", "getcurrenttime"
                   , "unsafeperformio", "data.ioref", "system.io"
                   , "double", "float", "fromintegral", "realtofrac" ]
+        -- Tokenized scan (re-gate NEW3 residual: `touch :: IO ()` has
+        -- none of the substrings above -- but its type names the IO
+        -- token, which no pure Progress module may do outside comments).
+        tokensOf c = T.split (\ch -> not (ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9'))) c
+        badToken c = "io" `elem` tokensOf c
         offenders = [ ln | ln <- lines src, let c = codeOf ln
-                    , any (`T.isInfixOf` c) needles ]
-    record cl 11 ("SXC1.Progress/" ++ f ++ " has no IO/Miso/clock/float reachability on non-comment text")
+                    , any (`T.isInfixOf` c) needles || badToken c ]
+    record cl 11 (f ++ " has no IO/Miso/clock/float reachability on non-comment text (substring + io-token scan)")
       (null offenders) (unlines (take 3 offenders))
 
 -- | M3 gate NEW2: pin EVERY field of the transition, not just ease. One
@@ -398,11 +404,37 @@ group12 cl = do
     (psStreakDay st2 == dayOf (day 11) && psStreakLen st2 == 2 && psFirstDay st2 == d10)
     ("streak=" ++ show (unDayNum (psStreakDay st2)) ++ "/" ++ show (psStreakLen st2)
       ++ " first=" ++ show (unDayNum (psFirstDay st2)))
+  record cl 12 "psLastPrompt tracks the last graded prompt" (psLastPrompt st2 == "t#1")
+    (T.unpack (psLastPrompt st2))
   let st3 = applyEvent (mkEv Nothing Completed 0 False 0 (day 11)) st2
-  record cl 12 "a promptless Completed changes psDone and NOTHING else"
+  -- M3 re-gate NEW2 residual: TOTAL isolation -- st3 with psDone rolled
+  -- back must equal st2 exactly, so a Completed touching ANY other
+  -- field (version, streak, firstDay, lastPrompt, recs...) fails.
+  record cl 12 "a promptless Completed changes psDone and NOTHING else (total-state check)"
     (psDone st3 == Map.insertWith (+) "q-9-99" 1 (psDone st2)
-      && psRecs st3 == psRecs st2 && psStreakLen st3 == psStreakLen st2)
-    "Completed touched more than psDone"
+      && st3 { psDone = psDone st2 } == st2)
+    "Completed touched a field other than psDone"
+  -- M3 re-gate NEW1 residual: an imported blob carrying absurd (but
+  -- Int-parseable) values is clamped into semantic domains on decode --
+  -- the scheduler can then never overflow an Int multiply from them.
+  let hostileR = "SXC1PROGRESS\t2\nM\t1\t1\t1\t\nR\thuge#1\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\t2000000000\n"
+  case decodeState hostileR of
+    DecodeOk st -> case Map.lookup "huge#1" (psRecs st) of
+      Just rc -> record cl 12 "hostile imported values clamp to semantic domains (ease<=3000, interval<=180, days<=dayCap)"
+        (rcEase rc == 3000 && rcInterval rc == 180 && unDayNum (rcDue rc) == dayCap
+          && unDayNum (rcLastSeen rc) == dayCap && rcReps rc == 1000000)
+        ("ease=" ++ show (rcEase rc) ++ " intv=" ++ show (rcInterval rc) ++ " due=" ++ show (unDayNum (rcDue rc)))
+      Nothing -> record cl 12 "hostile imported values clamp to semantic domains (ease<=3000, interval<=180, days<=dayCap)" False "record dropped"
+    other -> record cl 12 "hostile imported values clamp to semantic domains (ease<=3000, interval<=180, days<=dayCap)" False (resultTag other)
+
+walkHs :: FilePath -> IO [FilePath]
+walkHs dir = do
+  entries <- listDirectory dir
+  fmap concat . forM entries $ \e -> do
+    let path = dir ++ "/" ++ e
+    isDir <- doesDirectoryExist path
+    if isDir then walkHs path
+    else pure [ path | ".hs" `isSuffixOf` e ]
 
 --------------------------------------------------------------------------
 -- --replay: minimal flat-object JSON array reader for #sxc1-event-log

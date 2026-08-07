@@ -1322,6 +1322,7 @@ window.__SXC1_BOOTED = true;
     root().innerHTML =
       bannerHtml +
       renderQueueSection() +
+      renderContinueSection() +
       '<p id="sxc1-streak">Study streak: ' + (CURRENT_PROGRESS.streakLen || 0) + '</p>' +
       '<section id="sxc1-progress-tools">' +
       '<button id="btn-progress-export" type="button">Export</button>' +
@@ -1405,6 +1406,10 @@ window.__SXC1_BOOTED = true;
         try { window.localStorage.removeItem(PREFS_KEY); } catch (e) { /* best effort */ }
       }
       ST.wipeCount = wipeIndexBefore + 1;
+      // NEW14: a wipe clears the app's psLastPrompt too -- reset both
+      // continue trackers so section F's post-wipe epoch starts clean.
+      ST.firstSinceWipe = null;
+      ST.lastAnswered = null;
       ST.answersSinceWipe = 0;
       writeSelfTestState();
       // Same reasoning as onImportSubmit above -- and load-bearing here:
@@ -1489,7 +1494,29 @@ window.__SXC1_BOOTED = true;
     var elapsedMs = LEGACY_ALL ? 0 : Math.max(0, Date.now() - (promptAt || Date.now()));
     eventLog.push({ deck: FIXTURE.quiz.deck, exercise: exId, prompt: exId + '#1', kind: kind,
       outcome: outcome, attempt: 1, revealed: false, hints: 0, elapsedMs: elapsedMs, at: Date.now() });
+    // NEW14 (continueMatchesLast): mirror the app's psLastPrompt -- the
+    // LAST graded exercise -- plus the FIRST, which the sabotage renders
+    // instead (modelling the old lexicographic/first-scan bug).
+    if (!ST.firstAnswered) { ST.firstAnswered = exId; }
+    if (!ST.firstSinceWipe) { ST.firstSinceWipe = exId; }
+    ST.lastAnswered = exId;
+    writeSelfTestState();
     setEventLog();
+  }
+
+  function deckOf(exId) {
+    if (exId === FIXTURE.drill.id) return FIXTURE.drill.deck;
+    if (exId === FIXTURE.lookup.id) return FIXTURE.lookup.deck;
+    return FIXTURE.quiz.deck;
+  }
+
+  // NEW14: #sxc1-continue mirrors the app's psLastPrompt-driven section.
+  // SABOTAGE, selector 'continueMatchesLast': renders the FIRST-ever
+  // answered exercise instead of the last -- the old Map-scan bug shape.
+  function renderContinueSection() {
+    var target = sel('continueMatchesLast') ? ST.firstSinceWipe : ST.lastAnswered;
+    if (!target) return '';
+    return '<section id="sxc1-continue"><a href="#/x/' + deckOf(target) + '/' + target + '">Continue: ' + target + '</a></section>';
   }
 
   function renderIndex() {
@@ -2481,6 +2508,12 @@ const PROGRESS_ASSERTION_NAMES = {
   // before any wipe, then a real due>=1 -> due=0 transition after one.
   reviewBadgeMatchesDue: "review-queue badge/#sxc1-progress payload/#sxc1-review-queue agree on a REAL due>=1 record (badge text equals payload.due, a .queue-item links to the exercise), then all three genuinely return to zero/empty after a wipe",
   deckCardTierMatches: "a deck card's data-tier matches the deck's declared tier: field (content/exercises, independently re-read)",
+  // NEW14 (M3 re-gate): order-discriminating by construction -- the
+  // lookup (l-*) is graded FIRST and the quiz (q-*) SECOND, so the old
+  // lexicographic Map-scan Continue implementation (which would pick
+  // l-* on the same-day tie) fails this while the psLastPrompt pointer
+  // passes: the assertion is red against the pre-fix code by design.
+  continueMatchesLast: "#sxc1-continue links the LAST-graded exercise (lookup graded first, quiz re-graded second -> continue must point at the quiz, not the lexicographically-first lookup)",
   // c3, DELIBERATELY NOT part of runProgressAssertionsPre/Post or the
   // --self-test-negative sweep -- see --check-storage-refused's own
   // --help text and this task's final report. Kept here only so its
@@ -2869,6 +2902,30 @@ async function runProgressAssertionsPost(h, cfg) {
     Boolean(domTier) && domTier === cfg.expectedTier,
     { domTier, expectedTier: cfg.expectedTier },
   );
+
+  // -- F (M3 re-gate NEW14): Continue tracks LAST activity, not Map
+  // order. On the post-E wiped slate: grade the LOOKUP first (l-* sorts
+  // lexicographically before q-*), then the QUIZ. psLastPrompt must make
+  // #sxc1-continue point at the quiz; the old rcLastSeen/Map-scan
+  // implementation picks the same-day lexicographic first (the lookup)
+  // and fails -- the assertion is order-discriminating by construction.
+  await h.goto(`#/x/${cfg.lookupDeck}/${cfg.lookupId}`, '#ex-find-input');
+  await h.typeText('#ex-find-input', String(cfg.lookupTargetPage));
+  await h.clickAssert('#btn-ex-find-submit', 'F: submit the correct lookup page (grades the lookup FIRST)');
+  await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
+  await h.goto(`#/x/${cfg.quizDeck}/${cfg.quizId}`, `#${cfg.quizCorrectOpt}`);
+  await h.clickAssert(`#${cfg.quizCorrectOpt}`, 'F: click the correct quiz option (grades the quiz SECOND)');
+  await h.clickAssert('#btn-ex-submit', 'F: submit the quiz answer');
+  await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
+  await h.goto('#/', '#sxc1-progress-tools');
+  const continueInfo = await h.evaluate("(() => { const a = document.querySelector('#sxc1-continue a[href]'); return a ? { href: a.getAttribute('href') } : null; })()");
+  h.report(
+    PROGRESS_ASSERTION_NAMES.continueMatchesLast,
+    Boolean(continueInfo && continueInfo.href
+      && continueInfo.href.indexOf(cfg.quizId) !== -1
+      && continueInfo.href.indexOf(cfg.lookupId) === -1),
+    { continueInfo, wantId: cfg.quizId, mustNotBe: cfg.lookupId },
+  );
 }
 
 // `value` is either inline JSON text or a path to a JSON file (matches
@@ -3129,6 +3186,7 @@ const M3_SELECTOR_ASSERTIONS = {
   jaToggleHidesAndSticks: [PROGRESS_ASSERTION_NAMES.jaToggleHidesAndSticks],
   reviewBadgeMatchesDue: [PROGRESS_ASSERTION_NAMES.reviewBadgeMatchesDue],
   deckCardTierMatches: [PROGRESS_ASSERTION_NAMES.deckCardTierMatches],
+  continueMatchesLast: [PROGRESS_ASSERTION_NAMES.continueMatchesLast],
 };
 
 // The OLD (pre-NEW10) global-SABOTAGE=true expected-failure list, run
@@ -3459,6 +3517,9 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose }) {
       quizId: SELF_TEST_FIXTURE.quiz.id,
       quizCorrectOpt: SELF_TEST_FIXTURE.quiz.correctOpt,
       quizWrongOpt: SELF_TEST_FIXTURE.quiz.wrongOpt,
+      lookupDeck: SELF_TEST_FIXTURE.lookup.deck,
+      lookupId: SELF_TEST_FIXTURE.lookup.id,
+      lookupTargetPage: SELF_TEST_FIXTURE.lookup.targetPage,
       deckSlug: SELF_TEST_FIXTURE.quiz.deck,
       expectedTier: PROGRESS_SELF_TEST_TIER,
       manualSlug: 'demo-manual',
@@ -4646,6 +4707,9 @@ async function main() {
           // NEW11: section E now manufactures a real due-today record by
           // answering incorrectly first -- see runProgressAssertionsPost.
           quizWrongOpt: exerciseFixture.quiz.wrongOpt,
+          lookupDeck: exerciseFixture.lookup.deck,
+          lookupId: exerciseFixture.lookup.id,
+          lookupTargetPage: exerciseFixture.lookup.targetPage,
           deckSlug: exerciseFixture.quiz.deck,
           expectedTier: deckTierFromDisk(exerciseFixture.quiz.deck),
           manualSlug: 'guide-book',

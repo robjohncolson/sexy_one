@@ -324,8 +324,8 @@ the content-stats blobs above and no JSON *decoder*, and every field here is an 
 an already-slug-shaped id, so there is nothing to quote or escape):
 
 ```
-SXC1PROGRESS <TAB> <schemaVersion>
-M <TAB> streakDay <TAB> streakLen <TAB> firstDay
+SXC1PROGRESS <TAB> <schemaVersion>          (currently 2)
+M <TAB> streakDay <TAB> streakLen <TAB> firstDay <TAB> lastPrompt
 R <TAB> promptId <TAB> reps <TAB> lapses <TAB> ease <TAB> interval <TAB> due <TAB> lastSeen <TAB> seen
 D <TAB> exerciseId <TAB> completions
 ```
@@ -340,7 +340,7 @@ whole blob; the same is true of a truncated or malformed individual `R`/`D`/`M` 
 only that one record is dropped, never its siblings.
 
 **The migration story.** `SXC1.Progress.Codec.migrateWith` walks a decoded version `v`
-forward, `v -> v+1 -> ... -> currentSchema` (currently `1`), applying one step per hop
+forward, `v -> v+1 -> ... -> currentSchema` (currently `2`; the v1 -> v2 step added the M line's `lastPrompt` column for "continue where you left off"), applying one step per hop
 from a step table; a hop with no registered step is `DecodeCorrupt`, never a silently
 dropped history. Migration is forward-only by construction — there is no downgrade path,
 by design, since an older build encountering a newer schema version it cannot even
@@ -418,7 +418,7 @@ hand. Clicking Export (`#btn-progress-export`) fills a read-only textarea
 (`#sxc1-export-blob`) with a small JSON envelope:
 
 ```json
-{"format":"sxc1-progress","schema":1,"exportedAt":"<stamp>","payload":"<wire text>"}
+{"format":"sxc1-progress","schema":2,"exportedAt":"<stamp>","payload":"<wire text>"}
 ```
 
 `payload` is exactly the same tab-separated wire text `encodeState` produces internally —

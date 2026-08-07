@@ -208,6 +208,7 @@ data ProgressOp
   | PSetToday DayNum    -- ^ NEW13: today refreshed from a real wall reading on navigation
   | PStorageLost        -- ^ NEW9: a write failed after boot; storage is no longer trusted
   | PSaved ProgressState -- ^ NEW8: a save landed; DecodeEmpty graduates to DecodeOk
+  | PWipedOk            -- ^ NEW9 residual: the delete really landed; safe to reset
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
@@ -357,13 +358,18 @@ handleProg op = case op of
         else pure ()
     DecodeCorrupt reason -> modify (\m -> m { mImportMsg = Just reason })
     DecodeEmpty -> modify (\m -> m { mImportMsg = Just "import text was empty" })
-  PWipe -> do
-    -- An explicit learner decision: the stored key (corrupt or not) is
-    -- removed and the app returns to a writable empty state. Prefs are
-    -- untouched -- separate key, by design.
+  PWipe ->
+    -- An explicit learner decision -- but the state resets ONLY if the
+    -- delete actually landed (M3 re-gate NEW9 residual): a wipe the
+    -- bridge reports failed leaves the model exactly as it was and
+    -- degrades to storage-unavailable mode, so the app can never claim
+    -- an empty slate while the old key still exists on disk.
+    io $ do
+      okW <- wipeProgress
+      pure (if okW then Prog PWipedOk else Prog PStorageLost)
+  PWipedOk ->
     modify (\m -> m { mProgress = emptyProgress, mLoad = DecodeEmpty
                     , mExportBlob = Nothing, mImportMsg = Nothing })
-    io_ wipeProgress
   PJaFirst b -> do
     modify (\m -> m { mPrefs = Prefs b })
     -- NEW9: a failed prefs write degrades to storage-unavailable mode
