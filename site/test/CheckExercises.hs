@@ -44,6 +44,8 @@ import           SXC1.Exercise.Reader   (readDeck)
 import           SXC1.Exercise.Report
 import           SXC1.Exercise.Types
 import           SXC1.Exercise.Verify
+import           SXC1.Midi.Spec
+import           SXC1.Midi.Table        (parsePadNotes)
 import           SXC1.Route             (Route (..), parseRoute, renderRoute)
 
 --------------------------------------------------------------------------
@@ -625,7 +627,12 @@ main = do
 -- content/exercises/ and content/fixtures/ off disk -- there is no other
 -- way to compare the two parsers over the REAL corpus and fixture set
 -- rather than a hand-picked sample -- and group 18's real-corpus half
--- reads content/exercises/INDEX the same way. Neither ever degrades to a
+-- reads content/exercises/INDEX the same way. M4 (briefs/M4-manifest.json,
+-- task "midi-spec") adds group 20 to the same amendment: it reads
+-- translations/midi.md (to prove SXC1.Midi.Spec.padNoteTable agrees with
+-- SXC1.Midi.Table's freshly-parsed copy of the source table) and the
+-- three committed deck files carrying the six live verify: hooks.
+-- Neither ever degrades to a
 -- SILENT pass: an absent directory (this binary is always run from
 -- site/, where ../content exists) still yields a non-empty group with an
 -- explicit FAIL naming what was missing, never an empty (vacuously
@@ -657,10 +664,11 @@ stLabel 16 = "16. route: empty interior/trailing segments and non-[a-z0-9-] ids 
 stLabel 17 = "17. M3: SXC1.Exercise.Reader.readDeck agrees with parseDeck over the real corpus + fixtures"
 stLabel 18 = "18. M3: INDEX-driven embedding -- embeddable deck count == non-comment INDEX lines"
 stLabel 19 = "19. M3: StaticCode totality sweep (codeText/issueClassOf WHNF non-empty for every allIssueCodes member)"
+stLabel 20 = "20. M4: SXC1.Midi.Spec vs translations/midi.md -- decode/match/pads/ports/describe + the six live verify: hooks"
 stLabel n  = show n ++ ". ?"
 
 stMaxGroup :: Int
-stMaxGroup = 19
+stMaxGroup = 20
 
 stGroupsAllOk :: Int -> [STCheck] -> Bool
 stGroupsAllOk maxG cs = all oneGroupOk [1 .. maxG]
@@ -671,12 +679,14 @@ runSelfTest :: IO ()
 runSelfTest = do
   agreementChecks  <- readerAgreementChecks
   indexCountChecks <- indexDrivenEmbeddingChecks
+  midiSpecCks      <- midiSpecChecks
   let allChecks = concat
         [ grammarChecks, new12GuardSelfChecks, choiceChecks, recallChecks, confirmChecks
         , findPageChecks, retryChecks, hintChecks, progressEventChecks, promptIdChecks
         , routeConstructorChecks, routeTotalityChecks, blockUnparsedSeamChecks, resolutionChecks
         , clockChecks, routeStrictnessChecks
         , agreementChecks, indexCountChecks, staticCodeTotalityChecks
+        , midiSpecCks
         ]
   forM_ [1 .. stMaxGroup] $ \g -> do
     let inGroup = filter ((== g) . stGroup) allChecks
@@ -1590,6 +1600,265 @@ staticCodeTotalityChecks =
       (codeText c `seq` issueClassOf c `seq` not (T.null (codeText c)))
       "codeText/issueClassOf must force to WHNF and produce a non-empty codeText for every allIssueCodes member"
   | c <- allIssueCodes
+  ]
+
+--------------------------------------------------------------------------
+-- Group 20: M4 (briefs/M4-manifest.json, task "midi-spec") --
+-- SXC1.Midi.Spec proven against translations/midi.md. T1/T2/T3: the
+-- hand-transcribed literal padNoteTable agrees, CELL BY CELL, with
+-- SXC1.Midi.Table's freshly-parsed copy of the real source table, and
+-- the Pad 2 / Bank C = 68 erratum is pinned BY NAME on both sides -- so
+-- "correcting" translations/midi.md upstream turns CI red and forces a
+-- human decision instead of silently changing what a drill verifies.
+-- T5..T10: decodeMidi / matchSpec / selectPorts / describeSpec on fixed
+-- vectors. T11: the six live verify: hooks committed in the corpus,
+-- extracted from the real deck files, each satisfiable by a byte
+-- sequence constructed from translations/midi.md -- EXCEPT d-2-09
+-- step 1 (finding M4-F1, briefs/M4-plan.md section 8), whose
+-- unreachability by a continuous dial is pinned explicitly.
+--------------------------------------------------------------------------
+
+midiSpecMidiPath :: FilePath
+midiSpecMidiPath = "../translations/midi.md"
+
+-- | The three committed deck files carrying the six live verify: hooks
+-- (ids per briefs/M4-manifest.json; file names per the merged M3 tree).
+midiSpecHookFiles :: [(FilePath, Text)]
+midiSpecHookFiles =
+  [ ("../content/exercises/024-pad-01.ex.md", "d-2-01")
+  , ("../content/exercises/028-pad-03.ex.md", "d-2-02")
+  , ("../content/exercises/036-pad-07.ex.md", "d-2-09")
+  ]
+
+-- | decode-then-match: does @bytes@, as delivered by Web MIDI, satisfy
+-- @spec@ on channel @ch@?
+hookSatisfied :: Int -> VerifySpec -> [Int] -> Bool
+hookSatisfied ch spec bytes = case decodeMidi bytes of
+  Just m  -> matchSpec ch spec m
+  Nothing -> False
+
+-- | The ordered verify: specs of exercise @wantId@'s drill steps, or
+-- Nothing if the deck did not parse or the exercise is absent.
+extractVerifies :: Text -> Maybe Deck -> Maybe [VerifySpec]
+extractVerifies wantId mDeck = case mDeck of
+  Nothing -> Nothing
+  Just d  -> case [ e | e <- dkExercises d, exId e == ExId wantId ] of
+    (e : _) -> Just [ v | p <- exPrompts e, Confirm _ (Just v) <- [prBody p] ]
+    []      -> Nothing
+
+renderSpecs :: Maybe [VerifySpec] -> String
+renderSpecs = show
+
+midiSpecChecks :: IO [STCheck]
+midiSpecChecks = do
+  midiExists <- doesFileExist midiSpecMidiPath
+  if not midiExists
+    then pure [ mkST 20 "midi-spec/midi.md-not-found" False
+                  (midiSpecMidiPath ++ " does not exist -- cannot run the SXC1.Midi.Spec agreement group") ]
+    else do
+      midiRaw <- readUtf8File midiSpecMidiPath
+      let parsed = parsePadNotes midiRaw
+      hookSpecs <- forM midiSpecHookFiles $ \(fp, wantId) -> do
+        fileExists <- doesFileExist fp
+        if not fileExists
+          then pure Nothing
+          else do
+            raw <- readUtf8File fp
+            pure (extractVerifies wantId (readDeck fp raw))
+      let (mSpecs01, mSpecs02, mSpecs09) = case hookSpecs of
+            [a, b, c] -> (a, b, c)
+            _         -> (Nothing, Nothing, Nothing)
+      pure (concat
+        [ padTableChecks parsed
+        , decodeChecks
+        , matchSpecChecks
+        , selectPortsChecks
+        , describeSpecChecks
+        , verifyHookChecks parsed mSpecs01 mSpecs02 mSpecs09
+        ])
+
+-- | T1..T4.
+padTableChecks :: Map (Int, Char) Int -> [STCheck]
+padTableChecks parsed =
+  [ mkST 20 "pad-table/parsed-has-exactly-64-entries"
+      (Map.size parsed == 64)
+      ("parsePadNotes on the real translations/midi.md must yield exactly 64 entries, got "
+         ++ show (Map.size parsed))
+  , mkST 20 "pad-table/parsed-keys-are-pads-1-16-banks-A-D"
+      (all (\(p, b) -> p >= 1 && p <= 16 && b `elem` ("ABCD" :: String)) (Map.keys parsed))
+      ("every parsed key must be (1..16, A..D), got keys " ++ show (Map.keys parsed))
+  ]
+  ++
+  -- T2: cell by cell, not a spot check -- a failure names the exact cell.
+  [ mkST 20 ("pad-agreement/pad-" ++ show p ++ "-bank-" ++ [b])
+      (padNote p b == Map.lookup (p, b) parsed)
+      ("padNote " ++ show p ++ " " ++ show b ++ " = " ++ show (padNote p b)
+         ++ " but the cell parsed out of translations/midi.md = " ++ show (Map.lookup (p, b) parsed))
+  | p <- [1 .. 16], b <- "ABCD"
+  ]
+  ++
+  -- T3: the erratum pinned by name, on BOTH the literal and the parsed
+  -- side.
+  [ mkST 20 "pad-erratum/pad-1-bank-C-is-68"
+      (padNote 1 'C' == Just 68 && Map.lookup (1, 'C') parsed == Just 68)
+      ("pad 1 bank C must be 68 in both the literal table and the parsed source, got literal="
+         ++ show (padNote 1 'C') ++ " parsed=" ++ show (Map.lookup (1, 'C') parsed))
+  , mkST 20 "pad-erratum/pad-2-bank-C-is-68-the-pinned-source-erratum"
+      (padNote 2 'C' == Just 68 && Map.lookup (2, 'C') parsed == Just 68)
+      ("midi.md prints Pad 2 / Bank C = 68 (duplicating Pad 1 -- the recorded erratum, "
+         ++ "translations/midi.qa-notes.md); 'correcting' it upstream must turn this red, got literal="
+         ++ show (padNote 2 'C') ++ " parsed=" ++ show (Map.lookup (2, 'C') parsed))
+  -- T4: out-of-domain lookups.
+  , mkST 20 "pad-domain/pad-0-is-Nothing" (padNote 0 'A' == Nothing) (show (padNote 0 'A'))
+  , mkST 20 "pad-domain/pad-17-is-Nothing" (padNote 17 'A' == Nothing) (show (padNote 17 'A'))
+  , mkST 20 "pad-domain/bank-E-is-Nothing" (padNote 1 'E' == Nothing) (show (padNote 1 'E'))
+  ]
+
+-- | T5.
+decodeChecks :: [STCheck]
+decodeChecks =
+  [ mkST 20 "decode/cc-80-127-ch1"
+      (decodeMidi [0xB0, 0x50, 0x7F] == Just (MsgCC 1 80 127)) "want Just (MsgCC 1 80 127)"
+  , mkST 20 "decode/cc-80-127-ch2"
+      (decodeMidi [0xB1, 0x50, 0x7F] == Just (MsgCC 2 80 127)) "want Just (MsgCC 2 80 127)"
+  , mkST 20 "decode/note-36-127-ch1"
+      (decodeMidi [0x90, 0x24, 0x7F] == Just (MsgNote 1 36 127)) "want Just (MsgNote 1 36 127)"
+  , mkST 20 "decode/note-36-velocity-0-is-still-a-note-on"
+      (decodeMidi [0x90, 0x24, 0x00] == Just (MsgNote 1 36 0)) "want Just (MsgNote 1 36 0)"
+  , mkST 20 "decode/system-message-is-Nothing"
+      (decodeMidi [0xF0, 0x7E, 0xF7] == Nothing) "sysex/system (>= 0xF0) is never a verification"
+  , mkST 20 "decode/truncated-cc-is-Nothing"
+      (decodeMidi [0xB0, 0x50] == Nothing) "a 0xB0 message needs two data bytes"
+  , mkST 20 "decode/empty-is-Nothing"
+      (decodeMidi [] == Nothing) "the empty byte list decodes to Nothing"
+  ]
+
+-- | T6..T8. All positive vectors are on channel 1 against wantChannel 1.
+matchSpecChecks :: [STCheck]
+matchSpecChecks =
+  let cc80 = VerifyCC 80 [127]
+  in
+  [ mkST 20 "match-cc/exact-is-true"
+      (matchSpec 1 cc80 (MsgCC 1 80 127)) "CC 80 = 127 on channel 1 must match"
+  , mkST 20 "match-cc/wrong-cc-is-false"
+      (not (matchSpec 1 cc80 (MsgCC 1 81 127))) "CC 81 must not match a cc 80 hook"
+  , mkST 20 "match-cc/wrong-value-is-false"
+      (not (matchSpec 1 cc80 (MsgCC 1 80 0))) "value 0 must not match a cc 80 127 hook"
+  , mkST 20 "match-cc/wrong-channel-is-false"
+      (not (matchSpec 1 cc80 (MsgCC 2 80 127))) "channel 2 must not match when channel 1 is expected"
+  , mkST 20 "match-cc/note-is-false"
+      (not (matchSpec 1 cc80 (MsgNote 1 80 127))) "a note message must not match a cc hook"
+
+  -- T7: velocity-agnostic pad matching (see SXC1.Midi.Spec's VELOCITY
+  -- Haddock -- the one assumption only the owner's device can settle).
+  , mkST 20 "match-pad/note-36-matches-pad-1-bank-A"
+      (matchSpec 1 (VerifyPad 1 'A') (MsgNote 1 36 127)) "note 36 is pad 1 bank A"
+  , mkST 20 "match-pad/velocity-0-still-matches"
+      (matchSpec 1 (VerifyPad 1 'A') (MsgNote 1 36 0))
+      "a 0x90 with velocity 0 must still match -- the SXC-1's velocity byte is not meaningful"
+  , mkST 20 "match-pad/note-37-is-false"
+      (not (matchSpec 1 (VerifyPad 1 'A') (MsgNote 1 37 127))) "note 37 is pad 2, not pad 1"
+
+  -- T8: VerifyAny matches transmit-shaped activity only.
+  , mkST 20 "match-any/cc-is-true" (matchSpec 1 VerifyAny (MsgCC 1 80 127)) "any must match a CC"
+  , mkST 20 "match-any/note-is-true" (matchSpec 1 VerifyAny (MsgNote 1 36 127)) "any must match a note"
+  , mkST 20 "match-any/other-is-false"
+      (not (matchSpec 1 VerifyAny (MsgOther 1)))
+      "any must NOT match MsgOther -- the SXC-1 transmits only CC and note messages"
+  ]
+
+-- | T9.
+selectPortsChecks :: [STCheck]
+selectPortsChecks =
+  [ mkST 20 "ports/sxc1-name-wins-among-several"
+      (selectPorts [("Arturia KeyStep", "Arturia"), ("CASIO SXC-1 MIDI 1", "CASIO"), ("USB MIDI Device", "")]
+         == [1])
+      "only the SXC-1-looking index must be picked when one exists"
+  , mkST 20 "ports/sxc1-manufacturer-match-case-folded"
+      (selectPorts [("USB MIDI Device", "Casio SXC1"), ("Other Keyboard", "")] == [0])
+      "the sxc1 needle must match case-foldedly in the manufacturer field too"
+  , mkST 20 "ports/casio-fallback"
+      (selectPorts [("Arturia KeyStep", ""), ("CASIO USB MIDI", "")] == [1])
+      "with no sxc-1-looking port, casio-looking ports must be picked"
+  , mkST 20 "ports/unrecognised-falls-back-to-all"
+      (selectPorts [("USB MIDI Device", ""), ("Some Keyboard", "")] == [0, 1])
+      "nobody has seen the SXC-1's real port string -- an unmatched list must bind EVERY index"
+  , mkST 20 "ports/empty-is-empty" (selectPorts [] == []) "no ports, no indices"
+  ]
+
+-- | T10.
+describeSpecChecks :: [STCheck]
+describeSpecChecks =
+  [ mkST 20 "describe/cc-single" (describeSpec (VerifyCC 80 [127]) == "CC 80 = 127")
+      (T.unpack (describeSpec (VerifyCC 80 [127])))
+  , mkST 20 "describe/cc-pair" (describeSpec (VerifyCC 80 [0, 127]) == "CC 80 = 0 or 127")
+      (T.unpack (describeSpec (VerifyCC 80 [0, 127])))
+  , mkST 20 "describe/cc-comma-list-final-or" (describeSpec (VerifyCC 16 [0, 1, 2]) == "CC 16 = 0, 1 or 2")
+      (T.unpack (describeSpec (VerifyCC 16 [0, 1, 2])))
+  , mkST 20 "describe/note-single" (describeSpec (VerifyNote [36]) == "note 36")
+      (T.unpack (describeSpec (VerifyNote [36])))
+  , mkST 20 "describe/note-pair" (describeSpec (VerifyNote [36, 48]) == "note 36 or 48")
+      (T.unpack (describeSpec (VerifyNote [36, 48])))
+  , mkST 20 "describe/pad" (describeSpec (VerifyPad 1 'A') == "pad 1 in bank A (note 36)")
+      (T.unpack (describeSpec (VerifyPad 1 'A')))
+  , mkST 20 "describe/any" (describeSpec VerifyAny == "any MIDI activity from the device")
+      (T.unpack (describeSpec VerifyAny))
+  ]
+
+-- | T11: the six committed hooks, extracted from the real deck files.
+-- Byte sequences are constructed from translations/midi.md: CC numbers
+-- 80/108/109 from the "4. Control Change list" table (Bank Select A,
+-- EFFECT FX1, EFFECT FX2 -- 127 when pressed), pad notes looked up in
+-- the freshly-PARSED "5. Note mapping" table rather than hard-coded.
+-- d-2-09 step 1 (verify: cc 16 0,127) is finding M4-F1: CC 16 is the
+-- continuous FX1 dial (initial 0, +/-1 per detent), so no realistic
+-- dial value 1..126 may ever satisfy it -- pinned, not fixed.
+verifyHookChecks
+  :: Map (Int, Char) Int
+  -> Maybe [VerifySpec] -> Maybe [VerifySpec] -> Maybe [VerifySpec]
+  -> [STCheck]
+verifyHookChecks parsed mSpecs01 mSpecs02 mSpecs09 =
+  [ mkST 20 "hooks/d-2-01-spec-is-cc-80-127"
+      (mSpecs01 == Just [VerifyCC 80 [127]]) (renderSpecs mSpecs01)
+  , mkST 20 "hooks/d-2-01-satisfied-by-bank-select-A-press"
+      (case mSpecs01 of
+         Just [s] -> hookSatisfied 1 s [0xB0, 0x50, 0x7F]
+         _        -> False)
+      "CC 80 = 127 (Bank Select A pressed, midi.md section 4) must satisfy d-2-01 step 1"
+
+  , mkST 20 "hooks/d-2-02-specs-are-pad-1-A-and-pad-13-A"
+      (mSpecs02 == Just [VerifyPad 1 'A', VerifyPad 13 'A']) (renderSpecs mSpecs02)
+  , mkST 20 "hooks/d-2-02-step-1-satisfied-by-parsed-pad-1-bank-A-note"
+      (case (mSpecs02, Map.lookup (1, 'A') parsed) of
+         (Just (s : _), Just n) -> hookSatisfied 1 s [0x90, n, 0x7F]
+         _                      -> False)
+      "the note midi.md's parsed table gives for pad 1 bank A must satisfy d-2-02 step 1"
+  , mkST 20 "hooks/d-2-02-step-2-satisfied-by-parsed-pad-13-bank-A-note"
+      (case (mSpecs02, Map.lookup (13, 'A') parsed) of
+         (Just [_, s], Just n) -> hookSatisfied 1 s [0x90, n, 0x7F]
+         _                     -> False)
+      "the note midi.md's parsed table gives for pad 13 bank A must satisfy d-2-02 step 2"
+
+  , mkST 20 "hooks/d-2-09-specs-as-committed"
+      (mSpecs09 == Just [VerifyCC 16 [0, 127], VerifyCC 108 [127], VerifyCC 109 [127]])
+      (renderSpecs mSpecs09)
+  , mkST 20 "hooks/d-2-09-step-1-M4-F1-no-dial-value-1-126-satisfies-it"
+      (case mSpecs09 of
+         Just (s : _) -> all (\v -> not (hookSatisfied 1 s [0xB0, 16, v])) [1 .. 126]
+         _            -> False)
+      ("finding M4-F1 (briefs/M4-plan.md section 8): verify: cc 16 0,127 names the continuous "
+         ++ "FX1 dial, whose realistic values 1..126 must never satisfy the hook -- pinned so the "
+         ++ "content defect is not forgotten")
+  , mkST 20 "hooks/d-2-09-step-2-satisfied-by-effect-fx1-press"
+      (case mSpecs09 of
+         Just [_, s, _] -> hookSatisfied 1 s [0xB0, 0x6C, 0x7F]
+         _              -> False)
+      "CC 108 = 127 (EFFECT FX1 pressed, midi.md section 4) must satisfy d-2-09 step 2"
+  , mkST 20 "hooks/d-2-09-step-3-satisfied-by-effect-fx2-press"
+      (case mSpecs09 of
+         Just [_, _, s] -> hookSatisfied 1 s [0xB0, 0x6D, 0x7F]
+         _              -> False)
+      "CC 109 = 127 (EFFECT FX2 pressed, midi.md section 4) must satisfy d-2-09 step 3"
   ]
 
 --------------------------------------------------------------------------

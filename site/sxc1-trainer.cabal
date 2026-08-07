@@ -32,6 +32,8 @@ library
                     SXC1.Exercise.Verify
                     SXC1.Exercise.Engine
                     SXC1.Exercise.Report
+                    SXC1.Midi.Spec
+                    SXC1.Midi.Table
                     SXC1.Progress.Types
                     SXC1.Progress.Scheduler
                     SXC1.Progress.Codec
