@@ -396,7 +396,13 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
             --                         and access is granted)
             --   .ex-verify-idle       everything else -- including every
             --                         browser with no Web MIDI at all,
-            --                         and steps confirmed manually.
+            --                         and steps confirmed manually. The
+            --                         SENTENCE inside it tells the truth
+            --                         about the device (M5 item 11): while
+            --                         verification is granted the watch
+            --                         arms only the cursor's step, so an
+            --                         un-watched hooked step must not
+            --                         claim verification is "off".
             verifyEl _stepN _prompt Nothing = []
             verifyEl stepN prompt (Just v) =
               [ H.p_ [ P.class_ (ms ("ex-verify " <> stateClass))
@@ -409,9 +415,9 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
                 pidText = unPromptId' (prId prompt)
                 confirmedByDevice =
                   IntMap.lookup idx0 (esResponses st) == Just (RConfirmed ByDevice)
-                armed = dvwSupported dv
+                devOn = dvwSupported dv
                   && snapStatus (dvwSnap dv) == DevGranted
-                  && dvwWatching dv == Just pidText
+                armed = devOn && dvwWatching dv == Just pidText
                 (stateClass, sentence)
                   | confirmedByDevice =
                       ( "ex-verify-confirmed" :: Text
@@ -420,6 +426,16 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
                       ( "ex-verify-waiting"
                       , "Waiting for the device: " <> describeSpec v
                           <> " on MIDI channel " <> tshow (snapChannel (dvwSnap dv)) <> "." )
+                  -- M5 item 11: verification is ON but this hooked step is
+                  -- not the armed one (the watch names the cursor's step,
+                  -- or nothing is watched at all -- cursor on an unhooked
+                  -- step, or the drill is done). The old text claimed
+                  -- verification was off, which was false here.
+                  | devOn =
+                      ( "ex-verify-idle"
+                      , case dvwWatching dv of
+                          Just _  -> "Device verification is watching the current step — confirm this one manually."
+                          Nothing -> "Device verification is on — confirm this step manually." )
                   | otherwise =
                       ( "ex-verify-idle"
                       , "Device verification is off — confirm manually, or turn it on above." )

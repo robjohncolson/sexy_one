@@ -102,7 +102,7 @@ statsJsonText = renderStatsJson corpusSources
 
 headerView :: ProgHandlers action -> ProgData -> Route -> View model action
 headerView ph pd route = H.header_ [ P.id_ "sxc1-header" ]
-  ( [ H.a_ [ P.class_ "brand", P.href_ (ms (renderRoute RHome)) ] [ "SXC-1 Trainer" ]
+  ( [ H.a_ [ P.class_ "brand", P.href_ (ms (renderRoute RHome)) ] [ "SEXY ONE — SXC-1 Trainer" ]
     , Progress.reviewBadgeEl (Progress.dueCountLive pd)
     ]
     ++ breadcrumbFor route

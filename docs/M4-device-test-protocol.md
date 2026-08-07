@@ -227,9 +227,11 @@ FX1/FX2 *buttons* are on/off toggles — they transmit 127 when switching on
 and 0 when switching off, so a button step only auto-confirms on the
 switching-ON press).
 
-(Small cosmetic quirk, safe to ignore: once you hand-confirm step 1, the grey
-line under it reads "Device verification is off — confirm manually, or turn it
-on above." even though verification is still on.)
+(Once you hand-confirm step 1 with verification still on, the grey line under
+it reads "Device verification is watching the current step — confirm this one
+manually." — verification only ever watches the current step, so earlier
+steps drop back to this grey line. It used to claim verification was off;
+that quirk was fixed in M5, debt item 11.)
 
 ### Steps 2 and 3 — the FX buttons (checks 8 and 9)
 

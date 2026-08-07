@@ -1264,6 +1264,14 @@ window.__SXC1_BOOTED = true;
     } else if (DEV.supported && DEV.status === 'granted' && DEV.watchingPrompt === prompt) {
       cls = 'ex-verify-waiting';
       sentence = 'Waiting for the device: ' + spec.text + ' on MIDI channel ' + DEV.channel + '.';
+    } else if (DEV.supported && DEV.status === 'granted') {
+      // M5 item 11 parity with View.Exercise: verification is ON but this
+      // hooked step is not the armed one -- the idle line must not claim
+      // verification is off.
+      cls = 'ex-verify-idle';
+      sentence = DEV.watchingPrompt
+        ? 'Device verification is watching the current step ' + String.fromCharCode(8212) + ' confirm this one manually.'
+        : 'Device verification is on ' + String.fromCharCode(8212) + ' confirm this step manually.';
     } else {
       cls = 'ex-verify-idle';
       sentence = 'Device verification is off ' + String.fromCharCode(8212) + ' confirm manually, or turn it on above.';

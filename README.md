@@ -1,7 +1,8 @@
-# SXC-1 Trainer
+# SEXY ONE — SXC-1 Trainer
 
-An interactive English-language training course for the [Casio SXC-1](https://www.casio.com/)
-portable standalone sampler. The app is a Haskell/[Miso](https://haskell-miso.org/)
+**SEXY ONE** is an interactive English-language training course for the
+[Casio SXC-1](https://www.casio.com/) portable standalone sampler.
+The app is a Haskell/[Miso](https://haskell-miso.org/)
 application compiled to WebAssembly and served as static files — no server component.
 This is an unofficial fan project and is **not affiliated with Casio**.
 

@@ -7,7 +7,8 @@ Interactive web training course for the Casio SXC-1 portable standalone sampler
 2. **A training program** — exercises that take an owner from unboxing to fluency,
    mirroring the guide book's own progression.
 
-Working title: **SXC-1 Trainer** (rename freely).
+Site name: **SEXY ONE** (owner-confirmed 2026-08-08; "SXC-1 Trainer" stays
+alongside it as the descriptive subtitle — see Resolved).
 
 ## Locked decisions (owner interview, 2026-08-06)
 
@@ -117,10 +118,7 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
 - **Device is post-cutoff** — no model prior knowledge; manuals and Casio's linked
   tutorial videos are ground truth for all content.
 
-## Open questions for the owner
-
-1. Site title — "SXC-1 Trainer" is a placeholder ("SEXY ONE" is a natural
-   candidate given the repo name; owner to confirm).
+## Notes and rulings
 
 Deploy-path note (2026-08-06): GitHub's workflow Pages-deployment queue wedged
 (4 consecutive `deployment_queued` timeouts, no posted incident). The m1 build
