@@ -235,7 +235,12 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
 
   where
     renderRunner ex = H.article_ [ P.id_ "sxc1-exercise", P.class_ (ms ("exercise kind-" <> kindClass (exKind ex))) ]
-      ( [ H.h1_ [ P.id_ "ex-title" ] [ text (ms (exTitle ex)) ]
+      -- M5 a11y: @tabindex="-1"@ makes the title a programmatic focus
+      -- target -- Main.hs's advance-focus wiring lands here when a
+      -- quiz\/lookup prompt advances (see Main.advanceFocusTarget), so
+      -- keyboard\/SR focus is never dropped to \<body\> when the button
+      -- that had focus (e.g. #btn-ex-next) disappears with the old prompt.
+      ( [ H.h1_ [ P.id_ "ex-title", textProp "tabindex" "-1" ] [ text (ms (exTitle ex)) ]
         , H.p_ [ P.id_ "ex-progress" ] [ text (ms progressText) ]
         , H.div_ [ P.id_ "ex-stem" ] (Blocks.renderBlocks "" (exIntro ex))
         ]
@@ -353,7 +358,11 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
 
         drillStepsEl ex' = H.ol_ [ P.id_ "ex-steps" ] (zipWith renderStep [1 ..] (exPrompts ex'))
           where
-            renderStep stepN prompt = H.li_ [ P.class_ "ex-step", P.id_ (ms ("ex-step-" <> T.pack (show stepN))) ]
+            -- M5 a11y: each step is a programmatic focus target (see
+            -- #ex-title's own comment) -- confirming a step removes the
+            -- focused Confirm button, so Main.hs re-lands focus on the
+            -- NEXT step's container (manual and DEVICE confirms alike).
+            renderStep stepN prompt = H.li_ [ P.class_ "ex-step", P.id_ (ms ("ex-step-" <> T.pack (show stepN))), textProp "tabindex" "-1" ]
               ( H.div_ [ P.class_ "ex-step-instruction" ] (Blocks.renderBlocks "" (prStem prompt))
                 : case prBody prompt of
                     Confirm checkInlines mVerify ->
@@ -403,10 +412,14 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
             --                         arms only the cursor's step, so an
             --                         un-watched hooked step must not
             --                         claim verification is "off".
+            -- M5 a11y: @aria-live="polite"@ so a screen reader hears the
+            -- waiting -> confirmed sentence change (a DEVICE confirm
+            -- happens with no click to anchor the announcement to).
             verifyEl _stepN _prompt Nothing = []
             verifyEl stepN prompt (Just v) =
               [ H.p_ [ P.class_ (ms ("ex-verify " <> stateClass))
                      , P.id_ (ms ("ex-step-" <> T.pack (show stepN) <> "-verify"))
+                     , textProp "aria-live" "polite"
                      ]
                   [ text (ms sentence) ]
               ]
@@ -462,8 +475,10 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
                  ]
           where shownCount = IntMap.findWithDefault 0 cursor (esHints st)
 
+        -- M5 a11y: the summary is the focus target for the FINAL advance
+        -- (the whole exercise completing) -- see #ex-title's comment.
         summaryEl
-          | esDone st = [ H.section_ [ P.id_ "ex-summary" ] [ H.p_ [] [ "You've completed this exercise." ] ] ]
+          | esDone st = [ H.section_ [ P.id_ "ex-summary", textProp "tabindex" "-1" ] [ H.p_ [] [ "You've completed this exercise." ] ] ]
           | otherwise = []
 
         -- M4 (briefs/M4-plan.md section 3.8): the device panel --
@@ -479,9 +494,15 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
               [ H.section_ [ P.id_ "ex-device" ]
                   ( [ H.button_ [ P.id_ "btn-device-enable", E.onClick (exOnDevEnable h) ]
                         [ text (ms enableLabel) ]
-                    , H.p_ [ P.id_ "device-status" ] [ text (ms statusSentence) ]
+                    -- M5 a11y: status changes (grant/deny/mismatch/confirm
+                    -- teardown) happen without a focus change, so the
+                    -- sentence is a polite live region; the bare <select>
+                    -- has no <label> element, so aria-label carries its
+                    -- accessible name.
+                    , H.p_ [ P.id_ "device-status", textProp "aria-live" "polite" ] [ text (ms statusSentence) ]
                     , H.select_
                         [ P.id_ "sel-device-channel"
+                        , textProp "aria-label" "MIDI listening channel"
                         , E.onChange (\raw -> case parseDigits (fromMisoString raw) of
                             Just cn | cn >= 1 && cn <= 16 -> exOnDevChannel h cn
                             _                             -> exOnDevChannel h chan)

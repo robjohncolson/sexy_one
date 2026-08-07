@@ -838,6 +838,35 @@ window.__SXC1_BOOTED = true;
   var MANUAL_TOTAL_PAGES = 2;
 
   // -----------------------------------------------------------------------
+  // M5 a11y mirror -- the fixture-side halves of the app's a11y pass, so
+  // the SAME shared assertions (keyboard-only completion, focus on
+  // advance, SR labels) run against both targets, each with its own
+  // named sabotage:
+  //   focusEl        mirrors Main.hs's advance-focus wiring (a deferred
+  //                  getElementById(id).focus(), like Miso's callFocus).
+  //                  SABOTAGE 'a11yFocusAdvance': the move never happens,
+  //                  so focus is stranded on <body> after every advance
+  //                  (quiz Next, drill confirm -- manual AND device).
+  //   CTL_TAG        the tag primary in-prompt controls render as.
+  //                  SABOTAGE 'a11yKeyboard': click-only <span>s (the
+  //                  classic div-button defect) -- ids/classes/handlers
+  //                  identical, so every .click()-driven assertion still
+  //                  passes and EXACTLY the three keyboard-only flows
+  //                  fail (spans are unfocusable and ignore Enter).
+  //   *_ATTR         the ARIA surface (live regions + accessible names).
+  //                  SABOTAGE 'a11ySrLabels': all omitted.
+  // -----------------------------------------------------------------------
+  function focusEl(id) {
+    if (sel('a11yFocusAdvance')) return;
+    setTimeout(function () { var e = document.getElementById(id); if (e && e.focus) e.focus(); }, 30);
+  }
+  var CTL_TAG = sel('a11yKeyboard') ? 'span' : 'button';
+  var ARIA_LIVE_ATTR = sel('a11ySrLabels') ? '' : ' aria-live="polite"';
+  var CHAN_LABEL_ATTR = sel('a11ySrLabels') ? '' : ' aria-label="MIDI listening channel"';
+  var EXPORT_LABEL_ATTR = sel('a11ySrLabels') ? '' : ' aria-label="Exported progress data"';
+  var SUMMARY_HTML = '<section id="ex-summary" tabindex="-1"><p>You have completed this exercise.</p></section>';
+
+  // -----------------------------------------------------------------------
   // M3 harness wave: a small, self-contained, DELIBERATELY INDEPENDENT
   // mirror of SXC1.Progress.* (mini scheduler + mini wire codec) and of
   // Progress.Store's localStorage keys/never-overwrite rule -- see the
@@ -1087,6 +1116,10 @@ window.__SXC1_BOOTED = true;
     drillStepAt = Date.now();
     if (onDrillRoute()) renderDrill();
     devReconcile();
+    // M5 a11y (D26): a DEVICE confirm moves the cursor with no click to
+    // carry focus -- the same advance-focus move as the manual path
+    // (Main.hs's DApplyConfirm applies the same [ConfirmStep, Advance]).
+    if (onDrillRoute()) focusEl(drillCursor >= FIXTURE.drill.steps ? 'ex-summary' : ('ex-step-' + (drillCursor + 1)));
   }
 
   // The FULL stale-confirm guard mirror (the app's guardedConfirmIx,
@@ -1276,7 +1309,7 @@ window.__SXC1_BOOTED = true;
       cls = 'ex-verify-idle';
       sentence = 'Device verification is off ' + String.fromCharCode(8212) + ' confirm manually, or turn it on above.';
     }
-    return '<p class="ex-verify ' + cls + '" id="ex-step-' + stepN + '-verify">' + sentence + '</p>';
+    return '<p class="ex-verify ' + cls + '" id="ex-step-' + stepN + '-verify"' + ARIA_LIVE_ATTR + '>' + sentence + '</p>';
   }
 
   // The device panel mirror. Rendered on the drill route when supported
@@ -1313,8 +1346,8 @@ window.__SXC1_BOOTED = true;
     var el = document.createElement('section');
     el.id = 'ex-device';
     el.innerHTML = '<button id="btn-device-enable" type="button">' + label + '</button>' +
-      '<p id="device-status">' + statusText + '</p>' +
-      '<select id="sel-device-channel">' + options + '</select>' +
+      '<p id="device-status"' + ARIA_LIVE_ATTR + '>' + statusText + '</p>' +
+      '<select id="sel-device-channel"' + CHAN_LABEL_ATTR + '>' + options + '</select>' +
       '<p id="device-ports">' + portsText + '</p>' +
       (mismatch ? '<button id="btn-device-use-channel" type="button">Use channel ' + DEV.lastChannel + '</button>' : '');
     host.appendChild(el);
@@ -1748,7 +1781,7 @@ window.__SXC1_BOOTED = true;
       '<p id="sxc1-streak">Study streak: ' + (CURRENT_PROGRESS.streakLen || 0) + '</p>' +
       '<section id="sxc1-progress-tools">' +
       '<button id="btn-progress-export" type="button">Export</button>' +
-      '<textarea id="sxc1-export-blob" readonly></textarea>' +
+      '<textarea id="sxc1-export-blob" readonly' + EXPORT_LABEL_ATTR + '></textarea>' +
       '<form id="sxc1-import-form">' +
       '<label for="sxc1-import-input">Paste an exported blob to import:</label>' +
       '<textarea id="sxc1-import-input" name="sxc1-import-input"></textarea>' +
@@ -1887,6 +1920,12 @@ window.__SXC1_BOOTED = true;
   var quizSelected = Object.create(null);
   var quizAttempted = false;
   var lastQuizCorrect = false;
+  // M5 a11y: done-state mirrors (the app's esDone) -- set by the Next
+  // click after a correct answer, cleared by Restart (quiz) / route
+  // entry + Restart (lookup, matching this fixture's long-standing
+  // reset-on-entry semantics).
+  var quizDone = false;
+  var lookupDone = false;
   var quizPromptAt = 0;
   // M3: how many times THIS quiz prompt has been submitted since it was
   // last fresh/Begin/Restart -- mirrors the real engine's own attempt
@@ -1986,16 +2025,48 @@ window.__SXC1_BOOTED = true;
     // this back out below) re-baselines it, exactly once, before any
     // click can occur.
     if (quizPromptAt === 0) quizPromptAt = Date.now();
+    // M5 a11y: the done state mirrors the app exactly -- no options, no
+    // submit, no feedback; just title/progress/stem, Restart and the
+    // summary focus target (View.Exercise.bodyEls hides the prompt once
+    // esDone; summaryEl renders).
+    if (quizDone) {
+      root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-quiz">' +
+        '<h1 id="ex-title" tabindex="-1">Demo quiz</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Pick the right one.</p></div>' +
+        '<button id="btn-ex-restart">Restart</button>' + SUMMARY_HTML +
+        '</article>';
+      document.getElementById('btn-ex-restart').addEventListener('click', function () {
+        quizPromptAt = 0;
+        quizAttemptCount = 0;
+        quizDone = false;
+        if (!LEGACY_ALL) {
+          quizAttempted = false;
+          lastQuizCorrect = false;
+          quizSelected = Object.create(null);
+        }
+        renderQuiz();
+        focusEl('ex-title');
+      });
+      devUpdateState();
+      return;
+    }
     var optsHtml =
-      '<li><button id="' + FIXTURE.quiz.correctOpt + '" class="ex-option" aria-pressed="' + (quizSelected[FIXTURE.quiz.correctOpt] ? 'true' : 'false') + '">Correct option</button></li>' +
-      '<li><button id="' + FIXTURE.quiz.wrongOpt + '" class="ex-option" aria-pressed="' + (quizSelected[FIXTURE.quiz.wrongOpt] ? 'true' : 'false') + '">Wrong option</button></li>';
+      '<li><' + CTL_TAG + ' id="' + FIXTURE.quiz.correctOpt + '" class="ex-option" aria-pressed="' + (quizSelected[FIXTURE.quiz.correctOpt] ? 'true' : 'false') + '">Correct option</' + CTL_TAG + '></li>' +
+      '<li><' + CTL_TAG + ' id="' + FIXTURE.quiz.wrongOpt + '" class="ex-option" aria-pressed="' + (quizSelected[FIXTURE.quiz.wrongOpt] ? 'true' : 'false') + '">Wrong option</' + CTL_TAG + '></li>';
     root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-quiz">' +
-      '<h1 id="ex-title">Demo quiz</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Pick the right one.</p></div>' +
+      '<h1 id="ex-title" tabindex="-1">Demo quiz</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Pick the right one.</p></div>' +
       '<ul id="ex-options">' + optsHtml + '</ul>' +
-      '<button id="btn-ex-submit">Submit</button>' +
+      '<' + CTL_TAG + ' id="btn-ex-submit">Submit</' + CTL_TAG + '>' +
       (quizAttempted ? feedbackHtml(lastQuizCorrect) : '') +
       '<button id="btn-ex-restart">Restart</button>' +
       '</article>';
+    // M5 a11y: the final advance -- Next on the one-prompt quiz
+    // completes it; Main.hs's wiring then focuses #ex-summary.
+    var nextBtn = document.getElementById('btn-ex-next');
+    if (nextBtn) nextBtn.addEventListener('click', function () {
+      quizDone = true;
+      renderQuiz();
+      focusEl('ex-summary');
+    });
     // H7: Restart must yield a genuinely blank prompt -- clears this
     // attempt's own result state and re-baselines the clock, mirroring
     // Main.hs's applyExActions (Begin/Restart -> dropStale mExResults).
@@ -2008,12 +2079,15 @@ window.__SXC1_BOOTED = true;
     document.getElementById('btn-ex-restart').addEventListener('click', function () {
       quizPromptAt = 0;
       quizAttemptCount = 0;
+      quizDone = false;
       if (!LEGACY_ALL) {
         quizAttempted = false;
         lastQuizCorrect = false;
         quizSelected = Object.create(null);
       }
       renderQuiz();
+      // M5 a11y: Restart is a cursor move too (Main.hs advanceFocusTarget).
+      focusEl('ex-title');
     });
     Array.prototype.forEach.call(document.querySelectorAll('.ex-option'), function (btn) {
       btn.addEventListener('click', function () {
@@ -2070,20 +2144,24 @@ window.__SXC1_BOOTED = true;
       var citeHtml = (confirmed && !LEGACY_ALL)
         ? ('<ul class="ex-step-cites" id="ex-step-' + i + '-cites"><li><a class="cite" href="#/m/' + FIXTURE.drill.citeSlug + '/p/' + FIXTURE.drill.citePage + '">cite</a></li></ul>')
         : '';
-      stepsHtml += '<li class="ex-step" id="ex-step-' + i + '"><div class="ex-step-instruction"><p>Step ' + i + '.</p></div>' +
+      stepsHtml += '<li class="ex-step" id="ex-step-' + i + '" tabindex="-1"><div class="ex-step-instruction"><p>Step ' + i + '.</p></div>' +
         '<p class="ex-step-check" id="ex-step-' + i + '-check">Check ' + i + '.</p>' +
         // M4: the live verify line (idle/waiting/confirmed), mirroring
         // the app's View.Exercise render -- both fixture drill steps
         // carry a spec (see DRILL_SPECS above).
         (FIXTURE.drill.hasVerify ? devVerifyLineHtml(i) : '') +
         citeHtml +
-        (idx0 === drillCursor ? ('<button class="btn-ex-confirm" id="btn-ex-confirm-' + i + '">Confirm</button>') : '') +
+        (idx0 === drillCursor ? ('<' + CTL_TAG + ' class="btn-ex-confirm" id="btn-ex-confirm-' + i + '">Confirm</' + CTL_TAG + '>') : '') +
         '</li>';
     }
     root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-drill">' +
-      '<h1 id="ex-title">Demo drill</h1><p id="ex-progress">' + Math.min(drillCursor + 1, FIXTURE.drill.steps) + ' / ' + FIXTURE.drill.steps + '</p>' +
+      '<h1 id="ex-title" tabindex="-1">Demo drill</h1><p id="ex-progress">' + Math.min(drillCursor + 1, FIXTURE.drill.steps) + ' / ' + FIXTURE.drill.steps + '</p>' +
       '<div id="ex-stem"><p>Do the thing.</p></div><ol id="ex-steps">' + stepsHtml + '</ol>' +
-      '<button id="btn-ex-restart">Restart</button></article>';
+      '<button id="btn-ex-restart">Restart</button>' +
+      // M5 a11y: a completed drill keeps its step list (H8) AND gains the
+      // summary focus target, mirroring View.Exercise.summaryEl.
+      (drillCursor >= FIXTURE.drill.steps ? SUMMARY_HTML : '') +
+      '</article>';
     // M4 gate-1 (D24): the drill's Restart mirror -- the app renders
     // #btn-ex-restart on every runner. Mirrors Main.hs Restart exactly:
     // fresh attempt state, confirms wiped (esResponses resets), the
@@ -2097,6 +2175,9 @@ window.__SXC1_BOOTED = true;
       DEV.gen += 1;
       renderDrill();
       devReconcile();
+      // M5 a11y: Restart lands the cursor on step 1 (Main.hs
+      // advanceFocusTarget -> "ex-step-1" for a not-done drill).
+      focusEl('ex-step-1');
     });
     var btn = document.getElementById('btn-ex-confirm-' + (drillCursor + 1));
     if (btn) btn.addEventListener('click', function () {
@@ -2114,6 +2195,9 @@ window.__SXC1_BOOTED = true;
       drillStepAt = Date.now();
       renderDrill();
       devReconcile();
+      // M5 a11y: the confirmed step's button is gone from the DOM -- land
+      // focus on the next step (or the summary when that was the last).
+      focusEl(drillCursor >= FIXTURE.drill.steps ? 'ex-summary' : ('ex-step-' + (drillCursor + 1)));
     });
     devUpdateState();
   }
@@ -2128,6 +2212,28 @@ window.__SXC1_BOOTED = true;
 
   function renderLookup() {
     if (lookupStartedAt === 0) lookupStartedAt = Date.now();
+    // M5 a11y: restart resets this lookup to a blank attempt -- the app
+    // renders #btn-ex-restart on EVERY runner (this fixture's lookup
+    // previously had none), and the keyboard-only lookup flow starts by
+    // activating it.
+    function attachLookupRestart() {
+      document.getElementById('btn-ex-restart').addEventListener('click', function () {
+        lookupStartedAt = 0;
+        lookupResult = null;
+        lookupDone = false;
+        renderLookup();
+        focusEl('ex-title');
+      });
+    }
+    if (lookupDone) {
+      // Done state mirrors the app: prompt hidden, summary shown.
+      root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-lookup">' +
+        '<h1 id="ex-title" tabindex="-1">Demo lookup</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Find the page.</p></div>' +
+        '<button id="btn-ex-restart">Restart</button>' + SUMMARY_HTML +
+        '</article>';
+      attachLookupRestart();
+      return;
+    }
     // H8: a lookup's own citation is its find: TARGET page, rendered
     // ONLY after grading (gated the same way the real app gates it --
     // mAttempted -- never before, or the lookup spoils its own answer).
@@ -2140,12 +2246,21 @@ window.__SXC1_BOOTED = true;
       ? ''
       : ('<ul id="ex-cites"><li><a class="cite" href="#/m/' + FIXTURE.lookup.citeSlug + '/p/' + FIXTURE.lookup.citePage + '">cite</a></li></ul>');
     root().innerHTML = '<article id="sxc1-exercise" class="exercise kind-lookup">' +
-      '<h1 id="ex-title">Demo lookup</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Find the page.</p></div>' +
+      '<h1 id="ex-title" tabindex="-1">Demo lookup</h1><p id="ex-progress">1 / 1</p><div id="ex-stem"><p>Find the page.</p></div>' +
       '<p id="ex-find-task">Find it.</p>' +
       '<input id="ex-find-input" type="number" inputmode="numeric">' +
-      '<button id="btn-ex-find-submit">Submit</button>' +
+      '<' + CTL_TAG + ' id="btn-ex-find-submit">Submit</' + CTL_TAG + '>' +
       (lookupResult !== null ? (feedbackHtml(lookupResult, lookupResult ? lookupCiteHtml : '') + (lookupResult ? ('<p id="ex-elapsed">' + elapsedStr() + '</p>') : '')) : '') +
+      '<button id="btn-ex-restart">Restart</button>' +
       '</article>';
+    attachLookupRestart();
+    // M5 a11y: the final advance, exactly like the quiz's Next handler.
+    var lookupNext = document.getElementById('btn-ex-next');
+    if (lookupNext) lookupNext.addEventListener('click', function () {
+      lookupDone = true;
+      renderLookup();
+      focusEl('ex-summary');
+    });
     var input = document.getElementById('ex-find-input');
     var submitBtn = document.getElementById('btn-ex-find-submit');
     submitBtn.addEventListener('click', function () {
@@ -2203,7 +2318,7 @@ window.__SXC1_BOOTED = true;
       // each entry is a fresh attempt and bumps the generation, exactly
       // as the app's Begin batch does via applyExActions.
       if (exId === FIXTURE.drill.id) { drillCursor = 0; DEV.gen += 1; renderDrill(); updateProgressPayload(); return; }
-      if (exId === FIXTURE.lookup.id) { lookupStartedAt = 0; lookupResult = null; renderLookup(); updateProgressPayload(); return; }
+      if (exId === FIXTURE.lookup.id) { lookupStartedAt = 0; lookupResult = null; lookupDone = false; renderLookup(); updateProgressPayload(); return; }
     }
     if (parts[0] === 'm' && parts.length >= 4 && parts[2] === 'p') {
       var slug = parts[1];
@@ -2320,6 +2435,59 @@ const COLD_BASELINE_ASSERTION_NAME =
 // see the --self-test-negative sweep in this file's own final report.
 const BASELINE_POLL_BUDGET_MS = 3000;
 const BASELINE_POLL_INTERVAL_MS = 40;
+
+// ---------------------------------------------------------------------------
+// M5 a11y pass (briefs/M5-ship.md ship checklist): keyboard-only
+// completion, focus-on-advance, and SR-label assertions -- shared between
+// --self-test (the fixture mirrors the app's focus management and ARIA
+// surface; see the fixture's own a11y block) and a real run, exactly the
+// runExerciseAssertions precedent. Fixed names so the negative sweep's
+// M5_SELECTOR_ASSERTIONS map can reference them.
+//
+// The keyboard flows drive the page EXCLUSIVELY through CDP
+// Input.dispatchKeyEvent (trusted key events -- Tab moves real focus,
+// Enter genuinely activates; a synthetic page-JS KeyboardEvent does
+// neither), never element.click(): they prove a keyboard-only learner
+// can complete each exercise kind end to end. The focus assertions are
+// deliberately DECOUPLED from the keyboard flows (they drive their
+// advances with .click()), so the negative sweep can fail the
+// keyboard-reachability sabotage ('a11yKeyboard') and the focus sabotage
+// ('a11yFocusAdvance') independently -- see M5_SELECTOR_ASSERTIONS.
+// ---------------------------------------------------------------------------
+
+const KB_QUIZ_ASSERTION_NAME =
+  'keyboard-only quiz completion: Tab/Enter alone (CDP dispatchKeyEvent, no mouse) restarts, selects, submits and advances to #ex-summary';
+const KB_DRILL_ASSERTION_NAME =
+  'keyboard-only drill completion: Tab/Enter alone (CDP dispatchKeyEvent, no mouse) restarts and confirms every step to #ex-summary';
+const KB_LOOKUP_ASSERTION_NAME =
+  'keyboard-only lookup completion: Tab + typed digits + Enter alone (CDP dispatchKeyEvent, no mouse) restarts, submits and advances to #ex-summary';
+const FOCUS_QUIZ_ASSERTION_NAME =
+  'focus on advance (quiz): after the final Next, document.activeElement is #ex-summary -- never dropped to <body>';
+const FOCUS_DRILL_ASSERTION_NAME =
+  'focus on advance (drill): after each confirm, document.activeElement is the NEXT .ex-step (then #ex-summary) -- never dropped to <body>';
+const SR_LABELS_ASSERTION_NAME =
+  'SR labels: #sxc1-export-blob carries an aria-label accessible name; a verify-hooked drill\'s .ex-verify is aria-live=polite';
+
+// Trusted keyboard input for a session: returns pressKey(key) driving the
+// full keyDown/keyUp pair through CDP's Input domain. 'Tab'/'Enter' are
+// the navigation/activation pair the keyboard flows live on; single
+// characters (the lookup's typed digits) additionally carry `text` on the
+// keyDown so the focused <input> receives real text insertion.
+function keyPresserFor(cdp, sessionId) {
+  const NAMED = {
+    Tab: { key: 'Tab', code: 'Tab', vk: 9 },
+    Enter: { key: 'Enter', code: 'Enter', vk: 13, text: '\r' },
+    ' ': { key: ' ', code: 'Space', vk: 32, text: ' ' },
+  };
+  return async (key) => {
+    let d = NAMED[key];
+    if (!d && /^[0-9]$/.test(key)) d = { key, code: `Digit${key}`, vk: key.charCodeAt(0), text: key };
+    if (!d) d = { key, code: `Key${key.toUpperCase()}`, vk: key.toUpperCase().charCodeAt(0), text: key };
+    const base = { key: d.key, code: d.code, windowsVirtualKeyCode: d.vk, nativeVirtualKeyCode: d.vk };
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...base, ...(d.text ? { text: d.text } : {}) }, sessionId);
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base }, sessionId);
+  };
+}
 
 async function assertColdFirstTryElapsed(coldH, fixture, waitMs) {
   const baselinePoll = await coldH.evaluate(`(async () => {
@@ -2777,6 +2945,204 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     Boolean(lastEvent && lastEvent.outcome === 'correct' && lastEvent.exercise === fixture.lookup.id),
     { length: Array.isArray(eventLog) ? eventLog.length : eventLog, lastEvent },
   );
+
+  // 7b (M5 a11y pass). KEYBOARD-ONLY COMPLETION, FOCUS-ON-ADVANCE, SR
+  // LABELS -- see the M5 assertion-name block above for the design
+  // (keyboard flows: dispatchKeyEvent ONLY; focus flows: click-driven on
+  // purpose, so each sabotage fails exactly its own assertions). Runs
+  // AFTER section 7 (the event-log tail assertion) because completing
+  // exercises appends Completed events that would change that tail.
+  {
+    const kbActive = () => h.evaluate(
+      "(() => { const a = document.activeElement; return a ? { tag: a.tagName, id: a.id || null, isBody: a === document.body } : null; })()",
+    );
+    const kbBlur = () => h.evaluate(
+      'if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); true',
+    );
+    // Tab until the element with `wantId` holds focus. Two rounds with a
+    // blur between them: an app-side focus move mid-walk (the advance
+    // focus management this same section pins) can land the walk PAST the
+    // target in document order, and after sabotage a lost focus restarts
+    // from <body> -- the wrap keeps completion-reachability independent of
+    // where focus currently sits, which is exactly what keeps the
+    // 'a11yFocusAdvance' sabotage from also failing the keyboard flows.
+    const kbTabTo = async (wantId, maxTabs = 45) => {
+      for (let round = 0; round < 2; round += 1) {
+        for (let i = 0; i < maxTabs; i += 1) {
+          await h.pressKey('Tab');
+          const a = await kbActive();
+          if (a && a.id === wantId) return { found: true, round, tabs: i + 1 };
+        }
+        await kbBlur();
+      }
+      return { found: false, at: await kbActive() };
+    };
+    const waitFor = (exprJs, budget = 3000) => h.evaluate(`(async () => {
+      const start = Date.now();
+      while (Date.now() - start < ${budget}) {
+        if (${exprJs}) return true;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      return ${exprJs};
+    })()`);
+    const waitFocusOn = (wantId, budget = 2500) => h.evaluate(`(async () => {
+      const start = Date.now();
+      while (Date.now() - start < ${budget}) {
+        const a = document.activeElement;
+        if (a && a.id === ${JSON.stringify(wantId)}) return { ok: true, id: a.id };
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      const a = document.activeElement;
+      return { ok: false, want: ${JSON.stringify(wantId)}, got: a ? (a.id || a.tagName) : null, isBody: a === document.body };
+    })()`);
+    // Existence-guarded click: a missing element becomes an ordinary
+    // false observation folded into the owning assertion, never a page
+    // exception escaping as a spurious harness error (the m3(a)/(b)
+    // rule this whole file follows).
+    const fClick = (selector) => h.evaluate(
+      `(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return false; e.click(); return true; })()`,
+    );
+
+    // -- FOCUS ON ADVANCE, quiz (click-driven; the quiz is blank after
+    // 4b's restart, so restart -> correct -> submit -> Next is a full
+    // fresh pass whose final advance removes the focused Next button).
+    await h.goto(`#/x/${fixture.quiz.deck}/${fixture.quiz.id}`, '.kind-quiz');
+    await fClick('#btn-ex-restart');
+    await waitFor("document.querySelector('#ex-feedback') === null");
+    await fClick(`#${fixture.quiz.correctOpt}`);
+    await fClick('#btn-ex-submit');
+    await waitFor("(() => { const e = document.querySelector('#ex-feedback'); return e && /^Correct/.test(e.textContent); })()");
+    await fClick('#btn-ex-next');
+    const fqSummary = await waitFor("document.querySelector('#ex-summary') !== null");
+    const fqFocus = await waitFocusOn('ex-summary');
+    report(
+      FOCUS_QUIZ_ASSERTION_NAME,
+      fqSummary === true && Boolean(fqFocus) && fqFocus.ok === true,
+      { fqSummary, fqFocus },
+    );
+
+    // -- FOCUS ON ADVANCE, drill (click-driven): restart, then confirm
+    // each step and require focus to land on the NEXT step's li -- and,
+    // for the final confirm, on #ex-summary.
+    await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
+    await fClick('#btn-ex-restart');
+    await waitFor("document.querySelector('#btn-ex-confirm-1') !== null");
+    const fdSeq = [];
+    for (let s = 1; s <= fixture.drill.steps; s += 1) {
+      const present = await waitFor(`document.querySelector('#btn-ex-confirm-${s}') !== null`);
+      if (!present) { fdSeq.push({ step: s, present: false }); break; }
+      await fClick(`#btn-ex-confirm-${s}`);
+      const want = s === fixture.drill.steps ? 'ex-summary' : `ex-step-${s + 1}`;
+      fdSeq.push({ step: s, want, focus: await waitFocusOn(want) });
+    }
+    report(
+      FOCUS_DRILL_ASSERTION_NAME,
+      fdSeq.length === fixture.drill.steps && fdSeq.every((e) => e.focus && e.focus.ok === true),
+      fdSeq,
+    );
+
+    // -- KEYBOARD-ONLY QUIZ (dispatchKeyEvent only from here on: the
+    // focus flows above left the quiz/drill completed, so each keyboard
+    // flow starts by Tab+Enter on the always-rendered Restart button).
+    await h.goto(`#/x/${fixture.quiz.deck}/${fixture.quiz.id}`, '.kind-quiz');
+    await kbBlur();
+    const kbq = { restart: await kbTabTo('btn-ex-restart') };
+    if (kbq.restart.found) await h.pressKey('Enter');
+    // Sync only (never a pass criterion): whether the restart left a
+    // genuinely blank prompt is the dedicated Restart assertion's own
+    // claim (H7) -- and legacy-all deliberately breaks exactly that, so
+    // gating THIS assertion on blankness would misattribute an H7
+    // failure to the keyboard flow. The keyboard proof below is the
+    // aria-pressed flip + the summary, both keyboard-caused.
+    await waitFor("document.querySelector('#btn-ex-submit') !== null");
+    await sleep(250); // let the app's own restart focus move settle before walking
+    kbq.option = await kbTabTo(fixture.quiz.correctOpt);
+    if (kbq.option.found) await h.pressKey('Enter');
+    kbq.pressed = await waitFor(`(() => { const o = document.querySelector('#${fixture.quiz.correctOpt}'); return o && o.getAttribute('aria-pressed') === 'true'; })()`);
+    kbq.submit = await kbTabTo('btn-ex-submit');
+    if (kbq.submit.found) await h.pressKey('Enter');
+    kbq.correct = await waitFor("(() => { const e = document.querySelector('#ex-feedback'); return e && /^Correct/.test(e.textContent); })()");
+    kbq.next = await kbTabTo('btn-ex-next');
+    if (kbq.next.found) await h.pressKey('Enter');
+    kbq.summary = await waitFor("document.querySelector('#ex-summary') !== null");
+    report(
+      KB_QUIZ_ASSERTION_NAME,
+      Boolean(kbq.restart.found && kbq.option.found && kbq.pressed && kbq.submit.found
+        && kbq.correct && kbq.next.found && kbq.summary),
+      kbq,
+    );
+
+    // -- KEYBOARD-ONLY DRILL.
+    await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
+    await kbBlur();
+    const kbd = { restart: await kbTabTo('btn-ex-restart') };
+    if (kbd.restart.found) await h.pressKey('Enter');
+    kbd.fresh = await waitFor("document.querySelector('#btn-ex-confirm-1') !== null && document.querySelector('#ex-summary') === null");
+    await sleep(250);
+    kbd.steps = [];
+    let kbdOk = Boolean(kbd.restart.found && kbd.fresh);
+    for (let s = 1; kbdOk && s <= fixture.drill.steps; s += 1) {
+      await waitFor(`document.querySelector('#btn-ex-confirm-${s}') !== null`);
+      const t = await kbTabTo(`btn-ex-confirm-${s}`);
+      kbd.steps.push({ step: s, ...t });
+      if (!t.found) { kbdOk = false; break; }
+      await h.pressKey('Enter');
+    }
+    kbd.summary = kbdOk && await waitFor("document.querySelector('#ex-summary') !== null && document.querySelector('.btn-ex-confirm') === null");
+    report(KB_DRILL_ASSERTION_NAME, Boolean(kbdOk && kbd.summary), kbd);
+
+    // -- KEYBOARD-ONLY LOOKUP (typed digits travel as trusted key events
+    // with text payloads -- the same real-input rule as Input.insertText
+    // in typeText, one key at a time).
+    await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
+    await kbBlur();
+    const kbl = { restart: await kbTabTo('btn-ex-restart') };
+    if (kbl.restart.found) await h.pressKey('Enter');
+    kbl.blank = await waitFor("document.querySelector('#ex-feedback') === null && document.querySelector('#ex-find-input') !== null");
+    await sleep(250);
+    kbl.input = await kbTabTo('ex-find-input');
+    if (kbl.input.found) {
+      for (const ch of String(fixture.lookup.targetPage)) await h.pressKey(ch);
+    }
+    kbl.typed = await waitFor(`(() => { const e = document.querySelector('#ex-find-input'); return e && e.value === ${JSON.stringify(String(fixture.lookup.targetPage))}; })()`);
+    kbl.submit = await kbTabTo('btn-ex-find-submit');
+    if (kbl.submit.found) await h.pressKey('Enter');
+    kbl.correct = await waitFor("(() => { const e = document.querySelector('#ex-feedback'); return e && /^Correct/.test(e.textContent); })()");
+    kbl.next = await kbTabTo('btn-ex-next');
+    if (kbl.next.found) await h.pressKey('Enter');
+    kbl.summary = await waitFor("document.querySelector('#ex-summary') !== null");
+    report(
+      KB_LOOKUP_ASSERTION_NAME,
+      Boolean(kbl.restart.found && kbl.blank && kbl.input.found && kbl.typed && kbl.submit.found
+        && kbl.correct && kbl.next.found && kbl.summary),
+      kbl,
+    );
+
+    // -- SR LABELS (the device-panel half lives in the D-suite's D27,
+    // whose scenario drill always carries verify hooks; here the check
+    // covers what BOTH harness targets render without a fake: the home
+    // export textarea's accessible name, plus the verify-line live
+    // region whenever THIS fixture's drill does carry hooks).
+    let srVerify = { checked: false };
+    if (fixture.drill.hasVerify) {
+      await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
+      const live = await h.evaluate("(() => { const e = document.querySelector('.ex-verify'); return e ? e.getAttribute('aria-live') : null; })()");
+      srVerify = { checked: true, live };
+    }
+    await h.goto('#/', '#sxc1-progress-tools');
+    const srExport = await h.evaluate("(() => { const e = document.querySelector('#sxc1-export-blob'); return e ? e.getAttribute('aria-label') : null; })()");
+    report(
+      SR_LABELS_ASSERTION_NAME,
+      typeof srExport === 'string' && srExport.length > 0
+        && (!srVerify.checked || srVerify.live === 'polite'),
+      { srExport, srVerify },
+    );
+
+    // Restore the pre-existing route context: section 8 below has always
+    // measured the RUNNER's overflow (the lookup was the last runner on
+    // screen before this M5 section existed).
+    await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
+  }
 
   // 8. 390x844: no horizontal overflow on the runner.
   await h.setMobileViewport();
@@ -3492,6 +3858,14 @@ const DEVICE_ASSERTION_NAMES = {
   d23: 'D23: in-flight navigation -- matching bytes emitted and the route changed in the SAME JS turn: no confirmation may land once the drill route is gone, and the emit was provably delivered',
   d24: 'D24: in-flight Restart -- matching bytes emitted and #btn-ex-restart clicked in the SAME JS turn: the fresh attempt stays blank (no stale confirm lands on it), and a settled re-emit then confirms it (the generation guard does not over-block)',
   d25: 'D25: in-flight disable -- matching bytes emitted and #btn-device-enable clicked in the SAME JS turn: no confirm lands while the device is off, and re-enable + re-emit then confirms again',
+  // M5 a11y pass: a DEVICE confirm advances the cursor with no user
+  // click to carry focus, so the advance-focus wiring must run on that
+  // path too (D26); and the device panel's controls carry their SR
+  // names/live regions (D27). Deliberately D26/D27, OUTSIDE check-site's
+  // V6 floor regex (D1..D25) -- V6's 25-distinct-lines count is a frozen
+  // M4 contract this task may not widen from here.
+  d26: 'D26: a DEVICE confirm advance moves focus to the next .ex-step (document.activeElement lands on #ex-step-2, never <body>)',
+  d27: 'D27: device panel SR labels -- #sel-device-channel carries an aria-label accessible name; #device-status and the .ex-verify line are aria-live=polite',
 };
 
 // Preambles (per-scenario driver setup, run right after the fake installs).
@@ -3618,6 +3992,41 @@ const M4_SELECTOR_ASSERTIONS = {
   devSameOriginEgress: [DEVICE_ASSERTION_NAMES.d21],
   devShapedPathEgress: [DEVICE_ASSERTION_NAMES.d21],
   devRepeatAssetEgress: [DEVICE_ASSERTION_NAMES.d21],
+};
+
+// M5 a11y negative-sweep map, appended exactly like the M3/M4 maps: each
+// selector sabotages ONE a11y feature of the fixture mirror (see the
+// fixture's own M5 a11y block) and must make EXACTLY its mapped
+// assertion(s) fail. Each grouping is a single root cause observed at
+// several sites (the 'devPanelAlways'/'jaFirstPersist' precedent):
+//   a11yKeyboard     click-only <span> controls -- unfocusable, Enter
+//                    does nothing -- so all three keyboard-only flows
+//                    fail; every .click()-driven assertion (the whole
+//                    M2/M3 surface AND the click-driven focus flows)
+//                    stays green, which is what proves the keyboard
+//                    flows genuinely ride the keyboard.
+//   a11yFocusAdvance the advance-focus move is skipped everywhere (quiz
+//                    Next, drill confirm, DEVICE confirm), stranding
+//                    focus on <body>; the keyboard flows still complete
+//                    (their Tab walk restarts from <body> by design), so
+//                    exactly the three focus assertions fail. Needs the
+//                    device suite for D26.
+//   a11ySrLabels     every M5 ARIA attribute omitted (aria-live lines,
+//                    the channel select's and export textarea's
+//                    accessible names). Needs the device suite for D27.
+const M5_SELECTOR_ASSERTIONS = {
+  a11yKeyboard: {
+    expectedToFail: [KB_QUIZ_ASSERTION_NAME, KB_DRILL_ASSERTION_NAME, KB_LOOKUP_ASSERTION_NAME],
+    includeDevice: false,
+  },
+  a11yFocusAdvance: {
+    expectedToFail: [FOCUS_QUIZ_ASSERTION_NAME, FOCUS_DRILL_ASSERTION_NAME, DEVICE_ASSERTION_NAMES.d26],
+    includeDevice: true,
+  },
+  a11ySrLabels: {
+    expectedToFail: [SR_LABELS_ASSERTION_NAME, DEVICE_ASSERTION_NAMES.d27],
+    includeDevice: true,
+  },
 };
 
 // Fresh-target factory: everything a device scenario needs, built the
@@ -4504,6 +4913,70 @@ async function runDeviceAssertions(makeTarget, report, cfg) {
     await t.close();
   }
 
+  // --- T17 (M5 a11y pass): D26 device-confirm advance focus + D27 device
+  // panel SR labels. One fresh grant+SXC-port target on the drill route:
+  // enable, wait armed, read the panel's ARIA surface (D27), then emit
+  // the matching bytes so the DEVICE path confirms step 1 -- the cursor
+  // moves with no user click, and focus must land on the next step's own
+  // focus target (#ex-step-2, tabindex="-1") rather than being stranded
+  // wherever it was. Anti-vacuity: the emit must report a live handler
+  // and the confirm must genuinely land before the focus claim counts.
+  {
+    const t = await makeTarget({ preamble: DEV_PRE_GRANT_SXC, hash: cfg.drill.route });
+    if (!t.booted) {
+      report(N.d26, false, 'a11y-scenario target did not boot');
+      report(N.d27, false, 'a11y-scenario target did not boot');
+    } else {
+      await waitForTrue(t.evaluate, "document.querySelector('#btn-device-enable') !== null", 5000);
+      await devClick(t.evaluate, '#btn-device-enable');
+      const armed = await waitDeviceState(
+        t.evaluate,
+        `p.status === 'granted' && p.watching && p.watching.prompt === ${JSON.stringify(cfg.drill.prompt1)}`,
+        5000,
+      );
+      const labels = await t.evaluate(`(() => {
+        const sel = document.querySelector('#sel-device-channel');
+        const st = document.querySelector('#device-status');
+        const verify = document.querySelector('.ex-verify');
+        return {
+          panel: document.querySelector('#ex-device') !== null,
+          selLabel: sel ? sel.getAttribute('aria-label') : null,
+          statusLive: st ? st.getAttribute('aria-live') : null,
+          verifyLive: verify ? verify.getAttribute('aria-live') : null,
+        };
+      })()`);
+      report(
+        N.d27,
+        Boolean(labels && labels.panel === true
+          && typeof labels.selLabel === 'string' && labels.selLabel.length > 0
+          && labels.statusLive === 'polite' && labels.verifyLive === 'polite'),
+        labels,
+      );
+      const delivered = armed ? await t.evaluate(fakeEmitExpr(cfg.drill.good)) : -1;
+      const confirmed = armed && await waitDeviceState(
+        t.evaluate,
+        `p.confirms.some((c) => c.prompt === ${JSON.stringify(cfg.drill.prompt1)} && c.source === 'device')`,
+        5000,
+      );
+      const focusObs = await t.evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 3000) {
+          const a = document.activeElement;
+          if (a && a.id === 'ex-step-2') return { ok: true, id: a.id };
+          await new Promise((r) => setTimeout(r, 25));
+        }
+        const a = document.activeElement;
+        return { ok: false, got: a ? (a.id || a.tagName) : null, isBody: a === document.body };
+      })()`);
+      report(
+        N.d26,
+        Boolean(armed && delivered >= 1 && confirmed === true && focusObs && focusObs.ok === true),
+        { armed, delivered, confirmed, focusObs },
+      );
+    }
+    await t.close();
+  }
+
   // --- D22: the fake is never shipped. ----------------------------------
   {
     const found = [];
@@ -5035,6 +5508,8 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, inc
     const setMobileViewport = () => cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true }, sessionId);
     const clearViewport = () => cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
     const consoleHygiene = () => ({ ok: consoleErrors.length === 0 && exceptions.length === 0, consoleErrors, exceptions });
+    // M5 a11y: trusted keyboard input for the keyboard-only flows.
+    const pressKey = keyPresserFor(cdp, sessionId);
 
     // M3 harness wave: "reload" for the persistence assertions -- an
     // ordinary Page.reload of the SAME file:// fixture, which re-executes
@@ -5152,7 +5627,7 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, inc
     await runProgressAssertionsPre(progressHandle, progressCfg);
 
     const results = await runExerciseAssertions(
-      { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene },
+      { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene, pressKey },
       SELF_TEST_FIXTURE,
       expectedExJson,
       coldLoadFn,
@@ -5249,7 +5724,12 @@ const SELF_TEST_MIN_TIMEOUT_MS = 240000;
 // floor is applied ONLY inside the negative sweep, never to an ordinary
 // --self-test or real-app run, and an explicit --timeout larger than
 // this floor is still honoured.
-const NEGATIVE_SWEEP_MIN_TIMEOUT_MS = 90000;
+// M5: raised from 90000 -- every pass now also carries the M5 a11y
+// section (keyboard flows whose sabotaged variants deliberately walk
+// their full two-round Tab budget plus the failed-poll windows), and
+// 'legacy-all' was already the measured tight spot at the old floor.
+// Purely an upper bound on hangs; it loosens no assertion.
+const NEGATIVE_SWEEP_MIN_TIMEOUT_MS = 150000;
 
 async function runSelfTestNegative(opts) {
   // includeDevice per pass (see runOneSelfTestPass): the M3-era passes
@@ -5264,6 +5744,14 @@ async function runSelfTestNegative(opts) {
     })),
     ...Object.keys(M4_SELECTOR_ASSERTIONS).map((key) => ({
       key, selector: key, expectedToFail: M4_SELECTOR_ASSERTIONS[key], includeDevice: true,
+    })),
+    // M5 a11y passes -- includeDevice varies per selector (see the map's
+    // own comment: two of the three need D26/D27 to run).
+    ...Object.keys(M5_SELECTOR_ASSERTIONS).map((key) => ({
+      key,
+      selector: key,
+      expectedToFail: M5_SELECTOR_ASSERTIONS[key].expectedToFail,
+      includeDevice: M5_SELECTOR_ASSERTIONS[key].includeDevice,
     })),
   ];
 
@@ -5813,6 +6301,8 @@ async function main() {
         'guide-book p.15 has a p.17 cross-reference link',
         '108-route sweep with JA image decode',
         'mobile viewport has no horizontal overflow',
+        'mobile sweep at 360x640: no horizontal overflow across the main routes',
+        'mobile sweep at 320x568: no horizontal overflow across the main routes',
         '#sxc1-disclaimer names CASIO and non-affiliation',
         'no console errors or uncaught exceptions',
         // M4: the device suite runs on its own fresh targets, but a
@@ -6311,6 +6801,8 @@ async function main() {
         const setMobileViewport = () => cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true }, sessionId);
         const clearViewport = () => cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
         const consoleHygiene = () => ({ ok: consoleErrors.length === 0 && exceptions.length === 0, consoleErrors, exceptions });
+        // M5 a11y: trusted keyboard input for the keyboard-only flows.
+        const pressKey = keyPresserFor(cdp, sessionId);
 
         // M2 gate fix (H1/H6/M5): the real run's own coldLoadFn -- SAME
         // technique as the JA cold-load assertion above (a fresh CDP
@@ -6438,7 +6930,7 @@ async function main() {
         await runProgressAssertionsPre(progressHandle, progressCfg);
 
         await runExerciseAssertions(
-          { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene },
+          { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene, pressKey },
           exerciseFixture,
           expectedExerciseJson,
           coldLoadFn,
@@ -6448,6 +6940,101 @@ async function main() {
         // behind (it starts with its own wipe + reload) -- see
         // runProgressAssertionsPost's own comment.
         await runProgressAssertionsPost(progressHandle, progressCfg);
+      }
+
+      // -- 13b (M5). MOBILE POLISH SWEEP: the main routes at the two
+      // small-phone viewports (briefs/M5-ship.md ship checklist), pinning
+      // no-horizontal-overflow (document.scrollingElement.scrollWidth <=
+      // innerWidth, +1 rounding slack as in assertion 10) on every swept
+      // route -- MEASURED AGAINST THE EMULATED DEVICE WIDTH, with two
+      // reinforcements this task's own red-first probe showed are
+      // load-bearing (a 380px-min-width sabotage passed the bare
+      // predicate both ways):
+      //   1. body{overflow-x:hidden} means overflowing content never
+      //      widens the scrolling element -- it gets CLIPPED, so the
+      //      sweep also scans for any visible element whose right edge
+      //      passes the device width OUTSIDE a horizontal scroll
+      //      container (overflow-x auto/scroll ancestors are the
+      //      sanctioned pattern: .table-wrap, the header strip);
+      //   2. under mobile emulation the LAYOUT VIEWPORT itself inflates
+      //      to the widest content (innerWidth read back 380 on a 360
+      //      device), so innerWidth staying at the device width is
+      //      asserted too, and the scrollWidth comparison uses the
+      //      device width, never the elastic innerWidth.
+      // Runs AFTER the exercise/progress sections on purpose: visiting
+      // an exercise route fires its mount-time Begin, and doing that
+      // BEFORE section 13's elapsed-time assertions would shift their
+      // measured baselines. The exercise routes come from
+      // --exercise-fixture; without one the sweep covers the reader
+      // routes only (reported in the observation, never silently).
+      {
+        const m5MobileRoutes = [
+          ['#/', '#sxc1-home'],
+          ['#/m/guide-book', '#sxc1-toc'],
+          ['#/m/guide-book/p/17', '#page-17'],
+          ['#/m/guide-book/p/17/ja', '#ja-panel'],
+          ['#/x', '#sxc1-exercise-index'],
+        ];
+        if (exerciseFixture) {
+          m5MobileRoutes.push(
+            [`#/x/${exerciseFixture.quiz.deck}`, '#sxc1-deck'],
+            [`#/x/${exerciseFixture.quiz.deck}/${exerciseFixture.quiz.id}`, '.kind-quiz'],
+            [`#/x/${exerciseFixture.drill.deck}/${exerciseFixture.drill.id}`, '.kind-drill'],
+            [`#/x/${exerciseFixture.lookup.deck}/${exerciseFixture.lookup.id}`, '.kind-lookup'],
+          );
+        }
+        for (const [w, hgt] of [[360, 640], [320, 568]]) {
+          await cdp.send('Emulation.setDeviceMetricsOverride', {
+            width: w, height: hgt, deviceScaleFactor: 2, mobile: true,
+          }, sessionId);
+          const checks = [];
+          for (const [hash, ready] of m5MobileRoutes) {
+            await goto(hash, ready);
+            const overflowObs = await evaluate(`(() => {
+              const deviceW = ${w};
+              const offenders = [];
+              const inScroller = (el) => {
+                for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+                  const ox = getComputedStyle(a).overflowX;
+                  if (ox === 'auto' || ox === 'scroll') return true;
+                }
+                return false;
+              };
+              for (const el of document.querySelectorAll('#app *')) {
+                const r = el.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0) continue;
+                if (r.right > deviceW + 1 && !inScroller(el)) {
+                  offenders.push({
+                    sel: el.tagName + (el.id ? '#' + el.id : '')
+                      + (typeof el.className === 'string' && el.className ? '.' + el.className.split(' ')[0] : ''),
+                    right: Math.round(r.right),
+                  });
+                  if (offenders.length >= 4) break;
+                }
+              }
+              return {
+                scrollWidth: document.scrollingElement.scrollWidth,
+                innerWidth: window.innerWidth,
+                deviceW,
+                offenders,
+              };
+            })()`);
+            checks.push({
+              hash,
+              ok: Boolean(overflowObs)
+                && overflowObs.scrollWidth <= w + 1
+                && overflowObs.innerWidth <= w + 1
+                && overflowObs.offenders.length === 0,
+              overflowObs,
+            });
+          }
+          report(
+            `mobile sweep at ${w}x${hgt}: no horizontal overflow (scrollingElement.scrollWidth/innerWidth <= device width, and no element clipped past the right edge outside an overflow-x scroll container) across ${m5MobileRoutes.length} main routes${exerciseFixture ? '' : ' (reader routes only: no --exercise-fixture)'}`,
+            checks.length === m5MobileRoutes.length && checks.every((c) => c.ok),
+            checks.filter((c) => !c.ok),
+          );
+        }
+        await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
       }
 
       // -- 14 (M4). THE DEVICE SUITE, D1..D25 -- always part of a real

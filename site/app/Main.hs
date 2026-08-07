@@ -786,6 +786,33 @@ beginIfNeeded _ = pure ()
 -- in the one place that already owns 'mExResults'' lifetime, and
 -- "View.Exercise" (already correct: it only ever renders whatever
 -- @mResult@ it is handed) needs no change at all.
+-- | M5 a11y (briefs/M5-ship.md ship checklist, focus management on
+-- prompt advance): where keyboard\/screen-reader focus lands after a
+-- batch that MOVED the cursor -- an 'Advance' (every graded advance:
+-- quiz\/lookup Next, and BOTH confirm sources, since 'DApplyConfirm'
+-- applies @[ConfirmStep, Advance]@ -- so a DEVICE confirm, which changes
+-- the focus context without any user click, takes exactly this path
+-- too) or a 'Restart'. Without this, the element that HELD focus (the
+-- clicked #btn-ex-next \/ .btn-ex-confirm) is removed by the re-render
+-- and the browser drops focus to \<body\>, stranding keyboard and SR
+-- users. Targets carry @tabindex="-1"@ in "View.Exercise":
+--
+--   * whole exercise done -> @#ex-summary@ (the completion message);
+--   * drill mid-run       -> the NEXT step's own \<li\>
+--                            (@#ex-step-\<cursor+1\>@);
+--   * quiz\/lookup        -> @#ex-title@ (the exercise heading -- the
+--                            fresh prompt's own container ids are
+--                            kind-specific, the heading is not).
+--
+-- 'Begin' deliberately does NOT move focus: it fires on ordinary
+-- navigation (mount included), where stealing focus from the header\/
+-- address bar would be a WCAG 3.2.1-style surprise, not a repair.
+advanceFocusTarget :: Exercise -> ExerciseState -> Text
+advanceFocusTarget ex st
+  | esDone st           = "ex-summary"
+  | exKind ex == KDrill = "ex-step-" <> T.pack (show (esCursor st + 1))
+  | otherwise           = "ex-title"
+
 applyExActions :: ProgressSink -> ExId -> [ExerciseAction] -> Effect parent props Model Action
 applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
   Nothing -> pure ()
@@ -828,6 +855,17 @@ applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
       , mAttemptGen = mAttemptGen m + (if clearStale then 1 else 0)
       })
     io_ (mapM_ (sinkRecord sink) evsAll)
+    -- M5 a11y: see 'advanceFocusTarget'. Guarded on the route still
+    -- showing THIS exercise (a focus move must never fire for state
+    -- changes on an exercise the learner is not looking at). 'io_' runs
+    -- after the VDOM has been patched, and Miso's 'focus' adds its own
+    -- 50ms defer, so the target element exists when the call lands.
+    let cursorMoved = any (\a -> case a of { Advance _ _ -> True; Restart _ _ -> True; _ -> False }) acts
+    routeNow <- gets mRoute
+    case routeNow of
+      RExercise _ exSlug | cursorMoved, exSlug == key ->
+        io_ (focus (ms (advanceFocusTarget ex st1)))
+      _ -> pure ()
     -- NEW8: the first successful save of real progress moves the load
     -- state from DecodeEmpty to DecodeOk, so #sxc1-progress can never
     -- report state=empty while records exist and are persisted. NEW9: a

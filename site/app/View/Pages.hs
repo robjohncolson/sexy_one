@@ -109,22 +109,25 @@ headerView ph pd route = H.header_ [ P.id_ "sxc1-header" ]
     ++ Progress.jaFirstHeaderEls ph pd route
   )
 
+-- | M5 a11y: every breadcrumb \<nav\> carries @aria-label="Breadcrumb"@
+-- so the landmark is distinguishable from the page-nav landmark (two
+-- unnamed navs read as interchangeable "navigation" to a screen reader).
 breadcrumbFor :: Route -> [View model action]
 breadcrumbFor RHome = []
 breadcrumbFor (RManual slug) = case statsFor slug of
-  Just st -> [ H.nav_ [] [ text (ms (stTitle st)) ] ]
+  Just st -> [ H.nav_ [ textProp "aria-label" "Breadcrumb" ] [ text (ms (stTitle st)) ] ]
   Nothing -> []
 breadcrumbFor (RPage slug n _ja) = case (statsFor slug, rawFor slug) of
   (Just st, Just raw) | n >= 1 && n <= stPages st -> [ pageBreadcrumb slug st (buildOutline raw) n ]
   _                                                 -> []
-breadcrumbFor RExercises      = [ H.nav_ [] [ text "Training" ] ]
-breadcrumbFor (RDeck _)       = [ H.nav_ [] [ text "Training" ] ]
-breadcrumbFor (RExercise _ _) = [ H.nav_ [] [ text "Training" ] ]
+breadcrumbFor RExercises      = [ H.nav_ [ textProp "aria-label" "Breadcrumb" ] [ text "Training" ] ]
+breadcrumbFor (RDeck _)       = [ H.nav_ [ textProp "aria-label" "Breadcrumb" ] [ text "Training" ] ]
+breadcrumbFor (RExercise _ _) = [ H.nav_ [ textProp "aria-label" "Breadcrumb" ] [ text "Training" ] ]
 breadcrumbFor (RNotFound _) = []
 
 pageBreadcrumb :: T.Text -> DocStats -> Outline -> Int -> View model action
 pageBreadcrumb slug st outline n =
-  H.nav_ [] ( manualCrumb : groupCrumb ++ sectionCrumb ++ pageCrumb )
+  H.nav_ [ textProp "aria-label" "Breadcrumb" ] ( manualCrumb : groupCrumb ++ sectionCrumb ++ pageCrumb )
   where
     manualCrumb = H.a_ [ P.href_ (ms (renderRoute (RManual slug))) ] [ text (ms (stTitle st)) ]
 
@@ -306,7 +309,8 @@ renderPage toggleAction jaFirst slug total ja pg =
         ++ bodyOrderedEls
         ++ [ H.button_ [ P.id_ "btn-ja-toggle", E.onClick toggleAction ]
                [ if ja then "Hide original page" else "Show original page (JA)" ]
-           , H.nav_ [ P.class_ "page-nav" ] (navLinks slug n total)
+             -- M5 a11y: named nav landmark (see 'breadcrumbFor').
+           , H.nav_ [ P.class_ "page-nav", textProp "aria-label" "Manual pages" ] (navLinks slug n total)
            ]
     )
   where

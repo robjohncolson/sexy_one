@@ -360,8 +360,10 @@ corruptBannerEls (DecodeCorrupt reason) mRaw =
       )
   ]
   where
+    -- M5 a11y: no <label> element exists for this readonly textarea, so
+    -- aria-label carries its accessible name.
     rawEls = case mRaw of
-      Just raw -> [ H.textarea_ [ P.id_ "sxc1-corrupt-raw", P.readonly_ True, P.value_ (ms raw) ] ]
+      Just raw -> [ H.textarea_ [ P.id_ "sxc1-corrupt-raw", P.readonly_ True, textProp "aria-label" "Raw saved progress data", P.value_ (ms raw) ] ]
       Nothing  -> [ H.p_ [] [ "(No raw data could be read either.)" ] ]
 corruptBannerEls _ _ = []
 
@@ -400,7 +402,9 @@ exportImportEls ph pd =
   [ H.section_ [ P.id_ "sxc1-progress-tools" ]
       ( [ H.h2_ [] [ "Your saved progress" ]
         , H.button_ [ P.id_ "btn-progress-export", P.type_ "button", E.onClick (phExport ph) ] [ "Export" ]
-        , H.textarea_ [ P.id_ "sxc1-export-blob", P.readonly_ True, P.value_ (ms (fromMaybe "" (pdExportBlob pd))) ]
+          -- M5 a11y: like #sxc1-corrupt-raw, no <label> element exists,
+          -- so aria-label carries the accessible name.
+        , H.textarea_ [ P.id_ "sxc1-export-blob", P.readonly_ True, textProp "aria-label" "Exported progress data", P.value_ (ms (fromMaybe "" (pdExportBlob pd))) ]
         , H.form_ [ P.id_ "sxc1-import-form", onImportSubmit (phImport ph) ]
             ( H.label_ [ P.for_ "sxc1-import-input" ] [ "Paste an exported blob to import:" ]
             : H.textarea_ [ P.id_ "sxc1-import-input", P.name_ "sxc1-import-input" ]
