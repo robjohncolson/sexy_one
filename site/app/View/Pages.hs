@@ -45,15 +45,17 @@ viewRoute
   -> T.Text                     -- ^ #sxc1-exercise-stats JSON
   -> T.Text                     -- ^ #sxc1-event-log JSON
   -> T.Text                     -- ^ #sxc1-prompt-baseline JSON (M2 re-gate: see Main.promptBaselineJson)
+  -> T.Text                     -- ^ #sxc1-progress JSON (M3: see Main.progressJson)
   -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
   -> Route
   -> View model action
-viewRoute toggleAction exStatsJson eventLogJson baselineJson mExerciseBody route = H.main_ [ P.id_ "app" ]
+viewRoute toggleAction exStatsJson eventLogJson baselineJson progressJson mExerciseBody route = H.main_ [ P.id_ "app" ]
   [ headerView route
   , statsView
   , exerciseStatsView exStatsJson
   , eventLogView eventLogJson
   , promptBaselineView baselineJson
+  , progressPayloadView progressJson
   , routeBody toggleAction mExerciseBody route
   , footerView
   ]
@@ -203,6 +205,11 @@ eventLogView t = H.div_ [ P.id_ "sxc1-event-log", P.hidden_ True ] [ text (ms t)
 -- windows that page uptime can satisfy accidentally.
 promptBaselineView :: T.Text -> View model action
 promptBaselineView t = H.div_ [ P.id_ "sxc1-prompt-baseline", P.hidden_ True ] [ text (ms t) ]
+
+-- | M3: the #sxc1-progress machine-readable payload -- always [hidden],
+-- value-asserted by the harness. See Main.progressJson.
+progressPayloadView :: T.Text -> View model action
+progressPayloadView t = H.div_ [ P.id_ "sxc1-progress", P.hidden_ True ] [ text (ms t) ]
 
 --------------------------------------------------------------------------
 -- Home ("#/"): project blurb + one card per manual.

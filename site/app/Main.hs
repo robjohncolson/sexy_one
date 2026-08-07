@@ -17,7 +17,14 @@ import qualified Miso.Date              as Date
 
 import           SXC1.Exercise.Engine
 import           SXC1.Exercise.Types
+import           SXC1.Progress.Codec    (DecodeResult (..), Prefs (..), currentSchema,
+                                         exportBlob, importBlob)
+import           SXC1.Progress.Scheduler (applyEvents, dueCount, retention, reviewQueue)
+import           SXC1.Progress.Types    (DayNum (..), ProgressState (..), dayOf, emptyProgress)
 import           SXC1.Route             (Route (..), parseDigits, parseRoute, renderRoute)
+
+import           Progress.Store         (loadPrefs, loadProgress, savePrefs, saveProgress,
+                                         storageAvailable, wipeProgress)
 
 import           Exercises.Corpus       (exerciseCorpus, exerciseStatsJson, jArr, jBool, jInt, jInteger, jKV, jObj,
                                           jStr)
@@ -139,10 +146,19 @@ mkProgressSink = do
 -- 'Show' for them (its own size-discipline Haddock explains why), and
 -- this task does not own that module to add 'Ord'.
 data Model = Model
-  { mRoute     :: !Route
-  , mExStates  :: !(Map Text ExerciseState)
-  , mExResults :: !(Map Text (Outcome, Int))
-  , mEventLog  :: ![ProgressEvent]
+  { mRoute      :: !Route
+  , mExStates   :: !(Map Text ExerciseState)
+  , mExResults  :: !(Map Text (Outcome, Int))
+  , mEventLog   :: ![ProgressEvent]
+    -- M3 (task "storage-sink"):
+  , mProgress   :: !ProgressState   -- ^ the folded spaced-repetition state
+  , mLoad       :: !DecodeResult    -- ^ what startup 'loadProgress' saw; 'DecodeCorrupt' = read-only progress mode
+  , mStorageOk  :: !Bool            -- ^ 'storageAvailable' probe result
+  , mPrefs      :: !Prefs           -- ^ reader preference (separate key)
+  , mToday      :: !DayNum          -- ^ set at startup, advanced by events' own 'peAt' days
+  , mBooted     :: !Bool            -- ^ False only until the mount 'SetRoute' has run (JA-first needs to tell mount from toggle-echo)
+  , mExportBlob :: !(Maybe Text)    -- ^ last requested export envelope, for the view to render
+  , mImportMsg  :: !(Maybe Text)    -- ^ last import's failure reason, for the view to render
   } deriving (Eq)
 
 unDeckId :: DeckId -> Text
@@ -170,6 +186,17 @@ data Action
   | NoOp
   | ExBatch ExId [ExerciseAction]
   | ExClocked ExId (MonoMs -> WallMs -> [ExerciseAction])
+    -- M3: ONE additional constructor wrapping every progress operation
+    -- (the ExBatch/ExClocked two-constructor size discipline, applied
+    -- again rather than five new constructors).
+  | Prog ProgressOp
+
+data ProgressOp
+  = PExportReq          -- ^ learner asked for an export
+  | PExportGot Text     -- ^ IO produced the envelope (stamped)
+  | PImport Text        -- ^ learner submitted import text
+  | PWipe               -- ^ learner confirmed a wipe
+  | PJaFirst Bool       -- ^ learner flipped the JA-first reader preference
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
@@ -182,7 +209,17 @@ main = do
   -- THE M4 FORWARD HOOK, wired in (never a WebMIDI call, never a device
   -- permission request -- 'dvAvailable' is a constant 'pure False' in M2):
   _ <- dvAvailable noDeviceVerifier
-  startApp defaultEvents (readerApp sink (parseRoute h))
+  -- M3 startup: probe storage by WRITING (see Progress.Store), load both
+  -- blobs, and take today's day from a real wall reading. A corrupt
+  -- progress blob puts the app into read-only progress mode from the
+  -- first frame -- the blob on disk is never touched again until the
+  -- learner explicitly wipes or imports.
+  avail   <- storageAvailable
+  loadRes <- loadProgress
+  prefs   <- loadPrefs
+  (_, WallMs wall0) <- readClocks
+  let st0 = case loadRes of { DecodeOk s -> s; _ -> emptyProgress }
+  startApp defaultEvents (readerApp sink avail loadRes st0 prefs (dayOf wall0) (parseRoute h))
 
 -- | H6: a cold @RExercise@ route (a deep link, or the very first paint --
 -- Miso's own \"hashchange\" DOM event never fires for the page's INITIAL
@@ -197,12 +234,18 @@ main = do
 -- instead of "correctly by coincidence" (a cold load happening to measure
 -- runtime age as prompt age only because the browser's monotonic origin
 -- is page load -- see this task's final report).
-readerApp :: ProgressSink -> Route -> App Model Action
-readerApp sink r0 =
-  (component (Model r0 Map.empty Map.empty []) (updateModel sink) viewModel)
+readerApp :: ProgressSink -> Bool -> DecodeResult -> ProgressState -> Prefs -> DayNum -> Route -> App Model Action
+readerApp sink avail loadRes st0 prefs today0 r0 =
+  (component model0 (updateModel sink) viewModel)
     { subs  = [ windowSub "hashchange" emptyDecoder (const HashChanged) ]
     , mount = Just (SetRoute r0)
     }
+  where
+    model0 = Model
+      { mRoute = r0, mExStates = Map.empty, mExResults = Map.empty, mEventLog = []
+      , mProgress = st0, mLoad = loadRes, mStorageOk = avail, mPrefs = prefs
+      , mToday = today0, mBooted = False, mExportBlob = Nothing, mImportMsg = Nothing
+      }
 
 findExerciseById :: [Deck] -> ExId -> Maybe Exercise
 findExerciseById decks eid = find ((== eid) . exId) (concatMap dkExercises decks)
@@ -220,9 +263,31 @@ updateModel sink = \case
   NoOp -> pure ()
 
   SetRoute r -> do
-    modify (\m -> m { mRoute = r })
+    prev   <- gets mRoute
+    booted <- gets mBooted
+    ja     <- gets (prfJaFirst . mPrefs)
+    -- M3 JA-first (owner addendum): a NAVIGATION DEFAULT, never a forced
+    -- state. Redirect a plain page route to its /ja form only when the
+    -- preference is on AND this is a genuinely fresh page navigation:
+    -- either the mount dispatch (mBooted False -- prev EQUALS r there, so
+    -- route comparison alone cannot see it) or a route whose slug/page
+    -- differs from the previous one. The post-ToggleJA "hashchange" echo
+    -- re-delivers the SAME slug+page with mBooted True, so it falls
+    -- through and the toggle genuinely wins until the next page move --
+    -- the exact preference-fights-toggle bug the manifest warns about.
+    let freshPage slug n = not booted || case prev of
+          RPage ps pn _ -> ps /= slug || pn /= n
+          _             -> True
+    case r of
+      RPage slug n False | ja && freshPage slug n -> do
+        let r' = RPage slug n True
+        modify (\m -> m { mRoute = r', mBooted = True })
+        io_ (setHash (renderRoute r'))
+      _ -> modify (\m -> m { mRoute = r, mBooted = True })
     beginIfNeeded r
     io_ (scrollIntoView "app")
+
+  Prog op -> handleProg op
 
   ToggleJA -> do
     r <- gets mRoute
@@ -238,6 +303,42 @@ updateModel sink = \case
   ExClocked exid mk -> io $ do
     (mono, wall) <- readClocks
     pure (ExBatch exid (mk mono wall))
+
+-- | May THIS model save progress? True only when storage probed
+-- available AND the startup load was not corrupt -- the never-overwrite-
+-- what-you-could-not-decode rule. Import and wipe are the two explicit
+-- learner actions that clear a corrupt 'mLoad'.
+progressWritable :: Model -> Bool
+progressWritable m = mStorageOk m && case mLoad m of
+  DecodeCorrupt _ -> False
+  _               -> True
+
+handleProg :: ProgressOp -> Effect parent props Model Action
+handleProg op = case op of
+  PExportReq -> io $ do
+    (_, WallMs wall) <- readClocks
+    pure (Prog (PExportGot ("epoch-ms:" <> T.pack (show wall))))
+  PExportGot stamp -> do
+    st <- gets mProgress
+    modify (\m -> m { mExportBlob = Just (exportBlob stamp st) })
+  PImport raw -> case importBlob raw of
+    DecodeOk st -> do
+      modify (\m -> m { mProgress = st, mLoad = DecodeOk st
+                      , mImportMsg = Nothing, mExportBlob = Nothing })
+      writable <- gets mStorageOk
+      io_ (if writable then saveProgress st else pure ())
+    DecodeCorrupt reason -> modify (\m -> m { mImportMsg = Just reason })
+    DecodeEmpty -> modify (\m -> m { mImportMsg = Just "import text was empty" })
+  PWipe -> do
+    -- An explicit learner decision: the stored key (corrupt or not) is
+    -- removed and the app returns to a writable empty state. Prefs are
+    -- untouched -- separate key, by design.
+    modify (\m -> m { mProgress = emptyProgress, mLoad = DecodeEmpty
+                    , mExportBlob = Nothing, mImportMsg = Nothing })
+    io_ wipeProgress
+  PJaFirst b -> do
+    modify (\m -> m { mPrefs = Prefs b })
+    io_ (savePrefs (Prefs b))
 
 -- | On first navigation to an exercise (no state recorded for it yet),
 -- seed a fresh attempt with a real wall-clock reading. Never re-fires
@@ -294,12 +395,25 @@ applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
         dropStale rs
           | clearStale = Map.filterWithKey (\k _ -> not (thisExPromptPrefix `T.isPrefixOf` k)) rs
           | otherwise  = rs
+    -- M3: fold the new events into the spaced-repetition state and
+    -- persist -- IF AND ONLY IF the model is writable (storage probed
+    -- available and the startup load was not corrupt). Days advance from
+    -- the events' own peAt (never a clock read here), so mToday tracks a
+    -- midnight rollover mid-session as soon as the next event lands.
+    prog0    <- gets mProgress
+    writable <- gets progressWritable
+    let prog1  = applyEvents evsAll prog0
+        today' = foldr (max . dayOf . peAt) minDay evsAll
+        minDay = DayNum 0
     modify (\m -> m
       { mExStates  = Map.insert key st1 (mExStates m)
       , mExResults = foldr recordResult (dropStale (mExResults m)) evsAll
       , mEventLog  = capEvents (mEventLog m ++ evsAll)
+      , mProgress  = prog1
+      , mToday     = max (mToday m) today'
       })
     io_ (mapM_ (sinkRecord sink) evsAll)
+    io_ (if writable && not (null evsAll) then saveProgress prog1 else pure ())
   where
     recordResult ev acc = case pePrompt ev of
       Nothing  -> acc
@@ -387,5 +501,41 @@ promptBaselineJson m = case mRoute m of
     Nothing -> "null"
   _ -> "null"
 
+-- | Every PromptId the CURRENT corpus can mint -- the yardstick that
+-- tells a live stored record from a RETIRED one (a record whose prompt
+-- no longer exists). Retired records are kept in 'psRecs' (dropping
+-- them would let a content edit silently destroy history), excluded
+-- from the review queue, and counted separately here.
+allCorpusPromptIds :: Map Text ()
+allCorpusPromptIds = Map.fromList
+  [ (unPromptId (promptIdFor (exId e) i), ())
+  | d <- exerciseCorpus, e <- dkExercises d, i <- [1 .. length (exPrompts e)] ]
+
+-- | The #sxc1-progress machine-readable payload (M3 DOM contract).
+-- Every number derives from the real model state -- the harness asserts
+-- on VALUES here.
+progressJson :: Model -> Text
+progressJson m = jObj
+  [ jKV "available" (jBool (mStorageOk m))
+  , jKV "state" (jStr (case mLoad m of
+      DecodeOk _      -> "ok"
+      DecodeEmpty     -> "empty"
+      DecodeCorrupt _ -> "corrupt"))
+  , jKV "schema" (jInt currentSchema)
+  , jKV "records" (jInt (Map.size (psRecs st)))
+  , jKV "retired" (jInt (Map.size retiredRecs))
+  , jKV "due" (jInt (dueCount today liveState))
+  , jKV "streak" (jInt (psStreakLen st))
+  , jKV "retention" (jInt (retention today liveState))
+  , jKV "queue" (jArr (map (jStr . fst) (reviewQueue today liveState)))
+  , jKV "jaFirst" (jBool (prfJaFirst (mPrefs m)))
+  ]
+  where
+    st    = mProgress m
+    today = mToday m
+    (liveRecs, retiredRecs) =
+      Map.partitionWithKey (\k _ -> Map.member k allCorpusPromptIds) (psRecs st)
+    liveState = st { psRecs = liveRecs }
+
 viewModel :: props -> Model -> View Model Action
-viewModel _ m = viewRoute ToggleJA exerciseStatsJson (eventLogJson (mEventLog m)) (promptBaselineJson m) (exerciseBodyView m (mRoute m)) (mRoute m)
+viewModel _ m = viewRoute ToggleJA exerciseStatsJson (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson m) (exerciseBodyView m (mRoute m)) (mRoute m)
