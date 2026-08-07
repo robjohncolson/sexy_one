@@ -272,6 +272,7 @@ function parseArgs(argv) {
     selfTestNegative: false,
     exerciseFixture: null,
     expectExerciseJson: null,
+    checkStorageRefused: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -305,6 +306,9 @@ function parseArgs(argv) {
         break;
       case '--expect-exercise-json':
         opts.expectExerciseJson = argv[++i];
+        break;
+      case '--check-storage-refused':
+        opts.checkStorageRefused = true;
         break;
       case '--help':
       case '-h':
@@ -349,6 +353,24 @@ Options:
                        Bounds the WebSocket connect, every CDP command and
                        every polling loop -- not just the polling loops.
   --keep-open          Do not kill the browser on exit (debugging)
+  --check-storage-refused
+                       M3 harness item C, negative control c3 -- NOT part
+                       of the ordinary pass/fail run, and NOT invoked by
+                       check-site.sh: a standalone diagnostic against
+                       --url (a real running app). Launches its own
+                       throwaway browser, injects a script (via CDP's
+                       Page.addScriptToEvaluateOnNewDocument) that makes
+                       window.localStorage's setItem/getItem/removeItem
+                       all throw -- a realistic private-mode-style
+                       failure (the object itself stays present and
+                       accessible; only calling its methods throws,
+                       exactly the shape Progress.Store's own guarded
+                       probe is meant to catch) -- then reports whether
+                       the app boots and #sxc1-progress ends up with
+                       "available":false, or names whatever actually
+                       happened. See this task's final report for why
+                       this is a separate opt-in mode rather than a
+                       gating assertion.
   --help               Show this help and exit
 
 By default (no --quick) the page-route sweep visits all 108 routes in
@@ -699,6 +721,13 @@ const SELF_TEST_EXERCISE_STATS = {
 // grader: when true, EVERY submit reports "correct" regardless of what
 // was actually selected/entered/confirmed -- the one and only thing
 // --self-test-negative changes.
+// M3 harness wave: the self-test fixture's own declared deck tier -- must
+// match progressCfg.expectedTier at both self-test call sites below, and
+// is what "deckCardTierMatches" checks against (an independent constant
+// here, not read from any real content/exercises/ file -- the self-test
+// fixture is deliberately independent of the real app/content).
+const PROGRESS_SELF_TEST_TIER = 'core';
+
 function selfTestFixtureHtml(sabotage) {
   const fx = SELF_TEST_FIXTURE;
   const statsJson = JSON.stringify(SELF_TEST_EXERCISE_STATS).replace(/</g, '\\u003c');
@@ -707,10 +736,12 @@ function selfTestFixtureHtml(sabotage) {
 <html><head><meta charset="utf-8"><title>sxc1-self-test</title></head>
 <body>
 <div id="boot-status" hidden></div>
+<div id="sxc1-header"></div>
 <div id="app">
   <div id="sxc1-exercise-stats" hidden>${statsJson}</div>
   <div id="sxc1-event-log" hidden>[]</div>
   <div id="sxc1-prompt-baseline" hidden>null</div>
+  <div id="sxc1-progress" hidden></div>
   <div id="sxc1-root"></div>
 </div>
 <script>
@@ -718,6 +749,397 @@ window.__SXC1_BOOTED = true;
 (function () {
   var SABOTAGE = ${sabotage ? 'true' : 'false'};
   var FIXTURE = ${fixtureJson};
+  var PROGRESS_DECK_TIER = ${JSON.stringify(PROGRESS_SELF_TEST_TIER)};
+  var MANUAL_TOTAL_PAGES = 2;
+
+  // -----------------------------------------------------------------------
+  // M3 harness wave: a small, self-contained, DELIBERATELY INDEPENDENT
+  // mirror of SXC1.Progress.* (mini scheduler + mini wire codec) and of
+  // Progress.Store's localStorage keys/never-overwrite rule -- see the
+  // big comment above runProgressAssertionsPre/Post in this file for why
+  // this exists and what it is (and is not) proving. Everything in this
+  // block is fixture-only: it never asks the real Haskell implementation
+  // to grade itself.
+  // -----------------------------------------------------------------------
+  var PROG_KEY = 'sxc1.progress';
+  var PREFS_KEY = 'sxc1.prefs';
+  var PROG_TODAY = Math.floor(Date.now() / 86400000);
+  var EASE_DELTA = { GAgain: -320, GHard: -140, GGood: 0, GEasy: 100 };
+  // NOTE ON ESCAPING: this whole fixture is LITERAL TEXT inside
+  // browser-check.mjs's own outer JS template literal (the backtick
+  // string this function returns), which means the OUTER template
+  // literal's own backslash-escape processing already runs once on
+  // every character below before the browser ever sees it -- a backslash
+  // followed by the letter t, or by the letter n, written directly here
+  // would arrive as a REAL tab or newline character already spliced into
+  // the fixture's SOURCE CODE (breaking any string literal it lands
+  // inside), and an unrecognised escape (backslash followed by the
+  // letter s, for instance) would arrive with its backslash silently
+  // dropped. TAB/NL/BS below side-step the whole class of bugs: no
+  // backslash character ever appears in this fixture's literal text, so
+  // the outer template literal has nothing to mis-escape.
+  var TAB = String.fromCharCode(9);
+  var NL = String.fromCharCode(10);
+  var BS = String.fromCharCode(92);
+
+  function clamp1_180(x) { return Math.max(1, Math.min(180, x)); }
+
+  function gradeOfOutcomeJs(isCorrect, attempt, revealed, hints) {
+    if (!isCorrect) return 'GAgain';
+    if (revealed) return 'GHard';
+    if (attempt >= 2) return 'GHard';
+    if (hints > 0) return 'GGood';
+    return 'GEasy';
+  }
+
+  // SABOTAGE (sub-point 3, isolated to "answerReloadInterval" only -- see
+  // this file's runProgressAssertionsPost comment): a fresh GEasy at
+  // reps 0 returns 3 instead of the real scheduler's 2. Every other
+  // grade/reps combination this fixture can reach (GAgain always; GEasy
+  // reps>=1 is never reached by this fixture's own scripted scenarios)
+  // stays correct, so this sabotage cannot be masked by "everything is
+  // wrong" -- only the ONE value the assertion actually pins.
+  function nextIntervalDaysJs(rec, grade) {
+    if (grade === 'GAgain') return 0;
+    if (grade === 'GHard') return rec.reps === 0 ? 1 : clamp1_180(Math.floor(rec.interval * 12 / 10));
+    if (grade === 'GGood') return rec.reps === 0 ? 1 : (rec.reps === 1 ? 3 : clamp1_180(Math.floor(rec.interval * rec.ease / 1000)));
+    if (rec.reps === 0) return SABOTAGE ? 3 : 2;
+    return rec.reps === 1 ? 5 : clamp1_180(Math.floor(rec.interval * rec.ease * 13 / 10000));
+  }
+
+  function applyGradeToRec(existing, grade) {
+    var interval = nextIntervalDaysJs(existing, grade);
+    var ease = Math.max(1300, Math.min(3000, existing.ease + EASE_DELTA[grade]));
+    var reps = grade === 'GAgain' ? 0 : existing.reps + 1;
+    var lapses = existing.lapses + ((grade === 'GAgain' && existing.reps > 0) ? 1 : 0);
+    return { reps: reps, lapses: lapses, ease: ease, interval: interval, due: PROG_TODAY + interval, lastSeen: PROG_TODAY, seen: existing.seen + 1 };
+  }
+
+  // Wire format -- mirrors SXC1.Progress.Codec.hs's documented shape
+  // exactly: "SXC1PROGRESS<TAB><ver>" header, "M<TAB>...streak...", one
+  // "R<TAB>..." line per record, unknown leading tags skipped.
+  function encodeProgWire(recs, streakDay, streakLen) {
+    var lines = ['SXC1PROGRESS' + TAB + '1', 'M' + TAB + streakDay + TAB + streakLen + TAB + streakDay];
+    Object.keys(recs).forEach(function (pid) {
+      var r = recs[pid];
+      lines.push(['R', pid, r.reps, r.lapses, r.ease, r.interval, r.due, r.lastSeen, r.seen].join(TAB));
+    });
+    return lines.join(NL) + NL;
+  }
+
+  function decodeProgWire(raw) {
+    if (raw == null || raw.trim() === '') return { kind: 'empty', recs: {}, streakDay: 0, streakLen: 0 };
+    var lines = raw.split(NL);
+    var header = (lines[0] || '').split(TAB);
+    if (header[0] !== 'SXC1PROGRESS') return { kind: 'corrupt', recs: {}, streakDay: 0, streakLen: 0, reason: 'missing or malformed SXC1PROGRESS header', raw: raw };
+    var recs = {}, streakLen = 0, streakDay = 0;
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.trim() === '') continue;
+      var f = line.split(TAB);
+      if (f[0] === 'M' && f.length === 4) { streakDay = parseInt(f[1], 10) || 0; streakLen = parseInt(f[2], 10) || 0; }
+      else if (f[0] === 'R' && f.length === 9) {
+        recs[f[1]] = { reps: +f[2], lapses: +f[3], ease: +f[4], interval: +f[5], due: +f[6], lastSeen: +f[7], seen: +f[8] };
+      }
+      // any other leading tag: skipped, matching the real degrade-not-reject rule
+    }
+    return { kind: 'ok', recs: recs, streakDay: streakDay, streakLen: streakLen };
+  }
+
+  // jsonEscape/jsonUnescape/importBlobJs are all written as explicit
+  // character scans (never a regex containing BS, and never a literal
+  // backslash escape) for the reason TAB/NL/BS's own comment gives above.
+  function jsonEscape(s) {
+    var out = '', str = String(s);
+    for (var i = 0; i < str.length; i++) {
+      var c = str[i];
+      if (c === BS) out += BS + BS;
+      else if (c === '"') out += BS + '"';
+      else if (c === NL) out += BS + 'n';
+      else if (c === String.fromCharCode(13)) out += BS + 'r';
+      else if (c === TAB) out += BS + 't';
+      else out += c;
+    }
+    return out;
+  }
+  function jsonUnescape(s) {
+    var out = '';
+    for (var i = 0; i < s.length; i++) {
+      if (s[i] === BS && i + 1 < s.length) {
+        var c = s[i + 1];
+        if (c === 'n') { out += NL; i++; }
+        else if (c === 'r') { out += String.fromCharCode(13); i++; }
+        else if (c === 't') { out += TAB; i++; }
+        else if (c === '"' || c === BS) { out += c; i++; }
+        else out += s[i];
+      } else out += s[i];
+    }
+    return out;
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Finds the string value of a "payload":"..." JSON field by manual
+  // scan (mirrors SXC1.Progress.Codec.hs's own extractJsonStringField/
+  // takeJsonStringBody exactly: read up to the next UNESCAPED quote) --
+  // never a regex, for the same reason as above. Returns null if the
+  // marker or a terminating quote is not found.
+  function extractPayloadField(raw) {
+    var marker = '"payload":"';
+    var idx = raw.indexOf(marker);
+    if (idx === -1) return null;
+    var body = raw.slice(idx + marker.length);
+    for (var i = 0; i < body.length; i++) {
+      if (body[i] === BS) { i++; continue; }
+      if (body[i] === '"') return body.slice(0, i);
+    }
+    return null;
+  }
+
+  // Envelope-or-bare-wire import, mirroring SXC1.Progress.Codec.importBlob.
+  function importBlobJs(raw) {
+    var trimmed = raw.trim();
+    if (trimmed.indexOf('SXC1PROGRESS') === 0) return decodeProgWire(trimmed);
+    var payload = extractPayloadField(raw);
+    if (payload !== null) return decodeProgWire(jsonUnescape(payload));
+    return { kind: 'corrupt', recs: {}, streakDay: 0, streakLen: 0, reason: 'import text is neither a bare SXC1PROGRESS blob nor a recognisable export envelope' };
+  }
+
+  // Mirrors site/static/index.js's own countPastedRecords (same counting
+  // rule, re-expressed without any literal backslash) -- this fixture is
+  // testing browser-check.mjs's OWN "importPreview" assertion, i.e. that
+  // it correctly distinguishes a right count from a wrong one; it is not
+  // re-testing index.js's logic (the real run below drives the REAL
+  // index.js for that).
+  // SABOTAGE (isolated to "importPreview" only): always reports 0.
+  function countPastedRecordsJs(text) {
+    if (SABOTAGE) return 0;
+    var bareLines = text.split(NL).filter(function (line) { return line.indexOf('R' + TAB) === 0; }).length;
+    if (bareLines > 0 || text.trim().indexOf('SXC1PROGRESS') === 0) return bareLines;
+    var payload = extractPayloadField(text);
+    if (payload === null) return 0;
+    // The payload is still JSON-escaped here (matching index.js's own
+    // countPastedRecords, which counts escaped R-TAB lines directly
+    // without unescaping first) -- so the split/prefix markers are the
+    // ESCAPED two-character sequences BS+'n' / 'R' + BS+'t'.
+    return payload.split(BS + 'n').filter(function (line) { return line.indexOf('R' + BS + 't') === 0; }).length;
+  }
+  document.addEventListener('input', function (event) {
+    if (!event.target || event.target.id !== 'sxc1-import-input') return;
+    var preview = document.getElementById('sxc1-import-preview');
+    if (!preview) return;
+    var n = countPastedRecordsJs(event.target.value);
+    preview.textContent = n === 1 ? '1 record found in the pasted text.' : (n + ' records found in the pasted text.');
+  });
+
+  // Two-step wipe confirm -- mirrors site/static/index.js's own
+  // document-level delegated listener exactly (same reasoning: Miso
+  // destroys/recreates the subtree on navigation in the real app; this
+  // fixture's renderHome() does the analogous full re-render).
+  document.addEventListener('click', function (event) {
+    var id = event.target && event.target.id;
+    if (id === 'btn-progress-wipe') {
+      var confirmBtn = document.getElementById('btn-progress-wipe-confirm');
+      if (confirmBtn) confirmBtn.hidden = false;
+    }
+  });
+
+  var CURRENT_PROGRESS = (function () {
+    var raw = null;
+    try { raw = window.localStorage.getItem(PROG_KEY); } catch (e) { /* treated as empty */ }
+    return decodeProgWire(raw);
+  })();
+  // decodePrefsWire's own default (nothing stored) is ALWAYS false here,
+  // never sabotaged -- see runProgressAssertionsPost's own comment on why
+  // "default flipped to true" would cascade into the D-flow's later
+  // steps in a way that is hard to reason about; the freshJaFirst
+  // negative control instead sabotages the #sxc1-progress PAYLOAD's
+  // jaFirst field directly (below), leaving the real toggle/redirect
+  // mechanism itself unsabotaged and testable on its own.
+  var CURRENT_PREFS = (function () {
+    var raw = null;
+    try { raw = window.localStorage.getItem(PREFS_KEY); } catch (e) { /* treated as default */ }
+    if (raw == null || raw.trim() === '') return { jaFirst: false };
+    var lines = raw.split(NL);
+    var header = (lines[0] || '').split(TAB);
+    if (header[0] !== 'SXC1PREFS') return { jaFirst: false };
+    var jaFirst = false;
+    for (var i = 1; i < lines.length; i++) {
+      var f = lines[i].split(TAB);
+      if (f[0] === 'P' && f[1] === 'jaFirst') jaFirst = (f[2] === '1');
+    }
+    return { jaFirst: jaFirst };
+  })();
+
+  // SABOTAGE (isolated to "jaFirstPersistsValue" + "jaFirstPersistsOrder",
+  // both of which read state from the SAME post-reload page load -- see
+  // runProgressAssertionsPost's own comment): the in-memory model still
+  // updates (so the UI visibly reflects a click), but the localStorage
+  // write is skipped, so a RELOAD (a fresh script execution, re-reading
+  // from storage) loses it.
+  function saveJaFirst(v) {
+    CURRENT_PREFS = { jaFirst: v };
+    if (!SABOTAGE) {
+      try {
+        window.localStorage.setItem(PREFS_KEY, 'SXC1PREFS' + TAB + '1' + NL + 'P' + TAB + 'jaFirst' + TAB + (v ? '1' : '0') + NL);
+      } catch (e) { /* best effort */ }
+    }
+  }
+
+  function mergeRec(recs, pid, rec) {
+    var out = {};
+    for (var k in recs) { if (Object.prototype.hasOwnProperty.call(recs, k)) out[k] = recs[k]; }
+    out[pid] = rec;
+    return out;
+  }
+
+  // The never-overwrite rule (Progress.Store's THE ONE RULE THAT
+  // MATTERS): while CURRENT_PROGRESS.kind === 'corrupt', an ordinary
+  // grading write is a no-op. SABOTAGE (isolated to
+  // "corruptNeverOverwritten" only): disables the guard, so the corrupt
+  // blob is silently replaced by the next answer, exactly the defect
+  // this rule exists to prevent.
+  function gradeQuizPromptForProgress(isCorrect, attempt) {
+    var pid = FIXTURE.quiz.id + '#1';
+    if (CURRENT_PROGRESS.kind === 'corrupt' && !SABOTAGE) return;
+    var existing = (CURRENT_PROGRESS.kind === 'corrupt' ? {} : CURRENT_PROGRESS.recs)[pid]
+      || { reps: 0, lapses: 0, ease: 2500, interval: 0, due: 0, lastSeen: 0, seen: 0 };
+    var grade = gradeOfOutcomeJs(isCorrect, attempt, false, 0);
+    var updated = applyGradeToRec(existing, grade);
+    var baseRecs = CURRENT_PROGRESS.kind === 'corrupt' ? {} : CURRENT_PROGRESS.recs;
+    CURRENT_PROGRESS = {
+      kind: 'ok', recs: mergeRec(baseRecs, pid, updated),
+      streakDay: PROG_TODAY, streakLen: Math.max(1, CURRENT_PROGRESS.streakLen || 1),
+    };
+    try { window.localStorage.setItem(PROG_KEY, encodeProgWire(CURRENT_PROGRESS.recs, CURRENT_PROGRESS.streakDay, CURRENT_PROGRESS.streakLen)); } catch (e) { /* best effort */ }
+  }
+
+  function currentDue() {
+    var recs = CURRENT_PROGRESS.recs, out = 0;
+    for (var pid in recs) { if (Object.prototype.hasOwnProperty.call(recs, pid) && recs[pid].due <= PROG_TODAY) out++; }
+    return out;
+  }
+
+  // SABOTAGE (isolated to "freshRecords" + "wipeEmpties" +
+  // "answerReloadCount" + "exportWipeImportRestores" -- all four are
+  // legitimately testing the SAME counter, just at different points in
+  // the run, so a records-counting bug breaking all four together is an
+  // honest cascade, not test sloppiness): off by one, always.
+  function updateProgressPayload() {
+    var recs = CURRENT_PROGRESS.recs, pids = Object.keys(recs);
+    var payload = {
+      available: true,
+      state: CURRENT_PROGRESS.kind === 'ok' ? 'ok' : (CURRENT_PROGRESS.kind === 'corrupt' ? 'corrupt' : 'empty'),
+      schema: 1,
+      records: pids.length + (SABOTAGE ? 1 : 0),
+      retired: 0,
+      due: currentDue(),
+      streak: CURRENT_PROGRESS.streakLen || 0,
+      retention: 0,
+      queue: pids.filter(function (p) { return recs[p].due <= PROG_TODAY; }),
+      // SABOTAGE (isolated to "freshJaFirst" only -- see CURRENT_PREFS's
+      // own comment on why the DEFAULT itself is never sabotaged):
+      // always reports true here regardless of the real preference.
+      jaFirst: SABOTAGE ? true : (CURRENT_PREFS.jaFirst === true),
+    };
+    document.getElementById('sxc1-progress').textContent = JSON.stringify(payload);
+  }
+
+  // SABOTAGE (isolated to "reviewBadgeMatchesDue" only): off by one.
+  function renderHeader(onManualRoute) {
+    var due = currentDue() + (SABOTAGE ? 1 : 0);
+    var html = '<a id="sxc1-review-badge" href="#/">Review ' + due + '</a>';
+    if (onManualRoute) {
+      html += '<button id="btn-ja-first" type="button" aria-pressed="' + (CURRENT_PREFS.jaFirst ? 'true' : 'false') + '">' +
+        (CURRENT_PREFS.jaFirst ? 'Japanese first: on' : 'Japanese first: off') + '</button>';
+    }
+    document.getElementById('sxc1-header').innerHTML = html;
+    if (onManualRoute) {
+      document.getElementById('btn-ja-first').addEventListener('click', function () {
+        saveJaFirst(!CURRENT_PREFS.jaFirst);
+        render();
+      });
+    }
+  }
+
+  function renderHome() {
+    var corrupt = CURRENT_PROGRESS.kind === 'corrupt';
+    // SABOTAGE (isolated to "corruptBanner" -- and, honestly, cascading
+    // into "corruptNeverOverwritten"'s OWN bannerStillShown half, which
+    // is ALSO already covered by the never-overwrite sabotage above):
+    // the banner never renders even when the blob is undecodable.
+    var bannerHtml = (corrupt && !SABOTAGE)
+      ? ('<section id="sxc1-corrupt-banner"><p>Your saved progress could not be read (' + escapeHtml(CURRENT_PROGRESS.reason || '') + '). It has NOT been deleted.</p>' +
+        '<textarea id="sxc1-corrupt-raw" readonly>' + escapeHtml(CURRENT_PROGRESS.raw || '') + '</textarea></section>')
+      : '';
+    root().innerHTML =
+      bannerHtml +
+      '<p id="sxc1-streak">Study streak: ' + (CURRENT_PROGRESS.streakLen || 0) + '</p>' +
+      '<section id="sxc1-progress-tools">' +
+      '<button id="btn-progress-export" type="button">Export</button>' +
+      '<textarea id="sxc1-export-blob" readonly></textarea>' +
+      '<form id="sxc1-import-form">' +
+      '<label for="sxc1-import-input">Paste an exported blob to import:</label>' +
+      '<textarea id="sxc1-import-input" name="sxc1-import-input"></textarea>' +
+      '<p id="sxc1-import-preview">Paste text above to see how many records it contains.</p>' +
+      '<button id="btn-progress-import" type="submit">Import</button>' +
+      '</form>' +
+      '<button id="btn-progress-wipe" type="button">Wipe all progress</button>' +
+      '<button id="btn-progress-wipe-confirm" type="button" hidden>Yes, permanently wipe my progress</button>' +
+      '</section>';
+
+    document.getElementById('btn-progress-export').addEventListener('click', function () {
+      var wire = encodeProgWire(CURRENT_PROGRESS.kind === 'corrupt' ? {} : CURRENT_PROGRESS.recs, CURRENT_PROGRESS.streakDay || 0, CURRENT_PROGRESS.streakLen || 0);
+      var envelope = '{"format":"sxc1-progress","schema":1,"exportedAt":"epoch-ms:' + Date.now() + '","payload":"' + jsonEscape(wire) + '"}';
+      document.getElementById('sxc1-export-blob').value = envelope;
+    });
+    document.getElementById('sxc1-import-form').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var text = document.getElementById('sxc1-import-input').value;
+      var decoded = importBlobJs(text);
+      if (decoded.kind === 'ok') {
+        CURRENT_PROGRESS = decoded;
+        try { window.localStorage.setItem(PROG_KEY, encodeProgWire(decoded.recs, decoded.streakDay, decoded.streakLen)); } catch (e) { /* best effort */ }
+        renderHome();
+        updateProgressPayload();
+      }
+    });
+    document.getElementById('btn-progress-wipe-confirm').addEventListener('click', function () {
+      CURRENT_PROGRESS = { kind: 'empty', recs: {}, streakDay: 0, streakLen: 0 };
+      try { window.localStorage.removeItem(PROG_KEY); } catch (e) { /* best effort */ }
+      renderHome();
+      updateProgressPayload();
+    });
+  }
+
+  // SABOTAGE (isolated to "jaToggleHidesAndSticks" only): after an
+  // explicit hide, a stray re-render forces the panel back on shortly
+  // after -- "the preference fights the toggle", exactly the bug d3
+  // exists to catch. Only fires when jaFirst is actually on (the real
+  // bug's precondition) and only on a genuine hide (not a manual show).
+  function renderManualPage(slug, n, ja) {
+    var pageBodyHtml = '<div class="page-body" id="page-' + n + '">Manual page ' + n + ' of ' + slug + '.</div>';
+    var panelHtml = ja
+      ? ('<figure id="ja-panel"><img id="ja-image" src="pages/' + slug + '/page-' + n + '.webp"><figcaption>Page ' + n + ', original Japanese</figcaption></figure>')
+      : '';
+    var order = (ja && CURRENT_PREFS.jaFirst) ? (panelHtml + pageBodyHtml) : (pageBodyHtml + panelHtml);
+    var nextHref = (n < MANUAL_TOTAL_PAGES) ? ('#/m/' + slug + '/p/' + (n + 1)) : null;
+    var prevHref = (n > 1) ? ('#/m/' + slug + '/p/' + (n - 1)) : null;
+    root().innerHTML = '<article id="sxc1-page">' + order +
+      '<button id="btn-ja-toggle" type="button">' + (ja ? 'Hide original page' : 'Show original page (JA)') + '</button>' +
+      '<nav class="page-nav">' +
+      '<a id="btn-prev-page"' + (prevHref ? (' href="' + prevHref + '"') : '') + '>Previous page</a>' +
+      '<a id="btn-next-page"' + (nextHref ? (' href="' + nextHref + '"') : '') + '>Next page</a>' +
+      '</nav></article>';
+    document.getElementById('btn-ja-toggle').addEventListener('click', function () {
+      var wasShowingViaJaFirst = ja && CURRENT_PREFS.jaFirst;
+      location.hash = '#/m/' + slug + '/p/' + n + (ja ? '' : '/ja');
+      if (wasShowingViaJaFirst && SABOTAGE) {
+        setTimeout(function () { location.hash = '#/m/' + slug + '/p/' + n + '/ja'; }, 200);
+      }
+    });
+  }
   // Mirrors Main.hs's promptBaselineJson contract: a POSITIVE monotonic
   // reading once Begin has run at mount; stays "null" under SABOTAGE --
   // the lost-mount-Begin scenario --self-test-negative must catch.
@@ -730,6 +1152,12 @@ window.__SXC1_BOOTED = true;
   var quizAttempted = false;
   var lastQuizCorrect = false;
   var quizPromptAt = 0;
+  // M3: how many times THIS quiz prompt has been submitted since it was
+  // last fresh/Begin/Restart -- mirrors the real engine's own attempt
+  // counter, which gradeOfOutcomeJs needs (Correct on attempt >= 2 is
+  // GHard, never GEasy, even though this fixture's own quiz-grading
+  // SABOTAGE forces isCorrect=true regardless of selection).
+  var quizAttemptCount = 0;
   var drillCursor = 0;
   var drillStepAt = 0;
   var lookupStartedAt = 0;
@@ -764,7 +1192,11 @@ window.__SXC1_BOOTED = true;
   }
 
   function renderDeck() {
+    // SABOTAGE (isolated to "deckCardTierMatches" only): the rendered
+    // tier disagrees with the deck's own declared tier.
+    var renderedTier = SABOTAGE ? 'stretch' : PROGRESS_DECK_TIER;
     root().innerHTML = '<section id="sxc1-deck"><h1 id="ex-deck-title">Demo deck</h1>' +
+      '<div class="deck-card" data-tier="' + renderedTier + '"><span class="tier-badge">' + renderedTier + '</span></div>' +
       '<p id="ex-deck-summary">A demo deck.</p><ol class="ex-list">' +
       '<li><a class="ex-link" href="#/x/' + FIXTURE.quiz.deck + '/' + FIXTURE.quiz.id + '"><span class="ex-kind kind-quiz">Quiz</span><span class="ex-title">Demo quiz</span></a></li>' +
       '<li><a class="ex-link" href="#/x/' + FIXTURE.drill.deck + '/' + FIXTURE.drill.id + '"><span class="ex-kind kind-drill">Drill</span><span class="ex-title">Demo drill</span></a></li>' +
@@ -813,6 +1245,7 @@ window.__SXC1_BOOTED = true;
     // one thing this task's new Restart assertion exists to catch.
     document.getElementById('btn-ex-restart').addEventListener('click', function () {
       quizPromptAt = 0;
+      quizAttemptCount = 0;
       if (!SABOTAGE) {
         quizAttempted = false;
         lastQuizCorrect = false;
@@ -845,8 +1278,15 @@ window.__SXC1_BOOTED = true;
       var isCorrect = SABOTAGE ? true : (selectedIds.length === 1 && selectedIds[0] === FIXTURE.quiz.correctOpt);
       quizAttempted = true;
       lastQuizCorrect = isCorrect;
+      quizAttemptCount += 1;
+      // M3: feed the SAME submit that grades the quiz UI into the
+      // progress mini-engine too -- see gradeQuizPromptForProgress's own
+      // comment for why this fixture reuses the M2 quiz UI rather than
+      // simulating a second one.
+      gradeQuizPromptForProgress(isCorrect, quizAttemptCount);
       pushEvent(FIXTURE.quiz.id, 'quiz', isCorrect ? 'correct' : 'incorrect', quizPromptAt);
       renderQuiz();
+      updateProgressPayload();
     });
   }
 
@@ -926,23 +1366,70 @@ window.__SXC1_BOOTED = true;
     });
   }
 
-  function renderManualPage(slug, n) {
-    root().innerHTML = '<article id="sxc1-page"><div class="page-body" id="page-' + n + '">Manual page ' + n + ' of ' + slug + '.</div></article>';
-  }
+  // M3: tracks whether the mount-time render has already happened and,
+  // if so, which manual page it last showed -- mirrors Main.hs's
+  // mBooted/mRoute pair exactly, and drives the SAME "freshPage" rule:
+  // redirect to /ja only on a genuinely fresh page navigation (mount, or
+  // a slug/page change), never on the post-toggle hashchange echo of the
+  // SAME page (which is what lets an explicit #btn-ja-toggle win until
+  // the learner actually moves to a different page -- assertion
+  // "jaToggleHidesAndSticks"'s whole point).
+  var BOOTED = false;
+  var PREV_PAGE = null;
 
   function render() {
     var h = location.hash.replace(/^#/, '');
     var parts = h.split('/').filter(Boolean);
-    if (parts[0] === 'x' && parts.length === 1) { renderIndex(); return; }
-    if (parts[0] === 'x' && parts.length === 2) { renderDeck(); return; }
+
+    if (parts.length === 0) {
+      BOOTED = true; PREV_PAGE = null;
+      renderHeader(false);
+      renderHome();
+      updateProgressPayload();
+      return;
+    }
+    if (parts[0] === 'x' && parts.length === 1) {
+      BOOTED = true; PREV_PAGE = null;
+      renderHeader(false);
+      renderIndex();
+      updateProgressPayload();
+      return;
+    }
+    if (parts[0] === 'x' && parts.length === 2) {
+      BOOTED = true; PREV_PAGE = null;
+      renderHeader(false);
+      renderDeck();
+      updateProgressPayload();
+      return;
+    }
     if (parts[0] === 'x' && parts.length === 3) {
       var exId = parts[2];
-      if (exId === FIXTURE.quiz.id) { renderQuiz(); return; }
-      if (exId === FIXTURE.drill.id) { drillCursor = 0; renderDrill(); return; }
-      if (exId === FIXTURE.lookup.id) { lookupStartedAt = 0; lookupResult = null; renderLookup(); return; }
+      BOOTED = true; PREV_PAGE = null;
+      renderHeader(false);
+      if (exId === FIXTURE.quiz.id) { renderQuiz(); updateProgressPayload(); return; }
+      if (exId === FIXTURE.drill.id) { drillCursor = 0; renderDrill(); updateProgressPayload(); return; }
+      if (exId === FIXTURE.lookup.id) { lookupStartedAt = 0; lookupResult = null; renderLookup(); updateProgressPayload(); return; }
     }
-    if (parts[0] === 'm' && parts.length >= 4 && parts[2] === 'p') { renderManualPage(parts[1], parts[3]); return; }
+    if (parts[0] === 'm' && parts.length >= 4 && parts[2] === 'p') {
+      var slug = parts[1];
+      var n = parseInt(parts[3], 10);
+      var ja = parts[4] === 'ja';
+      var fresh = !BOOTED || !PREV_PAGE || PREV_PAGE.slug !== slug || PREV_PAGE.n !== n;
+      if (!ja && CURRENT_PREFS.jaFirst && fresh) {
+        BOOTED = true; PREV_PAGE = { slug: slug, n: n };
+        location.hash = '#/m/' + slug + '/p/' + n + '/ja';
+        return; // hashchange re-invokes render() with ja=true
+      }
+      BOOTED = true; PREV_PAGE = { slug: slug, n: n };
+      renderHeader(true);
+      renderManualPage(slug, n, ja);
+      updateProgressPayload();
+      return;
+    }
+    BOOTED = true; PREV_PAGE = null;
+    renderHeader(false);
     renderIndex();
+    updateProgressPayload();
   }
   window.addEventListener('hashchange', render);
   render();
@@ -1008,16 +1495,64 @@ const WARM_FIRST_ELAPSED_ASSERTION_NAME =
 const COLD_BASELINE_ASSERTION_NAME =
   'cold-load quiz: #sxc1-prompt-baseline is a positive number (Begin ran at mount; "null" means the mount-time Begin was lost)';
 
+// M3 harness wave, urgent item: the RACE FIX for #sxc1-prompt-baseline.
+// This used to sample the element ONCE, immediately after the cold
+// target reported window.__SXC1_BOOTED === true. Measured (M3 designer,
+// against the full 52-deck/435-exercise artifact, which boots slower
+// than M2's): 1 failure in 7 runs on the slower artifact, 0 in 5 on a
+// faster one, then five clean re-runs of that SAME slow artifact right
+// after -- classic timing-window inference (house verification standard
+// 3), because __SXC1_BOOTED only proves Miso's initial render committed,
+// not that the mount -> SetRoute -> beginIfNeeded -> ExBatch Begin round
+// trip that WRITES this element has flushed to the DOM yet. A "null"
+// read mid-flush is indistinguishable from the genuine lost-mount-Begin
+// defect this assertion exists to catch (see COLD_BASELINE_ASSERTION_NAME
+// above), which is exactly why a bare re-sample/retry-until-different
+// approach would not do -- the fix polls to a SETTLED, POSITIVE reading
+// with an explicit budget, and only THEN treats a value that never
+// arrives as the real defect.
+//
+// Budget: 3000ms, chosen per this task's own instruction ("poll for a
+// positive numeric baseline up to 3000ms after boot"). The negative
+// control is unchanged by this fix and still passes: SABOTAGE mode
+// (selfTestFixtureHtml(true) / a genuinely lost mount-time Begin) leaves
+// #sxc1-prompt-baseline at "null" FOREVER, so it never becomes positive
+// and this poll correctly exhausts its budget and reports the assertion
+// FAILED with the required "never became positive within Nms" wording --
+// see the --self-test-negative sweep in this file's own final report.
+const BASELINE_POLL_BUDGET_MS = 3000;
+const BASELINE_POLL_INTERVAL_MS = 40;
+
 async function assertColdFirstTryElapsed(coldH, fixture, waitMs) {
-  const baselineRaw = await coldH.evaluate(`(() => {
-    const el = document.querySelector('#sxc1-prompt-baseline');
-    return el ? el.textContent.trim() : null;
+  const baselinePoll = await coldH.evaluate(`(async () => {
+    const budgetMs = ${BASELINE_POLL_BUDGET_MS};
+    const intervalMs = ${BASELINE_POLL_INTERVAL_MS};
+    const start = Date.now();
+    let lastRaw = null;
+    while (Date.now() - start < budgetMs) {
+      const el = document.querySelector('#sxc1-prompt-baseline');
+      lastRaw = el ? el.textContent.trim() : null;
+      const n = lastRaw === null ? NaN : Number(lastRaw);
+      if (Number.isFinite(n) && n > 0) {
+        return { raw: lastRaw, settled: true, waitedMs: Date.now() - start };
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    return { raw: lastRaw, settled: false, waitedMs: Date.now() - start };
   })()`);
+  const baselineRaw = baselinePoll ? baselinePoll.raw : null;
   const baselineNum = baselineRaw === null ? NaN : Number(baselineRaw);
+  const baselineOk = Number.isFinite(baselineNum) && baselineNum > 0;
   coldH.report(
     COLD_BASELINE_ASSERTION_NAME,
-    Number.isFinite(baselineNum) && baselineNum > 0,
-    { baselineRaw },
+    baselineOk,
+    baselineOk
+      ? { baselineRaw, polledMs: baselinePoll.waitedMs }
+      : {
+        baselineRaw,
+        polledMs: baselinePoll ? baselinePoll.waitedMs : null,
+        note: `#sxc1-prompt-baseline never became positive within ${BASELINE_POLL_BUDGET_MS}ms`,
+      },
   );
   await sleep(waitMs);
   const clickedCorrect = await coldH.clickAssert(
@@ -1465,6 +2000,448 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
   return results;
 }
 
+// ---------------------------------------------------------------------------
+// M3 harness wave: PERSISTENCE / JA-FIRST / CORRUPT-BLOB / REVIEW-QUEUE
+// assertions -- this task's own manifest item C, the milestone's contract
+// requirement. Shared between --self-test (driven against
+// progressSelfTestFixtureHtml()'s synthetic, in-page mock of the M3
+// progress DOM contract) and a real run (driven against the real app's
+// real localStorage-backed SXC1.Progress.* system) by the SAME function,
+// exactly the way runExerciseAssertions() above is shared between the
+// quiz/drill/lookup self-test and the real exercise engine -- "the same
+// assertion code runs against it" (M2's own precedent, restated in this
+// task's own manifest prompt).
+//
+// WHY THE SELF-TEST FIXTURE REUSES THE EXISTING QUIZ UI RATHER THAN
+// SIMULATING A SECOND ONE: SELF_TEST_FIXTURE's quiz (FIXTURE.quiz)
+// already exercises the grading UI end to end (see runExerciseAssertions
+// above); this section's job is the STORAGE/PERSISTENCE layer
+// underneath it, not re-testing quiz grading a second time.
+// progressSelfTestFixtureHtml() hooks the SAME quiz submit handler to
+// ALSO update a small, self-contained, DELIBERATELY INDEPENDENT JS mirror
+// of SXC1.Progress.* (a mini scheduler + mini codec, documented at its
+// own definition) that reads/writes the SAME wire format
+// SXC1.Progress.Codec.hs documents to the SAME localStorage keys
+// (sxc1.progress / sxc1.prefs) -- independent of the real Haskell
+// implementation for exactly the reason SELF_TEST_FIXTURE's own Haddock
+// gives: "--self-test proves the BROWSER ASSERTIONS themselves can fail
+// ... never that the real app matches it".
+//
+// Both call sites share ONE route grammar (so no fixture-vs-real
+// indirection is needed anywhere below): quiz "#/x/<deck>/<id>", a deck
+// page "#/x/<deck>" (with a .deck-card[data-tier] on it), home "#/" with
+// #sxc1-progress-tools as its ready marker (only rendered on Home --
+// see View.Progress.exportImportEls), and a manual page
+// "#/m/<slug>/p/<n>" / ".../ja" with "#page-<n>" as its ready marker.
+// ---------------------------------------------------------------------------
+
+const PROGRESS_KEY = 'sxc1.progress';
+const PREFS_KEY = 'sxc1.prefs';
+
+// House standard 4 ("a check that counts must count independently"):
+// these two re-derive just enough of SXC1.Progress.Codec's documented
+// wire format --
+//   R <TAB> promptId <TAB> reps <TAB> lapses <TAB> ease <TAB> interval <TAB> due <TAB> lastSeen <TAB> seen
+// -- to check specific field VALUES, entirely in Node, from a raw string
+// already read back out of localStorage via evaluate(). This never asks
+// the app (or the self-test fixture's own mini-codec) to interpret
+// itself; it is a second, independent implementation in a different
+// language, exactly like scripts/recount-citations.py is for the M2
+// citation count.
+function findWireRecord(rawBlob, promptId) {
+  if (!rawBlob) return null;
+  for (const line of rawBlob.split('\n')) {
+    const f = line.split('\t');
+    if (f[0] === 'R' && f.length === 9 && f[1] === promptId) {
+      return {
+        promptId: f[1], reps: Number(f[2]), lapses: Number(f[3]), ease: Number(f[4]),
+        interval: Number(f[5]), due: Number(f[6]), lastSeen: Number(f[7]), seen: Number(f[8]),
+      };
+    }
+  }
+  return null;
+}
+
+function countWireRecords(rawBlob) {
+  if (!rawBlob) return 0;
+  return rawBlob.split('\n').filter((l) => l.startsWith('R\t')).length;
+}
+
+// A deck's declared `tier:` field, read straight off
+// content/exercises/*.ex.md on DISK -- never from the running app --
+// for assertion "deckCardTierMatches" below (house standard 4 again).
+const HARNESS_REPO_ROOT = path.dirname(path.dirname(new URL(import.meta.url).pathname));
+function deckTierFromDisk(deckSlug) {
+  const dir = path.join(HARNESS_REPO_ROOT, 'content', 'exercises');
+  let files;
+  try { files = fs.readdirSync(dir); } catch { return null; }
+  for (const fn of files) {
+    if (!fn.endsWith('.ex.md')) continue;
+    let raw;
+    try { raw = fs.readFileSync(path.join(dir, fn), 'utf8'); } catch { continue; }
+    const dm = raw.match(/^deck:[ \t]*(\S+)[ \t]*$/m);
+    if (!dm || dm[1] !== deckSlug) continue;
+    const tm = raw.match(/^tier:[ \t]*(\S+)[ \t]*$/m);
+    return tm ? tm[1] : null;
+  }
+  return null;
+}
+
+async function readSxc1Progress(evaluate) {
+  const raw = await evaluate(`(() => {
+    const e = document.querySelector('#sxc1-progress');
+    return e ? e.textContent : null;
+  })()`);
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+async function readLocalStorageRaw(evaluate, key) {
+  return evaluate(`(() => { try { return window.localStorage.getItem(${JSON.stringify(key)}); } catch (e) { return null; } })()`);
+}
+
+// Poll #sxc1-progress until `predicateSrc` (a JS expression string over a
+// local `p`, the parsed payload) is true, with an explicit budget --
+// house standard 3, and specifically the fix for the SAME class of race
+// the #sxc1-prompt-baseline fix above closes: a click that dispatches a
+// real Miso action (wipe-confirm, import-submit, ...) returns before
+// that action's render has necessarily flushed to the DOM, so reading
+// #sxc1-progress exactly once immediately afterward can observe the
+// PREVIOUS frame's payload. Every read of #sxc1-progress in
+// runProgressAssertionsPost that follows such a click goes through this
+// (or an equivalent explicit poll), never a bare readSxc1Progress().
+async function waitForProgressPredicate(evaluate, predicateSrc, budgetMs) {
+  return waitForTrue(evaluate, `(() => {
+    const e = document.querySelector('#sxc1-progress');
+    let p = null;
+    try { p = JSON.parse(e ? e.textContent : 'null'); } catch (err) { return false; }
+    if (!p) return false;
+    return Boolean(${predicateSrc});
+  })()`, budgetMs);
+}
+
+// Poll to a settled TRUE condition with an explicit budget (house
+// standard 3) -- `exprJs` is a JS expression string evaluated in-page;
+// must resolve to a boolean (or falsy/truthy) value each poll.
+async function waitForTrue(evaluate, exprJs, budgetMs, intervalMs = 30) {
+  const start = Date.now();
+  let last = false;
+  while (Date.now() - start < budgetMs) {
+    last = await evaluate(exprJs);
+    if (last) return true;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return Boolean(last);
+}
+
+// The inverse shape, for "hides AND STAYS hidden" (assertion
+// jaToggleHidesAndSticks below): confirms `exprJs` is false for the
+// WHOLE budget, returning false (the check FAILS) the instant it flips
+// true. This is the falsifiable form of "never comes back" -- a single
+// sample right after the click would pass even if a stray re-render
+// brought the panel straight back a few milliseconds later.
+async function staysFalseThroughout(evaluate, exprJs, budgetMs, intervalMs = 50) {
+  const start = Date.now();
+  while (Date.now() - start < budgetMs) {
+    if (await evaluate(exprJs)) return false;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return true;
+}
+
+const PROGRESS_ASSERTION_NAMES = {
+  freshRecords: 'fresh profile: #sxc1-progress reports records=0, state=empty before any answer',
+  freshJaFirst: 'fresh profile: #sxc1-progress reports jaFirst=false and a manual page does not auto-redirect to /ja',
+  wipeEmpties: 'export -> wipe -> import: the store is genuinely empty (records=0, state=empty) between wipe and import',
+  answerReloadCount: 'answer -> reload: #sxc1-progress records count equals the number of graded prompts (1)',
+  answerReloadInterval: "answer -> reload: the graded PromptId's stored interval equals the scheduler's fresh GEasy value (2 days)",
+  importPreview: '#sxc1-import-preview shows the correct record count before commit',
+  exportWipeImportRestores: 'export -> wipe -> import: restores the same record identity and values as before the wipe',
+  corruptBanner: 'hand-corrupted sxc1.progress: #sxc1-corrupt-banner appears with the raw text in #sxc1-corrupt-raw',
+  corruptNeverOverwritten: 'hand-corrupted sxc1.progress: the stored key is present and byte-identical after a reload and after answering another question',
+  jaFirstPersistsValue: 'JA-first: set -> reload -> sxc1.prefs still stores jaFirst=1 and the manual page auto-shows the JA panel',
+  jaFirstPersistsOrder: 'JA-first: set -> reload -> the original-page panel renders before the translated body',
+  jaFirstSurvivesWipe: 'JA-first: wiping progress does not clear the reading preference',
+  jaToggleHidesAndSticks: 'JA-first ON: an explicit #btn-ja-toggle click hides the panel, and it stays hidden until the learner navigates to a different page',
+  reviewBadgeMatchesDue: "review-queue badge (#sxc1-review-badge) count equals the #sxc1-progress payload's due count",
+  deckCardTierMatches: "a deck card's data-tier matches the deck's declared tier: field (content/exercises, independently re-read)",
+  // c3, DELIBERATELY NOT part of runProgressAssertionsPre/Post or the
+  // --self-test-negative sweep -- see --check-storage-refused's own
+  // --help text and this task's final report. Kept here only so its
+  // name is defined in exactly one place.
+  storageRefusedAvailableFalse: 'storage refused: the app still boots and #sxc1-progress reports available=false (never crashes)',
+};
+
+// PRE: must run BEFORE anything else (M2's own exercise assertions
+// included) ever touches localStorage -- c2 and d1's "fresh profile"
+// claims would be vacuous otherwise (a fresh temp --user-data-dir per
+// run, see runSelfTest/main below, is what makes "fresh profile" true at
+// the point this is called).
+async function runProgressAssertionsPre(h, cfg) {
+  const payload0 = await readSxc1Progress(h.evaluate);
+  h.report(
+    PROGRESS_ASSERTION_NAMES.freshRecords,
+    Boolean(payload0 && payload0.records === 0 && payload0.state === 'empty'),
+    payload0,
+  );
+
+  await h.goto(`#/m/${cfg.manualSlug}/p/${cfg.manualPage}`, `#page-${cfg.manualPage}`);
+  const hashAfter = await h.evaluate('window.location.hash');
+  const noAutoJa = typeof hashAfter === 'string' && !hashAfter.endsWith('/ja');
+  h.report(
+    PROGRESS_ASSERTION_NAMES.freshJaFirst,
+    Boolean(payload0 && payload0.jaFirst === false) && noAutoJa,
+    { payload0, hashAfter },
+  );
+}
+
+// POST: everything else. Run once M2's own exercise assertions have
+// already exercised quiz/drill/lookup on this same session (that history
+// is DELIBERATELY not relied on here -- every measurement below starts
+// from an explicit wipe + reload, which resets both the persisted
+// ProgressState (via the wipe) and the in-memory per-exercise engine
+// state (mExStates -- a wipe does not touch it, a fresh page load
+// always starts it at Map.empty, see Main.hs's readerApp/model0), so
+// "first-try correct" really is first-try no matter what earlier
+// assertions already did to the SAME quiz exercise.
+async function runProgressAssertionsPost(h, cfg) {
+  const promptId = `${cfg.quizId}#1`;
+
+  // -- Home, wipe -- a clean-slate SETUP step (the FORMAL "genuinely
+  // empty in between" assertion, B's own pre-condition, is checked
+  // against the SECOND wipe below, the one between export and import --
+  // this first wipe only exists so assertion A starts from nothing).
+  // Polls to the settled post-wipe state rather than reading once
+  // immediately after the confirm click, which dispatches a real Miso
+  // action (phWipe) whose render is not necessarily flushed the instant
+  // the click handler returns -- see waitForProgressPredicate's own
+  // comment. -----------------------------------------------------------
+  await h.goto('#/', '#sxc1-progress-tools');
+  await h.clickAssert('#btn-progress-wipe', 'M3: click #btn-progress-wipe');
+  await h.clickAssert('#btn-progress-wipe-confirm', 'M3: click #btn-progress-wipe-confirm');
+  await waitForProgressPredicate(h.evaluate, "p.records === 0 && p.state === 'empty'", 3000);
+
+  // -- A full RELOAD here resets mExStates to Map.empty (a fresh Haskell
+  // Model), so the quiz below really is a first-ever interaction with
+  // this ExId in THIS Model instance, on top of the just-wiped (empty)
+  // ProgressState. ---------------------------------------------------
+  await h.reload('#sxc1-progress-tools');
+
+  // -- A: answer a fresh quiz correct on the first try, then RELOAD, then
+  // assert on IDENTITY AND VALUE (house standard 2) -- never "the key is
+  // non-empty". -------------------------------------------------------
+  await h.goto(`#/x/${cfg.quizDeck}/${cfg.quizId}`, `#${cfg.quizCorrectOpt}`);
+  await h.clickAssert(`#${cfg.quizCorrectOpt}`, 'M3: click the correct quiz option (first try, clean)');
+  await h.clickAssert('#btn-ex-submit', 'M3: submit the first-try correct answer');
+  await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
+  await h.reload(`#${cfg.quizCorrectOpt}`);
+
+  const payloadA = await readSxc1Progress(h.evaluate);
+  const rawA = await readLocalStorageRaw(h.evaluate, PROGRESS_KEY);
+  const recA = findWireRecord(rawA, promptId);
+  h.report(
+    PROGRESS_ASSERTION_NAMES.answerReloadCount,
+    Boolean(payloadA && payloadA.records === 1) && countWireRecords(rawA) === 1,
+    { payload: payloadA, wireRecordCount: countWireRecords(rawA) },
+  );
+  h.report(
+    PROGRESS_ASSERTION_NAMES.answerReloadInterval,
+    Boolean(recA && recA.reps === 1 && recA.interval === 2),
+    recA,
+  );
+
+  // -- B: export -> wipe (empty in between) -> import -> survives, plus
+  // the import-preview count. ------------------------------------------
+  await h.goto('#/', '#sxc1-progress-tools');
+  await h.clickAssert('#btn-progress-export', 'M3: click #btn-progress-export');
+  await waitForTrue(h.evaluate, "(document.querySelector('#sxc1-export-blob') || {}).value && document.querySelector('#sxc1-export-blob').value.length > 0", 3000);
+  const exportedBlob = await h.evaluate("(document.querySelector('#sxc1-export-blob') || {}).value || ''");
+
+  await h.clickAssert('#btn-progress-wipe', 'M3: click #btn-progress-wipe (before import)');
+  await h.clickAssert('#btn-progress-wipe-confirm', 'M3: click #btn-progress-wipe-confirm (before import)');
+  // THE formal "genuinely empty in between" assertion (house standard 3:
+  // poll to settled, never sample once against a Miso action that may
+  // not have flushed yet).
+  await waitForProgressPredicate(h.evaluate, "p.records === 0 && p.state === 'empty'", 3000);
+  const emptiedForImport = await readSxc1Progress(h.evaluate);
+  h.report(
+    PROGRESS_ASSERTION_NAMES.wipeEmpties,
+    Boolean(emptiedForImport && emptiedForImport.records === 0 && emptiedForImport.state === 'empty'),
+    emptiedForImport,
+  );
+
+  await h.typeText('#sxc1-import-input', exportedBlob);
+  // The placeholder text ("Paste text above to see how many records it
+  // contains.") is itself non-empty, so waiting for "non-empty" would be
+  // vacuous (house standard 2) -- poll for the SPECIFIC expected string
+  // instead. There is exactly one graded prompt at this point (the fresh
+  // quiz answer from assertion A, just exported), so the real app's own
+  // index.js (countPastedRecords) must render exactly "1 record found in
+  // the pasted text." -- singular, exact wording -- never merely
+  // "contains the word record" or "contains a digit".
+  const previewSettled = await waitForTrue(
+    h.evaluate,
+    "(() => { const e = document.querySelector('#sxc1-import-preview'); return Boolean(e && e.textContent === '1 record found in the pasted text.'); })()",
+    3000,
+  );
+  const previewText = await h.evaluate("(() => { const e = document.querySelector('#sxc1-import-preview'); return e ? e.textContent : null; })()");
+  h.report(
+    PROGRESS_ASSERTION_NAMES.importPreview,
+    previewSettled === true && previewText === '1 record found in the pasted text.',
+    { previewText, emptiedForImport },
+  );
+  await h.clickAssert('#btn-progress-import', 'M3: click #btn-progress-import (submit)');
+  await waitForTrue(h.evaluate, "(() => { const e = document.querySelector('#sxc1-progress'); if (!e) return false; try { return JSON.parse(e.textContent).records === 1; } catch (err) { return false; } })()", 3000);
+
+  const payloadB = await readSxc1Progress(h.evaluate);
+  const rawB = await readLocalStorageRaw(h.evaluate, PROGRESS_KEY);
+  const recB = findWireRecord(rawB, promptId);
+  h.report(
+    PROGRESS_ASSERTION_NAMES.exportWipeImportRestores,
+    Boolean(payloadB && payloadB.records === 1)
+      && Boolean(recB && recB.reps === recA.reps && recB.interval === recA.interval && recB.due === recA.due),
+    { payload: payloadB, restored: recB, original: recA },
+  );
+
+  // -- C: a hand-corrupted blob -> corrupt banner, never overwritten. --
+  const CORRUPT_TEXT = 'GARBAGE-NOT-A-VALID-SXC1-BLOB-' + Date.now();
+  await h.evaluate(`(() => { window.localStorage.setItem(${JSON.stringify(PROGRESS_KEY)}, ${JSON.stringify(CORRUPT_TEXT)}); return true; })()`);
+  await h.reload('#sxc1-progress-tools');
+  const bannerShown = await h.evaluate("document.querySelector('#sxc1-corrupt-banner') !== null");
+  const rawText = await h.evaluate("(() => { const e = document.querySelector('#sxc1-corrupt-raw'); return e ? (e.value !== undefined ? e.value : e.textContent) : null; })()");
+  h.report(
+    PROGRESS_ASSERTION_NAMES.corruptBanner,
+    bannerShown === true && rawText === CORRUPT_TEXT,
+    { bannerShown, rawText },
+  );
+
+  // Answer "another question" while corrupt, then reload again -- the
+  // never-overwrite rule under test. The corrupt banner is Home-only
+  // (progressHomeView/renderHome), so "reload" alone is not enough to
+  // observe it -- reload preserves whatever route we were last on (the
+  // quiz), so an explicit return to Home is what actually lets the
+  // banner (or its absence) be read back.
+  await h.goto(`#/x/${cfg.quizDeck}/${cfg.quizId}`, `#${cfg.quizCorrectOpt}`);
+  await h.clickAssert(`#${cfg.quizCorrectOpt}`, 'M3: click the correct quiz option (while progress is corrupt)');
+  await h.clickAssert('#btn-ex-submit', 'M3: submit an answer while progress is corrupt');
+  await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
+  await h.reload(`#${cfg.quizCorrectOpt}`);
+  await h.goto('#/', '#sxc1-progress-tools');
+  const rawAfterAnswer = await readLocalStorageRaw(h.evaluate, PROGRESS_KEY);
+  const bannerStillShown = await h.evaluate("document.querySelector('#sxc1-corrupt-banner') !== null");
+  h.report(
+    PROGRESS_ASSERTION_NAMES.corruptNeverOverwritten,
+    rawAfterAnswer === CORRUPT_TEXT && bannerStillShown === true,
+    { rawAfterAnswer, bannerStillShown },
+  );
+
+  // Explicit wipe clears the corrupt state back to writable/empty before
+  // the JA-first section below (which needs a writable progress key for
+  // its own wipe-based d2 negative control) -- an explicit learner wipe
+  // is the documented, intentional escape from read-only-corrupt mode.
+  await h.goto('#/', '#sxc1-progress-tools');
+  await h.clickAssert('#btn-progress-wipe', 'M3: click #btn-progress-wipe (clear corrupt state)');
+  await h.clickAssert('#btn-progress-wipe-confirm', 'M3: click #btn-progress-wipe-confirm (clear corrupt state)');
+
+  // -- D: JA-first set -> reload -> survives (value AND order), plus its
+  // three required negative controls. ----------------------------------
+  await h.goto(`#/m/${cfg.manualSlug}/p/${cfg.manualPage}`, `#page-${cfg.manualPage}`);
+  await h.clickAssert('#btn-ja-first', 'M3: click #btn-ja-first');
+  // reload()'s own ready-selector (#page-N) is satisfied by BOTH the
+  // pre-redirect render (ja=false, mount's own initial SetRoute) and the
+  // post-redirect one (ja=true, after the freshPage rule's OWN setHash
+  // -> hashchange -> SetRoute round trip) -- the page-body div exists in
+  // both, just reordered. So reload() alone can settle on the FIRST of
+  // those two frames -- the same class of race the #sxc1-prompt-baseline
+  // fix and the wipe-predicate fix above both close. Poll to the
+  // SPECIFIC settled condition (hash ends /ja AND #ja-panel exists)
+  // before reading anything else, rather than trusting reload()'s
+  // generic readiness.
+  await h.reload(`#page-${cfg.manualPage}`);
+  await waitForTrue(
+    h.evaluate,
+    "window.location.hash.endsWith('/ja') && document.querySelector('#ja-panel') !== null",
+    3000,
+  );
+
+  const prefsRaw = await readLocalStorageRaw(h.evaluate, PREFS_KEY);
+  const hashAfterReload = await h.evaluate('window.location.hash');
+  const jaPanelPresent = await h.evaluate("document.querySelector('#ja-panel') !== null");
+  h.report(
+    PROGRESS_ASSERTION_NAMES.jaFirstPersistsValue,
+    /(^|\n)P\tjaFirst\t1(\n|$)/.test(prefsRaw || '') && hashAfterReload.endsWith('/ja') && jaPanelPresent,
+    { prefsRaw, hashAfterReload, jaPanelPresent },
+  );
+
+  const domOrder = await h.evaluate(`(() => {
+    const panel = document.querySelector('#ja-panel');
+    const body = document.querySelector('#page-${cfg.manualPage}');
+    if (!panel || !body) return { panel: Boolean(panel), body: Boolean(body) };
+    // DOCUMENT_POSITION_FOLLOWING (4): panel precedes body.
+    const rel = panel.compareDocumentPosition(body);
+    return { panelBeforeBody: Boolean(rel & Node.DOCUMENT_POSITION_FOLLOWING) };
+  })()`);
+  h.report(PROGRESS_ASSERTION_NAMES.jaFirstPersistsOrder, domOrder && domOrder.panelBeforeBody === true, domOrder);
+
+  await h.goto('#/', '#sxc1-progress-tools');
+  await h.clickAssert('#btn-progress-wipe', 'M3: click #btn-progress-wipe (d2: must not clear jaFirst)');
+  await h.clickAssert('#btn-progress-wipe-confirm', 'M3: click #btn-progress-wipe-confirm (d2)');
+  await waitForProgressPredicate(h.evaluate, "p.state === 'empty'", 3000);
+  const payloadAfterWipe2 = await readSxc1Progress(h.evaluate);
+  const prefsRawAfterWipe = await readLocalStorageRaw(h.evaluate, PREFS_KEY);
+  h.report(
+    PROGRESS_ASSERTION_NAMES.jaFirstSurvivesWipe,
+    Boolean(payloadAfterWipe2 && payloadAfterWipe2.jaFirst === true) && /(^|\n)P\tjaFirst\t1(\n|$)/.test(prefsRawAfterWipe || ''),
+    { payloadAfterWipe2, prefsRawAfterWipe },
+  );
+
+  // d3: an explicit toggle hides the panel and it STAYS hidden until the
+  // learner navigates to a different page (jaFirst must not fight it).
+  await h.goto(`#/m/${cfg.manualSlug}/p/${cfg.manualPage}`, `#ja-panel`);
+  await h.clickAssert('#btn-ja-toggle', 'M3: click #btn-ja-toggle (d3: explicit hide)');
+  const hidNow = await waitForTrue(h.evaluate, "document.querySelector('#ja-panel') === null", 2000);
+  const staysHidden = hidNow && await staysFalseThroughout(h.evaluate, "document.querySelector('#ja-panel') !== null", 600);
+  let reappearsOnNewPage = false;
+  if (staysHidden) {
+    await h.goto(`#/m/${cfg.manualSlug}/p/${cfg.manualNextPage}`, `#page-${cfg.manualNextPage}`);
+    reappearsOnNewPage = await waitForTrue(h.evaluate, "document.querySelector('#ja-panel') !== null", 3000);
+  }
+  h.report(
+    PROGRESS_ASSERTION_NAMES.jaToggleHidesAndSticks,
+    hidNow && staysHidden && reappearsOnNewPage,
+    { hidNow, staysHidden, reappearsOnNewPage },
+  );
+
+  // Leave JA-first off again so it cannot bleed into any check that runs
+  // after this function returns (defensive; nothing currently does, but
+  // an assertion group should never depend on being last).
+  await h.clickAssert('#btn-ja-first', 'M3: click #btn-ja-first (reset to off)');
+
+  // -- E: review-queue badge vs payload's due; deck-card tier. ----------
+  // payloadE is read AFTER the goto below (not immediately after the
+  // ja-first reset click above) -- goto's own ready-selector poll
+  // already waits for THIS navigation's render to settle, which is a
+  // safe point to read #sxc1-progress from (unlike reading immediately
+  // after a click that dispatches a Miso action with no intervening
+  // wait -- see waitForProgressPredicate's own comment).
+  await h.goto('#/', '#sxc1-review-badge');
+  const payloadE = await readSxc1Progress(h.evaluate);
+  const badgeText = await h.evaluate("(() => { const e = document.querySelector('#sxc1-review-badge'); return e ? e.textContent : null; })()");
+  const badgeNum = badgeText ? Number((badgeText.match(/\d+/) || [NaN])[0]) : NaN;
+  h.report(
+    PROGRESS_ASSERTION_NAMES.reviewBadgeMatchesDue,
+    Boolean(payloadE) && Number.isFinite(badgeNum) && badgeNum === payloadE.due,
+    { badgeText, badgeNum, due: payloadE ? payloadE.due : null },
+  );
+
+  await h.goto(`#/x/${cfg.deckSlug}`, '.deck-card');
+  const domTier = await h.evaluate("(() => { const e = document.querySelector('.deck-card'); return e ? e.getAttribute('data-tier') : null; })()");
+  h.report(
+    PROGRESS_ASSERTION_NAMES.deckCardTierMatches,
+    Boolean(domTier) && domTier === cfg.expectedTier,
+    { domTier, expectedTier: cfg.expectedTier },
+  );
+}
+
 // `value` is either inline JSON text or a path to a JSON file (matches
 // --exercise-fixture's documented "<path|json>" and, pragmatically,
 // --expect-exercise-json too). Tries inline JSON first; falls back to
@@ -1484,10 +2461,22 @@ function parseJsonOrFile(value, label) {
   return JSON.parse(raw);
 }
 
+// M2 gate-3 LOW, closed by the M3 harness wave: this used to require only
+// drill deck/id/steps/hasVerify and lookup deck/id/targetPage. A hand-
+// supplied or stale fixture missing drill.citeSlug/citePage or
+// lookup.targetSlug passed this upfront validation, then produced
+// "#/m/undefined/..." expectations deep inside runExerciseAssertions and
+// failed later with misleading browser output instead of failing fast,
+// here, before a browser is even launched. citeSlug/citePage/targetSlug
+// are exactly the fields SELF_TEST_FIXTURE already carries (see its own
+// drill/lookup entries above) and exactly what the sabotage-negative
+// assertion names below interpolate -- this just makes a REAL
+// --exercise-fixture payload missing them fail loudly instead of
+// silently.
 const EXERCISE_FIXTURE_FIELDS = {
   quiz: ['deck', 'id', 'correctOpt', 'wrongOpt', 'citeSlug', 'citePage'],
-  drill: ['deck', 'id', 'steps', 'hasVerify'],
-  lookup: ['deck', 'id', 'targetPage'],
+  drill: ['deck', 'id', 'steps', 'hasVerify', 'citeSlug', 'citePage'],
+  lookup: ['deck', 'id', 'targetPage', 'targetSlug'],
 };
 
 // Validates the shape exercise-check --browser-fixture emits. Returns
@@ -1512,6 +2501,174 @@ function validateExerciseFixture(fx) {
 // app via --exercise-fixture. `negative` selects the sabotaged grader
 // and the negative-control exit-code rule (see below).
 // ---------------------------------------------------------------------------
+
+// M3 harness wave, negative control c3 ("storage refused"): a standalone
+// diagnostic, NOT part of the ordinary pass/fail run and NOT invoked by
+// check-site.sh -- see --check-storage-refused's own --help text for the
+// full rationale, and this task's final report for what running this
+// against the real app actually shows. Launches its own throwaway
+// browser (same idiom as runSelfTest), injects a script BEFORE the
+// page's own via Page.addScriptToEvaluateOnNewDocument that makes
+// window.localStorage's setItem/getItem/removeItem all throw --
+// window.localStorage itself stays present and accessible, matching
+// Progress.Store's own Haddock ("a private-mode browser can expose
+// window.localStorage and still throw on the first write") -- then
+// navigates to --url and reports what actually happens: the app is
+// expected to boot and #sxc1-progress to report "available":false
+// (Progress.Store.storageAvailable's guarded probe catching the throw),
+// never a crash.
+async function runStorageRefusedCheck(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const cleanupFns = [];
+  const runCleanup = async () => {
+    for (const fn of cleanupFns.splice(0).reverse()) {
+      try { await fn(); } catch { /* best-effort cleanup */ }
+    }
+  };
+  const die = async (code, message) => {
+    if (message) console.log(message);
+    await runCleanup();
+    process.exit(code);
+  };
+
+  const browserPath = resolveBrowser(opts.browser);
+  if (!browserPath) {
+    await die(2, 'error: no browser found for --check-storage-refused. Install Google Chrome/Chromium, or set ' +
+      'SXC1_BROWSER to a browser executable path, or pass --browser <path>.');
+    return;
+  }
+
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sxc1-storagerefused-profile-'));
+  cleanupFns.push(() => removeDirWithRetry(userDataDir));
+  const debugPort = await findFreePort();
+  const browserArgs = [
+    '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
+    '--disable-dev-shm-usage', `--user-data-dir=${userDataDir}`, `--remote-debugging-port=${debugPort}`, 'about:blank',
+  ];
+  const browserProc = spawn(browserPath, browserArgs, { stdio: 'ignore', detached: true });
+  let cdp = null;
+  let browserFailure = null;
+  const noteBrowserFailure = (message) => {
+    if (!browserFailure) browserFailure = new Error(message);
+    if (cdp) cdp.failFatally(browserFailure);
+  };
+  browserProc.on('exit', (code, signal) => {
+    noteBrowserFailure(`browser process exited unexpectedly (code=${code === null ? 'null' : code}, signal=${signal || 'none'})`);
+  });
+  browserProc.on('error', (err) => {
+    noteBrowserFailure(`browser process error: ${err && err.message ? err.message : err}`);
+  });
+  cleanupFns.push(() => new Promise((resolve) => {
+    const killGroup = (signal) => { try { process.kill(-browserProc.pid, signal); } catch { /* group already gone */ } };
+    if (browserProc.exitCode !== null || browserProc.signalCode !== null) { killGroup('SIGKILL'); resolve(); return; }
+    const forceKillTimer = setTimeout(() => killGroup('SIGKILL'), 3000);
+    browserProc.once('exit', () => { clearTimeout(forceKillTimer); killGroup('SIGKILL'); resolve(); });
+    killGroup('SIGTERM');
+  }));
+
+  let versionInfo = null;
+  while (Date.now() < deadline) {
+    if (browserFailure) {
+      await die(2, `error: ${browserFailure.message} (before DevTools became reachable at ${browserPath})`);
+      return;
+    }
+    try {
+      const info = await withDeadline(
+        httpGetJson(`http://127.0.0.1:${debugPort}/json/version`),
+        deadline,
+        'DevTools /json/version request',
+      );
+      if (info && info.webSocketDebuggerUrl) { versionInfo = info; break; }
+    } catch { /* not up yet, or this attempt ran past the deadline */ }
+    await sleep(200);
+  }
+  if (!versionInfo) {
+    await die(2, 'error: timed out waiting for DevTools (--check-storage-refused)');
+    return;
+  }
+
+  const ws = await withDeadline(connectWebSocket(versionInfo.webSocketDebuggerUrl), deadline, 'WebSocket connect');
+  cleanupFns.push(() => { try { ws.close(); } catch { /* ignore */ } });
+  cdp = new CDPClient(ws, { getRemaining: () => remaining(deadline) });
+  ws.addEventListener('close', () => cdp.failFatally(new Error('CDP WebSocket closed unexpectedly')));
+  ws.addEventListener('error', (ev) => cdp.failFatally(new Error(`CDP WebSocket error: ${formatWsErrorEvent(ev)}`)));
+
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+  await cdp.send('Page.enable', {}, sessionId);
+  await cdp.send('Runtime.enable', {}, sessionId);
+
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `
+      var sxc1RealStorage = window.localStorage;
+      var sxc1Thrower = function () { throw new DOMException('SXC1 test: storage refused', 'QuotaExceededError'); };
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        get: function () {
+          return { setItem: sxc1Thrower, getItem: sxc1Thrower, removeItem: sxc1Thrower, clear: sxc1Thrower, key: sxc1Thrower, length: 0 };
+        }
+      });
+    `,
+  }, sessionId);
+
+  const evaluate = async (expression) => {
+    const res = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+    if (res.exceptionDetails) {
+      const d = res.exceptionDetails;
+      throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
+    }
+    return res.result ? res.result.value : undefined;
+  };
+
+  await cdp.send('Page.navigate', { url: opts.url }, sessionId);
+
+  let bootOutcome = null;
+  while (Date.now() < deadline) {
+    let state;
+    try {
+      state = await evaluate(`(() => {
+        if (typeof window.__SXC1_BOOT_ERROR === 'string') return { error: window.__SXC1_BOOT_ERROR };
+        if (window.__SXC1_BOOTED === true) return { booted: true };
+        return { pending: true };
+      })()`);
+    } catch (err) {
+      state = { error: `evaluate failed: ${err && err.message ? err.message : err}` };
+    }
+    if (state.error) { bootOutcome = { ok: false, error: state.error }; break; }
+    if (state.booted) { bootOutcome = { ok: true }; break; }
+    await sleep(100);
+  }
+
+  const NAME = PROGRESS_ASSERTION_NAMES.storageRefusedAvailableFalse;
+
+  if (!bootOutcome) {
+    console.log(`FAIL - ${NAME} (observed: timed out waiting for boot or an error)`);
+    await die(1, null);
+    return;
+  }
+  if (!bootOutcome.ok) {
+    console.log(`FAIL - ${NAME} (observed: the app did NOT boot -- window.__SXC1_BOOT_ERROR = ${JSON.stringify(bootOutcome.error)})`);
+    console.log('       This is a REAL, reproducible finding, not a harness bug: forcing window.localStorage.setItem/getItem/removeItem to throw (while leaving');
+    console.log('       window.localStorage itself present, matching real private-mode behaviour) makes the app fail to boot instead of gracefully falling back');
+    console.log('       to available:false. Progress.Store.storageAvailable is documented to guard exactly this case (guarded = try); this run is evidence that,');
+    console.log('       against a real thrown JS exception from a foreign-import call, the app does not currently degrade gracefully. Out of scope for scripts/');
+    console.log('       (site/app/Progress/Store.hs is owned by task "storage-sink") -- reported here as this negative control\'s actual, reproducible result.');
+    await die(1, null);
+    return;
+  }
+
+  const payloadRaw = await evaluate(`(() => { const e = document.querySelector('#sxc1-progress'); return e ? e.textContent : null; })()`);
+  let payload = null;
+  try { payload = JSON.parse(payloadRaw); } catch { /* reported below */ }
+  const ok = Boolean(payload && payload.available === false);
+  if (ok) {
+    console.log(`ok - ${NAME}`);
+    await die(0, null);
+  } else {
+    console.log(`FAIL - ${NAME} (observed: booted, but #sxc1-progress = ${payloadRaw})`);
+    await die(1, null);
+  }
+}
 
 async function runSelfTest(opts, negative) {
   const deadline = Date.now() + opts.timeout;
@@ -1713,6 +2870,34 @@ async function runSelfTest(opts, negative) {
   const clearViewport = () => cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
   const consoleHygiene = () => ({ ok: consoleErrors.length === 0 && exceptions.length === 0, consoleErrors, exceptions });
 
+  // M3 harness wave: "reload" for the persistence assertions -- an
+  // ordinary Page.reload of the SAME file:// fixture, which re-executes
+  // the whole inline <script> from scratch (a fresh IIFE invocation,
+  // module-scope vars reinitialised) while localStorage -- the very
+  // thing under test -- survives, exactly mirroring the real run's own
+  // reload (see that one's comment for the full rationale).
+  const reload = async (readySelector, timeoutMs = 15000) => {
+    await cdp.send('Page.reload', {}, sessionId);
+    const bootDeadline = Date.now() + timeoutMs;
+    let rebooted = false;
+    while (Date.now() < bootDeadline) {
+      let b;
+      try { b = await evaluate('window.__SXC1_BOOTED === true'); } catch { b = false; }
+      if (b === true) { rebooted = true; break; }
+      await sleep(50);
+    }
+    if (!rebooted) throw new Error(`self-test fixture did not report __SXC1_BOOTED within ${timeoutMs}ms after reload`);
+    if (readySelector) {
+      const readyDeadline = Date.now() + timeoutMs;
+      while (Date.now() < readyDeadline) {
+        if (await evaluate(`document.querySelector(${JSON.stringify(readySelector)}) !== null`)) return true;
+        await sleep(30);
+      }
+      return false;
+    }
+    return true;
+  };
+
   // M2 gate fix (H1/H6/M5): --self-test's own coldLoadFn. A SECOND,
   // independent target attached to the SAME throwaway browser, whose
   // INITIAL navigation URL already carries the quiz's own deep-link hash
@@ -1768,12 +2953,45 @@ async function runSelfTest(opts, negative) {
     }
   };
 
+  // M3 harness wave: the persistence/JA-first/corrupt-blob/review-queue
+  // assertions, driven against THIS SAME fixture page (see
+  // selfTestFixtureHtml's own M3 section above) via
+  // runProgressAssertionsPre/Post -- the same "one function, two
+  // callers" pattern as runExerciseAssertions. `report` here is the
+  // outer report() (drives passed/total + console output); progressResults
+  // separately tracks {name, ok} pairs so --self-test-negative's
+  // expectedToFail matching below can see them, the same way `results`
+  // does for the M2 ones.
+  const progressResults = [];
+  const progressReport = (name, ok, observed) => { progressResults.push({ name, ok }); report(name, ok, observed); };
+  const progressHandle = { evaluate, report: progressReport, goto, click, clickAssert, assertElement, typeText, reload };
+  const progressCfg = {
+    quizDeck: SELF_TEST_FIXTURE.quiz.deck,
+    quizId: SELF_TEST_FIXTURE.quiz.id,
+    quizCorrectOpt: SELF_TEST_FIXTURE.quiz.correctOpt,
+    deckSlug: SELF_TEST_FIXTURE.quiz.deck,
+    expectedTier: PROGRESS_SELF_TEST_TIER,
+    manualSlug: 'demo-manual',
+    manualPage: 1,
+    manualNextPage: 2,
+  };
+
+  // PRE must run before ANYTHING touches localStorage, including
+  // runExerciseAssertions below (its own cold-load quiz answer alone
+  // would already make "records=0" false).
+  await runProgressAssertionsPre(progressHandle, progressCfg);
+
   const results = await runExerciseAssertions(
     { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene },
     SELF_TEST_FIXTURE,
     negative ? null : expectedExJson,
     coldLoadFn,
   );
+
+  // POST does not rely on anything runExerciseAssertions left behind --
+  // it starts with its own wipe + reload.
+  await runProgressAssertionsPost(progressHandle, progressCfg);
+  results.push(...progressResults);
 
   await runCleanup();
 
@@ -1798,6 +3016,27 @@ async function runSelfTest(opts, negative) {
       'Restart yields a genuinely blank prompt: no #ex-feedback, no #ex-note, no #btn-ex-next, no option aria-pressed="true"',
       `a completed drill renders a.cite hrefs that are well-formed AND include the declared #/m/${SELF_TEST_FIXTURE.drill.citeSlug}/p/${SELF_TEST_FIXTURE.drill.citePage}`,
       `a graded (correct) lookup renders an a.cite whose href equals the declared #/m/${SELF_TEST_FIXTURE.lookup.targetSlug}/p/${SELF_TEST_FIXTURE.lookup.targetPage}`,
+      // M3 harness wave: every new persistence/JA-first/corrupt-blob/
+      // review-queue assertion name -- see selfTestFixtureHtml's own M3
+      // section for exactly which SABOTAGE branch breaks each one, and
+      // runProgressAssertionsPost's inline comments for why each is
+      // isolated (or, where honestly unavoidable, cascades) the way it
+      // does.
+      PROGRESS_ASSERTION_NAMES.freshRecords,
+      PROGRESS_ASSERTION_NAMES.freshJaFirst,
+      PROGRESS_ASSERTION_NAMES.wipeEmpties,
+      PROGRESS_ASSERTION_NAMES.answerReloadCount,
+      PROGRESS_ASSERTION_NAMES.answerReloadInterval,
+      PROGRESS_ASSERTION_NAMES.importPreview,
+      PROGRESS_ASSERTION_NAMES.exportWipeImportRestores,
+      PROGRESS_ASSERTION_NAMES.corruptBanner,
+      PROGRESS_ASSERTION_NAMES.corruptNeverOverwritten,
+      PROGRESS_ASSERTION_NAMES.jaFirstPersistsValue,
+      PROGRESS_ASSERTION_NAMES.jaFirstPersistsOrder,
+      PROGRESS_ASSERTION_NAMES.jaFirstSurvivesWipe,
+      PROGRESS_ASSERTION_NAMES.jaToggleHidesAndSticks,
+      PROGRESS_ASSERTION_NAMES.reviewBadgeMatchesDue,
+      PROGRESS_ASSERTION_NAMES.deckCardTierMatches,
     ];
     const byName = new Map(results.map((r) => [r.name, r.ok]));
     const problems = [];
@@ -1864,6 +3103,14 @@ async function main() {
   }
   if (opts.selfTest || opts.selfTestNegative) {
     await runSelfTest(opts, opts.selfTestNegative === true);
+    return;
+  }
+
+  // --check-storage-refused: also a full short-circuit (its own
+  // throwaway browser, own target, own deadline) -- see its own --help
+  // text and runStorageRefusedCheck's comment.
+  if (opts.checkStorageRefused) {
+    await runStorageRefusedCheck(opts);
     return;
   }
 
@@ -2792,12 +4039,74 @@ async function main() {
           }
         };
 
+        // M3 harness wave: "reload" for the persistence assertions below --
+        // an ORDINARY full-page reload (not a hash change), which
+        // re-fetches app.wasm and re-runs hs_start(), giving a genuinely
+        // fresh Haskell Model (mExStates back to Map.empty) while
+        // localStorage -- the very thing under test -- survives, exactly
+        // like a learner closing and reopening the tab. Reuses the SAME
+        // boot-poll technique as the cold-target boot wait just above,
+        // against the SAME sessionId (Page.reload keeps the target/session
+        // alive, so the existing console-hygiene listeners keep working
+        // across it for free).
+        const reload = async (readySelector, timeoutMs = 15000) => {
+          await cdp.send('Page.reload', {}, sessionId);
+          const bootDeadline = Date.now() + timeoutMs;
+          let booted = false;
+          while (Date.now() < bootDeadline) {
+            const state = await evaluate(`(() => {
+              if (typeof window.__SXC1_BOOT_ERROR === 'string') return { error: window.__SXC1_BOOT_ERROR };
+              if (window.__SXC1_BOOTED === true) return { booted: true };
+              return { pending: true };
+            })()`);
+            if (state && state.error) throw new Error(`boot error after reload: ${state.error}`);
+            if (state && state.booted) { booted = true; break; }
+            await sleep(60);
+          }
+          if (!booted) throw new Error(`app did not report __SXC1_BOOTED within ${timeoutMs}ms after reload`);
+          if (readySelector) {
+            const readyDeadline = Date.now() + timeoutMs;
+            while (Date.now() < readyDeadline) {
+              if (await evaluate(`document.querySelector(${JSON.stringify(readySelector)}) !== null`)) return true;
+              await sleep(30);
+            }
+            return false;
+          }
+          return true;
+        };
+
+        // deckTierFromDisk re-derives the quiz's OWN deck's declared
+        // tier: straight from content/exercises/ -- independent of
+        // whatever the app renders, for assertion "deckCardTierMatches".
+        const progressCfg = {
+          quizDeck: exerciseFixture.quiz.deck,
+          quizId: exerciseFixture.quiz.id,
+          quizCorrectOpt: exerciseFixture.quiz.correctOpt,
+          deckSlug: exerciseFixture.quiz.deck,
+          expectedTier: deckTierFromDisk(exerciseFixture.quiz.deck),
+          manualSlug: 'guide-book',
+          manualPage: 17,
+          manualNextPage: 18,
+        };
+        const progressHandle = { evaluate, report, goto, click, clickAssert, assertElement, typeText, reload };
+
+        // PRE must run before ANYTHING touches localStorage, including
+        // M2's own runExerciseAssertions below (its cold-load quiz answer
+        // alone would already make "records=0" false) -- see
+        // runProgressAssertionsPre's own comment.
+        await runProgressAssertionsPre(progressHandle, progressCfg);
+
         await runExerciseAssertions(
           { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene },
           exerciseFixture,
           expectedExerciseJson,
           coldLoadFn,
         );
+
+        // POST does not rely on anything runExerciseAssertions left
+        // behind (it starts with its own wipe + reload) -- see
+        // runProgressAssertionsPost's own comment.
+        await runProgressAssertionsPost(progressHandle, progressCfg);
       }
     }
 

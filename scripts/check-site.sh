@@ -47,6 +47,13 @@ SKIP_CONTENT=0
 if [ "${SXC1_SKIP_CONTENT:-0}" = "1" ]; then
   SKIP_CONTENT=1
 fi
+# --optimized (M3 harness, "build the lever, do not pull it" -- see the
+# big comment right before its implementation below, near the top of the
+# main check sequence): NOT a new skip axis (this is opt-IN extra work,
+# never fewer checks) and NOT a change to what a plain `check-site.sh`
+# checks by default. Off by default, same convention as the two flags
+# above.
+OPTIMIZED=0
 
 usage() {
   cat <<EOF
@@ -84,6 +91,25 @@ Options:
                    without --expect-exercise-json/--exercise-fixture (the
                    M2 exercise-engine browser assertions simply do not run
                    in that case -- see check 17 below).
+  --optimized      BUILD THE LEVER, DO NOT PULL IT (PLAN.md "Size ruling"
+                   is the coordinator's call, not this flag's): re-derives
+                   an optimized+stripped COPY of the artifact already at
+                   --dir by running \`wasm-opt -all -O2\` then
+                   \`wasm-tools strip\` on a copy of app.wasm (never the
+                   original -- the unoptimized artifact this invocation
+                   was pointed at is left untouched), reports both gzip
+                   sizes, then re-runs THIS ENTIRE SAME SUITE against the
+                   optimized copy via a fresh self-invocation with --dir
+                   pointed at it (forwarding --port/--skip-browser/
+                   --skip-content). Exits with that inner run's exit
+                   code. Requires wasm-opt and wasm-tools on PATH (the
+                   toolchain env is sourced automatically, same as the
+                   content-checker below). Does NOT change what a plain
+                   \`check-site.sh\` (no --optimized) checks, and does NOT
+                   change build-site.sh's own --optimize default (still
+                   off -- see OPTIMIZE=0 there). Adopting wasm-opt as the
+                   default shipping build is a coordinator/CI decision
+                   (task "docs-and-ci"), not this flag's.
   --port N         TCP port to try first for the dev server used by the
                    browser checks (default: 8123, env SXC1_PORT). If busy,
                    the next free port is used instead.
@@ -232,6 +258,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-content)
       SKIP_CONTENT=1
+      shift
+      ;;
+    --optimized)
+      OPTIMIZED=1
       shift
       ;;
     --port)
@@ -442,6 +472,93 @@ register_temp_file() {
 }
 
 echo "check-site: checking '$DIR'"
+
+# ===========================================================================
+# --optimized (M3 harness, task "harness", item 5): BUILD THE LEVER, DO NOT
+# PULL IT. This must run before Check 1 and short-circuit everything below
+# -- it is a "build a variant, then delegate the entire suite to it" step,
+# not a check of its own.
+#
+# What it does NOT do, on purpose: it never touches $DIR/app.wasm itself
+# (the artifact this invocation was pointed at stays exactly as
+# build-site.sh left it -- optimized or not, whatever it already was); it
+# never edits build-site.sh's own OPTIMIZE default (still 0, checked by
+# this task's own verify_commands); and it adds no new skip axis -- this is
+# opt-in EXTRA verification, never fewer checks on the default path.
+#
+# Ordering (mirrors build-site.sh's own --optimize branch exactly): run
+# wasm-opt/wasm-tools strip strictly AFTER post-link.mjs, never before --
+# stripping removes the custom wasm section post-link.mjs reads to emit
+# ghc_wasm_jsffi.js. $DIR/app.wasm was already produced by build-site.sh,
+# which always runs post-link.mjs before any optional optimize step
+# (--optimize or not) -- so optimizing a COPY of it here, without ever
+# re-running post-link, satisfies that ordering by construction.
+#
+# Sizing context (coordinator, PLAN.md "Size ruling", 2026-08-07): the M3
+# designer measured wasm-opt -O2 saving 169-179 KB on this codebase and
+# could not make it miscompile (exercise-check --self-test byte-identical
+# output; the real optimized app passed 70/70 browser assertions across
+# six runs). This flag is what lets that lever be re-verified on demand,
+# against the SAME suite everything else is judged by, without silently
+# adopting it as the default build. Measured on this tree (M3 harness
+# wave, full 52-deck/435-exercise course): unoptimized app.wasm gzips to
+# 1,094,331 bytes (over the 1,000,000 ceiling -- see the WASM_GZIP_CEILING
+# comment below for why that is a known, already-ruled-on gap this task
+# does not close); wasm-opt -all -O2 + wasm-tools strip brings that down
+# to approximately 907,600-907,650 bytes (measured 907,644 and 907,635 on
+# two runs a few source-tree edits apart) -- comfortably under budget.
+# Adopting wasm-opt as the DEFAULT shipping build is a coordinator/CI
+# decision (task "docs-and-ci"), never this script's to make on its own.
+# ===========================================================================
+if [ "$OPTIMIZED" -eq 1 ]; then
+  TOOLCHAIN_ENV_FILE="${GHC_WASM_PREFIX:-$HOME/.ghc-wasm}/env"
+  if [ -f "$TOOLCHAIN_ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$TOOLCHAIN_ENV_FILE"
+  fi
+
+  if ! command -v wasm-opt >/dev/null 2>&1 || ! command -v wasm-tools >/dev/null 2>&1; then
+    echo "check-site: --optimized requires both wasm-opt and wasm-tools on PATH (source $TOOLCHAIN_ENV_FILE or install the toolchain)" >&2
+    exit 1
+  fi
+  if [ ! -f "$DIR/app.wasm" ]; then
+    echo "check-site: --optimized needs an existing build at '$DIR/app.wasm' -- run ./scripts/build-site.sh first" >&2
+    exit 1
+  fi
+
+  ORIG_GZIP="$(gzip -c "$DIR/app.wasm" | wc -c | tr -d ' ')"
+
+  OPT_TMP="$(mktemp -d -t sxc1-check-site-optimized.XXXXXX)"
+  register_temp_dir "$OPT_TMP"
+  OPT_DIR="$OPT_TMP/public"
+  mkdir -p "$OPT_DIR"
+  cp -R "$DIR"/. "$OPT_DIR"/
+
+  echo "check-site: --optimized -- running wasm-opt -all -O2 then wasm-tools strip on a COPY of '$DIR/app.wasm' (the original is untouched)"
+  if ! wasm-opt -all -O2 "$OPT_DIR/app.wasm" -o "$OPT_DIR/app.opt.wasm"; then
+    echo "check-site: --optimized -- wasm-opt failed; the artifact at '$DIR' was never modified" >&2
+    exit 1
+  fi
+  if ! wasm-tools strip -o "$OPT_DIR/app.wasm" "$OPT_DIR/app.opt.wasm"; then
+    echo "check-site: --optimized -- wasm-tools strip failed; the artifact at '$DIR' was never modified" >&2
+    exit 1
+  fi
+  rm -f "$OPT_DIR/app.opt.wasm"
+
+  OPT_GZIP="$(gzip -c "$OPT_DIR/app.wasm" | wc -c | tr -d ' ')"
+  echo "check-site: app.wasm gzip -- UNOPTIMIZED (as built): $ORIG_GZIP bytes; OPTIMIZED+stripped (this flag): $OPT_GZIP bytes; saved $((ORIG_GZIP - OPT_GZIP)) bytes"
+
+  CHILD_ARGS=(--dir "$OPT_DIR" --port "$PORT")
+  if [ "$SKIP_BROWSER" -eq 1 ]; then CHILD_ARGS+=(--skip-browser); fi
+  if [ "$SKIP_CONTENT" -eq 1 ]; then CHILD_ARGS+=(--skip-content); fi
+
+  echo "check-site: --optimized -- running the ENTIRE existing suite against the optimized copy: ${BASH_SOURCE[0]} ${CHILD_ARGS[*]}"
+  set +e
+  "${BASH_SOURCE[0]}" "${CHILD_ARGS[@]}"
+  CHILD_RC=$?
+  set -e
+  exit "$CHILD_RC"
+fi
 
 # ===========================================================================
 # Check 1: required files exist at the root of the build directory.
@@ -697,6 +814,89 @@ fi
 rm -f "$CLOCK_STUB_PY"
 
 # ===========================================================================
+# THE Miso.Storage STANDING GUARD (M3 harness, task "harness", item 6).
+# Unconditional -- not on the content axis, never skipped, a pure
+# source-tree grep with no toolchain dependency, exactly like the clock/M4
+# invariant just above.
+#
+# briefs/M3-manifest.json's own milestone_verify_commands already gate this
+# exact property at the MILESTONE level; this check exists so a plain
+# `./scripts/check-site.sh` run also catches it, on the same "every check
+# reports through ok()/fail()/skip()" bookkeeping everything else here
+# uses. "SXC1.Progress.Store" (site/app/Progress/Store.hs) is the ONE
+# module in the project allowed to import Miso.Storage -- pure codecs live
+# in SXC1.Progress.Codec, and every OTHER module is expected to go through
+# Store's small IO-boundary API (loadProgress/saveProgress/wipeProgress/
+# loadPrefs/savePrefs/storageAvailable) rather than touching localStorage
+# directly, so the never-overwrite-a-corrupt-blob rule has exactly one
+# place it can be violated from.
+#
+# CASE-INSENSITIVE, DELIBERATELY: Miso's actual API surface is
+# `setLocalStorage`/`getLocalStorage`/`removeLocalStorage` (see
+# Miso.Storage's own export list) -- a case-SENSITIVE grep for the module
+# name still catches an `import Miso.Storage` line, but the module-name
+# grep alone would miss a hypothetical direct FFI/JS-DSL reach for
+# `window.localStorage` under a differently-cased identifier. Grepping
+# case-insensitively for the substring "localstorage" catches both the
+# import line and any such call, wherever spelled.
+#
+# ANCHORED TO NON-COMMENT LINES (house standard 5): a naive
+# `grep -rli "miso.storage\|localstorage"` across this tree ALSO matches
+# Haddock prose that merely DESCRIBES the rule ("no 'Miso.Storage' import"
+# in SXC1.Exercise.Engine's module header; "the ONE module ... allowed to
+# ... write @localStorage@" in Store.hs's own Haddock and in
+# SXC1.Progress.Codec's) -- demonstrated directly: an unanchored grep over
+# this exact tree returns THREE files, not one, purely from comments
+# describing the very discipline this check exists to enforce (the M0-n2
+# pattern this project has been bitten by before). This uses the same
+# split-each-line-on-its-first-"--" strip the clock/M4 check just above
+# already uses, for the same reason -- a naive grep is trivially defeated
+# by (or in this case, trivially defeats itself against) a comment.
+# ===========================================================================
+STORAGE_GUARD_PY="$(mktemp -t sxc1-check-site-storageguard.XXXXXX.py)"
+register_temp_file "$STORAGE_GUARD_PY"
+cat > "$STORAGE_GUARD_PY" <<'PYEOF'
+import os
+import sys
+
+ROOTS = sys.argv[1:]
+NEEDLES = ("miso.storage", "localstorage")
+
+hits = []
+for root in ROOTS:
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for fn in filenames:
+            if not fn.endswith(".hs"):
+                continue
+            path = os.path.join(dirpath, fn)
+            with open(path, encoding="utf-8") as fh:
+                for line in fh:
+                    code_part = line.split("--", 1)[0].lower()
+                    if any(n in code_part for n in NEEDLES):
+                        hits.append(path)
+                        break
+
+hits = sorted(set(hits))
+print("HITS " + ("\t".join(hits) if hits else ""))
+PYEOF
+
+if command -v python3 >/dev/null 2>&1; then
+  STORAGE_GUARD_OUT="$(python3 "$STORAGE_GUARD_PY" "$REPO_ROOT/site/src" "$REPO_ROOT/site/app" "$REPO_ROOT/site/test" 2>&1)" || true
+  STORAGE_HITS="${STORAGE_GUARD_OUT#HITS }"
+  if [ "$STORAGE_HITS" = "$REPO_ROOT/site/app/Progress/Store.hs" ]; then
+    ok "Miso.Storage (case-insensitive, non-comment lines only: Miso.Storage or *localStorage*) appears in exactly one file: site/app/Progress/Store.hs"
+  else
+    STORAGE_HITS_DISPLAY="$(printf '%s' "$STORAGE_HITS" | tr '\t' ' ')"
+    STORAGE_HIT_COUNT=0
+    [ -n "$STORAGE_HITS" ] && STORAGE_HIT_COUNT="$(printf '%s' "$STORAGE_HITS" | tr '\t' '\n' | grep -c . || true)"
+    fail "Miso.Storage (case-insensitive, non-comment lines only: Miso.Storage or *localStorage*) appears in exactly one file, site/app/Progress/Store.hs (observed: $STORAGE_HIT_COUNT file(s): ${STORAGE_HITS_DISPLAY:-<none>})"
+  fi
+else
+  fail "Miso.Storage (case-insensitive, non-comment lines only: Miso.Storage or *localStorage*) appears in exactly one file, site/app/Progress/Store.hs (observed: python3 not found on PATH)"
+fi
+rm -f "$STORAGE_GUARD_PY"
+
+# ===========================================================================
 # Check 6: byte sizes, raw and gzipped -- informational, never a failure.
 # ===========================================================================
 report_size() {
@@ -738,6 +938,26 @@ report_size "$JSFFI_FILE" "ghc_wasm_jsffi.js"
 # CI logs long before the ceiling is ever approached. If this constant
 # ever needs to move, that must be a deliberate, explained change -- not
 # a silent bump to make a red build green.
+#
+# M3 UPDATE (coordinator, PLAN.md "Size ruling", 2026-08-07, binding):
+# THE SHIPPING ARTIFACT IS build-site.sh --optimize'S OUTPUT. The full
+# 52-deck/435-exercise course does not fit under this ceiling unoptimized
+# (measured 1,094,331 bytes on this tree -- OVER by 94,331); wasm-opt -O2
+# + wasm-tools strip (this task's own --optimized flag above reproduces
+# that pipeline exactly, ordering included) measured ~907,600-907,650,
+# comfortably under. That gap and its resolution are a COORDINATOR
+# decision, not this task's: this task does not enable --optimize by
+# default in build-site.sh (still OPTIMIZE=0 there) and does not touch
+# this constant -- CI wiring of --optimize as the default shipping build
+# belongs to task "docs-and-ci". What this check DOES do, unchanged by
+# any of the above and by design: it measures gzip($WASM_FILE) --
+# whatever is ACTUALLY sitting at site/public/app.wasm right now, e.g.
+# via `report_size` above -- REGARDLESS of which build flavour produced
+# it. Point build-site.sh at either flavour (plain, or --optimize) and
+# this same check fails if, and only if, THAT artifact -- the one that
+# would actually ship -- is at or over the ceiling. There is no separate
+# "optimized-only" carve-out: an optimized build that somehow still came
+# in over budget would fail this exactly as an unoptimized one does.
 # ===========================================================================
 WASM_GZIP_CEILING_BYTES=1000000
 if [ -f "$WASM_FILE" ]; then
@@ -751,6 +971,106 @@ if [ -f "$WASM_FILE" ]; then
   fi
 else
   fail "app.wasm gzip size is under the $WASM_GZIP_CEILING_BYTES byte ceiling (observed: app.wasm missing)"
+fi
+
+# ===========================================================================
+# THE SIZE LEDGER (M3 harness, task "harness", item 4): a standing
+# instrument, not a check that goes red -- see the WASM_GZIP_CEILING_BYTES
+# comment above for the actual gate. This exists so "the full course does
+# not fit the ceiling unoptimized" (briefs/M3-manifest.json's own
+# top-level note; PLAN.md's "Size ruling") is a NUMBER RECORDED ON EVERY
+# RUN, forever, rather than something that has to be manually
+# rediscovered the next time the corpus grows -- "the instrument that
+# keeps the decision from being rediscovered at deck 40".
+#
+# THE COEFFICIENT (named, commented, a single easy-to-find constant so a
+# future re-measurement is a one-line, explained change -- never a silent
+# bump): 0.3456 gzip bytes per raw byte of .ex.md, measured by the M3
+# designer (briefs/M3-plan.md) from gzip(app.wasm) deltas against
+# content/exercises/*.ex.md raw-byte deltas as the corpus grew. This is a
+# LINEAR APPROXIMATION (content compresses reasonably uniformly; it is
+# not exact for any single deck) -- good enough for an early-warning
+# instrument, never treated as more precise than that.
+SXC1_SIZE_LEDGER_GZIP_PER_RAW_BYTE=0.3456
+SXC1_SIZE_LEDGER_TARGET_EXERCISES=435
+#
+# Method: measure the CURRENT corpus's raw bytes and exercise count
+# straight off disk (independent of the content axis -- this runs even
+# under --skip-content, since it needs no built binary, only
+# content/exercises/ and python3 for the one floating-point line), scale
+# both linearly to the 435-exercise target, and hold the app's own
+# non-content baseline fixed at whatever today's measured total minus
+# today's corpus's own estimated contribution implies. When the corpus
+# already IS the full 435-exercise course (true on this tree as of the
+# M3 harness wave: 435 "^id: " lines across content/exercises/), the
+# scale factor is 1 and the projection collapses to (and is a live
+# cross-check against) today's actual measurement; if the tree is ever
+# checked out at a smaller, partial-course state again (e.g. mid-authoring
+# on a future content branch), the same formula extrapolates forward
+# instead of silently under-reporting.
+#
+# This block FAILS if it cannot compute all three numbers (content/
+# exercises/ missing or empty, python3 unavailable, or app.wasm missing).
+# It NEVER fails merely because the projection is over
+# WASM_GZIP_CEILING_BYTES -- that is reported loudly as an info line
+# naming the exact shortfall, because acting on it is the coordinator's
+# call (PLAN.md), not a build-breaking assertion this task may add.
+# ===========================================================================
+SIZE_LEDGER_DIR="$REPO_ROOT/state"
+SIZE_LEDGER_FILE="$SIZE_LEDGER_DIR/size-ledger.tsv"
+mkdir -p "$SIZE_LEDGER_DIR"
+if [ ! -f "$SIZE_LEDGER_FILE" ]; then
+  printf 'timestamp\tapp_wasm_gzip_bytes\tcorpus_raw_bytes\tcorpus_exercise_count\tprojected_435_gzip_bytes\tceiling_bytes\tover_ceiling_bytes\n' > "$SIZE_LEDGER_FILE"
+fi
+
+CORPUS_DIR="$REPO_ROOT/content/exercises"
+if [ -d "$CORPUS_DIR" ] && command -v python3 >/dev/null 2>&1 && [ -f "$WASM_FILE" ]; then
+  CORPUS_RAW_BYTES=0
+  CORPUS_EX_COUNT=0
+  for f in "$CORPUS_DIR"/*.ex.md; do
+    [ -e "$f" ] || continue
+    fsz="$(wc -c < "$f" | tr -d ' ')"
+    CORPUS_RAW_BYTES=$((CORPUS_RAW_BYTES + fsz))
+    fn="$(grep -cE '^id: ' "$f" || true)"
+    CORPUS_EX_COUNT=$((CORPUS_EX_COUNT + fn))
+  done
+
+  if [ "$CORPUS_RAW_BYTES" -gt 0 ] && [ "$CORPUS_EX_COUNT" -gt 0 ]; then
+    LEDGER_CALC="$(python3 - "$WASM_GZIP_BYTES" "$CORPUS_RAW_BYTES" "$CORPUS_EX_COUNT" \
+        "$SXC1_SIZE_LEDGER_GZIP_PER_RAW_BYTE" "$SXC1_SIZE_LEDGER_TARGET_EXERCISES" "$WASM_GZIP_CEILING_BYTES" <<'PYEOF'
+import sys
+wasm_gzip, corpus_raw, corpus_ex, target_ex, ceiling = (
+    int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[5]), int(sys.argv[6])
+)
+coeff = float(sys.argv[4])
+scaled_raw = corpus_raw * target_ex / corpus_ex
+current_contribution = corpus_raw * coeff
+baseline = wasm_gzip - current_contribution
+projected = baseline + scaled_raw * coeff
+projected_i = int(round(projected))
+over = projected_i - ceiling
+print("%d\t%d" % (projected_i, over))
+PYEOF
+)"
+    PROJECTED_435_BYTES="$(printf '%s' "$LEDGER_CALC" | cut -f1)"
+    OVER_CEILING="$(printf '%s' "$LEDGER_CALC" | cut -f2)"
+
+    SIZE_LEDGER_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf '%s\t%d\t%d\t%d\t%d\t%d\t%d\n' \
+      "$SIZE_LEDGER_TS" "$WASM_GZIP_BYTES" "$CORPUS_RAW_BYTES" "$CORPUS_EX_COUNT" \
+      "$PROJECTED_435_BYTES" "$WASM_GZIP_CEILING_BYTES" "$OVER_CEILING" \
+      >> "$SIZE_LEDGER_FILE"
+    ok "size ledger: recorded app.wasm=$WASM_GZIP_BYTES corpus_raw=$CORPUS_RAW_BYTES (${CORPUS_EX_COUNT} exercises) projected_435=$PROJECTED_435_BYTES to state/size-ledger.tsv"
+    if [ "$OVER_CEILING" -gt 0 ]; then
+      info "size ledger: the 435-exercise projection ($PROJECTED_435_BYTES bytes) is OVER the $WASM_GZIP_CEILING_BYTES byte ceiling by $OVER_CEILING bytes -- see PLAN.md 'Size ruling' (a coordinator decision, not a build failure)"
+    else
+      info "size ledger: the 435-exercise projection ($PROJECTED_435_BYTES bytes) is under the $WASM_GZIP_CEILING_BYTES byte ceiling (headroom $((0 - OVER_CEILING)) bytes)"
+    fi
+  else
+    fail "size ledger: recorded app.wasm/corpus/projection to state/size-ledger.tsv (observed: corpus_raw_bytes=$CORPUS_RAW_BYTES corpus_exercise_count=$CORPUS_EX_COUNT -- could not compute)"
+  fi
+else
+  fail "size ledger: recorded app.wasm/corpus/projection to state/size-ledger.tsv (observed: missing content/exercises/, python3, or app.wasm -- see checks above)"
 fi
 
 # ===========================================================================
@@ -1006,6 +1326,14 @@ if [ "$SKIP_CONTENT" -eq 1 ]; then
   skip "fixture coverage invariant: every file/dir code from --list-codes has >=1 fixture"
   skip "seam-class coverage cap: exactly one seam-class code, E-BLOCK-UNPARSED"
   skip "independent verdict re-derivation from fixture filenames matches --fixtures --json"
+  # M3 harness item 6: progress-check/registry-check share this SAME
+  # content axis (no new skip flag) -- see the real run's matching ok()/
+  # fail() calls below for why.
+  skip "exe:progress-check binary resolved"
+  skip "exe:progress-check --self-test runs under wasm-run.mjs and exits 0"
+  skip "exe:registry-check binary resolved"
+  skip "exe:registry-check --self-test runs under wasm-run.mjs and exits 0"
+  skip "exe:registry-check (no args, against the real content/id-registry.tsv and corpus) runs under wasm-run.mjs and exits 0"
 else
   TOOLCHAIN_ENV_FILE="${GHC_WASM_PREFIX:-$HOME/.ghc-wasm}/env"
   if [ -f "$TOOLCHAIN_ENV_FILE" ]; then
@@ -1992,6 +2320,78 @@ PYEOF
     fail "independent verdict re-derivation from fixture filenames matches --fixtures --json (observed: toolchain env, binary, or python3 unavailable -- see checks above)"
   fi
   rm -f "$FIXTURES_PY"
+
+  # -------------------------------------------------------------------------
+  # M3 harness item 6: exe:progress-check and exe:registry-check, wired
+  # onto this SAME content axis -- NO NEW SKIP FLAG (M2's ruling: one
+  # fewer switch is one fewer route to result=complete without having
+  # checked). Resolved and run exactly like exe:content-check/
+  # exe:exercise-check above: same toolchain env (already sourced at the
+  # top of this branch), same wasm32-wasi-cabal list-bin / wasm-run.mjs
+  # convention, same site/-relative-path convention (both binaries read
+  # e.g. "../content/id-registry.tsv" / "src/SXC1/Progress/*.hs" relative
+  # to site/, so every invocation below is cd'd there first).
+  # -------------------------------------------------------------------------
+  PROGRESS_CHECK_BIN=""
+  if command -v wasm32-wasi-cabal >/dev/null 2>&1; then
+    PROGRESS_CHECK_BIN="$(cd "$REPO_ROOT/site" && wasm32-wasi-cabal list-bin exe:progress-check 2>/dev/null | tail -n1 || true)"
+  fi
+  if [ -n "$PROGRESS_CHECK_BIN" ] && [ -f "$PROGRESS_CHECK_BIN" ]; then
+    ok "exe:progress-check binary resolved (observed: $PROGRESS_CHECK_BIN)"
+  else
+    fail "exe:progress-check binary resolved (observed: missing -- run ./scripts/build-site.sh first; fallback runner: wasmtime run --dir=/ <binary>)"
+    PROGRESS_CHECK_BIN=""
+  fi
+  if [ -n "$PROGRESS_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    PROGRESS_RUN_LOG="$(mktemp -t sxc1-check-site-progress-run.XXXXXX)"
+    register_temp_file "$PROGRESS_RUN_LOG"
+    if ( cd "$REPO_ROOT/site" && wasm-run.mjs "$PROGRESS_CHECK_BIN" --self-test ) >"$PROGRESS_RUN_LOG" 2>&1; then
+      ok "exe:progress-check --self-test runs under wasm-run.mjs and exits 0"
+    else
+      fail "exe:progress-check --self-test runs under wasm-run.mjs and exits 0 (observed: non-zero exit; output follows)"
+      sed 's/^/    /' "$PROGRESS_RUN_LOG" >&2
+    fi
+    rm -f "$PROGRESS_RUN_LOG"
+  else
+    fail "exe:progress-check --self-test runs under wasm-run.mjs and exits 0 (observed: toolchain env or binary unavailable -- see checks above; fallback runner: wasmtime run --dir=/ <binary>)"
+  fi
+
+  REGISTRY_CHECK_BIN=""
+  if command -v wasm32-wasi-cabal >/dev/null 2>&1; then
+    REGISTRY_CHECK_BIN="$(cd "$REPO_ROOT/site" && wasm32-wasi-cabal list-bin exe:registry-check 2>/dev/null | tail -n1 || true)"
+  fi
+  if [ -n "$REGISTRY_CHECK_BIN" ] && [ -f "$REGISTRY_CHECK_BIN" ]; then
+    ok "exe:registry-check binary resolved (observed: $REGISTRY_CHECK_BIN)"
+  else
+    fail "exe:registry-check binary resolved (observed: missing -- run ./scripts/build-site.sh first; fallback runner: wasmtime run --dir=/ <binary>)"
+    REGISTRY_CHECK_BIN=""
+  fi
+  if [ -n "$REGISTRY_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    REGISTRY_SELFTEST_LOG="$(mktemp -t sxc1-check-site-registry-selftest.XXXXXX)"
+    register_temp_file "$REGISTRY_SELFTEST_LOG"
+    if ( cd "$REPO_ROOT/site" && wasm-run.mjs "$REGISTRY_CHECK_BIN" --self-test ) >"$REGISTRY_SELFTEST_LOG" 2>&1; then
+      ok "exe:registry-check --self-test runs under wasm-run.mjs and exits 0"
+    else
+      fail "exe:registry-check --self-test runs under wasm-run.mjs and exits 0 (observed: non-zero exit; output follows)"
+      sed 's/^/    /' "$REGISTRY_SELFTEST_LOG" >&2
+    fi
+    rm -f "$REGISTRY_SELFTEST_LOG"
+  else
+    fail "exe:registry-check --self-test runs under wasm-run.mjs and exits 0 (observed: toolchain env or binary unavailable -- see checks above; fallback runner: wasmtime run --dir=/ <binary>)"
+  fi
+  if [ -n "$REGISTRY_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1; then
+    REGISTRY_RUN_LOG="$(mktemp -t sxc1-check-site-registry-run.XXXXXX)"
+    register_temp_file "$REGISTRY_RUN_LOG"
+    if ( cd "$REPO_ROOT/site" && wasm-run.mjs "$REGISTRY_CHECK_BIN" ) >"$REGISTRY_RUN_LOG" 2>&1; then
+      ok "exe:registry-check (no args, against the real content/id-registry.tsv and corpus) runs under wasm-run.mjs and exits 0"
+    else
+      fail "exe:registry-check (no args, against the real content/id-registry.tsv and corpus) runs under wasm-run.mjs and exits 0 (observed: non-zero exit; output follows)"
+      sed 's/^/    /' "$REGISTRY_RUN_LOG" >&2
+    fi
+    rm -f "$REGISTRY_RUN_LOG"
+  else
+    fail "exe:registry-check (no args, against the real content/id-registry.tsv and corpus) runs under wasm-run.mjs and exits 0 (observed: toolchain env or binary unavailable -- see checks above; fallback runner: wasmtime run --dir=/ <binary>)"
+  fi
 fi
 
 # ===========================================================================

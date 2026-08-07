@@ -87,7 +87,7 @@ if [ "$CABAL_UPDATE" -eq 1 ]; then
   wasm32-wasi-cabal update
 fi
 
-wasm32-wasi-cabal build -j"$JOBS" exe:app exe:content-check exe:exercise-check
+wasm32-wasi-cabal build -j"$JOBS" exe:app exe:content-check exe:exercise-check exe:progress-check exe:registry-check
 
 # ---------------------------------------------------------------------------
 # 4. Locate the built binaries.
