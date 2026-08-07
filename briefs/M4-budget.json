@@ -1,0 +1,40 @@
+{
+  "measured_at": "2026-08-07",
+  "tree": "6fea9a0130fd7255980cf1efa61e8540c535cc26",
+  "authorised": true,
+  "m3_final_gzip_bytes": 890713,
+  "m3_final_raw_bytes": 2531529,
+  "second_build_gzip_bytes": 890713,
+  "ceiling_bytes": 1000000,
+  "reserve_bytes": 60000,
+  "m4_budget_bytes": 42000,
+  "task_local_ceiling_bytes": 932713,
+  "contract": {
+    "device_verifier_shape_intact": true,
+    "confirm_source_bydevice_present": true,
+    "verifyspec_four_constructors": true,
+    "exercise_state_exported": true,
+    "six_verify_hooks_present": true,
+    "verify_dom_ids_present": true,
+    "low_staticcode_totality_closed": true,
+    "low_fixture_declared_targets_closed": true
+  },
+  "totals": {
+    "check_site_checks": 80,
+    "browser_check_assertions": 108
+  },
+  "evidence": [
+    "STEP 1: rm -rf site/public && ./scripts/build-site.sh --optimize twice; both builds: raw 2531529, gzip 890713 (zero inter-build variance). Measured with gzip -c site/public/app.wasm | wc -c. NOTE: --optimize is the SHIPPING build per the gate-ratified PLAN.md Size ruling (m3 gate GATE-CLEAR, briefs/M3-codex-gate5.json) and its 2026-08-07 amendment (wasm-opt --detect-features -Oz --converge, adopted in the commit immediately before this file); the manifest's plain-build instruction predates that ruling and would measure the non-shipping 1,094K artifact.",
+    "STEP 2: grep -n '^WASM_GZIP_CEILING_BYTES=' scripts/check-site.sh -> 968:WASM_GZIP_CEILING_BYTES=1000000 (untouched).",
+    "STEP 3: 890713 <= 895000 -> authorised true; task_local_ceiling_bytes = min(940000, 890713+42000) = 932713.",
+    "a. site/app/Main.hs:104-107 'data DeviceVerifier = DeviceVerifier { dvAvailable :: IO Bool , dvWatch :: VerifySpec -> (ConfirmSource -> IO ()) -> IO (IO ()) }'; noDeviceVerifier wired at Main.hs:109-112.",
+    "b. SXC1/Exercise/Engine.hs:31 exports ConfirmSource (..); Engine.hs:69 'data ConfirmSource = ByLearner | ByDevice'; Engine.hs:126 'ConfirmStep Int ConfirmSource MonoMs WallMs'.",
+    "c. SXC1/Exercise/Types.hs:135-138 VerifyCC/VerifyNote/VerifyPad/VerifyAny (exactly four constructors); promptIdFor exported at Types.hs:34, defined 143-144.",
+    "d. Engine.hs:29/35 export Response (..) and ExerciseState (..); Engine.hs:60 'RConfirmed ConfirmSource'; Engine.hs:100 esResponses :: IntMap Response.",
+    "e. All six verify hooks present at the SAME exercise ids and specs; M3 renamed the deck files and slugs: d-2-01 'verify: cc 80 127' now content/exercises/024-pad-01.ex.md:99 (deck pad-01); d-2-02 'verify: pad 1 bank A' + 'verify: pad 13 bank A' now 028-pad-03.ex.md:26,34 (deck pad-03); d-2-09 'verify: cc 16 0,127' + 'verify: cc 108 127' + 'verify: cc 109 127' now 036-pad-07.ex.md:27,36,45 (deck pad-07). ROUTES DRIFTED from the manifest: now #/x/pad-01/d-2-01, #/x/pad-03/d-2-02, #/x/pad-07/d-2-09. The M3 course also added 31 more hooks (37 total corpus-wide). exercise-check validates the corpus clean (inside check-site 80/80).",
+    "f. site/app/View/Exercise.hs:365 renders p.ex-verify with id ex-step-N-verify; View/Exercise.hs:374 renders button.btn-ex-confirm with id btn-ex-confirm-N.",
+    "g(i). CheckExercises.hs:1584-1591 StaticCode totality sweep over allIssueCodes (stLabel 19) -> LOW closed. g(ii). browser-check.mjs:2962-2966 EXERCISE_FIXTURE_FIELDS requires citeSlug/citePage on quiz and drill and targetPage/targetSlug on lookup -> LOW closed.",
+    "h. ./scripts/check-site.sh -> 'check-site: 80/80 checks passed' + result=complete; node scripts/browser-check.mjs --self-test -> '108/108 assertions passed'.",
+    "STEP 6: guard red-test: a copy with task_local_ceiling_bytes=999999999 fails the schema guard with 'task_local_ceiling_bytes is not min(940000, m3_final+42000)' (exit 1); the real file passes with 'M4-budget.json ok: M3_FINAL=890713 authorised=True task_ceiling=932713'."
+  ]
+}
