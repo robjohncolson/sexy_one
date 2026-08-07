@@ -1613,9 +1613,11 @@ staticCodeTotalityChecks =
 -- T5..T10: decodeMidi / matchSpec / selectPorts / describeSpec on fixed
 -- vectors. T11: the six live verify: hooks committed in the corpus,
 -- extracted from the real deck files, each satisfiable by a byte
--- sequence constructed from translations/midi.md -- EXCEPT d-2-09
--- step 1 (finding M4-F1, briefs/M4-plan.md section 8), whose
--- unreachability by a continuous dial is pinned explicitly.
+-- sequence constructed from translations/midi.md. d-2-09 step 1's
+-- mid-range dial values are additionally pinned as NON-confirming
+-- (finding M4-F1 as revised by owner evidence,
+-- docs/M4-device-evidence.md: only the dial ENDPOINTS 0/127 confirm,
+-- and the M5 content pass reworded the step to a full sweep).
 --------------------------------------------------------------------------
 
 midiSpecMidiPath :: FilePath
@@ -1808,11 +1810,15 @@ describeSpecChecks =
 -- | T11: the six committed hooks, extracted from the real deck files.
 -- Byte sequences are constructed from translations/midi.md: CC numbers
 -- 80/108/109 from the "4. Control Change list" table (Bank Select A,
--- EFFECT FX1, EFFECT FX2 -- 127 when pressed), pad notes looked up in
--- the freshly-PARSED "5. Note mapping" table rather than hard-coded.
--- d-2-09 step 1 (verify: cc 16 0,127) is finding M4-F1: CC 16 is the
--- continuous FX1 dial (initial 0, +/-1 per detent), so no realistic
--- dial value 1..126 may ever satisfy it -- pinned, not fixed.
+-- EFFECT FX1, EFFECT FX2), pad notes looked up in the freshly-PARSED
+-- "5. Note mapping" table rather than hard-coded. The M5 content pass
+-- recalibrated d-2-09 to the owner's device evidence
+-- (docs/M4-device-evidence.md): step 1 (verify: cc 16 0,127) is the
+-- continuous FX1 dial (initial 0, +/-1 per detent), confirmable only
+-- at its range ENDPOINTS -- mid-range values 1..126 stay pinned as
+-- non-confirming (finding M4-F1 as revised); steps 2 and 3 accept
+-- 0,127 because the FX buttons are toggles transmitting 127 on the
+-- ON edge and 0 on the OFF edge, so BOTH edges must satisfy.
 verifyHookChecks
   :: Map (Int, Char) Int
   -> Maybe [VerifySpec] -> Maybe [VerifySpec] -> Maybe [VerifySpec]
@@ -1840,25 +1846,27 @@ verifyHookChecks parsed mSpecs01 mSpecs02 mSpecs09 =
       "the note midi.md's parsed table gives for pad 13 bank A must satisfy d-2-02 step 2"
 
   , mkST 20 "hooks/d-2-09-specs-as-committed"
-      (mSpecs09 == Just [VerifyCC 16 [0, 127], VerifyCC 108 [127], VerifyCC 109 [127]])
+      (mSpecs09 == Just [VerifyCC 16 [0, 127], VerifyCC 108 [0, 127], VerifyCC 109 [0, 127]])
       (renderSpecs mSpecs09)
   , mkST 20 "hooks/d-2-09-step-1-M4-F1-no-dial-value-1-126-satisfies-it"
       (case mSpecs09 of
          Just (s : _) -> all (\v -> not (hookSatisfied 1 s [0xB0, 16, v])) [1 .. 126]
          _            -> False)
-      ("finding M4-F1 (briefs/M4-plan.md section 8): verify: cc 16 0,127 names the continuous "
-         ++ "FX1 dial, whose realistic values 1..126 must never satisfy the hook -- pinned so the "
-         ++ "content defect is not forgotten")
+      ("finding M4-F1 as revised by owner evidence (docs/M4-device-evidence.md): verify: "
+         ++ "cc 16 0,127 names the continuous FX1 dial, confirmable only at its range "
+         ++ "endpoints -- mid-range values 1..126 must never satisfy the hook")
   , mkST 20 "hooks/d-2-09-step-2-satisfied-by-effect-fx1-press"
       (case mSpecs09 of
-         Just [_, s, _] -> hookSatisfied 1 s [0xB0, 0x6C, 0x7F]
+         Just [_, s, _] -> hookSatisfied 1 s [0xB0, 0x6C, 0x7F] && hookSatisfied 1 s [0xB0, 0x6C, 0x00]
          _              -> False)
-      "CC 108 = 127 (EFFECT FX1 pressed, midi.md section 4) must satisfy d-2-09 step 2"
+      ("CC 108 = 127 (FX1 switching ON) and CC 108 = 0 (FX1 switching OFF) must BOTH satisfy "
+         ++ "d-2-09 step 2 -- the FX buttons are toggles (midi.md section 4; owner evidence)")
   , mkST 20 "hooks/d-2-09-step-3-satisfied-by-effect-fx2-press"
       (case mSpecs09 of
-         Just [_, _, s] -> hookSatisfied 1 s [0xB0, 0x6D, 0x7F]
+         Just [_, _, s] -> hookSatisfied 1 s [0xB0, 0x6D, 0x7F] && hookSatisfied 1 s [0xB0, 0x6D, 0x00]
          _              -> False)
-      "CC 109 = 127 (EFFECT FX2 pressed, midi.md section 4) must satisfy d-2-09 step 3"
+      ("CC 109 = 127 (FX2 switching ON) and CC 109 = 0 (FX2 switching OFF) must BOTH satisfy "
+         ++ "d-2-09 step 3 -- the FX buttons are toggles (midi.md section 4; owner evidence)")
   ]
 
 --------------------------------------------------------------------------

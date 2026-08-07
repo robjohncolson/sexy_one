@@ -202,16 +202,16 @@ FX2**). Enable the device panel if its button offers to. Start a loop playing
 
 ### Step 1: auto-confirm depends on HOW FAR you turn (check 7)
 
-Step 1 asks you to turn the FX1 dial, and its line reads **"Waiting for the
-device: CC 16 = 0 or 127 on MIDI channel 1."** The dial transmits a
-*continuous* value, one step per click, across the 0–127 range (MIDI doc §4,
-p. 3) — so a few clicks from the middle send 41, 42, 43… and confirm nothing,
-but a full sweep to either END of the range lands on 0 (or 127) and DOES
-auto-confirm. The first owner run proved both behaviours on real hardware
-(`docs/M4-device-evidence.md`).
+Step 1 asks you to turn the FX1 dial all the way down (or all the way up),
+and its line reads **"Waiting for the device: CC 16 = 0 or 127 on MIDI
+channel 1."** The dial transmits a *continuous* value, one step per click,
+across the 0–127 range (MIDI doc §4, p. 3) — so a few clicks from the middle
+send 41, 42, 43… and confirm nothing, but a full sweep to either END of the
+range lands on 0 (or 127) and DOES auto-confirm. The first owner run proved
+both behaviours on real hardware (`docs/M4-device-evidence.md`).
 
-1. Do the step: turn the FX1 dial and watch the effect type change on the
-   unit's display.
+1. Do the step: turn the FX1 dial fully down (or up) and watch the effect
+   type change on the unit's display.
 
    **Expect:** a few clicks mid-range — the page stays on "Waiting for the
    device: …". Sweep the dial fully down (or up) — it auto-confirms.
@@ -221,11 +221,11 @@ auto-confirm. The first owner run proved both behaviours on real hardware
 
 Either outcome is a **PASS** for check 7 — just note in the report WHICH
 happened (mid-range no-confirm, endpoint auto-confirm, or both). The step's
-instruction wording is being recalibrated to the real dial behaviour in the
-next milestone (finding **M4-F1**, revised by owner evidence; also note the
-FX1/FX2 *buttons* are on/off toggles — they transmit 127 when switching on
-and 0 when switching off, so a button step only auto-confirms on the
-switching-ON press).
+instruction now tells you to turn the dial all the way down (or up), matching
+the real dial behaviour (finding **M4-F1**, revised by owner evidence and
+recalibrated in M5; also note the FX1/FX2 *buttons* are on/off toggles — they
+transmit 127 when switching on and 0 when switching off, and since M5 the
+button steps accept both edges, so either press auto-confirms).
 
 (Once you hand-confirm step 1 with verification still on, the grey line under
 it reads "Device verification is watching the current step — confirm this one
@@ -236,18 +236,20 @@ that quirk was fixed in M5, debt item 11.)
 ### Steps 2 and 3 — the FX buttons (checks 8 and 9)
 
 3. Do step 2: press the `FX1` button so it lights, then turn the dial to
-   change the effect strength. Pressing `FX1` transmits CC 108 = 127 (MIDI
-   doc §4, p. 3).
+   change the effect strength. Pressing `FX1` transmits CC 108 = 127 when
+   the effect switches on and CC 108 = 0 when it switches off (MIDI doc §4,
+   p. 3) — the step accepts either edge.
 
-   **Expect (check 8):** the moment `FX1` lights, step 2's line reads
-   **"Confirmed by the device: CC 108 = 127."** — before you even turn the
-   dial.
+   **Expect (check 8):** the moment you press `FX1`, step 2's line reads
+   **"Confirmed by the device: CC 108 = 0 or 127."** — before you even turn
+   the dial, and whichever way the toggle went.
 
 4. Do step 3: turn the FX2 dial with `FX2` unlit to pick a type, then press
-   `FX2`. Pressing `FX2` transmits CC 109 = 127 (MIDI doc §4, p. 3).
+   `FX2`. Pressing `FX2` transmits CC 109 = 127 when switching on and 0 when
+   switching off (MIDI doc §4, p. 3) — again, either edge confirms.
 
-   **Expect (check 9):** **"Confirmed by the device: CC 109 = 127."** and
-   "You've completed this exercise."
+   **Expect (check 9):** **"Confirmed by the device: CC 109 = 0 or 127."**
+   and "You've completed this exercise."
 
 ---
 

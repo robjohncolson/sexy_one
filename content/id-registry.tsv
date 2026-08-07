@@ -46,8 +46,9 @@
 # cross-checked against the app's own Reader by exe:registry-check R3 --
 # the two derivations agreeing across all 435 rows is the seeding
 # evidence, per the no-single-implementation house rule. Ids first
-# shipped under m2 keep first-shipped=m2 (16 rows); the other 419 live
-# rows are m3. Nothing was hand-typed from memory. The five inventory
+# shipped under m2 keep first-shipped=m2 (16 live rows; 21 total incl.
+# tombstones); the other 419 live rows are m3. Nothing was hand-typed
+# from memory. The five inventory
 # tombstones (q-1-14, q-1-15, q-1-16, q-3-05, q-3-06) were never authored
 # as content -- they are seeded straight from
 # content/exercise-inventory.md's own tombstone notes.
