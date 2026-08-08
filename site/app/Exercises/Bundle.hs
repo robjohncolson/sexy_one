@@ -35,18 +35,47 @@
 -- round-trips each deck's text byte-identically and the per-deck
 -- FNV-1a\/chars\/lines numbers in "Exercises.Corpus" stay equal to the
 -- disk-derived ones.
+--
+-- ACCEPTANCE IS ALL-OR-NOTHING (M6 gate round 1, finding M6-R1-1). A
+-- successful HTTP response is NOT evidence of a healthy corpus: the URL
+-- can serve the other language's bundle, a stale build, a truncated
+-- body that still carries every delimiter, a zero-deck body, or a body
+-- missing a deck -- and every one of those used to render as a
+-- smaller-but-"healthy" course with no alert. 'parseBundle' now checks
+-- the fetched bytes against "Exercises.Manifest" -- the BUILD-TIME
+-- expectation compiled into this same wasm module -- and returns 'Left'
+-- (the existing visible alert\/retry state) on ANY disagreement:
+--
+--   1. the header's language must equal the language the shell actually
+--      requested (it used to be parsed and thrown away);
+--   2. the @!SXC1-DECK@ names must equal 'manifestDecks' EXACTLY, in
+--      INDEX order (which also rejects duplicates, omissions and
+--      insertions);
+--   3. the header's declared deck count must equal both;
+--   4. FNV-1a\/32 over the WHOLE body must equal this build's recorded
+--      fingerprint for that language.
+--
+-- The expectation deliberately does not travel WITH the bundle: a
+-- bundle attesting to itself proves only internal consistency, so a
+-- complete older build would satisfy it. See "Exercises.Manifest"'s own
+-- header. "Exercises.Corpus".'Exercises.Corpus.checkedCorpusOf' then
+-- adds the half that needs a parse: every deck must parse, and the
+-- aggregate (decks, exercises, prompts) counts must match the same
+-- manifest exactly.
 module Exercises.Bundle
   ( loadDeckSources
   , parseBundle
   ) where
 
-import           Data.Text   (Text)
-import qualified Data.Text   as T
+import           Data.Text          (Text)
+import qualified Data.Text          as T
 
-import           Miso        (JSVal, fromJSValUnchecked, jsg, (#))
-import           Miso.String (MisoString, fromMisoString)
+import           Miso               (JSVal, fromJSValUnchecked, jsg, (#))
+import           Miso.String        (MisoString, fromMisoString)
 
-import           SXC1.Route  (parseDigits)
+import           Exercises.Corpus   (fnv1a32)
+import           Exercises.Manifest (manifestDeckCount, manifestDecks, manifestFingerprint)
+import           SXC1.Route         (parseDigits)
 
 -- | Call one niladic method on the @window.__sxc1Content@ bridge. The
 -- bridge is installed by the static shell before the wasm boots; every
@@ -67,50 +96,103 @@ bridgeText = fromJSValUnchecked =<< bridge "text"
 bridgeError :: IO (Maybe MisoString)
 bridgeError = fromJSValUnchecked =<< bridge "error"
 
--- | The boot-time read: 'Right' the INDEX-ordered @(file name, text)@
--- deck sources (exactly the shape the retired "Exercises.Embed" spliced
--- at compile time), or 'Left' a human-readable reason the app must
--- surface in its degraded state. Never throws.
-loadDeckSources :: IO (Either Text [(FilePath, Text)])
+-- | Which language the shell actually ASKED FOR -- the boot hint it
+-- picked the URL from, not anything the response says about itself.
+-- Anything the bridge cannot report is @\"en\"@, the same clamp the
+-- shell and the prefs codec apply.
+bridgeLang :: IO Text
+bridgeLang = do
+  ml <- fromJSValUnchecked =<< bridge "lang"
+  pure (case ml of
+    Just l | not (T.null (T.strip (fromMisoString l))) -> T.strip (fromMisoString l)
+    _ -> "en")
+
+-- | The boot-time read: the language the shell requested, plus 'Right'
+-- the INDEX-ordered @(file name, text)@ deck sources (exactly the shape
+-- the retired "Exercises.Embed" spliced at compile time) or 'Left' a
+-- human-readable reason the app must surface in its degraded state.
+-- Never throws.
+loadDeckSources :: IO (Text, Either Text [(FilePath, Text)])
 loadDeckSources = do
-  mt <- bridgeText
-  case mt of
-    Just t  -> pure (parseBundle (fromMisoString t))
+  lang <- bridgeLang
+  mt   <- bridgeText
+  res  <- case mt of
+    Just t  -> pure (parseBundle lang (fromMisoString t))
     Nothing -> do
       me <- bridgeError
       pure (Left (case me of
         Just e | not (T.null (T.strip (fromMisoString e))) -> fromMisoString e
         _ -> "content bundle unavailable (no reason reported by the shell)"))
+  pure (lang, res)
 
 deckDelim :: Text
 deckDelim = "!SXC1-DECK "
 
 -- | Split a fetched bundle back into decks -- the inverse of the
--- emitter's concatenation. Strict about its own framing (a malformed
--- bundle is a degraded state naming the problem, never a silent
--- half-corpus), while the deck text itself is passed through verbatim
--- for "SXC1.Exercise.Reader" to parse exactly as it parsed the
--- embedded text.
-parseBundle :: Text -> Either Text [(FilePath, Text)]
-parseBundle raw = case T.lines raw of
+-- emitter's concatenation -- and check the whole thing against
+-- "Exercises.Manifest", this build's own expectation (see the module
+-- Haddock: acceptance is ALL-OR-NOTHING). @wantLang@ is the language
+-- the shell REQUESTED; the deck text itself is passed through verbatim
+-- for "SXC1.Exercise.Reader" to parse exactly as it parsed the embedded
+-- text.
+parseBundle :: Text -> Text -> Either Text [(FilePath, Text)]
+parseBundle wantLang raw = case T.lines raw of
   []           -> Left "content bundle is empty"
   (hdr : rest) -> do
-    n     <- headerDeckCount hdr
+    n     <- headerCheck hdr
     decks <- splitDecks rest
-    if length decks == n
-      then Right decks
-      else Left ("content bundle header declares " <> tshow n
-                   <> " deck(s) but " <> tshow (length decks) <> " were found")
+    _     <- if length decks == n
+               then Right ()
+               else Left ("content bundle header declares " <> tshow n
+                            <> " deck(s) but " <> tshow (length decks) <> " were found")
+    _     <- checkNames (0 :: Int) (map fst decks) manifestDecks
+    _     <- checkFingerprint
+    Right decks
   where
     tshow = T.pack . show
 
-    headerDeckCount hdr = case T.words hdr of
-      ["!SXC1-BUNDLE", "v1", _lang, countTxt] ->
-        case parseDigits countTxt of
-          Just n  -> Right n
-          Nothing -> Left ("content bundle header has a malformed deck count: " <> T.take 80 hdr)
+    -- (a) The header language must EQUAL the requested language -- it
+    -- used to be bound as _lang and ignored, so the ja bundle served at
+    -- the en URL (a mis-deployed or mis-cached host) rendered as a
+    -- healthy English course in Japanese.
+    headerCheck hdr = case T.words hdr of
+      ["!SXC1-BUNDLE", "v1", lang, countTxt]
+        | lang /= wantLang ->
+            Left ("content bundle is for language '" <> lang <> "' but '" <> wantLang
+                    <> "' was requested")
+        | otherwise -> case parseDigits countTxt of
+            Just n
+              | n == manifestDeckCount -> Right n
+              | otherwise -> Left ("content bundle header declares " <> tshow n
+                                     <> " deck(s); this build expects " <> tshow manifestDeckCount)
+            Nothing -> Left ("content bundle header has a malformed deck count: " <> T.take 80 hdr)
       _ -> Left ("content bundle does not start with a '!SXC1-BUNDLE v1 <lang> <count>' header: "
                    <> T.take 80 hdr)
+
+    -- (b) The exact INDEX-ordered deck manifest. Equality of the two
+    -- ordered lists rejects a missing deck, an extra deck, a renamed
+    -- deck, a reordered deck and a duplicated deck in one comparison.
+    checkNames _ []       []       = Right ()
+    checkNames i (g : gs) (e : es)
+      | g == e    = checkNames (i + 1) gs es
+      | otherwise = Left ("content bundle deck " <> tshow (i + 1) <> " is '" <> T.pack g
+                            <> "'; this build expects '" <> T.pack e <> "'")
+    checkNames i gs es = Left ("content bundle carries " <> tshow (i + length gs)
+                                 <> " deck(s); this build expects " <> tshow (i + length es))
+
+    -- (c) The catch-all: this build's fingerprint over the WHOLE body.
+    -- Anything the checks above cannot see -- a stale build, an edited
+    -- deck body, a truncated final deck, whitespace drift -- fails here.
+    checkFingerprint = case manifestFingerprint wantLang of
+      Nothing -> Left ("this build ships no content bundle for language '" <> wantLang <> "'")
+      Just want
+        | got == want -> Right ()
+        -- Not 'tshow': the fingerprints are 'Word32', and the
+        -- monomorphism restriction has already fixed tshow at Int here.
+        | otherwise   -> Left ("content bundle does not match this build (fingerprint "
+                                 <> T.pack (show got) <> ", expected " <> T.pack (show want)
+                                 <> ") -- a stale or altered bundle is being served")
+        where got = fnv1a32 raw
 
     splitDecks [] = Right []
     splitDecks (l : ls) = case T.stripPrefix deckDelim l of

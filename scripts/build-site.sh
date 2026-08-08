@@ -89,6 +89,28 @@ if [ "$CABAL_UPDATE" -eq 1 ]; then
   wasm32-wasi-cabal update
 fi
 
+# ---------------------------------------------------------------------------
+# 3a. M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-1):
+#     regenerate the BUILD-TIME BUNDLE EXPECTATION *before* compiling, so it
+#     is compiled INTO app.wasm. site/app/Exercises/Manifest.hs carries the
+#     INDEX-ordered deck names, the (decks, exercises, prompts) counts and
+#     one FNV-1a/32 fingerprint per language over the whole emitted bundle
+#     -- names, counts and hashes only, never corpus text.
+#
+#     It must live in the WASM and not in the bundle: a bundle carrying its
+#     own manifest/fingerprint attests only to its own internal
+#     consistency, so a complete OLDER build served at the right URL would
+#     satisfy it. Checking the fetched bytes against a constant baked into
+#     a DIFFERENT artifact means acceptance requires agreement between two
+#     separately served files -- something only the build that produced
+#     both can supply. Step 7b below emits the bundles themselves from the
+#     same corpus with the same script, so the two always agree here;
+#     check-site.sh independently re-derives both and fails on any drift.
+# ---------------------------------------------------------------------------
+python3 "$SCRIPT_DIR/emit-content-bundles.py" \
+  --exercises-dir "$REPO_ROOT/content/exercises" \
+  --manifest-hs "$REPO_ROOT/site/app/Exercises/Manifest.hs"
+
 wasm32-wasi-cabal build -j"$JOBS" exe:app exe:content-check exe:exercise-check exe:progress-check exe:registry-check
 
 # ---------------------------------------------------------------------------

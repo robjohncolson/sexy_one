@@ -1,0 +1,123 @@
+{
+  "task_type": "review",
+  "milestone": "M6",
+  "scope": "git log m5..HEAD plus whole-tree inspection of the M6 claims",
+  "review_method": "Read-only source, artifact-gate, corpus-format, and commit-diff inspection. Per the subagent constraint, no build, test, lint, or browser command was run; the coordinator-reported 109/109, 238/238, 198/198, 42/42, 454/454, 56/56, 412/412, 91/91, and registry totals were treated as supplied evidence rather than independently reproduced.",
+  "findings": [
+    {
+      "id": "M6-R1-1",
+      "severity": "HIGH",
+      "title": "A syntactically framed but wrong, stale, or truncated HTTP-200 bundle is treated as a healthy corpus",
+      "evidence": [
+        "site/static/index.js:89-100 treats every resp.ok body as success after resp.text(); it has no language, length, fingerprint, registry, or corpus-shape check.",
+        "site/app/Exercises/Bundle.hs:94-123 validates only the header shape and the number of !SXC1-DECK delimiters. The header language is captured as _lang and ignored at lines 107-109; deck names need only be non-empty, and neither order nor identity is checked.",
+        "site/app/Exercises/Corpus.hs:54-58 maps readDeck over the sources and silently omits every Nothing result. Thus a bundle declaring 52 delimiters but containing a truncated or unparsable final deck still produces Right sources, a smaller corpus, and no content error.",
+        "site/app/Main.hs:341-346 sets mContentErr only when loadDeckSources returns Left. Any framed Right value, including a zero-deck `!SXC1-BUNDLE v1 ja 0` body or a 52-delimiter body whose decks do not match id-registry, is rendered as healthy.",
+        "site/app/Main.hs:1039-1054 shows that the visible degraded surface is conditional solely on mContentErr; silently dropped or wrong decks therefore yield ordinary empty/not-found views rather than role=alert plus retry.",
+        "scripts/check-site.sh:1444-1472 provides strong byte-freshness for the locally shipped artifacts, but it cannot protect a learner from a stale cache/CDN response or a wrong body served at the correct URL. The app carries no runtime coupling to that checked artifact."
+      ],
+      "impact": "The core W1 robustness claim is false for successful HTTP responses with bad content. A wrong-language body, stale bundle, delimiter-complete truncation, duplicate/mismatched deck set, or all-unparseable corpus can reach learners silently. Existing progress records are retained in storage, but the bad corpus can make them appear retired and can expose route-shadowed or wrong exercises until a good bundle is loaded.",
+      "recommendation": "Make bundle acceptance all-or-nothing: compare requested/bridge language with the header, require the exact INDEX-ordered filename/deck manifest and expected aggregate counts (including prompts), force every deck to parse, reject duplicates, and couple the response to a build-time version/fingerprint. Any mismatch must return Left and use the existing alert/retry state."
+    },
+    {
+      "id": "M6-R1-2",
+      "severity": "MEDIUM",
+      "title": "A prose Japanese replacement can introduce structural option or field syntax while all current M6 checks stay green",
+      "evidence": [
+        "scripts/emit-content-bundles.py:183-190 rejects blank, nested-ja, and delimiter payloads globally, but the prose branch at lines 229-241 rejects only structural headings. It does not reject `- [x] ...`, `- [ ] ...`, or field-shaped payloads such as `id:`/`verify:`.",
+        "site/src/SXC1/Exercise/Reader.hs:151-159 and 188-197 interpret field-shaped lines structurally after headings; lines 238-264 lift top-level checkbox lines into a choice list. A payload classified from its English anchor as prose can therefore be reclassified structurally after JA emission.",
+        "site/test/CheckExercises.hs:500-513 makes E-JA-MISSING a presence check: a directly following ja: line is sufficient. It does not validate the emitted JA deck's structural equality with EN.",
+        "scripts/browser-check.mjs:3598-3602 explicitly disables the disk-derived exercise JSON comparison in the JA pass. JA_COURSE_PINS at lines 2725-2753 pins deck/exercise totals and one deck, but not the full ordered ids, prompt totals, kinds, or option structure; the bundle assertion at lines 3628-3633 likewise checks only 52 decks, 435 exercises, and one title."
+      ],
+      "impact": "The same-file invariant prevents translated id lines in the normal authored shape, but the emitter does not actually guarantee structural equivalence of arbitrary allowed prose variants. A future Japanese prose line resembling a task option can change a quiz from recall to choice or change its options without triggering E-JA-MISSING, freshness, registry-check, or the five sampled browser assertions.",
+      "recommendation": "Reject every structural token in prose payloads (at least field and task-option shapes as well as headings), parse both fresh emitted bundles in the checker, and compare their complete ordered deck/exercise/prompt identity and kind/option-correctness shape. Add negative controls for structural-marker payloads."
+    },
+    {
+      "id": "M6-R1-3",
+      "severity": "MEDIUM",
+      "title": "Check 23 counts a prefix and cardinality, not the exact five required JA-course assertion names",
+      "evidence": [
+        "scripts/check-site.sh:3637 sets only JA_COURSE_ASSERT_COUNT=5.",
+        "scripts/check-site.sh:3648-3655 extracts every distinct line beginning `ok - ja course:` and returns only its count; there is no allowlist of the five constants from browser-check.mjs.",
+        "scripts/check-site.sh:3967-3972 passes when both counts equal five. Replacing one required assertion with a trivial passing assertion named `ja course: replacement` preserves both this 5/5 check and the 238-stage floor.",
+        "scripts/browser-check.mjs:2755-2764 does define the real five names, but check-site never compares its captured set to those names."
+      ],
+      "impact": "The coordinator claim that the five checks cannot be swapped out under the N/N floor is not enforced. The current five assertions are real and literal-pinned, but the anti-unplug/anti-substitution guard can false-green after a future edit.",
+      "recommendation": "Give the five assertions stable IDs and compare the captured set to an exact, independently declared five-ID allowlist, as the D1-D27 floor compares explicit numbered identities. Add a negative control that swaps one required ID for a dummy `ja course:` success."
+    },
+    {
+      "id": "M6-R1-4",
+      "severity": "MEDIUM",
+      "title": "The boot-hint write result is discarded, allowing a silent UI/content-language split",
+      "evidence": [
+        "site/app/Progress/Store.hs:148-155 deliberately returns Bool from saveUiLangHint and says a failed write should participate in storage-loss degradation.",
+        "site/app/Main.hs:581-588 checks the prefs write, but discards the hint result at line 585 and reloads unconditionally. A successful prefs write followed by a quota/revocation/key-specific hint failure reloads using the old hint.",
+        "site/app/Main.hs:371-383 also discards a failed boot-time resync and intentionally does not reload; content was already loaded before prefs/hint reconciliation at lines 341 and 370-380.",
+        "site/static/index.js:71-84 chooses both the bundle and document.documentElement.lang solely from the hint, whereas Main renders UI strings from decoded prfUiLang. A stale hint can therefore produce Japanese UI with English course and `lang=en`, or the inverse, for the whole session without an alert."
+      ],
+      "impact": "This does not alter the separately keyed progress blob, but it contradicts the claimed honest degradation under refused storage and can leave screen-reader language, UI language, and course language inconsistent indefinitely if hint writes keep failing.",
+      "recommendation": "Reload only after both prefs and hint writes succeed. On a failed hint write, dispatch PStorageLost and keep the in-memory/no-reload path; also update document.lang for that in-memory switch. At boot, expose a visible language-content mismatch or perform one loop-guarded corrective refetch/reload after a successful resync."
+    },
+    {
+      "id": "M6-R1-5",
+      "severity": "MEDIUM",
+      "title": "A stalled content fetch can prevent boot forever because the guard has no deadline",
+      "evidence": [
+        "site/static/index.js:89-102 starts a bare fetch with no AbortController or timeout.",
+        "site/static/index.js:129-137 awaits that promise before installing the bridge result and calling hs_start. If the server accepts the connection but never completes the response, neither the Haskell app nor the manuals/retry surface mounts."
+      ],
+      "impact": "404s and thrown fetch/text failures degrade correctly, but a hung or indefinitely slow response leaves only the static loading state, contrary to the promise that the new network dependency cannot prevent the manuals from working.",
+      "recommendation": "Apply a bounded timeout with AbortController and turn timeout into the same `{ok:false,error}` result used by 404/offline failures."
+    },
+    {
+      "id": "M6-R1-6",
+      "severity": "LOW",
+      "title": "The M6 budget record is only partially checked against its live measurements",
+      "evidence": [
+        "briefs/M6-budget.json records shrink_bytes=73560 and separate en/ja gzip measurements.",
+        "scripts/check-site.sh:1506-1535 reads m5_final, m6_entry, m6_final, the ceilings, and three bundle figures, but never reads or checks shrink_bytes. It checks b_en+b_ja equals b_combined and compares only the combined live gzip to the recorded combined value; swapped or compensatingly wrong individual en/ja figures remain green.",
+        "The actual published arithmetic is correct: 933305-859745=73560; 1000000-879161=120839; 76602+91130=167732; and 300000-167732=132268. scripts/check-site.sh:1397-1407 correctly pins the 300000 bundle ceiling, and lines 1157-1165 preserve the frozen 1000000 wasm ceiling."
+      ],
+      "impact": "This is an audit-record falsifiability gap, not a current size overrun. The actual artifact figures and hard ceilings are internally consistent.",
+      "recommendation": "Assert shrink_bytes == m5_final_gzip_bytes - m6_entry_gzip_bytes and compare live EN and JA measurements individually to their corresponding recorded fields."
+    }
+  ],
+  "focus_area_verdicts": {
+    "a_progress_safety_across_languages": {
+      "verdict": "PASS-WITH-CAVEATS",
+      "assessment": "For valid EN/JA bundles, progress identity is shared safely: the progress wire half of site/src/SXC1/Progress/Codec.hs remains unchanged, currentSchema remains 2, and site/test/CheckProgress.hs:385-403 pins its canonical bytes; SXC1.Progress.Scheduler and SXC1.Progress.Types are byte-identical to m5. The M6 change in Codec.hs begins in the separately keyed prefs section at line 334. v1 prefs migration marks the historically explicit jaFirst choice and defaults uiLang to en without touching sxc1.progress. Main's live/retired partition at lines 1100-1137 never deletes retired records, and applyEvents folds into the full saved state. No normal language switch replays or duplicates a progress event. Caveats are M6-R1-1 (a bad accepted corpus can temporarily misclassify history) and M6-R1-4 (hint desync), neither of which rewrites the stored history by itself."
+    },
+    "b_boot_robustness": {
+      "verdict": "FAIL",
+      "assessment": "Thrown fetch failures and non-2xx statuses are guarded, and View.Pages:95-109 supplies the required role=alert/retry/manuals-working surface. M6-R1-1 shows malformed HTTP-200 bodies bypass it; M6-R1-5 shows a stalled fetch can prevent the app and manuals from mounting at all."
+    },
+    "c_ja_content_integrity_at_the_seam": {
+      "verdict": "FAIL",
+      "assessment": "The checked-out shipping artifacts have strong exact-byte freshness via scripts/check-site.sh:1444-1472, and the five browser expectations are genuine hard-coded corpus literals at scripts/browser-check.mjs:2725-2753. Runtime response identity is not authenticated/validated (M6-R1-1), the emitter permits structural prose escapes (M6-R1-2), and the named floor is substitutable (M6-R1-3)."
+    },
+    "d_enforcement_honesty": {
+      "verdict": "FAIL",
+      "assessment": "E-JA-MISSING itself is non-vacuous for absence: jaUnitsOf covers headings, both summary/check field kinds, options, and prose (CheckExercises.hs:442-513); nine negative controls cover the documented visible kinds at lines 1597-1672; and the real INDEX sweep refuses missing/empty input at lines 1677-1702. The separate BindScope is sound. Overall enforcement still fails the seam guarantee because a present but structurally dangerous JA payload passes, and check 23 does not require the exact five proof identities."
+    },
+    "e_size_and_budget": {
+      "verdict": "PASS-WITH-LOW",
+      "assessment": "All supplied arithmetic is correct, the wasm ceiling remains literally 1000000, the bundle ceiling is independently pinned to 300000, and current headroom is 120839 wasm gzip bytes plus 132268 combined-bundle gzip bytes. M6-R1-6 is the only budget issue and does not invalidate the current measurements."
+    },
+    "f_vacuous_or_masked_checks": {
+      "verdict": "FAIL",
+      "assessment": "No new tee/pipe exit masking was found in the M6 sections, and the cardinality pins do count skipped paths. M6-R1-3 is nevertheless a concrete shape/cardinality false-green: five arbitrary prefix-matching names satisfy the claimed exact five-assertion floor. M6-R1-2 is a second self-consistency gap because the shipped bundle is compared to output from the same emitter without a full independent JA structural comparison."
+    }
+  },
+  "report_hs_deviation": {
+    "ruling": "ACCEPTED-SOUND",
+    "assessment": "The 17-line additive edit is the minimum type-safe way to add E-JA-MISSING while preserving mkIssue's closed IssueCode boundary. site/src/SXC1/Exercise/Report.hs:167-190 adds the real bounded StaticCode constructor; lines 256-257 expose its pattern; lines 290-335 give codeText; lines 341-362 classify it DirClass. allIssueCodes is mechanically `map Static [minBound .. maxBound]` at lines 271-277, so the new constructor is necessarily enumerated. site/test/CheckExercises.hs:2300-2305 forces codeText and issueClassOf for every enumerated member, which includes E-JA-MISSING, and the dedicated dir fixture additionally exercises emission. exe:app imports Reader, not Report; Exercises.Corpus imports only Reader, and Report is absent from the app import closure. The coordinator's byte-identical wasm measurement is therefore architecturally credible. The deviation should be ratified."
+  },
+  "low_severity_ship_ruling": "M6-R1-6 does not block ship by itself: current numbers are correct and both hard ceilings are pinned. It should be repaired to keep the budget record fully falsifiable.",
+  "coordinator_reported_state": "Accepted as supplied but not rerun. The green totals demonstrate the current happy-path artifacts and corpus; they do not exercise the accepted-HTTP malformed-bundle cases, prose-structural payload case, exact-name substitution, partial hint-write failure, or stalled fetch described above.",
+  "verdict": "GATE-BLOCKED",
+  "blocking_reasons": [
+    "HIGH M6-R1-1: successful but wrong/stale/truncated/mismatched bundles bypass the visible degraded state.",
+    "The MEDIUM enforcement and anti-unplug gaps M6-R1-2/M6-R1-3 materially weaken the core cross-language guarantee and should be closed in the same repair round."
+  ],
+  "final_line": "GATE-BLOCKED — the runtime accepts wrong, stale, registry-mismatched, and delimiter-complete truncated bundles as healthy; the JA emitter permits structural prose escapes; and check 23 does not require the exact five claimed course assertions."
+}

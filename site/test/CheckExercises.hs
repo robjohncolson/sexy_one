@@ -61,6 +61,10 @@ data Opts = Opts
   , optFixtures         :: Maybe FilePath
   , optListCodes        :: Bool
   , optBrowserFixture   :: Bool
+    -- | M6 gate round 1 (briefs\/M6-codex-gate1.json, finding M6-R1-2):
+    -- @--bundle-structural-diff EN JA@ -- the two emitted content
+    -- bundles to compare for STRUCTURAL identity.
+  , optBundleDiff       :: Maybe (FilePath, FilePath)
   }
 
 defaultOpts :: FilePath -> Opts
@@ -68,6 +72,7 @@ defaultOpts root = Opts
   { optContentDir = root </> "content", optTranslationsDir = root </> "translations"
   , optJson = False, optSelfTest = False, optFixtures = Nothing
   , optListCodes = False, optBrowserFixture = False
+  , optBundleDiff = Nothing
   }
 
 -- | @content\/fixtures@'s default location under the resolved repo root
@@ -93,6 +98,9 @@ parseArgs root = go (defaultOpts root)
     go o ("--fixtures" : rest)             = go o { optFixtures = Just (defaultFixturesDir root) } rest
     go o ("--list-codes" : rest)           = go o { optListCodes = True } rest
     go o ("--browser-fixture" : rest)      = go o { optBrowserFixture = True } rest
+    go o ("--bundle-structural-diff" : en : ja : rest)
+      | not ("--" `isPrefixOf` en), not ("--" `isPrefixOf` ja)
+      = go o { optBundleDiff = Just (en, ja) } rest
     go _ (bad : _)                         = Left ("unknown or incomplete argument: " ++ bad)
 
 --------------------------------------------------------------------------
@@ -764,6 +772,140 @@ runListCodes opts = do
 -- --browser-fixture
 --------------------------------------------------------------------------
 
+--------------------------------------------------------------------------
+-- --bundle-structural-diff: EN vs JA STRUCTURAL IDENTITY (M6 gate round
+-- 1, briefs/M6-codex-gate1.json, finding M6-R1-2).
+--
+-- E-JA-MISSING is a PRESENCE check (a ja: line directly follows the
+-- line it translates) and the JA browser pass disables the disk-derived
+-- exercise-JSON comparison, so nothing in the M6 suite actually
+-- compared the two EMITTED bundles' structure. A ja: prose payload that
+-- the Reader reclassifies structurally after substitution (an option
+-- line, a field line) could therefore change what a JA learner is asked
+-- -- a recall prompt becoming a choice, an option's correctness moving
+-- -- with every check green.
+--
+-- This mode parses BOTH freshly emitted bundles with the SAME
+-- SXC1.Exercise.Reader the app links, and requires complete ORDERED
+-- structural identity: deck ids in order, exercise ids/order/kind per
+-- deck, prompt count and prompt ids per exercise, prompt BODY SHAPE per
+-- prompt, and for choice prompts the option count, the positional
+-- option ids and exactly which options are correct. Only TEXT may
+-- differ -- titles, stems, labels, answers, check sentences are never
+-- compared.
+--
+-- Its own bundle splitter is deliberately a small independent
+-- re-implementation of the framing (this binary cannot import
+-- exe:app's Exercises.Bundle), so an error in the app-side splitter
+-- cannot hide here.
+--------------------------------------------------------------------------
+
+-- | Split a bundle body into INDEX-ordered @(deck file name, text)@ --
+-- the framing only; nothing here knows the app's manifest.
+splitBundleDecks :: Text -> Either String [(FilePath, Text)]
+splitBundleDecks raw = case T.lines raw of
+  [] -> Left "bundle is empty"
+  (hdr : rest)
+    | not ("!SXC1-BUNDLE v1 " `T.isPrefixOf` hdr) ->
+        Left ("bundle does not start with a '!SXC1-BUNDLE v1 <lang> <count>' header: " ++ T.unpack (T.take 60 hdr))
+    | otherwise -> go rest
+  where
+    delim = "!SXC1-DECK "
+    go [] = Right []
+    go (l : ls) = case T.stripPrefix delim l of
+      Nothing -> Left ("expected a '" ++ T.unpack delim ++ "<name>' delimiter, got: " ++ T.unpack (T.take 60 l))
+      Just nameTxt ->
+        let (body, more) = break (T.isPrefixOf delim) ls
+        in ((T.unpack (T.strip nameTxt), T.unlines body) :) <$> go more
+
+-- | The comparable SHAPE of one prompt body: constructor identity plus,
+-- for a choice list, the positional option ids and which are correct.
+-- Never any learner-visible text.
+bodyShapeOf :: PromptBody -> String
+bodyShapeOf b = case b of
+  Choice opts -> "choice[" ++ concatMap one opts ++ "]"
+    where one o = T.unpack (optId o) ++ (if optCorrect o then "+" else "-")
+  Recall _    -> "recall"
+  Confirm _ v -> "confirm" ++ maybe "" (const "+verify") v
+  FindPage c l -> "findpage(" ++ T.unpack (citSlug c) ++ " " ++ show (citPage c)
+                    ++ maybe "" ((" limit " ++) . show) l ++ ")"
+
+-- | The whole structural signature of one deck, as comparable lines.
+deckSignature :: Deck -> [String]
+deckSignature d =
+  ("deck " ++ T.unpack (unDeckIdT (dkId d)) ++ " exercises=" ++ show (length (dkExercises d)))
+  : concatMap exSignature (dkExercises d)
+  where
+    exSignature e =
+      ("  exercise " ++ T.unpack (unExIdT (exId e))
+         ++ " kind=" ++ kindWord (exKind e)
+         ++ " prompts=" ++ show (length (exPrompts e))
+         ++ " hints=" ++ show (length (exHints e)))
+      : [ "    prompt " ++ T.unpack (unPromptIdT (prId p)) ++ " " ++ bodyShapeOf (prBody p)
+        | p <- exPrompts e ]
+    kindWord KQuiz = "quiz"
+    kindWord KDrill = "drill"
+    kindWord KLookup = "lookup"
+    unDeckIdT (DeckId t) = t
+    unExIdT (ExId t) = t
+    unPromptIdT (PromptId t) = t
+
+runBundleStructuralDiff :: FilePath -> FilePath -> IO ()
+runBundleStructuralDiff enPath jaPath = do
+  enRaw <- readUtf8FileOrHarnessError enPath
+  jaRaw <- readUtf8FileOrHarnessError jaPath
+  case (splitBundleDecks enRaw, splitBundleDecks jaRaw) of
+    (Left e, _) -> harnessError (enPath ++ ": " ++ e)
+    (_, Left e) -> harnessError (jaPath ++ ": " ++ e)
+    (Right enDecks, Right jaDecks) -> do
+      let names = ["en/ja deck file names and order are identical"]
+          nameOk = map fst enDecks == map fst jaDecks
+          problems0
+            | nameOk    = []
+            | otherwise = ["deck file names/order differ: en=" ++ show (map fst enDecks)
+                             ++ " ja=" ++ show (map fst jaDecks)]
+          -- Parse EVERY deck of BOTH bundles: an unparsable deck is a
+          -- failure here too, never a silent drop.
+          parseAll lbl ds = [ case readDeck fp txt of
+                                Just d  -> Right (fp, d)
+                                Nothing -> Left (lbl ++ " deck '" ++ fp ++ "' does not parse")
+                            | (fp, txt) <- ds ]
+          enParsed = parseAll "en" enDecks
+          jaParsed = parseAll "ja" jaDecks
+          parseProblems = [ e | Left e <- enParsed ++ jaParsed ]
+          sigProblems =
+            [ "deck '" ++ fp ++ "': structural difference at " ++ show (i :: Int)
+                ++ ": en=" ++ show a ++ " ja=" ++ show b
+            | (Right (fp, dEn), Right (_, dJa)) <- zip enParsed jaParsed
+            , (i, a, b) <- firstDiff (deckSignature dEn) (deckSignature dJa)
+            ]
+          problems = problems0 ++ parseProblems ++ (if null parseProblems then sigProblems else [])
+      mapM_ putStrLn [ "ok - " ++ n | n <- names, nameOk ]
+      forM_ problems (\p -> putStrLn ("FAIL - " ++ p))
+      let deckCount = length enDecks
+          passed = (if nameOk then 1 else 0) + (if null problems then deckCount else 0)
+          total  = 1 + deckCount
+      when (null problems) $
+        forM_ enParsed $ \r -> case r of
+          Right (fp, _) -> putStrLn ("ok - " ++ fp ++ ": en/ja structurally identical (deck/exercise ids and order, kinds, prompt ids, body shapes, option ids and correctness)")
+          Left _        -> pure ()
+      putStrLn ("exercise-check --bundle-structural-diff: " ++ show passed ++ "/" ++ show total ++ " checks passed")
+      if null problems then exitSuccess else exitFailure
+
+-- | The first index at which two signature lists differ (as a
+-- singleton list, or empty when identical) -- a differing LENGTH counts
+-- as a difference at the first missing position.
+firstDiff :: [String] -> [String] -> [(Int, String, String)]
+firstDiff xs ys = go 0 xs ys
+  where
+    go _ []       []       = []
+    go i (a : as) (b : bs)
+      | a == b    = go (i + 1) as bs
+      | otherwise = [(i, a, b)]
+    go i as       bs       = [(i, headOr as, headOr bs)]
+    headOr (x : _) = x
+    headOr []      = "<absent>"
+
 runBrowserFixture :: Opts -> IO ()
 runBrowserFixture opts = do
   loaded <- collectFromDirs realCorpusScope (optContentDir opts) (optTranslationsDir opts)
@@ -968,6 +1110,7 @@ main = do
     Left err -> harnessError err
     Right opts
       | optSelfTest opts       -> runSelfTest
+      | Just (en, ja) <- optBundleDiff opts -> runBundleStructuralDiff en ja
       | optListCodes opts      -> runListCodes opts
       | Just fdir <- optFixtures opts -> runFixtures opts fdir
       | optBrowserFixture opts -> runBrowserFixture opts

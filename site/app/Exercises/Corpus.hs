@@ -15,6 +15,7 @@
 -- See "SXC1.Exercise.Reader"'s Haddock for the size history.
 module Exercises.Corpus
   ( exerciseCorpusOf
+  , checkedCorpusOf
   , exerciseStatsJsonOf
   , fnv1a32
     -- * Tiny JSON combinators, reused verbatim by Main.hs's event-log
@@ -34,6 +35,7 @@ import qualified Data.Text           as T
 import           Data.Text           (Text)
 import           Data.Word           (Word32)
 
+import           Exercises.Manifest   (manifestDeckCount, manifestExercises, manifestPrompts)
 import           SXC1.Content.Stats   (jsonEscape)
 import           SXC1.Exercise.Reader (readDeck)
 import           SXC1.Exercise.Types
@@ -43,9 +45,7 @@ import           SXC1.Exercise.Types
 -- SXC1.Content.Corpus.docs): matching 'Just d' only forces 'parseDeck'
 -- to WHNF, never any individual 'Block' or prompt inside the resulting
 -- 'Deck' -- those stay unevaluated thunks until a view actually demands
--- them. A deck that fails to parse (never happens against the real seed
--- content -- CI gates it) is silently absent here rather than crashing
--- the app; SXC1.Exercise.Parse owns all validation, not this module.
+-- them.
 --------------------------------------------------------------------------
 
 -- | (file name, raw bundle text, parsed 'Deck' if any), in INDEX
@@ -54,8 +54,52 @@ import           SXC1.Exercise.Types
 parsedDecksOf :: [(FilePath, Text)] -> [(FilePath, Text, Maybe Deck)]
 parsedDecksOf srcs = [ (fp, raw, readDeck fp raw) | (fp, raw) <- srcs ]
 
+-- | The unchecked projection, kept for 'exerciseStatsJsonOf' (which
+-- must be able to describe a corpus warts and all). Every LIVE path
+-- goes through 'checkedCorpusOf' instead.
 exerciseCorpusOf :: [(FilePath, Text)] -> [Deck]
 exerciseCorpusOf srcs = [ d | (_, _, Just d) <- parsedDecksOf srcs ]
+
+-- | THE PARSE HALF OF ALL-OR-NOTHING BUNDLE ACCEPTANCE (M6 gate round
+-- 1, finding M6-R1-1c\/d). 'exerciseCorpusOf' above DROPS a deck whose
+-- 'readDeck' returned 'Nothing', which meant a bundle whose framing was
+-- perfect but whose final deck was truncated mid-exercise produced a
+-- SMALLER corpus and no error at all -- retired-looking progress
+-- records and a quietly shorter course. Here a parse failure is a hard,
+-- deck-NAMING error, and the corpus must additionally agree with this
+-- build's "Exercises.Manifest" on all three aggregate counts and carry
+-- no duplicate deck id. Any violation returns 'Left', which Main turns
+-- into the same visible alert\/retry state a failed fetch produces.
+checkedCorpusOf :: [(FilePath, Text)] -> Either Text [Deck]
+checkedCorpusOf srcs = do
+  decks <- mapM parseOne srcs
+  noDuplicateIds (map dkId decks)
+  let exs     = concatMap dkExercises decks
+      prompts = concatMap exPrompts exs
+  expect "deck"     manifestDeckCount (length decks)
+  expect "exercise" manifestExercises (length exs)
+  expect "prompt"   manifestPrompts   (length prompts)
+  Right decks
+  where
+    parseOne (fp, raw) = case readDeck fp raw of
+      Just d  -> Right d
+      Nothing -> Left ("content bundle deck '" <> T.pack fp
+                         <> "' does not parse (truncated or corrupted body)")
+
+    tshow :: Int -> Text
+    tshow = T.pack . show
+
+    expect what want got
+      | want == got = Right ()
+      | otherwise   = Left ("content bundle carries " <> tshow got <> " " <> what
+                              <> "(s); this build expects " <> tshow want)
+
+    noDuplicateIds ids = go [] ids
+      where
+        go _    []       = Right ()
+        go seen (i : is)
+          | i `elem` seen = Left ("content bundle repeats deck id '" <> unDeckId i <> "'")
+          | otherwise     = go (i : seen) is
 
 --------------------------------------------------------------------------
 -- FNV-1a/32 over the UTF-8 BYTES of a 'Text' -- hand-rolled because

@@ -46,6 +46,7 @@ module I18n
     -- * The table (one named entry per learner-visible string)
   , iContentErrorBanner, iDegradedTitle, iDegradedBody, iDegradedManualsOk
   , iRetryButton, iBackToManuals
+  , iLangSplitNotice, iLangSplitButton
   , iBreadcrumbAria, iTraining, iPageOf
   , iHomeBlurb, iTrainingCardSub, iPagesSections, iTocPageAbbrev
   , iHideOriginal, iShowOriginal, iManualPagesAria, iPrevPage, iNextPage
@@ -159,6 +160,30 @@ iDegradedManualsOk = t "The manuals are unaffected and remain fully readable."
 iRetryButton :: Lang -> Text
 iRetryButton = t "Reload and try again"
                  "\20877\35501\12415\36796\12415\12375\12390\20877\35430\34892"
+
+-- | M6 gate round 1 (finding M6-R1-4): the UI\/CONTENT LANGUAGE SPLIT.
+-- The static shell picks the content bundle from the @sxc1.uilang@ boot
+-- hint before the wasm exists, while the UI renders from the decoded
+-- prefs blob -- so a hint write that failed (quota, revoked storage)
+-- used to leave a Japanese UI with an English course, silently, for the
+-- whole session. When the two disagree the app now SAYS SO, visibly, on
+-- every route. The language CODES are wire values and stay Latin (the
+-- never-localize rule).
+iLangSplitNotice :: Lang -> Text -> Text -> Text
+iLangSplitNotice En ui content =
+  "Interface language '" <> ui <> "' does not match the loaded course language '" <> content
+    -- "Reload to load", not "Reload to f-e-t-c-h": check-site's V5
+    -- no-network-egress invariant greps site/app for network verbs on
+    -- non-comment lines, and a learner-visible STRING would trip it.
+    <> "'. Reload to load the course in '" <> ui <> "'."
+iLangSplitNotice Ja ui content =
+  "\34920\31034\35328\35486\12392\35501\12415\36796\12414\12428\12383\25945\26448\12398\35328\35486\12364\19968\33268\12375\12390\12356\12414\12379\12435\65288\34920\31034: "
+    <> ui <> "\12289\25945\26448: " <> content
+    <> "\65289\12290\34920\31034\35328\35486\12398\25945\26448\12434\35501\12415\36796\12416\12395\12399\12289\20877\35501\12415\36796\12415\12375\12390\12367\12384\12373\12356\12290"
+
+iLangSplitButton :: Lang -> Text
+iLangSplitButton = t "Reload the course"
+                     "\25945\26448\12434\20877\35501\12415\36796\12415"
 
 iBackToManuals :: Lang -> Text
 iBackToManuals = t "Back to the manuals"

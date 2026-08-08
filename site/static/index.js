@@ -83,21 +83,65 @@ function sxc1ContentLang() {
 const sxc1UiLang = sxc1ContentLang();
 try { document.documentElement.lang = sxc1UiLang; } catch (e) { /* harmless */ }
 
+// M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-5): THE
+// FETCH DEADLINE. The load below is awaited before hs_start, so a
+// server that accepts the connection and then never completes the body
+// (a stalled CDN edge, a captive portal, a half-open proxy) used to
+// block boot FOREVER: no app, no manuals, no retry -- only the static
+// loading state, which is precisely the failure mode the JS-side guard
+// exists to prevent. Neither fetch() nor Response.text() has a timeout
+// of its own, so the whole load (headers AND body) runs under one
+// AbortController armed with this deadline; a timeout resolves to the
+// same { ok: false, error } shape a 404 or an offline failure does, and
+// the app boots into its ordinary visible degraded state with the
+// #btn-content-retry affordance.
+//
+// 15 seconds: an order of magnitude above a realistic worst case for a
+// ~280 KB text response over a wire-compressed CDN link, and far below
+// any human tolerance for a blank page. The value is a constant, not a
+// setting -- scripts/check-site.sh's stalled-fetch stage serves a
+// deliberately hung endpoint and asserts the degraded surface appears
+// (the harness never injects a shorter deadline: the served endpoint
+// IS the input, exactly like --check-content-missing).
+const SXC1_CONTENT_TIMEOUT_MS = 15000;
+
 // Started BEFORE wasm instantiation so the two loads overlap; awaited
-// just before hs_start. This promise NEVER rejects -- both failure
-// shapes resolve to { ok: false, error }.
+// just before hs_start. This promise NEVER rejects -- all three failure
+// shapes (non-2xx, thrown, timed out) resolve to { ok: false, error }.
 const sxc1ContentPromise = (async () => {
   const lang = sxc1ContentLang();
   const rel = `./content/content.${lang}.txt`;
+  let controller = null;
+  let timer = null;
   try {
-    const resp = await fetch(rel);
+    controller = typeof AbortController === 'function' ? new AbortController() : null;
+  } catch (e) {
+    controller = null;
+  }
+  let timedOut = false;
+  if (controller) {
+    timer = setTimeout(() => {
+      timedOut = true;
+      try { controller.abort(); } catch (e) { /* already settled */ }
+    }, SXC1_CONTENT_TIMEOUT_MS);
+  }
+  try {
+    const resp = await fetch(rel, controller ? { signal: controller.signal } : undefined);
     if (!resp.ok) {
       return { lang, ok: false, error: `HTTP ${resp.status} fetching ${rel}` };
     }
+    // The body is read under the SAME deadline: a server can send
+    // headers immediately and then stall the body indefinitely, which
+    // is the exact stall this guard exists for.
     const text = await resp.text();
     return { lang, ok: true, text };
   } catch (err) {
+    if (timedOut) {
+      return { lang, ok: false, error: `${rel} timed out after ${SXC1_CONTENT_TIMEOUT_MS}ms (content load deadline)` };
+    }
     return { lang, ok: false, error: `${rel} unreachable: ${err && err.message ? err.message : String(err)}` };
+  } finally {
+    if (timer !== null) clearTimeout(timer);
   }
 })();
 
@@ -177,11 +221,19 @@ document.addEventListener("click", (event) => {
     if (confirmBtn) confirmBtn.hidden = false;
   } else if (id === "btn-progress-wipe-confirm") {
     event.target.hidden = true;
-  } else if (id === "btn-content-retry") {
+  } else if (id === "btn-content-retry" || id === "btn-lang-resync") {
     // M6 W1: the degraded-content retry affordance. A full reload IS the
     // retry -- it re-runs this file's guarded bundle load and the app's
     // boot-time read of it, with no separate re-fetch path to keep in
     // sync (re-fetch-on-language-switch is W2's seam).
+    //
+    // M6 gate round 1 (finding M6-R1-4): #btn-lang-resync -- inside the
+    // visible #sxc1-lang-split banner -- takes the same path. The app
+    // re-syncs the boot hint from the decoded pref at every boot, so
+    // once a hint write succeeds again this reload fetches the bundle
+    // the UI language actually calls for. It is LEARNER-INITIATED and
+    // therefore cannot loop, which is why no automatic corrective
+    // reload exists on the boot path (see Main.main).
     window.location.reload();
   }
 });

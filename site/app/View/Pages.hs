@@ -58,12 +58,17 @@ viewRoute
   -> Maybe T.Text               -- ^ M6: 'Just' the content-bundle load-failure reason -- renders the
                                 --   visible \#sxc1-content-error banner on EVERY route (never rendered,
                                 --   not merely hidden, on a healthy boot)
+  -> Maybe (T.Text, T.Text)     -- ^ M6 gate round 1 (M6-R1-4): 'Just' (UI language code, LOADED course
+                                --   language code) when the two disagree -- renders the visible
+                                --   \#sxc1-lang-split banner on EVERY route; 'Nothing' (the healthy
+                                --   case) renders nothing at all
   -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
   -> Route
   -> View model action
-viewRoute lang toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mContentErr mExerciseBody route = H.main_ [ P.id_ "app" ]
+viewRoute lang toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mContentErr mLangSplit mExerciseBody route = H.main_ [ P.id_ "app" ]
   ( headerView ph pd route
   : contentErrorBanner lang mContentErr
+  ++ langSplitBanner lang mLangSplit
   ++ [ statsView
      , exerciseStatsView exStatsJson
      , eventLogView eventLogJson
@@ -97,6 +102,38 @@ contentErrorBanner _    Nothing    = []
 contentErrorBanner lang (Just err) =
   [ H.div_ [ P.id_ "sxc1-content-error", textProp "role" "alert" ]
       [ text (ms (iContentErrorBanner lang err)) ]
+  ]
+
+-- | M6 gate round 1 (finding M6-R1-4): the UI\/CONTENT LANGUAGE SPLIT
+-- banner. The shell picks the bundle from the pre-boot @sxc1.uilang@
+-- hint; Main renders every string from the decoded prefs blob. A hint
+-- write that FAILED (quota, revoked storage) therefore used to produce
+-- a Japanese UI over an English course -- or the inverse -- for the
+-- whole session with nothing on screen saying so. Same discipline as
+-- 'contentErrorBanner': a visible role="alert" element on every route,
+-- ABSENT ENTIRELY (never merely hidden) when the two agree. The button
+-- is handled JS-side by the same delegated click listener as
+-- \#btn-content-retry (site\/static\/index.js) -- a reload re-reads the
+-- (already re-synced) hint and fetches the right bundle.
+-- MEASURED (this fix's own red run): the explicit @hidden=False@ below
+-- is load-bearing, not decoration. Unlike 'contentErrorBanner' -- whose
+-- presence is decided once at boot and never changes -- this banner
+-- APPEARS MID-SESSION (the in-memory language switch), growing
+-- @main#app@'s child list by one. Miso's diff is positional, and the
+-- slot this node takes over previously held @#sxc1-content-stats@,
+-- which renders @hidden=True@; with no @hidden@ in the new node's
+-- attribute list the diff has nothing to disagree with, so the old
+-- property survived and the freshly inserted alert was
+-- @display:none@ (visible in the DOM, invisible on screen -- the worst
+-- possible outcome for an accessibility alert). Stating @hidden=False@
+-- makes the two trees disagree, so the diff clears it.
+langSplitBanner :: Lang -> Maybe (T.Text, T.Text) -> [View model action]
+langSplitBanner _    Nothing              = []
+langSplitBanner lang (Just (ui, content)) =
+  [ H.div_ [ P.id_ "sxc1-lang-split", P.hidden_ False, textProp "role" "alert" ]
+      [ text (ms (iLangSplitNotice lang ui content))
+      , H.button_ [ P.id_ "btn-lang-resync" ] [ text (ms (iLangSplitButton lang)) ]
+      ]
   ]
 
 contentDegradedView :: Lang -> T.Text -> View model action

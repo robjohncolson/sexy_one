@@ -320,6 +320,21 @@ Checks performed, in order:
      (a 3000-byte window rather than an equality because gzip's exact
      output is a property of the local gzip build, not of this tree --
      the same window the artifact figure already uses).
+     M6 GATE ROUND 1 adds three more, all unconditional: the generated
+     site/app/Exercises/Manifest.hs -- the BUILD-TIME EXPECTATION
+     compiled into app.wasm, which the running app now checks every
+     fetched bundle against -- must be byte-identical to a fresh
+     --manifest-hs regeneration (M6-g); its deck list, deck count and
+     per-language FNV-1a/32 fingerprints must re-derive independently
+     from the SHIPPED bundles (M6-h, the one check that catches a
+     manifest and a bundle set that are each internally fine but
+     describe different builds); and the emitter must REJECT a ja: prose
+     payload shaped like a task-list option, a field line or a heading,
+     while the same scratch corpus without them emits cleanly (M6-i,
+     finding M6-R1-2's emitter half). A fourth, on the content axis,
+     parses BOTH fresh emissions with the real Reader and requires
+     complete ordered EN/JA structural identity, with its own flipped-
+     option negative control.
   21. M6 FETCH-FAILURE DEGRADATION (browser axis): a COPY of the bundle
      is served WITHOUT its content/ directory and browser-check
      --check-content-missing must report 4/4: the app still boots (the
@@ -328,10 +343,11 @@ Checks performed, in order:
      exercise routes offer #btn-content-retry. Skipped via skip() under
      --skip-browser, like every other browser-axis stage.
   22. M6 W2 UI-LANGUAGE TOGGLE ROUNDTRIP (browser axis): a COPY of the
-     bundle is served whose content bundles are RE-EMITTED from a COPY
-     of content/exercises carrying ONE injected ja: fixture variant
-     (content/ itself is never touched -- the M6-c/d freshness checks
-     pin that), and browser-check --check-ja-toggle must report 9/9 on
+     bundle is served AS SHIPPED (gate round 1: a re-emitted bundle is
+     no longer accepted by the app at all -- the wasm-embedded manifest
+     fingerprint rejects it -- so the stage pins the corpus's OWN
+     wave-3 Japanese title instead of an injected fixture one, which
+     is strictly stronger), and browser-check --check-ja-toggle must report 9/9 on
      a fresh profile: boots EN fetching content.en.txt; #btn-ui-lang
      switches to JA through the app's own persist-then-reload
      (reload-as-refetch, proven by the fresh document's resource
@@ -339,12 +355,12 @@ Checks performed, in order:
      the sxc1.uilang boot hint and the SXC1PREFS uiLang line survive;
      ruling 4's one-time jaFirst suggestion fires (fresh profile ==
      never explicitly set) without marking the choice taken; the
-     injected JA exercise title renders from the ja bundle; a JA
+     pinned JA exercise title renders from the ja bundle; a JA
      device flow (fake-midi) pins the JA status/waiting/confirmed
      sentences including the describeSpec JA renderer; and switching
-     back restores EN. The injection is grep-confirmed both into the
-     served copy's ja bundle AND absent from its en bundle before the
-     browser ever runs. Skipped via skip() under --skip-browser.
+     back restores EN. The pinned title is grep-confirmed present in
+     the served copy's ja bundle AND absent from its en bundle before
+     the browser ever runs. Skipped via skip() under --skip-browser.
   23. M6 W4 JA COURSE FLOOR (browser axis): the five "ja course:"
      assertions scripts/browser-check.mjs runs inside BOTH full stages
      (checks 7/8, within the UI-language JA flow) must each be reported
@@ -366,6 +382,39 @@ Checks performed, in order:
      five red. Skipped via skip() under --skip-browser (the stages
      never ran) and under --skip-content (without --exercise-fixture
      the JA flow does not run at all).
+  24. M6 GATE-1 BAD-BUNDLE REJECTION (browser axis): six sibling copies
+     of the bundle are served from one server -- five whose en content
+     bundle is sabotaged in a DIFFERENT way (the ja bundle served at the
+     en URL; one deck's text altered; the final deck truncated with
+     every !SXC1-DECK delimiter and the header count still intact; a
+     syntactically perfect zero-deck bundle; one whole deck removed with
+     the header count adjusted to match) and one untouched. Each
+     sabotage is verified structurally before the browser runs (the
+     truncated case is checked to KEEP all 52 delimiters -- the exact
+     shape the pre-fix runtime accepted as a healthy, slightly smaller
+     course), and browser-check --check-bad-bundle must report exactly
+     12/12: every sabotaged copy shows the visible #sxc1-content-error
+     alert AND reports zero decks with the degraded #/x notice, while
+     the control shows no banner and the whole 52-deck/435-exercise
+     course. Skipped via skip() under --skip-browser.
+  25. M6 GATE-1 STALLED-FETCH DEADLINE (browser axis): a threaded server
+     answers the en content bundle with 200 + headers + a few bytes and
+     then never finishes it (verified: curl must NOT complete that URL
+     within 3s), serving everything else normally, and browser-check
+     --check-content-stalled must report exactly 4/4: the app boots
+     anyway inside site/static/index.js's AbortController deadline, the
+     visible banner names the TIMEOUT, a manual page still renders, and
+     the exercise route offers #btn-content-retry. Skipped via skip()
+     under --skip-browser.
+  26. M6 GATE-1 UI/CONTENT LANGUAGE SPLIT (browser axis): with writes to
+     the sxc1.uilang BOOT HINT -- and only that key -- forced to throw,
+     browser-check --check-hint-write-failure must report exactly 4/4:
+     clicking #btn-ui-lang does NOT reload (a window marker survives, so
+     the session cannot land back on the stale hint), #sxc1-progress
+     reports uiLang=ja with contentLang=en and available=false, the
+     VISIBLE #sxc1-lang-split alert names both languages and offers
+     #btn-lang-resync, and document.documentElement.lang follows the
+     in-memory switch. Skipped via skip() under --skip-browser.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -557,7 +606,18 @@ info() {
 # deck card/page/summary in Japanese, a real corpus quiz COMPLETED in
 # Japanese, and a real corpus drill step's JA check: sentence --
 # measured 238/238 on both full stages at this raise).
-M5_CHECK_TOTAL=109
+# M6 GATE ROUND 1 pin raise (same documented procedure: ADDING A CHECK
+# REQUIRES A VISIBLE EDIT TO THE PIN): 109 -> 115 (+1 manifest freshness
+# M6-g, +1 manifest/shipped-bundle agreement M6-h, +1 emitter prose
+# structural-token rejection M6-i, +1 EN/JA bundle structural identity
+# with its own negative control, +1 bad-bundle browser stage (check 24),
+# +1 stalled-fetch browser stage (check 25), +1 UI/content language-split
+# browser stage (check 26)). The browser-stage floor is
+# UNCHANGED at 238: all six additions are their own stages/checks with
+# their own pinned cardinalities (12/12 and 4/4, asserted literally by
+# the stages themselves), and none of them adds or removes an assertion
+# inside the two full stages.
+M5_CHECK_TOTAL=116
 M5_BROWSER_ASSERT_FLOOR=238
 
 # ---------------------------------------------------------------------------
@@ -1470,8 +1530,212 @@ for lang in en ja; do
       ;;
   esac
 done
-rm -rf "$BUNDLE_FRESH_TMP"
-unregister_temp_dir "$BUNDLE_FRESH_TMP"
+# ===========================================================================
+# M6 GATE ROUND 1 (briefs/M6-codex-gate1.json, findings M6-R1-1/M6-R1-2):
+# THE BUILD-TIME BUNDLE EXPECTATION AND THE EMITTER'S STRUCTURAL RULES.
+#
+# The runtime now refuses any bundle that disagrees with
+# site/app/Exercises/Manifest.hs -- the generated module compiled INTO
+# app.wasm (deck names in INDEX order, aggregate counts, one FNV-1a/32
+# fingerprint per language over the whole bundle). That expectation is
+# only worth anything if it is (M6-g) genuinely regenerated from the
+# corpus rather than hand-maintained, and (M6-h) actually describes the
+# bundles that ship. Both are pure file/python work, so both are
+# unconditional here; the behavioural half (a sabotaged bundle must
+# produce the visible degraded state) is the bad-bundle browser stage
+# below.
+# ===========================================================================
+MANIFEST_HS="$REPO_ROOT/site/app/Exercises/Manifest.hs"
+
+# --- M6-g: MANIFEST FRESHNESS (the exact-bytes discipline, again) ---------
+M6G_LABEL="bundle manifest freshness (site/app/Exercises/Manifest.hs is byte-identical to a fresh scripts/emit-content-bundles.py --manifest-hs regeneration from content/exercises/ -- the wasm-embedded expectation really describes THIS corpus)"
+MANIFEST_FRESH_TMP="$(mktemp -d -t sxc1-check-site-manifest.XXXXXX)"
+register_temp_dir "$MANIFEST_FRESH_TMP"
+MANIFEST_EMIT_OUT="$(python3 "$REPO_ROOT/scripts/emit-content-bundles.py" \
+  --exercises-dir "$REPO_ROOT/content/exercises" \
+  --manifest-hs "$MANIFEST_FRESH_TMP/Manifest.hs" 2>&1)" || MANIFEST_EMIT_OUT="EMIT-FAILED: $MANIFEST_EMIT_OUT"
+case "$MANIFEST_EMIT_OUT" in
+  EMIT-FAILED:*)
+    fail "$M6G_LABEL (observed: fresh regeneration failed -- ${MANIFEST_EMIT_OUT#EMIT-FAILED: })"
+    ;;
+  *)
+    if [ -f "$MANIFEST_HS" ] && cmp -s "$MANIFEST_FRESH_TMP/Manifest.hs" "$MANIFEST_HS"; then
+      ok "$M6G_LABEL"
+    else
+      fail "$M6G_LABEL (observed: the committed manifest diverges from a fresh regeneration -- content/exercises/ was edited without re-running build-site.sh, or the file was hand-edited)"
+    fi
+    ;;
+esac
+rm -rf "$MANIFEST_FRESH_TMP"
+unregister_temp_dir "$MANIFEST_FRESH_TMP"
+
+# --- M6-h: MANIFEST <-> SHIPPED BUNDLES -----------------------------------
+# Re-derives the expectation straight from the bundles that are actually
+# shipping at --dir -- deck names in delimiter order, deck count, and
+# FNV-1a/32 over each whole file -- and compares it to the literals in
+# the committed manifest module. This is the one check that would catch a
+# manifest and a bundle set that are each internally fine but describe
+# DIFFERENT builds (which is exactly what the app refuses to boot on).
+M6H_LABEL="bundle manifest agreement (the committed manifest's deck list, deck count and per-language FNV-1a/32 fingerprints re-derived independently from the SHIPPED $DIR/content bundles)"
+if [ -f "$MANIFEST_HS" ] && [ -f "$BUNDLE_EN_FILE" ] && [ -f "$BUNDLE_JA_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  M6H_PY="$(mktemp -t sxc1-check-site-manifest.XXXXXX.py)"
+  register_temp_file "$M6H_PY"
+  cat > "$M6H_PY" <<'PYEOF'
+import re, sys
+
+MASK32 = 0xFFFFFFFF
+
+
+def fnv1a32(data):
+    h = 2166136261
+    for b in data:
+        h ^= b
+        h = (h * 16777619) & MASK32
+    return h
+
+
+# Vector-pinned before use, exactly like every other FNV re-derivation in
+# this script.
+for data, want in [(b"", 2166136261), (b"hello", 1335831723), ("⊕⊖".encode("utf-8"), 3369799694)]:
+    if fnv1a32(data) != want:
+        print("FAIL FNV-1a/32 self-check failed in the re-derivation itself")
+        raise SystemExit
+
+src = open(sys.argv[1], encoding="utf-8").read()
+names = re.findall(r'^\s*[\[,]\s*"([^"]+)"\s*$', src, re.M)
+m_count = re.search(r'^manifestDeckCount = (\d+)$', src, re.M)
+fps = dict((lang, int(v)) for lang, v in re.findall(r'^manifestFingerprint "([a-z]+)" = Just (\d+)$', src, re.M))
+problems = []
+if not names:
+    problems.append("could not read manifestDecks out of the manifest module")
+if not m_count:
+    problems.append("could not read manifestDeckCount out of the manifest module")
+elif int(m_count.group(1)) != len(names):
+    problems.append("manifestDeckCount=%s but manifestDecks lists %d name(s)" % (m_count.group(1), len(names)))
+
+for lang, path in (("en", sys.argv[2]), ("ja", sys.argv[3])):
+    data = open(path, "rb").read()
+    text = data.decode("utf-8")
+    lines = text.split("\n")
+    hdr = lines[0] if lines else ""
+    want_hdr = "!SXC1-BUNDLE v1 %s %d" % (lang, len(names))
+    if hdr != want_hdr:
+        problems.append("%s header is %r, expected %r" % (path, hdr[:60], want_hdr))
+    got_names = [l[len("!SXC1-DECK "):].strip() for l in lines if l.startswith("!SXC1-DECK ")]
+    if got_names != names:
+        problems.append("%s deck delimiters do not equal manifestDecks in order (%d vs %d names; first difference: %r)"
+                        % (path, len(got_names), len(names),
+                           next(((a, b) for a, b in zip(got_names + [None] * len(names), names + [None] * len(got_names)) if a != b), None)))
+    got_fp = fnv1a32(data)
+    if fps.get(lang) != got_fp:
+        problems.append("%s fingerprint is %d, manifest records %r" % (path, got_fp, fps.get(lang)))
+
+if problems:
+    print("FAIL " + "; ".join(problems))
+else:
+    print("OK %d decks; fingerprints en=%d ja=%d re-derived from the shipped bundles" % (len(names), fps["en"], fps["ja"]))
+PYEOF
+  M6H_OUT="$(python3 "$M6H_PY" "$MANIFEST_HS" "$BUNDLE_EN_FILE" "$BUNDLE_JA_FILE" 2>&1)" || true
+  rm -f "$M6H_PY"
+  case "$M6H_OUT" in
+    "OK "*) ok "$M6H_LABEL (${M6H_OUT#OK })" ;;
+    *)      fail "$M6H_LABEL (observed: ${M6H_OUT#FAIL })" ;;
+  esac
+else
+  fail "$M6H_LABEL (observed: site/app/Exercises/Manifest.hs, a shipped bundle, or python3 is missing)"
+fi
+
+# --- M6-i: THE EMITTER'S PROSE STRUCTURAL-TOKEN REJECTION -----------------
+# Finding M6-R1-2's emitter half, as a permanent negative control. The
+# prose branch used to reject only structural HEADINGS, so a ja: prose
+# payload shaped like a task-list option or a field line was substituted
+# happily and then RECLASSIFIED STRUCTURALLY by the Reader -- a JA deck
+# that differs structurally from EN while E-JA-MISSING (presence-only)
+# and the JA browser pass (no disk-derived JSON comparison) both stay
+# green. Three payload shapes, each of which the Reader treats
+# structurally, must each make the emitter EXIT NON-ZERO; and the same
+# scratch corpus without any of them must emit cleanly, so the check
+# cannot pass by refusing everything.
+M6I_LABEL="emitter prose-payload structural rejection: a ja: prose payload shaped like a task-list option, a field line, or a heading is a build failure (finding M6-R1-2 -- each shape enumerated from SXC1.Exercise.Reader's own classification rules), while the same scratch corpus without them emits cleanly"
+M6I_TMP="$(mktemp -d -t sxc1-check-site-emitneg.XXXXXX)"
+register_temp_dir "$M6I_TMP"
+mkdir -p "$M6I_TMP/corpus" "$M6I_TMP/out"
+printf '900-scratch.ex.md\n' > "$M6I_TMP/corpus/INDEX"
+cat > "$M6I_TMP/corpus/900-scratch.ex.md" <<'EOF'
+# Scratch deck
+ja: # スクラッチデッキ
+
+deck: scratch-01
+chapter: Scratch
+tier: intro
+summary: A scratch deck for the emitter's negative controls.
+ja: summary: エミッタの負のコントロール用のスクラッチデッキ。
+
+Ordinary prose that a ja: run may replace.
+ja: 置き換えてよい通常の散文。
+
+## A scratch exercise
+ja: ## スクラッチ演習
+
+type: quiz
+id: q-9-01
+
+The stem prose.
+ja: 設問の文。
+
+- [x] The right one
+ja: - [x] 正しい選択肢
+- [ ] The wrong one
+ja: - [ ] 誤った選択肢
+EOF
+M6I_PROBLEMS=""
+if ! python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$M6I_TMP/corpus" --out-dir "$M6I_TMP/out" >/dev/null 2>&1; then
+  M6I_PROBLEMS="the UNMUTATED scratch corpus does not emit (the negative controls below would be vacuous)"
+else
+  M6I_ANCHOR='ja: 置き換えてよい通常の散文。'
+  cp "$M6I_TMP/corpus/900-scratch.ex.md" "$M6I_TMP/pristine.ex.md"
+  # Each payload is appended to the PROSE run above, so the emitter's
+  # prose branch is the one that must reject it.
+  while IFS= read -r payload; do
+    [ -z "$payload" ] && continue
+    cp "$M6I_TMP/pristine.ex.md" "$M6I_TMP/corpus/900-scratch.ex.md"
+    if ! python3 - "$M6I_TMP/corpus/900-scratch.ex.md" "$M6I_ANCHOR" "ja: $payload" <<'PYEOF' >/dev/null 2>&1
+import sys
+path, anchor, extra = sys.argv[1], sys.argv[2], sys.argv[3]
+lines = open(path, encoding="utf-8").read().splitlines(True)
+out, done = [], False
+for ln in lines:
+    out.append(ln)
+    if not done and ln.rstrip("\n") == anchor:
+        out.append(extra + "\n")
+        done = True
+if not done:
+    raise SystemExit(1)
+open(path, "w", encoding="utf-8").write("".join(out))
+PYEOF
+    then
+      M6I_PROBLEMS="$M6I_PROBLEMS; could not inject the payload '$payload' into the scratch deck"
+      continue
+    fi
+    if ! grep -qF "ja: $payload" "$M6I_TMP/corpus/900-scratch.ex.md"; then
+      M6I_PROBLEMS="$M6I_PROBLEMS; grep-confirm IN failed for payload '$payload'"
+    elif python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$M6I_TMP/corpus" --out-dir "$M6I_TMP/out" >/dev/null 2>&1; then
+      M6I_PROBLEMS="$M6I_PROBLEMS; the emitter ACCEPTED the structural prose payload '$payload'"
+    fi
+  done <<'EOF'
+- [x] X
+id: x
+## X
+EOF
+  cp "$M6I_TMP/pristine.ex.md" "$M6I_TMP/corpus/900-scratch.ex.md"
+fi
+if [ -z "$M6I_PROBLEMS" ]; then
+  ok "$M6I_LABEL (observed: all three structural payload shapes rejected; the unmutated scratch corpus emits)"
+else
+  fail "$M6I_LABEL (observed:${M6I_PROBLEMS#;})"
+fi
+rm -rf "$M6I_TMP"
+unregister_temp_dir "$M6I_TMP"
 
 # --- M6-e: THE WASM-SHRINK RE-BASELINE (briefs/M6-budget.json) ------------
 # The M5-R1-2 pattern applied to the M6 record: the file must MATCH the
@@ -1529,8 +1793,19 @@ try:
         problems.append("bundle_combined_gzip_bytes=%d is not bundle_en_gzip_bytes=%d + bundle_ja_gzip_bytes=%d" % (b_combined, b_en, b_ja))
     if b_combined >= bundle_ceiling:
         problems.append("recorded bundle_combined_gzip_bytes=%d is at/over the bundle ceiling %d" % (b_combined, bundle_ceiling))
+    # M6 gate-1 finding M6-R1-6: comparing only the COMBINED figure let
+    # swapped or compensatingly-wrong per-language records stay green, and
+    # shrink_bytes was recorded but never checked. Each recorded figure is
+    # now derived-or-compared individually.
+    shrink = int(m6["shrink_bytes"])
+    if shrink != m5_final - m6_entry:
+        problems.append("shrink_bytes=%d is not m5_final_gzip_bytes - m6_entry_gzip_bytes = %d - %d = %d" % (shrink, m5_final, m6_entry, m5_final - m6_entry))
     if live_en >= 0 and live_ja >= 0:
         live_combined = live_en + live_ja
+        if abs(live_en - b_en) > 3000:
+            problems.append("live EN bundle gzip=%d is %d bytes from the recorded bundle_en_gzip_bytes=%d (beyond the 3000-byte window) -- re-measure and update briefs/M6-budget.json" % (live_en, live_en - b_en, b_en))
+        if abs(live_ja - b_ja) > 3000:
+            problems.append("live JA bundle gzip=%d is %d bytes from the recorded bundle_ja_gzip_bytes=%d (beyond the 3000-byte window) -- re-measure and update briefs/M6-budget.json" % (live_ja, live_ja - b_ja, b_ja))
         if abs(live_combined - b_combined) > 3000:
             problems.append("live combined bundle gzip=%d (en=%d + ja=%d) is %d bytes from the recorded %d (beyond the 3000-byte window) -- re-measure and update briefs/M6-budget.json" % (live_combined, live_en, live_ja, live_combined - b_combined, b_combined))
 except KeyError as e:
@@ -2250,6 +2525,7 @@ if [ "$SKIP_CONTENT" -eq 1 ]; then
   skip "exercise validator reports zero issues over real content (exercise-check --json ok:true)"
   skip "exercise-stats/inventory-binding-scope-fired (totals.inventoryChecked equals totals.decks)"
   skip "exercise-check --self-test passes from the repo root as well as site/ (cwd-robust content-root resolution, M5 debt item 6)"
+  skip "EN/JA bundle structural identity (exercise-check --bundle-structural-diff over both FRESH emissions: deck/exercise ids and order, kinds, prompt ids, body shapes, option ids and correctness -- only text may differ), with its own negative control (one flipped option correctness in the ja bundle must turn it red)"
   skip "exercise-stats/fnv1a-vectors (FNV-1a/32 pinned against published test vectors)"
   skip "exercise-stats/index-directory-agreement (content/exercises/INDEX vs directory, both directions)"
   skip "exercise-stats/totals-agreement (python re-derivation vs exercise-check --json totals)"
@@ -2659,6 +2935,90 @@ else:
     fi
   else
     fail "$BOTHCWD_LABEL (observed: toolchain env or binary unavailable -- see checks above)"
+  fi
+
+  # -------------------------------------------------------------------------
+  # M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-2), CHECKER
+  # HALF: EN/JA STRUCTURAL IDENTITY of the two freshly emitted bundles.
+  #
+  # E-JA-MISSING is presence-only and the JA browser pass disables the
+  # disk-derived exercise-JSON comparison, so nothing compared what the
+  # two EMITTED bundles actually PARSE TO. exercise-check
+  # --bundle-structural-diff parses BOTH with the real
+  # SXC1.Exercise.Reader and requires complete ordered identity: deck ids
+  # and order, exercise ids/order/kind, prompt ids and counts, prompt body
+  # shapes, and for choice prompts the option ids and exactly which are
+  # correct. Only TEXT may differ.
+  #
+  # Its own NEGATIVE CONTROL runs in the same check: the ja bundle with
+  # ONE option's correctness flipped must make the same mode exit
+  # non-zero. Without it a differ that compared nothing would pass.
+  # -------------------------------------------------------------------------
+  JADIFF_LABEL="EN/JA bundle structural identity (exercise-check --bundle-structural-diff over both FRESH emissions: deck/exercise ids and order, kinds, prompt ids, body shapes, option ids and correctness -- only text may differ), with its own negative control (one flipped option correctness in the ja bundle must turn it red)"
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    JADIFF_TMP="$(mktemp -d -t sxc1-check-site-jadiff.XXXXXX)"
+    register_temp_dir "$JADIFF_TMP"
+    JADIFF_PROBLEMS=""
+    if ! python3 "$REPO_ROOT/scripts/emit-content-bundles.py" \
+         --exercises-dir "$REPO_ROOT/content/exercises" --out-dir "$JADIFF_TMP" >/dev/null 2>&1; then
+      JADIFF_PROBLEMS="a fresh emission from content/exercises/ failed"
+    else
+      set +e
+      JADIFF_OUT="$(cd "$REPO_ROOT/site" && wasm-run.mjs "$EXERCISE_CHECK_BIN" \
+        --bundle-structural-diff "$JADIFF_TMP/content.en.txt" "$JADIFF_TMP/content.ja.txt" 2>&1)"
+      JADIFF_RC=$?
+      set -e
+      JADIFF_LAST="$(printf '%s\n' "$JADIFF_OUT" | tail -n 1)"
+      JADIFF_N="$(printf '%s' "$JADIFF_LAST" | sed -nE 's|^exercise-check --bundle-structural-diff: ([0-9]+)/([0-9]+) checks passed$|\1 \2|p')"
+      if [ "$JADIFF_RC" -ne 0 ] || [ -z "$JADIFF_N" ]; then
+        JADIFF_PROBLEMS="the positive run exited $JADIFF_RC (last line: ${JADIFF_LAST:-<empty>})"
+      else
+        JADIFF_PASSED="$(printf '%s' "$JADIFF_N" | cut -d' ' -f1)"
+        JADIFF_TOTAL="$(printf '%s' "$JADIFF_N" | cut -d' ' -f2)"
+        # The total is 1 (deck-name/order) + one per deck, so it also
+        # pins that every deck was really compared.
+        if [ "$JADIFF_PASSED" != "$JADIFF_TOTAL" ] || [ "$JADIFF_TOTAL" -lt 53 ]; then
+          JADIFF_PROBLEMS="the positive run reported $JADIFF_PASSED/$JADIFF_TOTAL (expected N/N with N >= 53: one name/order check plus one per deck)"
+        fi
+      fi
+      if [ -z "$JADIFF_PROBLEMS" ]; then
+        cp "$JADIFF_TMP/content.ja.txt" "$JADIFF_TMP/content.ja.mutated.txt"
+        if ! python3 -c '
+import sys
+p = sys.argv[1]
+lines = open(p, encoding="utf-8").read().split("\n")
+flipped = 0
+for i, l in enumerate(lines):
+    if flipped == 0 and l.startswith("- [x] "):
+        lines[i] = "- [ ] " + l[6:]; flipped = 1
+    elif flipped == 1 and l.startswith("- [ ] "):
+        lines[i] = "- [x] " + l[6:]; flipped = 2; break
+if flipped != 2:
+    raise SystemExit(1)
+open(p, "w", encoding="utf-8").write("\n".join(lines))
+' "$JADIFF_TMP/content.ja.mutated.txt" >/dev/null 2>&1; then
+          JADIFF_PROBLEMS="could not build the negative control (no option pair found in the ja bundle)"
+        else
+          set +e
+          (cd "$REPO_ROOT/site" && wasm-run.mjs "$EXERCISE_CHECK_BIN" \
+            --bundle-structural-diff "$JADIFF_TMP/content.en.txt" "$JADIFF_TMP/content.ja.mutated.txt" >/dev/null 2>&1)
+          JADIFF_NEG_RC=$?
+          set -e
+          if [ "$JADIFF_NEG_RC" -eq 0 ]; then
+            JADIFF_PROBLEMS="the NEGATIVE CONTROL passed: a ja bundle with one option's correctness flipped was accepted as structurally identical"
+          fi
+        fi
+      fi
+    fi
+    if [ -z "$JADIFF_PROBLEMS" ]; then
+      ok "$JADIFF_LABEL (observed: $JADIFF_PASSED/$JADIFF_TOTAL structural checks passed; the flipped-option negative control exited $JADIFF_NEG_RC)"
+    else
+      fail "$JADIFF_LABEL (observed: $JADIFF_PROBLEMS)"
+    fi
+    rm -rf "$JADIFF_TMP"
+    unregister_temp_dir "$JADIFF_TMP"
+  else
+    fail "$JADIFF_LABEL (observed: toolchain env, exercise-check binary, or python3 unavailable -- see checks above)"
   fi
 
   # -------------------------------------------------------------------------
@@ -3617,8 +3977,13 @@ DEVICE_SUITE_LABEL="device assertions D1..D27 ran and passed inside check 7's ro
 # (M5-R1-3): reject a pre-occupied port, verify the child serves OUR
 # copy's index.html byte-for-byte, kill only our own child.
 CONTENT_MISSING_LABEL="fetch-failure degradation: served WITHOUT content/ bundles the app still boots, names the failure, keeps manuals readable, and offers a retry (browser-check --check-content-missing, 4/4)"
+# M6 gate round 1 (briefs/M6-codex-gate1.json, findings M6-R1-1 and
+# M6-R1-5) -- see usage() checks 24 and 25 and each stage's own comment.
+BAD_BUNDLE_LABEL="bad-bundle rejection: five 200-response bundles (wrong language, stale text, delimiter-complete truncation, zero decks, one deck missing) each produce the VISIBLE #sxc1-content-error alert with ZERO decks rendered, while an unsabotaged control served beside them renders the whole 52-deck course (browser-check --check-bad-bundle, 12/12)"
+STALLED_LABEL="stalled-fetch deadline: with the content bundle answered 200-then-never-finished, the app still boots inside the fetch deadline, names the TIMEOUT in the visible #sxc1-content-error banner, keeps the manuals readable and offers #btn-content-retry (browser-check --check-content-stalled, 4/4)"
+HINT_SPLIT_LABEL="ui/content language split: with ONLY the sxc1.uilang key's writes failing, the UI-language toggle does NOT reload onto the stale hint -- it switches in memory, degrades storage honestly (uiLang=ja, contentLang=en, available=false), renders the VISIBLE #sxc1-lang-split alert with #btn-lang-resync, and moves document lang (browser-check --check-hint-write-failure, 4/4)"
 # M6 W2: the ui-language toggle roundtrip stage -- see usage() check 22.
-JA_TOGGLE_LABEL="ui-language toggle roundtrip: served copy with one injected ja: fixture variant -- EN boot, JA switch via reload-as-refetch, header/pref/ruling-4 suggestion, JA content title, JA device flow, back to EN (browser-check --check-ja-toggle, 9/9)"
+JA_TOGGLE_LABEL="ui-language toggle roundtrip: served copy of the SHIPPED bundles -- EN boot, JA switch via reload-as-refetch, header/pref/ruling-4 suggestion, the real corpus JA content title, JA device flow, back to EN (browser-check --check-ja-toggle, 9/9)"
 ROOT_CARDINALITY_LABEL="M5 cardinality contract: root browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 # M6 W4 (check 23): THE JA COURSE FLOOR -- V6's naming discipline
@@ -3635,7 +4000,7 @@ SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage repor
 # demonstration served a copy whose content.ja.txt was the EN emission
 # relabelled "ja" and all five failed (M6 W4 report).
 JA_COURSE_ASSERT_COUNT=5
-JA_COURSE_LABEL="M6 W4 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course: 52 decks/435 exercises + a JA deck title from #sxc1-exercise-stats, the deck card/page/summary, a JA quiz COMPLETED, a JA drill check: sentence) -- counted BY NAME, so unplugging them cannot hide under the N/N floor"
+JA_COURSE_LABEL="M6 W4 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course: 52 decks/435 exercises + a JA deck title from #sxc1-exercise-stats, the deck card/page/summary, a JA quiz COMPLETED, a JA drill check: sentence) -- counted BY STABLE ID (JAC1..JAC5, allowlisted in this script), so unplugging, renaming or substituting one cannot hide under the N/N floor"
 
 # Parse one stage's captured output for its final "browser-check: N/M
 # assertions passed" summary line and enforce the contract: the line must
@@ -3645,13 +4010,48 @@ JA_COURSE_LABEL="M6 W4 JA course floor: BOTH full browser stages reported all $J
 # capture reported ok. A failed assertion prints "FAIL - ja course: ..."
 # instead, so it is missing from this count -- the check goes red both
 # when the suite is unplugged and when any member fails.
-ja_course_ok_count() {
+# M6 gate-1 finding M6-R1-3: counting a PREFIX and a cardinality let a
+# required assertion be swapped for a trivial passing one named
+# "ja course: ..." while both the 5/5 count and the stage floor stayed
+# green. The five assertions therefore carry STABLE IDs (JAC1..JAC5,
+# declared in scripts/browser-check.mjs) and this script declares the
+# same five INDEPENDENTLY below: the check compares the captured ID SET
+# to that allowlist, exactly as V6 compares D1..D27 by number. An extra
+# "ja course:" assertion is not a substitute for a missing one.
+JA_COURSE_IDS="JAC1 JAC2 JAC3 JAC4 JAC5"
+
+# Echoes the JAC ids reported ok in one stage capture, sorted+unique. A
+# failed assertion prints "FAIL - ja course: [JACn] ..." instead, so it
+# is absent here -- red both when the suite is unplugged and when any
+# member fails.
+ja_course_ok_ids() {
   local log="$1"
   if [ -n "$log" ] && [ -s "$log" ]; then
-    grep -oE '^ok - ja course: [^(]*' "$log" | sort -u | grep -c '^ok - ja course: ' || true
+    grep -oE '^ok - ja course: \[JAC[0-9]+\]' "$log" \
+      | grep -oE 'JAC[0-9]+' | sort -u | tr '\n' ' ' | sed 's/ $//'
   else
-    echo 0
+    echo ""
   fi
+}
+
+# The ids from JA_COURSE_IDS that a capture did NOT report ok.
+ja_course_missing_ids() {
+  local got=" $(ja_course_ok_ids "$1") "
+  local missing=""
+  local id
+  for id in $JA_COURSE_IDS; do
+    case "$got" in
+      *" $id "*) ;;
+      *) missing="$missing $id" ;;
+    esac
+  done
+  echo "${missing# }"
+}
+
+ja_course_ok_count() {
+  local ids
+  ids="$(ja_course_ok_ids "$1")"
+  if [ -z "$ids" ]; then echo 0; else echo "$ids" | wc -w; fi
 }
 
 browser_stage_assertion_floor() {
@@ -3681,6 +4081,9 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$SUBPATH_BROWSER_LABEL"
   skip "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation)"
   skip "$CONTENT_MISSING_LABEL"
+  skip "$BAD_BUNDLE_LABEL"
+  skip "$STALLED_LABEL"
+  skip "$HINT_SPLIT_LABEL"
   skip "$JA_TOGGLE_LABEL"
   skip "$DEVICE_SUITE_LABEL"
   skip "$ROOT_CARDINALITY_LABEL"
@@ -3694,6 +4097,9 @@ else
     fail "$SUBPATH_BROWSER_LABEL"
     fail "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation) (observed: no browser found, the stage never ran)"
     fail "$CONTENT_MISSING_LABEL (observed: no browser found, the stage never ran)"
+    fail "$BAD_BUNDLE_LABEL (observed: no browser found, the stage never ran)"
+    fail "$STALLED_LABEL (observed: no browser found, the stage never ran)"
+    fail "$HINT_SPLIT_LABEL (observed: no browser found, the stage never ran)"
     fail "$JA_TOGGLE_LABEL (observed: no browser found, the stage never ran)"
     fail "$DEVICE_SUITE_LABEL (observed: no browser found, the suite never ran)"
     fail "$ROOT_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
@@ -3825,15 +4231,337 @@ else
       unregister_temp_dir "$CONTENT_MISSING_TMP"
     fi
 
+    # M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-1): the
+    # BAD-BUNDLE stage. A 200 response is not evidence of a healthy
+    # corpus, so five separately sabotaged copies of the SHIPPED bundle
+    # -- each served at the right URL, each a perfectly ordinary HTTP
+    # success -- must every one of them produce the visible degraded
+    # state rather than a smaller-but-"healthy" course. A sixth,
+    # UNSABOTAGED copy is served from the same server in the same run as
+    # the anti-vacuity control (no banner, whole course). The sabotage
+    # itself is verified here, before the browser runs, and includes the
+    # exact case the old runtime could not see: a TRUNCATED body whose
+    # !SXC1-DECK delimiter count and header count are both still right.
+    BAD_BUNDLE_PORT=$((PORT + 17))
+    if port_in_use "$BAD_BUNDLE_PORT"; then
+      fail "$BAD_BUNDLE_LABEL (observed: port $BAD_BUNDLE_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
+    else
+      BAD_BUNDLE_TMP="$(mktemp -d -t sxc1-check-site-badbundle.XXXXXX)"
+      register_temp_dir "$BAD_BUNDLE_TMP"
+      BAD_BUNDLE_PREP_ERR=""
+      for bb_case in healthy wrong-language stale truncated zero-deck missing-deck; do
+        mkdir -p "$BAD_BUNDLE_TMP/$bb_case"
+        # Hard links for the 13MB of shared assets (never edited in
+        # place); the content/ directory alone is a real copy, so each
+        # case's sabotage cannot reach any other case or $DIR itself.
+        cp -al "$DIR"/. "$BAD_BUNDLE_TMP/$bb_case"/ 2>/dev/null || cp -R "$DIR"/. "$BAD_BUNDLE_TMP/$bb_case"/
+        rm -rf "$BAD_BUNDLE_TMP/$bb_case/content"
+        mkdir -p "$BAD_BUNDLE_TMP/$bb_case/content"
+        cp "$DIR/content/content.en.txt" "$DIR/content/content.ja.txt" "$BAD_BUNDLE_TMP/$bb_case/content/"
+      done
+      BAD_BUNDLE_SABOTAGE_PY="$(mktemp -t sxc1-check-site-badbundle.XXXXXX.py)"
+      register_temp_file "$BAD_BUNDLE_SABOTAGE_PY"
+      cat > "$BAD_BUNDLE_SABOTAGE_PY" <<'PYEOF'
+# Build the five sabotaged en bundles and PROVE each one is the sabotage
+# it claims to be (the grep-confirm discipline, in Python because the
+# claims are structural: "the delimiter count is still 52" is the whole
+# point of the truncated case).
+import os
+import sys
+
+root = sys.argv[1]
+DELIM = "!SXC1-DECK "
+problems = []
+
+
+def en(case):
+    return os.path.join(root, case, "content", "content.en.txt")
+
+
+def read(case):
+    return open(en(case), encoding="utf-8").read()
+
+
+def write(case, text):
+    open(en(case), "w", encoding="utf-8").write(text)
+
+
+pristine = read("healthy")
+plines = pristine.split("\n")
+p_delims = [l for l in plines if l.startswith(DELIM)]
+if plines[0] != "!SXC1-BUNDLE v1 en %d" % len(p_delims):
+    problems.append("the healthy control's own header/delimiter count disagree -- refusing to sabotage from it")
+
+# 1. wrong-language: the ja bundle served at the en URL.
+write("wrong-language", open(os.path.join(root, "wrong-language", "content", "content.ja.txt"), encoding="utf-8").read())
+if not read("wrong-language").startswith("!SXC1-BUNDLE v1 ja "):
+    problems.append("wrong-language: the served en bundle does not carry the ja header")
+
+# 2. stale: ONE deck's text altered, framing untouched.
+sl = list(plines)
+changed = None
+for i, l in enumerate(sl):
+    if l.startswith("summary: ") and i > 2:
+        sl[i] = l + " (stale build)"
+        changed = i
+        break
+if changed is None:
+    problems.append("stale: no summary: line found to alter")
+else:
+    write("stale", "\n".join(sl))
+    s = read("stale")
+    if s == pristine:
+        problems.append("stale: the bundle is byte-identical to the healthy one")
+    if s.split("\n")[0] != plines[0] or len([l for l in s.split("\n") if l.startswith(DELIM)]) != len(p_delims):
+        problems.append("stale: the framing changed (it must NOT -- only the text may differ)")
+
+# 3. truncated: the final deck's body cut, every delimiter still present
+#    and the header count still right. This is the case the pre-fix
+#    runtime rendered as a healthy, slightly smaller course.
+last = max(i for i, l in enumerate(plines) if l.startswith(DELIM))
+tl = plines[: last + 3]          # delimiter + two body lines, then nothing
+write("truncated", "\n".join(tl) + "\n")
+t = read("truncated")
+t_lines = t.split("\n")
+if t_lines[0] != plines[0]:
+    problems.append("truncated: the header changed")
+if len([l for l in t_lines if l.startswith(DELIM)]) != len(p_delims):
+    problems.append("truncated: the delimiter count changed (%d vs %d) -- the whole point is that it does NOT"
+                    % (len([l for l in t_lines if l.startswith(DELIM)]), len(p_delims)))
+if len(t) >= len(pristine):
+    problems.append("truncated: the bundle did not get shorter")
+
+# 4. zero-deck: syntactically perfect, no decks at all.
+write("zero-deck", "!SXC1-BUNDLE v1 en 0\n")
+if read("zero-deck") != "!SXC1-BUNDLE v1 en 0\n":
+    problems.append("zero-deck: unexpected content")
+
+# 5. missing-deck: one whole deck removed, header count adjusted so the
+#    bundle is INTERNALLY CONSISTENT.
+starts = [i for i, l in enumerate(plines) if l.startswith(DELIM)]
+drop_from = starts[1]
+drop_to = starts[2]
+ml = ["!SXC1-BUNDLE v1 en %d" % (len(p_delims) - 1)] + plines[1:drop_from] + plines[drop_to:]
+write("missing-deck", "\n".join(ml))
+m = read("missing-deck")
+m_lines = m.split("\n")
+if len([l for l in m_lines if l.startswith(DELIM)]) != len(p_delims) - 1:
+    problems.append("missing-deck: exactly one deck was not removed")
+if m_lines[0] != "!SXC1-BUNDLE v1 en %d" % (len(p_delims) - 1):
+    problems.append("missing-deck: the header count was not adjusted (the bundle must be self-consistent)")
+
+# The control must still be pristine.
+if read("healthy") != pristine:
+    problems.append("healthy: the control was modified")
+
+if problems:
+    print("FAIL " + "; ".join(problems))
+else:
+    print("OK 5 sabotaged bundles built from a %d-deck control (truncated keeps all %d delimiters; missing-deck is internally consistent at %d)"
+          % (len(p_delims), len(p_delims), len(p_delims) - 1))
+PYEOF
+      BAD_BUNDLE_PREP_OUT="$(python3 "$BAD_BUNDLE_SABOTAGE_PY" "$BAD_BUNDLE_TMP" 2>&1)" || BAD_BUNDLE_PREP_OUT="FAIL sabotage script error: $BAD_BUNDLE_PREP_OUT"
+      rm -f "$BAD_BUNDLE_SABOTAGE_PY"
+      case "$BAD_BUNDLE_PREP_OUT" in
+        "OK "*) ;;
+        *) BAD_BUNDLE_PREP_ERR="${BAD_BUNDLE_PREP_OUT#FAIL }" ;;
+      esac
+      if [ -n "$BAD_BUNDLE_PREP_ERR" ]; then
+        fail "$BAD_BUNDLE_LABEL (observed: $BAD_BUNDLE_PREP_ERR)"
+      else
+        python3 -m http.server "$BAD_BUNDLE_PORT" --bind 127.0.0.1 --directory "$BAD_BUNDLE_TMP" >/dev/null 2>&1 &
+        BAD_BUNDLE_SRV_PID=$!
+        SERVER_PIDS+=("$BAD_BUNDLE_SRV_PID")
+        BAD_BUNDLE_VERIFIED=0
+        if ! wait_for_port "$BAD_BUNDLE_PORT" 15; then
+          fail "$BAD_BUNDLE_LABEL (observed: this stage's own python http.server (pid $BAD_BUNDLE_SRV_PID) never came up on port $BAD_BUNDLE_PORT within 15s)"
+        elif ! verify_server_healthy "$BAD_BUNDLE_SRV_PID" "$BAD_BUNDLE_PORT" "/healthy/index.html" "$BAD_BUNDLE_TMP/healthy/index.html"; then
+          fail "$BAD_BUNDLE_LABEL (observed: the listener on port $BAD_BUNDLE_PORT is not provably this stage's own child serving the sabotage tree -- child dead, /healthy/index.html unfetchable, or served bytes mismatch; browser check not run)"
+        else
+          BAD_BUNDLE_VERIFIED=1
+        fi
+        if [ "$BAD_BUNDLE_VERIFIED" -eq 1 ]; then
+          BAD_BUNDLE_LOG="$(mktemp -t sxc1-check-site-badbundle-log.XXXXXX)"
+          register_temp_file "$BAD_BUNDLE_LOG"
+          set +e
+          "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-bad-bundle --url "http://127.0.0.1:$BAD_BUNDLE_PORT/" --timeout 240000 >"$BAD_BUNDLE_LOG" 2>&1
+          BAD_BUNDLE_RC=$?
+          set -e
+          BAD_BUNDLE_SUMMARY="$(grep -E '^browser-check --check-bad-bundle: [0-9]+/[0-9]+ assertions passed$' "$BAD_BUNDLE_LOG" | tail -n1)"
+          # The cardinality is pinned, not merely "all passed": the mode
+          # runs two assertions per sabotage case plus two for the
+          # control, so a case quietly dropped from BAD_BUNDLE_CASES
+          # cannot hide behind a smaller all-green run.
+          if [ "$BAD_BUNDLE_RC" -eq 0 ] && [ "$BAD_BUNDLE_SUMMARY" = "browser-check --check-bad-bundle: 12/12 assertions passed" ]; then
+            ok "$BAD_BUNDLE_LABEL"
+          else
+            fail "$BAD_BUNDLE_LABEL (browser-check --check-bad-bundle exit $BAD_BUNDLE_RC, summary: ${BAD_BUNDLE_SUMMARY:-<none>}; expected 12/12)"
+            sed 's/^/    /' "$BAD_BUNDLE_LOG" >&2
+          fi
+          rm -f "$BAD_BUNDLE_LOG"
+        fi
+        kill "$BAD_BUNDLE_SRV_PID" >/dev/null 2>&1 || true
+        wait "$BAD_BUNDLE_SRV_PID" 2>/dev/null || true
+      fi
+      rm -rf "$BAD_BUNDLE_TMP"
+      unregister_temp_dir "$BAD_BUNDLE_TMP"
+    fi
+
+    # M6 gate round 1 (finding M6-R1-5): the STALLED-FETCH stage. The
+    # boot loader awaits the content bundle before hs_start, so a server
+    # that accepts the connection, answers 200, and then never finishes
+    # the body used to block boot forever -- no app, no manuals, no
+    # retry. This stage's server does exactly that for
+    # /content/content.en.txt and serves everything else normally; the
+    # app must still boot inside site/static/index.js's AbortController
+    # deadline and show the ordinary degraded surface naming the
+    # timeout. Nothing is injected: the SERVER is the input.
+    STALLED_PORT=$((PORT + 19))
+    if port_in_use "$STALLED_PORT"; then
+      fail "$STALLED_LABEL (observed: port $STALLED_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
+    else
+      STALLED_SRV_PY="$(mktemp -t sxc1-check-site-stall.XXXXXX.py)"
+      register_temp_file "$STALLED_SRV_PY"
+      cat > "$STALLED_SRV_PY" <<'PYEOF'
+# A deliberately half-open server: every request is served normally
+# EXCEPT the en content bundle, which gets a 200, real headers, a few
+# bytes of body -- and then nothing, forever. Threaded so the stalled
+# response cannot block the rest of the page from loading (which is the
+# realistic shape: one hung object, not a hung server).
+import http.server
+import sys
+import time
+
+ROOT = sys.argv[1]
+PORT = int(sys.argv[2])
+STALL_SUFFIX = "/content/content.en.txt"
+
+
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *a, **kw):
+        super().__init__(*a, directory=ROOT, **kw)
+
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        if self.path.split("?")[0].endswith(STALL_SUFFIX):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", "284108")
+            self.end_headers()
+            try:
+                self.wfile.write(b"!SXC1-BUN")
+                self.wfile.flush()
+            except Exception:
+                return
+            time.sleep(600)
+            return
+        return super().do_GET()
+
+
+http.server.ThreadingHTTPServer.allow_reuse_address = True
+srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+srv.daemon_threads = True
+srv.serve_forever()
+PYEOF
+      python3 "$STALLED_SRV_PY" "$DIR" "$STALLED_PORT" >/dev/null 2>&1 &
+      STALLED_SRV_PID=$!
+      SERVER_PIDS+=("$STALLED_SRV_PID")
+      STALLED_VERIFIED=0
+      if ! wait_for_port "$STALLED_PORT" 15; then
+        fail "$STALLED_LABEL (observed: this stage's own stalling server (pid $STALLED_SRV_PID) never came up on port $STALLED_PORT within 15s)"
+      elif ! verify_server_healthy "$STALLED_SRV_PID" "$STALLED_PORT" "/index.html" "$DIR/index.html"; then
+        fail "$STALLED_LABEL (observed: the listener on port $STALLED_PORT is not provably this stage's own child serving '$DIR' -- child dead, /index.html unfetchable, or served bytes mismatch; browser check not run)"
+      elif curl -fsS --max-time 3 "http://127.0.0.1:$STALLED_PORT/content/content.en.txt" -o /dev/null >/dev/null 2>&1; then
+        fail "$STALLED_LABEL (observed: the bundle URL COMPLETED within 3s -- the stalling server is not stalling, so the check would be vacuous)"
+      else
+        STALLED_VERIFIED=1
+      fi
+      if [ "$STALLED_VERIFIED" -eq 1 ]; then
+        STALLED_LOG="$(mktemp -t sxc1-check-site-stall-log.XXXXXX)"
+        register_temp_file "$STALLED_LOG"
+        set +e
+        "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-content-stalled --url "http://127.0.0.1:$STALLED_PORT/" --timeout 180000 >"$STALLED_LOG" 2>&1
+        STALLED_RC=$?
+        set -e
+        STALLED_SUMMARY="$(grep -E '^browser-check --check-content-stalled: [0-9]+/[0-9]+ assertions passed$' "$STALLED_LOG" | tail -n1)"
+        if [ "$STALLED_RC" -eq 0 ] && [ "$STALLED_SUMMARY" = "browser-check --check-content-stalled: 4/4 assertions passed" ]; then
+          ok "$STALLED_LABEL"
+        else
+          fail "$STALLED_LABEL (browser-check --check-content-stalled exit $STALLED_RC, summary: ${STALLED_SUMMARY:-<none>}; expected 4/4)"
+          sed 's/^/    /' "$STALLED_LOG" >&2
+        fi
+        rm -f "$STALLED_LOG"
+      fi
+      kill "$STALLED_SRV_PID" >/dev/null 2>&1 || true
+      wait "$STALLED_SRV_PID" 2>/dev/null || true
+      rm -f "$STALLED_SRV_PY"
+    fi
+
+    # M6 gate round 1 (finding M6-R1-4): the UI/CONTENT LANGUAGE-SPLIT
+    # stage. The boot hint (sxc1.uilang) is what the pre-wasm shell picks
+    # the bundle AND document.documentElement.lang from; the UI itself
+    # renders from the decoded prefs blob. Main used to discard the hint
+    # write's result and reload unconditionally, so a successful prefs
+    # write plus a failed hint write reloaded onto the OLD hint -- a
+    # Japanese UI over an English course, silently, for the whole
+    # session. The mode injects a setItem that throws for that key and
+    # ONLY that key (every other write still lands, which is what makes
+    # it a PARTIAL failure rather than the storage-refused case check 9
+    # already covers). RED-FIRST: the pre-fix artifact reloads, the
+    # marker dies with the document, and the mode reports 0/4.
+    HINT_SPLIT_PORT=$((PORT + 21))
+    if port_in_use "$HINT_SPLIT_PORT"; then
+      fail "$HINT_SPLIT_LABEL (observed: port $HINT_SPLIT_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
+    else
+      python3 -m http.server "$HINT_SPLIT_PORT" --bind 127.0.0.1 --directory "$DIR" >/dev/null 2>&1 &
+      HINT_SPLIT_SRV_PID=$!
+      SERVER_PIDS+=("$HINT_SPLIT_SRV_PID")
+      HINT_SPLIT_VERIFIED=0
+      if ! wait_for_port "$HINT_SPLIT_PORT" 15; then
+        fail "$HINT_SPLIT_LABEL (observed: this stage's own python http.server (pid $HINT_SPLIT_SRV_PID) never came up on port $HINT_SPLIT_PORT within 15s)"
+      elif ! verify_server_healthy "$HINT_SPLIT_SRV_PID" "$HINT_SPLIT_PORT" "/index.html" "$DIR/index.html"; then
+        fail "$HINT_SPLIT_LABEL (observed: the listener on port $HINT_SPLIT_PORT is not provably this stage's own child serving '$DIR' -- child dead, /index.html unfetchable, or served bytes mismatch; browser check not run)"
+      else
+        HINT_SPLIT_VERIFIED=1
+      fi
+      if [ "$HINT_SPLIT_VERIFIED" -eq 1 ]; then
+        HINT_SPLIT_LOG="$(mktemp -t sxc1-check-site-hintsplit-log.XXXXXX)"
+        register_temp_file "$HINT_SPLIT_LOG"
+        set +e
+        "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-hint-write-failure --url "http://127.0.0.1:$HINT_SPLIT_PORT/" --timeout 120000 >"$HINT_SPLIT_LOG" 2>&1
+        HINT_SPLIT_RC=$?
+        set -e
+        HINT_SPLIT_SUMMARY="$(grep -E '^browser-check --check-hint-write-failure: [0-9]+/[0-9]+ assertions passed$' "$HINT_SPLIT_LOG" | tail -n1)"
+        if [ "$HINT_SPLIT_RC" -eq 0 ] && [ "$HINT_SPLIT_SUMMARY" = "browser-check --check-hint-write-failure: 4/4 assertions passed" ]; then
+          ok "$HINT_SPLIT_LABEL"
+        else
+          fail "$HINT_SPLIT_LABEL (browser-check --check-hint-write-failure exit $HINT_SPLIT_RC, summary: ${HINT_SPLIT_SUMMARY:-<none>}; expected 4/4)"
+          sed 's/^/    /' "$HINT_SPLIT_LOG" >&2
+        fi
+        rm -f "$HINT_SPLIT_LOG"
+      fi
+      kill "$HINT_SPLIT_SRV_PID" >/dev/null 2>&1 || true
+      wait "$HINT_SPLIT_SRV_PID" 2>/dev/null || true
+    fi
+
     # M6 W2: the ui-language toggle roundtrip stage -- see
-    # JA_TOGGLE_LABEL's comment / usage() check 22. The served copy's
-    # bundles are re-emitted from a COPY of content/exercises carrying
-    # one injected ja: heading variant for q-2-01 (the same exercise the
-    # D-suite's DEVICE_REAL_CFG already pins), so the stage proves the
-    # WHOLE pipe: ja: variant -> emit-content-bundles.py ja substitution
-    # -> boot-hint bundle pick -> the wasm renders the Japanese title.
-    # Injection is grep-confirmed IN (ja bundle) and OUT (en bundle)
-    # before the browser runs; content/ itself is never touched.
+    # JA_TOGGLE_LABEL's comment / usage() check 22.
+    #
+    # M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-1): this
+    # stage used to serve a copy whose bundles were RE-EMITTED from a
+    # corpus copy carrying one injected ja: heading variant. That is
+    # exactly what the new build-time manifest forbids -- a re-emitted
+    # bundle is not the bundle THIS app.wasm was built against, so the
+    # wasm-embedded fingerprint now (correctly) rejects it. It is also no
+    # longer needed: wave 3 landed the REAL Japanese variant for the very
+    # anchor the fixture faked, so the stage now serves the SHIPPED
+    # bundles UNMODIFIED and pins that real title -- strictly stronger,
+    # since it proves the artifact that actually ships renders the
+    # Japanese course. The grep-confirm discipline is preserved and now
+    # applies to the shipped bundles themselves: the pinned title must be
+    # IN content.ja.txt and OUT of content.en.txt before the browser runs.
     JA_TOGGLE_PORT=$((PORT + 13))
     if port_in_use "$JA_TOGGLE_PORT"; then
       fail "$JA_TOGGLE_LABEL (observed: port $JA_TOGGLE_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
@@ -3841,47 +4569,15 @@ else
       JA_TOGGLE_TMP="$(mktemp -d -t sxc1-check-site-jatoggle.XXXXXX)"
       register_temp_dir "$JA_TOGGLE_TMP"
       cp -R "$DIR"/. "$JA_TOGGLE_TMP"/
-      JA_EX_TMP="$(mktemp -d -t sxc1-check-site-jaex.XXXXXX)"
-      register_temp_dir "$JA_EX_TMP"
-      cp -R "$REPO_ROOT/content/exercises"/. "$JA_EX_TMP"/
       JA_TOGGLE_PREP_ERR=""
-      JA_FIXTURE_TITLE='「BANK」とは'
-      if ! python3 - "$JA_EX_TMP/024-pad-01.ex.md" <<'PYEOF2'
-import sys
-path = sys.argv[1]
-ANCHOR = '## What a "BANK" is'
-VARIANT = 'ja: ## \u300cBANK\u300d\u3068\u306f\n'
-lines = open(path, encoding='utf-8').read().splitlines(True)
-out, done, skipping = [], False, False
-for ln in lines:
-    # W3 lands real ja: variants concurrently: if the anchor already
-    # carries a variant run, REPLACE it with the pinned fixture variant
-    # (two variant lines after a heading anchor would be an emitter
-    # error; and the stage pins the exact fixture title).
-    if skipping:
-        if ln.startswith('ja:'):
-            continue
-        skipping = False
-    out.append(ln)
-    if not done and ln.rstrip('\n') == ANCHOR:
-        out.append(VARIANT)
-        done = True
-        skipping = True
-if not done:
-    print('anchor heading %r not found in %s' % (ANCHOR, path))
-    raise SystemExit(1)
-open(path, 'w', encoding='utf-8').write(''.join(out))
-PYEOF2
-      then
-        JA_TOGGLE_PREP_ERR="could not inject the ja: fixture variant (anchor heading missing from 024-pad-01.ex.md?)"
-      elif ! grep -qF "$JA_FIXTURE_TITLE" "$JA_EX_TMP/024-pad-01.ex.md"; then
-        JA_TOGGLE_PREP_ERR="grep-confirm IN failed: the injected ja: variant is not in the temp deck copy"
-      elif ! python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$JA_EX_TMP" --out-dir "$JA_TOGGLE_TMP/content" >/dev/null 2>&1; then
-        JA_TOGGLE_PREP_ERR="emit-content-bundles.py failed on the variant-injected temp corpus"
-      elif ! grep -qF "$JA_FIXTURE_TITLE" "$JA_TOGGLE_TMP/content/content.ja.txt"; then
-        JA_TOGGLE_PREP_ERR="grep-confirm IN failed: the served copy's content.ja.txt does not carry the injected JA title"
+      # browser-check.mjs's JA_TOGGLE_CFG.jaQuizTitle, i.e.
+      # content/exercises/024-pad-01.ex.md's own wave-3 ja: variant of
+      # q-2-01's heading (「BANK」とは何か).
+      JA_FIXTURE_TITLE="$(printf '「BANK」とは何か')"
+      if ! grep -qF "$JA_FIXTURE_TITLE" "$JA_TOGGLE_TMP/content/content.ja.txt"; then
+        JA_TOGGLE_PREP_ERR="grep-confirm IN failed: the served copy's content.ja.txt does not carry the pinned JA title"
       elif grep -qF "$JA_FIXTURE_TITLE" "$JA_TOGGLE_TMP/content/content.en.txt"; then
-        JA_TOGGLE_PREP_ERR="grep-confirm OUT failed: the injected JA title leaked into the served copy's content.en.txt"
+        JA_TOGGLE_PREP_ERR="grep-confirm OUT failed: the pinned JA title appears in the served copy's content.en.txt"
       fi
       if [ -n "$JA_TOGGLE_PREP_ERR" ]; then
         fail "$JA_TOGGLE_LABEL (observed: $JA_TOGGLE_PREP_ERR)"
@@ -3893,7 +4589,7 @@ PYEOF2
         if ! wait_for_port "$JA_TOGGLE_PORT" 15; then
           fail "$JA_TOGGLE_LABEL (observed: this stage's own python http.server (pid $JA_TOGGLE_SRV_PID) never came up on port $JA_TOGGLE_PORT within 15s)"
         elif ! verify_server_healthy "$JA_TOGGLE_SRV_PID" "$JA_TOGGLE_PORT" "/index.html" "$JA_TOGGLE_TMP/index.html"; then
-          fail "$JA_TOGGLE_LABEL (observed: the listener on port $JA_TOGGLE_PORT is not provably this stage's own child serving the variant-injected copy -- child dead, /index.html unfetchable, or served bytes mismatch; browser check not run)"
+          fail "$JA_TOGGLE_LABEL (observed: the listener on port $JA_TOGGLE_PORT is not provably this stage's own child serving this stage's copy -- child dead, /index.html unfetchable, or served bytes mismatch; browser check not run)"
         else
           JA_TOGGLE_VERIFIED=1
         fi
@@ -3911,9 +4607,8 @@ PYEOF2
         kill "$JA_TOGGLE_SRV_PID" >/dev/null 2>&1 || true
         wait "$JA_TOGGLE_SRV_PID" 2>/dev/null || true
       fi
-      rm -rf "$JA_TOGGLE_TMP" "$JA_EX_TMP"
+      rm -rf "$JA_TOGGLE_TMP"
       unregister_temp_dir "$JA_TOGGLE_TMP"
-      unregister_temp_dir "$JA_EX_TMP"
     fi
 
     # V6 (M4, task "verification"; floor widened to D1..D27 by the M5
@@ -3966,10 +4661,12 @@ PYEOF2
     else
       JA_COURSE_ROOT_OK="$(ja_course_ok_count "${ROOT_BROWSER_STAGE_LOG:-}")"
       JA_COURSE_SUB_OK="$(ja_course_ok_count "${SUBPATH_BROWSER_STAGE_LOG:-}")"
-      if [ "$JA_COURSE_ROOT_OK" -eq "$JA_COURSE_ASSERT_COUNT" ] && [ "$JA_COURSE_SUB_OK" -eq "$JA_COURSE_ASSERT_COUNT" ]; then
+      JA_COURSE_ROOT_MISSING="$(ja_course_missing_ids "${ROOT_BROWSER_STAGE_LOG:-}")"
+      JA_COURSE_SUB_MISSING="$(ja_course_missing_ids "${SUBPATH_BROWSER_STAGE_LOG:-}")"
+      if [ -z "$JA_COURSE_ROOT_MISSING" ] && [ -z "$JA_COURSE_SUB_MISSING" ]; then
         ok "$JA_COURSE_LABEL (observed: root $JA_COURSE_ROOT_OK/$JA_COURSE_ASSERT_COUNT, sub-path $JA_COURSE_SUB_OK/$JA_COURSE_ASSERT_COUNT distinct ja course assertions reported ok)"
       else
-        fail "$JA_COURSE_LABEL (observed: root $JA_COURSE_ROOT_OK/$JA_COURSE_ASSERT_COUNT, sub-path $JA_COURSE_SUB_OK/$JA_COURSE_ASSERT_COUNT -- a JA course assertion failed, or the JA course block was unplugged and never ran)"
+        fail "$JA_COURSE_LABEL (observed: root reported [$(ja_course_ok_ids "${ROOT_BROWSER_STAGE_LOG:-}")] missing[${JA_COURSE_ROOT_MISSING:-none}], sub-path reported [$(ja_course_ok_ids "${SUBPATH_BROWSER_STAGE_LOG:-}")] missing[${JA_COURSE_SUB_MISSING:-none}] -- a required JA course assertion failed, was renamed, or was swapped for a different 'ja course:' assertion)"
       fi
     fi
   fi

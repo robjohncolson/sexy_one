@@ -279,6 +279,9 @@ function parseArgs(argv) {
     expectExerciseJson: null,
     checkStorageRefused: false,
     checkContentMissing: false,
+    checkBadBundle: false,
+    checkContentStalled: false,
+    checkHintWriteFailure: false,
     checkJaToggle: false,
     deviceOnly: false,
   };
@@ -323,6 +326,15 @@ function parseArgs(argv) {
         break;
       case '--check-content-missing':
         opts.checkContentMissing = true;
+        break;
+      case '--check-bad-bundle':
+        opts.checkBadBundle = true;
+        break;
+      case '--check-content-stalled':
+        opts.checkContentStalled = true;
+        break;
+      case '--check-hint-write-failure':
+        opts.checkHintWriteFailure = true;
         break;
       case '--check-ja-toggle':
         opts.checkJaToggle = true;
@@ -436,6 +448,42 @@ Options:
                        demonstrated by breaking the index.js guard
                        (rethrowing from the load path kills boot, which
                        this mode reports as its own FAIL).
+  --check-bad-bundle   M6 gate round 1 (finding M6-R1-1) bad-body check,
+                       invoked by check-site.sh against a served tree
+                       carrying six sibling copies of the bundle:
+                       wrong-language/, stale/, truncated/, zero-deck/,
+                       missing-deck/ (each a 200 response with a
+                       DIFFERENT kind of wrong content bundle) and
+                       healthy/ (the untouched control). Every sabotaged
+                       copy must produce the visible #sxc1-content-error
+                       alert AND zero decks in #sxc1-exercise-stats with
+                       the degraded #/x notice -- never a smaller-but-
+                       "healthy" course; the control must show no banner
+                       and the whole 52-deck course. Nothing is injected:
+                       the served bytes are the input.
+  --check-content-stalled
+                       M6 gate round 1 (finding M6-R1-5) stalled-fetch
+                       check, invoked by check-site.sh against a server
+                       that answers ./content/content.en.txt with 200 +
+                       headers and then NEVER completes the body. The
+                       app must boot anyway (index.js's AbortController
+                       deadline, not the server, ends the wait), name the
+                       timeout in the visible banner, keep the manuals
+                       readable and offer #btn-content-retry. Red-first:
+                       without the deadline the page never boots and this
+                       mode reports 0/4.
+  --check-hint-write-failure
+                       M6 gate round 1 (finding M6-R1-4) UI/content
+                       language-split check. Injects a setItem that
+                       throws for the key "sxc1.uilang" and ONLY that key
+                       (per-key quota / revoked key), clicks #btn-ui-lang
+                       once, and requires: no reload (a window marker
+                       survives), #sxc1-progress reporting uiLang=ja +
+                       contentLang=en + available=false, a VISIBLE
+                       #sxc1-lang-split alert with #btn-lang-resync, and
+                       document.documentElement.lang switched to 'ja'.
+                       Red-first: the pre-fix app reloads on the stale
+                       hint and reports 0/4.
   --check-ja-toggle    M6 W2 UI-language roundtrip check, invoked by
                        check-site.sh against a served COPY of the bundle
                        whose ja content bundle carries ONE injected ja:
@@ -2753,15 +2801,15 @@ const JA_COURSE_PINS = {
 };
 
 const JA_COURSE_BUNDLE_ASSERTION_NAME =
-  'ja course: the SHIPPED ja bundle carries the whole course -- #sxc1-exercise-stats reports 52 decks / 435 exercises and the pinned deck\'s title is its JAPANESE title (an EN-fallback ja bundle fails here)';
+  'ja course: [JAC1] the SHIPPED ja bundle carries the whole course -- #sxc1-exercise-stats reports 52 decks / 435 exercises and the pinned deck\'s title is its JAPANESE title (an EN-fallback ja bundle fails here)';
 const JA_COURSE_INDEX_ASSERTION_NAME =
-  'ja course: the deck index card, the deck page title and the deck summary: all render the corpus Japanese for the pinned deck';
+  'ja course: [JAC2] the deck index card, the deck page title and the deck summary: all render the corpus Japanese for the pinned deck';
 const JA_COURSE_QUIZ_RENDER_ASSERTION_NAME =
-  'ja course: a real corpus quiz renders in Japanese -- #ex-title, the #ex-stem question and BOTH pinned option labels are the corpus JA text';
+  'ja course: [JAC3] a real corpus quiz renders in Japanese -- #ex-title, the #ex-stem question and BOTH pinned option labels are the corpus JA text';
 const JA_COURSE_QUIZ_COMPLETE_ASSERTION_NAME =
-  'ja course: completing that quiz in Japanese -- clicking the JA correct option grades Correct (JA feedback) and #ex-note renders the JA rationale';
+  'ja course: [JAC4] completing that quiz in Japanese -- clicking the JA correct option grades Correct (JA feedback) and #ex-note renders the JA rationale';
 const JA_COURSE_DRILL_ASSERTION_NAME =
-  'ja course: a real corpus drill step shows its Japanese check: sentence in #ex-step-1-check';
+  'ja course: [JAC5] a real corpus drill step shows its Japanese check: sentence in #ex-step-1-check';
 
 // Trusted keyboard input for a session: returns pressKey(key) driving the
 // full keyDown/keyUp pair through CDP's Input domain. 'Tab'/'Enter' are
@@ -6037,18 +6085,525 @@ async function runContentMissingCheck(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// M6 gate round 1 (briefs/M6-codex-gate1.json, findings M6-R1-1 and
+// M6-R1-5): the two BAD-INPUT modes below drive several fresh targets
+// each, so the browser boilerplate every other mode inlines is factored
+// out here ONCE. Behaviour is identical to --check-content-missing's
+// (same flags, same DevTools wait, same group kill), and like that mode
+// NOTHING is injected into the page: the SERVED BYTES (or the server's
+// own behaviour) are the input under test.
+// ---------------------------------------------------------------------------
+async function openCheckSession(opts, modeName, deadline) {
+  const cleanupFns = [];
+  const runCleanup = async () => {
+    for (const fn of cleanupFns.splice(0).reverse()) {
+      try { await fn(); } catch { /* best-effort cleanup */ }
+    }
+  };
+  const die = async (code, message) => {
+    if (message) console.log(message);
+    await runCleanup();
+    process.exit(code);
+  };
+
+  const browserPath = resolveBrowser(opts.browser);
+  if (!browserPath) {
+    await die(2, `error: no browser found for ${modeName}. Install Google Chrome/Chromium, or set ` +
+      'SXC1_BROWSER to a browser executable path, or pass --browser <path>.');
+  }
+
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sxc1-badbundle-profile-'));
+  cleanupFns.push(() => removeDirWithRetry(userDataDir));
+  const debugPort = await findFreePort();
+  const browserProc = spawn(browserPath, [
+    '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
+    '--disable-dev-shm-usage', `--user-data-dir=${userDataDir}`, `--remote-debugging-port=${debugPort}`, 'about:blank',
+  ], { stdio: 'ignore', detached: true });
+  let cdp = null;
+  let browserFailure = null;
+  const noteBrowserFailure = (message) => {
+    if (!browserFailure) browserFailure = new Error(message);
+    if (cdp) cdp.failFatally(browserFailure);
+  };
+  browserProc.on('exit', (code, signal) => {
+    noteBrowserFailure(`browser process exited unexpectedly (code=${code === null ? 'null' : code}, signal=${signal || 'none'})`);
+  });
+  browserProc.on('error', (err) => {
+    noteBrowserFailure(`browser process error: ${err && err.message ? err.message : err}`);
+  });
+  cleanupFns.push(() => new Promise((resolve) => {
+    const killGroup = (signal) => { try { process.kill(-browserProc.pid, signal); } catch { /* group already gone */ } };
+    if (browserProc.exitCode !== null || browserProc.signalCode !== null) { killGroup('SIGKILL'); resolve(); return; }
+    const forceKillTimer = setTimeout(() => killGroup('SIGKILL'), 3000);
+    browserProc.once('exit', () => { clearTimeout(forceKillTimer); killGroup('SIGKILL'); resolve(); });
+    killGroup('SIGTERM');
+  }));
+
+  let versionInfo = null;
+  while (Date.now() < deadline) {
+    if (browserFailure) {
+      await die(2, `error: ${browserFailure.message} (before DevTools became reachable at ${browserPath})`);
+      return null;
+    }
+    try {
+      const info = await withDeadline(
+        httpGetJson(`http://127.0.0.1:${debugPort}/json/version`),
+        deadline,
+        'DevTools /json/version request',
+      );
+      if (info && info.webSocketDebuggerUrl) { versionInfo = info; break; }
+    } catch { /* not up yet, or this attempt ran past the deadline */ }
+    await sleep(200);
+  }
+  if (!versionInfo) {
+    await die(2, `error: timed out waiting for DevTools (${modeName})`);
+    return null;
+  }
+
+  const ws = await withDeadline(connectWebSocket(versionInfo.webSocketDebuggerUrl), deadline, 'WebSocket connect');
+  cleanupFns.push(() => { try { ws.close(); } catch { /* ignore */ } });
+  cdp = new CDPClient(ws, { getRemaining: () => remaining(deadline) });
+  ws.addEventListener('close', () => cdp.failFatally(new Error('CDP WebSocket closed unexpectedly')));
+  ws.addEventListener('error', (ev) => cdp.failFatally(new Error(`CDP WebSocket error: ${formatWsErrorEvent(ev)}`)));
+
+  // One genuinely fresh target per case (fresh document, fresh boot).
+  const newTarget = async (url, bootBudgetMs) => {
+    const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+    await cdp.send('Page.enable', {}, sessionId);
+    await cdp.send('Runtime.enable', {}, sessionId);
+    const evaluate = async (expression) => {
+      const res = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+      if (res.exceptionDetails) {
+        const d = res.exceptionDetails;
+        throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
+      }
+      return res.result ? res.result.value : undefined;
+    };
+    const startedAt = Date.now();
+    await cdp.send('Page.navigate', { url }, sessionId);
+    let outcome = { ok: false, timeout: true };
+    const bootDeadline = Math.min(deadline, Date.now() + bootBudgetMs);
+    while (Date.now() < bootDeadline) {
+      let state;
+      try {
+        state = await evaluate(`(() => {
+          if (typeof window.__SXC1_BOOT_ERROR === 'string') return { error: window.__SXC1_BOOT_ERROR };
+          if (window.__SXC1_BOOTED === true) return { booted: true };
+          return { pending: true };
+        })()`);
+      } catch (err) {
+        state = { pending: true };   // document may still be navigating
+      }
+      if (state && state.error) { outcome = { ok: false, error: state.error }; break; }
+      if (state && state.booted) { outcome = { ok: true }; break; }
+      await sleep(100);
+    }
+    return {
+      boot: outcome,
+      bootMs: Date.now() - startedAt,
+      evaluate,
+      close: async () => { try { await cdp.send('Target.closeTarget', { targetId }); } catch { /* best effort */ } },
+    };
+  };
+
+  return { cdp, die, newTarget };
+}
+
+// ---------------------------------------------------------------------------
+// M6 gate round 1 (finding M6-R1-1): --check-bad-bundle. Five separately
+// sabotaged copies of the SHIPPED bundle -- each served at the correct
+// URL with a 200 -- must every one of them produce the VISIBLE
+// content-error state, never a smaller-but-"healthy" course:
+//
+//   wrong-language  the ja bundle served at ./content/content.en.txt
+//   stale           one deck's TEXT altered (framing untouched)
+//   truncated       the last deck's body cut, every !SXC1-DECK delimiter
+//                   still present and the header count still right
+//   zero-deck       "!SXC1-BUNDLE v1 en 0" and nothing else
+//   missing-deck    one whole deck removed, header count adjusted to match
+//
+// plus a HEALTHY control served from the same server in the same run --
+// the anti-vacuity floor: if the app rejected everything (or the pages
+// simply failed to load), the control fails too. check-site.sh builds
+// the six directories; this mode never injects anything.
+//
+// Each case asserts BOTH halves, because "no partial course" is the
+// actual claim: the visible role=alert banner AND #sxc1-exercise-stats
+// reporting zero decks with the degraded #/x notice.
+// ---------------------------------------------------------------------------
+const BAD_BUNDLE_CASES = [
+  { dir: 'wrong-language', why: 'the ja bundle served at the en URL' },
+  { dir: 'stale', why: "one deck's text altered, framing untouched" },
+  { dir: 'truncated', why: 'the final deck truncated with every delimiter still present' },
+  { dir: 'zero-deck', why: 'a syntactically perfect zero-deck bundle' },
+  { dir: 'missing-deck', why: 'one whole deck removed, header count adjusted' },
+];
+const BAD_BUNDLE_HEALTHY_DIR = 'healthy';
+const BAD_BUNDLE_EXPECT_DECKS = 52;
+const BAD_BUNDLE_EXPECT_EXERCISES = 435;
+
+async function runBadBundleCheck(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const session = await openCheckSession(opts, '--check-bad-bundle', deadline);
+  if (!session) return;
+  const { die, newTarget } = session;
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); }
+    else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+
+  const baseNoHash = opts.url.replace(/#.*$/, '').replace(/\/$/, '');
+
+  // What the running app says about itself: the visible banner, the
+  // machine-readable stats payload, and the degraded exercise route.
+  const surfaceOf = async (evaluate) => evaluate(`(async () => {
+    window.location.hash = '#/x';
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+      if (document.querySelector('#sxc1-exercise-degraded') || document.querySelector('.deck-card, #sxc1-exercise-index, #sxc1-exercises')) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const banner = document.querySelector('#sxc1-content-error');
+    const stats = document.querySelector('#sxc1-exercise-stats');
+    let totals = null;
+    try { totals = JSON.parse(stats ? stats.textContent : 'null').totals; } catch (e) { totals = null; }
+    return {
+      bannerExists: banner !== null,
+      bannerVisible: banner !== null && !banner.hidden && banner.offsetParent !== null,
+      bannerRole: banner ? banner.getAttribute('role') : null,
+      bannerText: banner ? (banner.textContent || '').trim().slice(0, 200) : '',
+      totals,
+      degraded: document.querySelector('#sxc1-exercise-degraded') !== null,
+      retry: document.querySelector('#btn-content-retry') !== null,
+      deckLinks: document.querySelectorAll('a[href^="#/x/"]').length,
+    };
+  })()`);
+
+  for (const c of BAD_BUNDLE_CASES) {
+    const alertName = `bad bundle (${c.dir}): a 200 response carrying ${c.why} produces the VISIBLE #sxc1-content-error alert`;
+    const emptyName = `bad bundle (${c.dir}): no partial course -- zero decks in #sxc1-exercise-stats and the degraded #/x notice with #btn-content-retry`;
+    const t = await newTarget(`${baseNoHash}/${c.dir}/`, 30000);
+    if (!t.boot.ok) {
+      report(alertName, false, t.boot);
+      report(emptyName, false, 'skipped: app did not boot');
+      await t.close();
+      continue;
+    }
+    let s = null;
+    try { s = await surfaceOf(t.evaluate); } catch (err) { s = { error: String(err && err.message ? err.message : err) }; }
+    report(
+      alertName,
+      Boolean(s && s.bannerExists && s.bannerVisible && s.bannerRole === 'alert' && s.bannerText.length > 0),
+      s,
+    );
+    report(
+      emptyName,
+      Boolean(s && s.totals && s.totals.decks === 0 && s.totals.exercises === 0 && s.degraded && s.retry),
+      s,
+    );
+    await t.close();
+  }
+
+  // The control, from the same server, in the same run.
+  const healthyAlertName = 'bad bundle (healthy control): the UNSABOTAGED copy renders NO #sxc1-content-error banner at all';
+  const healthyCourseName = `bad bundle (healthy control): the unsabotaged copy renders the whole course (${BAD_BUNDLE_EXPECT_DECKS} decks / ${BAD_BUNDLE_EXPECT_EXERCISES} exercises, deck links present, no degraded notice)`;
+  const h = await newTarget(`${baseNoHash}/${BAD_BUNDLE_HEALTHY_DIR}/`, 30000);
+  if (!h.boot.ok) {
+    report(healthyAlertName, false, h.boot);
+    report(healthyCourseName, false, 'skipped: app did not boot');
+  } else {
+    let s = null;
+    try { s = await surfaceOf(h.evaluate); } catch (err) { s = { error: String(err && err.message ? err.message : err) }; }
+    report(healthyAlertName, Boolean(s && s.bannerExists === false), s);
+    report(
+      healthyCourseName,
+      Boolean(s && s.totals && s.totals.decks === BAD_BUNDLE_EXPECT_DECKS
+        && s.totals.exercises === BAD_BUNDLE_EXPECT_EXERCISES && s.deckLinks > 0 && !s.degraded),
+      s,
+    );
+  }
+  await h.close();
+
+  console.log(`browser-check --check-bad-bundle: ${passed}/${total} assertions passed`);
+  await die(passed === total ? 0 : 1, null);
+}
+
+// ---------------------------------------------------------------------------
+// M6 gate round 1 (finding M6-R1-5): --check-content-stalled. The
+// content fetch used to have no deadline, so a server that accepts the
+// connection and never completes the body blocked hs_start forever --
+// no app, no manuals, no retry, only the static loading state. The
+// stage's server answers ./content/content.en.txt by sending 200 +
+// headers and then nothing, forever; everything else is served
+// normally. The app must boot anyway, inside the deadline
+// site/static/index.js arms (SXC1_CONTENT_TIMEOUT_MS), and show the
+// ordinary degraded surface. No injection: the SERVER is the input.
+// ---------------------------------------------------------------------------
+const STALL_BOOT_BUDGET_MS = 45000;
+
+async function runContentStalledCheck(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const session = await openCheckSession(opts, '--check-content-stalled', deadline);
+  if (!session) return;
+  const { die, newTarget } = session;
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); }
+    else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+  const NAMES = {
+    boots: `content stalled: the app boots within ${STALL_BOOT_BUDGET_MS}ms even though the bundle response never completes (the fetch deadline, not the server, ends the wait)`,
+    banner: 'content stalled: the VISIBLE #sxc1-content-error banner names the timeout',
+    manual: 'content stalled: a manual page still renders its translated body (manuals stay embedded)',
+    retry: 'content stalled: the exercise route renders the degraded notice with #btn-content-retry',
+  };
+
+  const t = await newTarget(opts.url, STALL_BOOT_BUDGET_MS);
+  if (!t.boot.ok) {
+    report(NAMES.boots, false, t.boot);
+    for (const n of [NAMES.banner, NAMES.manual, NAMES.retry]) report(n, false, 'skipped: app did not boot');
+    console.log(`browser-check --check-content-stalled: ${passed}/${total} assertions passed`);
+    await die(1, null);
+    return;
+  }
+  report(NAMES.boots, true, { bootMs: t.bootMs });
+
+  const banner = await t.evaluate(`(() => {
+    const e = document.querySelector('#sxc1-content-error');
+    if (!e) return { exists: false };
+    return {
+      exists: true,
+      visible: !e.hidden && e.offsetParent !== null,
+      role: e.getAttribute('role'),
+      text: (e.textContent || '').trim(),
+    };
+  })()`);
+  report(
+    NAMES.banner,
+    Boolean(banner && banner.exists && banner.visible && banner.role === 'alert'
+      && /timed out|deadline/i.test(banner.text)),
+    banner,
+  );
+
+  const manualOk = await t.evaluate(`(async () => {
+    window.location.hash = '#/m/guide-book/p/15';
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+      const body = document.querySelector('#sxc1-page .page-body');
+      if (body && body.textContent && body.textContent.trim().length > 100) {
+        return { ok: true, chars: body.textContent.trim().length };
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return { ok: false };
+  })()`);
+  report(NAMES.manual, Boolean(manualOk && manualOk.ok), manualOk);
+
+  const retryOk = await t.evaluate(`(async () => {
+    window.location.hash = '#/x';
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+      if (document.querySelector('#sxc1-exercise-degraded') && document.querySelector('#btn-content-retry')) return { ok: true };
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return { ok: false };
+  })()`);
+  report(NAMES.retry, Boolean(retryOk && retryOk.ok), retryOk);
+  await t.close();
+
+  console.log(`browser-check --check-content-stalled: ${passed}/${total} assertions passed`);
+  await die(passed === total ? 0 : 1, null);
+}
+
+// ---------------------------------------------------------------------------
+// M6 gate round 1 (finding M6-R1-4): --check-hint-write-failure. The
+// static shell picks the content bundle (and document.documentElement
+// .lang) from the pre-boot sxc1.uilang HINT, while the app renders every
+// string from the decoded prefs blob. Main used to DISCARD the hint
+// write's result and reload unconditionally, so a successful prefs write
+// followed by a failed hint write reloaded with the OLD hint: Japanese UI
+// over an English course (or the inverse) for the whole session, with
+// nothing on screen saying so.
+//
+// This mode injects the narrowest possible failure -- Storage.prototype
+// .setItem throws for the key "sxc1.uilang" and ONLY that key, so every
+// other write still lands, which is exactly the partial-failure shape
+// (per-key quota, a revoked key) the finding describes -- then clicks
+// #btn-ui-lang once and requires: no reload, honest storage degradation,
+// a VISIBLE #sxc1-lang-split alert naming both languages, and
+// document.documentElement.lang following the in-memory switch.
+// ---------------------------------------------------------------------------
+const HINT_BLOCK_SCRIPT = `(() => {
+  try {
+    const origSet = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === 'sxc1.uilang') {
+        window.__SXC1_HINT_WRITES_BLOCKED = (window.__SXC1_HINT_WRITES_BLOCKED || 0) + 1;
+        throw new DOMException('QuotaExceededError (simulated, sxc1.uilang only)', 'QuotaExceededError');
+      }
+      return origSet.call(this, k, v);
+    };
+  } catch (e) { /* nothing we can do; the assertions below will say so */ }
+})();`;
+
+async function runHintWriteFailureCheck(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const session = await openCheckSession(opts, '--check-hint-write-failure', deadline);
+  if (!session) return;
+  const { cdp, die } = session;
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); }
+    else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+  const NAMES = {
+    noReload: 'hint write failure: the page did NOT reload after the failed boot-hint write (reloading would have re-read the STALE hint and re-fetched the old language)',
+    honest: 'hint write failure: #sxc1-progress reports the in-memory switch honestly -- uiLang=ja, contentLang=en, available=false',
+    banner: 'hint write failure: the VISIBLE #sxc1-lang-split alert names both languages and offers #btn-lang-resync',
+    docLang: "hint write failure: document.documentElement.lang follows the in-memory switch to 'ja' (the shell set it from the stale hint)",
+  };
+
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+  await cdp.send('Page.enable', {}, sessionId);
+  await cdp.send('Runtime.enable', {}, sessionId);
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: HINT_BLOCK_SCRIPT }, sessionId);
+  const evaluate = async (expression) => {
+    const res = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+    if (res.exceptionDetails) {
+      const d = res.exceptionDetails;
+      throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
+    }
+    return res.result ? res.result.value : undefined;
+  };
+  await cdp.send('Page.navigate', { url: opts.url }, sessionId);
+
+  let booted = false;
+  const bootDeadline = Math.min(deadline, Date.now() + 40000);
+  while (Date.now() < bootDeadline) {
+    let state;
+    try {
+      state = await evaluate(`(() => {
+        if (typeof window.__SXC1_BOOT_ERROR === 'string') return { error: window.__SXC1_BOOT_ERROR };
+        if (window.__SXC1_BOOTED === true) return { booted: true };
+        return { pending: true };
+      })()`);
+    } catch { state = { pending: true }; }
+    if (state && state.error) break;
+    if (state && state.booted) { booted = true; break; }
+    await sleep(100);
+  }
+  if (!booted) {
+    for (const n of Object.values(NAMES)) report(n, false, 'app did not boot');
+    console.log(`browser-check --check-hint-write-failure: ${passed}/${total} assertions passed`);
+    await die(1, null);
+    return;
+  }
+
+  // A window-scoped marker a reload would destroy: this is how "no
+  // reload happened" is OBSERVED rather than assumed.
+  // A RELOAD is exactly what the pre-fix app does here, and it kills the
+  // in-flight evaluation with "Inspected target navigated or closed" --
+  // caught below and reported as the failure it is, rather than crashing
+  // the harness (that is the red-first demonstration's own output).
+  let outcome = null;
+  try {
+    outcome = await evaluate(`(async () => {
+    window.__SXC1_NO_RELOAD_MARKER = 'alive';
+    const btn = document.querySelector('#btn-ui-lang');
+    if (!btn) return { error: 'no #btn-ui-lang' };
+    btn.click();
+    const start = Date.now();
+    while (Date.now() - start < 6000) {
+      if (window.__SXC1_NO_RELOAD_MARKER !== 'alive') break;
+      const split = document.querySelector('#sxc1-lang-split');
+      if (split) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const split = document.querySelector('#sxc1-lang-split');
+    let progress = null;
+    try { progress = JSON.parse(document.querySelector('#sxc1-progress').textContent); } catch (e) { progress = null; }
+    return {
+      markerAlive: window.__SXC1_NO_RELOAD_MARKER === 'alive',
+      hintWritesBlocked: window.__SXC1_HINT_WRITES_BLOCKED || 0,
+      progress,
+      docLang: document.documentElement.lang,
+      split: split === null ? null : {
+        visible: !split.hidden && split.offsetParent !== null,
+        role: split.getAttribute('role'),
+        text: (split.textContent || '').trim().slice(0, 200),
+        resync: split.querySelector('#btn-lang-resync') !== null,
+      },
+    };
+  })()`);
+  } catch (err) {
+    outcome = { navigated: String(err && err.message ? err.message : err), markerAlive: false };
+  }
+  if (outcome && outcome.navigated) {
+    // Re-read the (new) document: a reload means the whole claim failed,
+    // but the report should still describe what is on screen now.
+    try {
+      outcome.afterReload = await evaluate(`(() => ({
+        marker: window.__SXC1_NO_RELOAD_MARKER || null,
+        split: document.querySelector('#sxc1-lang-split') !== null,
+        docLang: document.documentElement.lang,
+      }))()`);
+    } catch { /* still navigating; the failure is already recorded */ }
+  }
+
+  report(NAMES.noReload, Boolean(outcome && outcome.markerAlive && outcome.hintWritesBlocked > 0), outcome);
+  report(
+    NAMES.honest,
+    Boolean(outcome && outcome.progress && outcome.progress.uiLang === 'ja'
+      && outcome.progress.contentLang === 'en' && outcome.progress.available === false),
+    outcome && outcome.progress,
+  );
+  report(
+    NAMES.banner,
+    Boolean(outcome && outcome.split && outcome.split.visible && outcome.split.role === 'alert'
+      && outcome.split.resync && /ja/.test(outcome.split.text) && /en/.test(outcome.split.text)),
+    outcome && outcome.split,
+  );
+  report(NAMES.docLang, Boolean(outcome && outcome.docLang === 'ja'), outcome && outcome.docLang);
+
+  try { await cdp.send('Target.closeTarget', { targetId }); } catch { /* best effort */ }
+  console.log(`browser-check --check-hint-write-failure: ${passed}/${total} assertions passed`);
+  await die(passed === total ? 0 : 1, null);
+}
+
+// ---------------------------------------------------------------------------
 // M6 W2: --check-ja-toggle -- see printHelp's own entry. The pinned
 // route/title constants live here (the DEVICE_REAL_CFG precedent: the
-// harness pins real seed-corpus identities); the JA title is the one
-// temporary ja: variant check-site's stage injects into ITS SERVED COPY
-// of the corpus (content/ itself is never touched -- the shipped
-// bundles' freshness check would catch that).
+// harness pins real seed-corpus identities).
+//
+// M6 gate round 1 (finding M6-R1-1): this stage used to serve a copy
+// whose bundles were RE-EMITTED from a corpus copy carrying one injected
+// ja: fixture heading. That is no longer possible, and no longer needed:
+// a re-emitted bundle is by construction not the bundle THIS app.wasm
+// was built against, so the wasm-embedded manifest fingerprint rejects
+// it -- which is exactly the protection the finding asked for. The stage
+// now serves the SHIPPED bundles unmodified and pins the REAL wave-3
+// Japanese title of q-2-01, so the assertion is strictly stronger than
+// the fixture it replaces: it proves the artifact that actually ships
+// renders the Japanese course.
 // ---------------------------------------------------------------------------
 const JA_TOGGLE_CFG = {
   quizRoute: '#/x/pad-01/q-2-01',
   quizReady: '.kind-quiz',
-  // 「BANK」とは -- the injected ja: heading variant for q-2-01's title.
-  jaQuizTitle: '\u300cBANK\u300d\u3068\u306f',
+  // 「BANK」とは何か -- content/exercises/024-pad-01.ex.md's own
+  // ja: variant of q-2-01's title (the real corpus, not a fixture).
+  jaQuizTitle: '\u300cBANK\u300d\u3068\u306f\u4f55\u304b',
   drillRoute: DEVICE_REAL_CFG.drill.route,
   goodBytes: DEVICE_REAL_CFG.drill.good,
   // デバイス検証を有効にする -- I18n.iDevEnable (Ja).
@@ -7063,6 +7618,18 @@ async function main() {
   // text and runStorageRefusedCheck's comment.
   if (opts.checkContentMissing) {
     await runContentMissingCheck(opts);
+    return;
+  }
+  if (opts.checkBadBundle) {
+    await runBadBundleCheck(opts);
+    return;
+  }
+  if (opts.checkContentStalled) {
+    await runContentStalledCheck(opts);
+    return;
+  }
+  if (opts.checkHintWriteFailure) {
+    await runHintWriteFailureCheck(opts);
     return;
   }
   if (opts.checkJaToggle) {

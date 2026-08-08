@@ -33,7 +33,7 @@ import           Device.Midi            (DeviceStatus (..), DeviceVerifier (..),
                                          HubSnapshot (..), hubDisable, hubEnable, hubSetChannel,
                                          hubSnapshot, newHub, statusText, webMidiVerifier)
 import           Exercises.Bundle       (loadDeckSources)
-import           Exercises.Corpus       (exerciseCorpusOf, exerciseStatsJsonOf, jArr, jBool, jInt, jInteger, jKV, jObj,
+import           Exercises.Corpus       (checkedCorpusOf, exerciseStatsJsonOf, jArr, jBool, jInt, jInteger, jKV, jObj,
                                           jStr)
 import           View.Exercise          (DevView (..), ExHandlers (..))
 import qualified View.Exercise          as Exercise
@@ -86,6 +86,20 @@ reloadPage = do
   loc <- jsg ("window" :: MisoString) ! ("location" :: MisoString)
   _ <- (loc # ("reload" :: MisoString)) ([] :: [MisoString])
   pure ()
+
+-- | M6 gate round 1 (finding M6-R1-4): @document.documentElement.lang@,
+-- written from the Haskell side for the ONE path that switches UI
+-- language WITHOUT a reload -- the in-memory switch taken when the boot
+-- hint could not be written (see 'PUiLangToggle'). The static shell
+-- sets this attribute pre-boot from the hint; on that path the hint is
+-- exactly what could not be updated, so a screen reader would keep
+-- announcing the old language for the whole session unless this runs.
+-- A plain attribute write through Miso's own DSL -- never a
+-- @foreign import javascript@ (see 'currentHash').
+setDocumentLang :: T.Text -> IO ()
+setDocumentLang code = do
+  el <- jsg ("document" :: MisoString) ! ("documentElement" :: MisoString)
+  setProp ("lang" :: MisoString) (ms code) (Object el)
 
 --------------------------------------------------------------------------
 -- Clocks (briefs/M2-manifest.json, task "exercise-ui").
@@ -238,6 +252,16 @@ data Model = Model
     -- wasm32 'Int' is 32-bit: fine -- a session cannot plausibly bump
     -- this 2^31 times.
   , mAttemptGen   :: !Int
+    -- M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-4):
+    -- the language of the content bundle the shell ACTUALLY loaded --
+    -- i.e. what the pre-boot @sxc1.uilang@ hint said, which is NOT
+    -- necessarily what the decoded prefs blob says (a failed hint
+    -- write, a wiped key, a first boot after an import). Set once at
+    -- boot from 'Exercises.Bundle.loadDeckSources' and never rewritten
+    -- by the no-reload in-memory language switch -- that path changes
+    -- the UI language while the COURSE stays as loaded, which is
+    -- exactly the split 'langSplitFor' below renders visibly.
+  , mContentLang  :: !Text
   } deriving (Eq)
 
 unDeckId :: DeckId -> Text
@@ -338,11 +362,19 @@ main = do
   -- embedded, are unaffected. Retry is a plain page reload, delegated
   -- JS-side in site/static/index.js (#btn-content-retry), so the
   -- re-load takes exactly this same boot path again.
-  bootContent <- loadDeckSources
-  let (deckSrcs, mContentErr) = case bootContent of
-        Right srcs -> (srcs, Nothing)
-        Left err   -> ([], Just err)
-      corpus     = exerciseCorpusOf deckSrcs
+  --
+  -- M6 gate round 1 (finding M6-R1-1): acceptance is ALL-OR-NOTHING. A
+  -- 200 response is not evidence of a healthy corpus, so the bundle is
+  -- checked against this build's own "Exercises.Manifest" -- language,
+  -- exact INDEX-ordered deck list, aggregate counts, whole-body
+  -- fingerprint ("Exercises.Bundle") -- AND every deck must parse
+  -- ('checkedCorpusOf'). ANY disagreement takes exactly the same
+  -- visible degraded path a 404 takes: an EMPTY corpus plus a reason,
+  -- never a smaller-but-"healthy" course.
+  (contentLang, bootContent) <- loadDeckSources
+  let (deckSrcs, corpus, mContentErr) = case bootContent >>= \srcs -> (,) srcs <$> checkedCorpusOf srcs of
+        Right (srcs, ds) -> (srcs, ds, Nothing)
+        Left err         -> ([], [], Just err)
       exStatsTxt = exerciseStatsJsonOf deckSrcs
   -- M4: the device hub. 'newHub' and 'dvAvailable' are feature detection
   -- ONLY (they read navigator.requestMIDIAccess and test undefined/null;
@@ -377,13 +409,27 @@ main = do
   -- NEXT load picks the right bundle up. Skipped when storage probed
   -- unavailable: writing would fail anyway, and the shell's "en"
   -- fallback is the documented harmless degradation.
-  hint    <- loadUiLangHint
-  if avail && hint /= Just (prfUiLang prefs)
-    then () <$ saveUiLangHint (prfUiLang prefs)
-    else pure ()
+  --
+  -- M6 gate round 1 (finding M6-R1-4): the resync RESULT is no longer
+  -- discarded. A hint write that fails while the boot probe said
+  -- "writable" means storage is no longer trustworthy, so the session
+  -- degrades to storage-unavailable exactly as a failed progress write
+  -- does -- and the disagreement itself is surfaced visibly by the
+  -- #sxc1-lang-split banner below (which compares the decoded pref
+  -- against the language the shell ACTUALLY loaded), so a learner is
+  -- never left with a Japanese UI over an English course and no
+  -- explanation. NO corrective reload happens here, at boot, by design:
+  -- a reload whose own success depends on the write that just failed
+  -- could repeat forever (the loop this comment's predecessor already
+  -- warned about); the banner's button is learner-initiated and
+  -- therefore cannot loop.
+  hint     <- loadUiLangHint
+  resyncOk <- if avail && hint /= Just (prfUiLang prefs)
+                then saveUiLangHint (prfUiLang prefs)
+                else pure True
   (_, WallMs wall0) <- readClocks
   let st0 = case loadRes of { DecodeOk s -> s; _ -> emptyProgress }
-  startApp defaultEvents (readerApp corpus exStatsTxt mContentErr sink dev supported snap0 avail loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
+  startApp defaultEvents (readerApp corpus exStatsTxt mContentErr contentLang sink dev supported snap0 (avail && resyncOk) loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
 
 -- | H6: a cold @RExercise@ route (a deep link, or the very first paint --
 -- Miso's own \"hashchange\" DOM event never fires for the page's INITIAL
@@ -399,10 +445,10 @@ main = do
 -- runtime age as prompt age only because the browser's monotonic origin
 -- is page load -- see this task's final report).
 readerApp
-  :: [Deck] -> Text -> Maybe Text
+  :: [Deck] -> Text -> Maybe Text -> Text
   -> ProgressSink -> DevCtx -> Bool -> HubSnapshot -> Bool -> DecodeResult -> Maybe Text -> ProgressState -> Prefs -> DayNum -> Route
   -> App Model Action
-readerApp corpus exStatsTxt mContentErr sink dev supported snap0 avail loadRes rawBlob st0 prefs today0 r0 =
+readerApp corpus exStatsTxt mContentErr contentLang sink dev supported snap0 avail loadRes rawBlob st0 prefs today0 r0 =
   (component model0 (updateModel corpus sink dev) (viewModel corpus exStatsTxt mContentErr))
     { subs  = [ windowSub "hashchange" emptyDecoder (const HashChanged) ]
     , mount = Just (SetRoute r0)
@@ -415,6 +461,7 @@ readerApp corpus exStatsTxt mContentErr sink dev supported snap0 avail loadRes r
       , mRawCorrupt = rawBlob
       , mDevice = snap0, mDevSupported = supported, mDevWatching = Nothing
       , mAttemptGen = 0
+      , mContentLang = contentLang
       }
 
 findExerciseById :: [Deck] -> ExId -> Maybe Exercise
@@ -578,13 +625,33 @@ handleProg op = case op of
         prefs'  = prefs0 { prfUiLang = newCode
                          , prfJaFirst = prfJaFirst prefs0 || suggest }
     modify (\m -> m { mPrefs = prefs' })
+    -- M6 gate round 1 (finding M6-R1-4): the hint write's result used to
+    -- be DISCARDED and the reload issued unconditionally, so a
+    -- successful prefs write followed by a failed hint write reloaded
+    -- with the OLD hint -- the shell then fetched the OLD language's
+    -- bundle while the (successfully saved) pref rendered the UI in the
+    -- NEW one: a silent Japanese-UI/English-course session. The reload
+    -- now happens only when BOTH writes land. When the hint write
+    -- fails, the switch stays in memory (the pref write DID land, so
+    -- reloading would not be wrong so much as useless -- the shell
+    -- would re-read the stale hint), storage degrades to unavailable
+    -- (PStorageLost), and document.documentElement.lang -- which the
+    -- shell also set from that stale hint -- is corrected here so
+    -- screen readers follow the UI. The resulting UI/content split is
+    -- itself visible: 'langSplitFor' compares the pref against
+    -- 'mContentLang', which this path deliberately leaves alone.
     io $ do
       okW <- savePrefs prefs'
       if okW
         then do
-          _ <- saveUiLangHint newCode
-          reloadPage
-          pure NoOp
+          okH <- saveUiLangHint newCode
+          if okH
+            then do
+              reloadPage
+              pure NoOp
+            else do
+              setDocumentLang newCode
+              pure (Prog PStorageLost)
         else pure (Prog PStorageLost)
   PSetToday d -> modify (\m -> m { mToday = max (mToday m) d })
   PStorageLost -> modify (\m -> m { mStorageOk = False })
@@ -1128,6 +1195,11 @@ progressJson corpus m = jObj
     -- M6 W2: the active UI language, for the harness's toggle-roundtrip
     -- and JA-flow assertions (a wire code, never localized).
   , jKV "uiLang" (jStr (prfUiLang (mPrefs m)))
+    -- M6 gate round 1 (finding M6-R1-4): the language of the bundle the
+    -- shell actually LOADED. Equal to uiLang on every healthy boot;
+    -- when they differ the #sxc1-lang-split banner is on screen and the
+    -- harness can assert the split by value rather than by prose.
+  , jKV "contentLang" (jStr (mContentLang m))
   ]
   where
     st    = mProgress m
@@ -1167,5 +1239,21 @@ progDataFor corpus m = ProgData
   , pdStorageOk  = mStorageOk m
   }
 
+-- | M6 gate round 1 (finding M6-R1-4): 'Just' (UI language, LOADED
+-- course language) exactly when the two disagree -- the input to
+-- "View.Pages"'s visible \#sxc1-lang-split banner. Suppressed while a
+-- content error is already on screen: there the course language is not
+-- "the other one", it is ABSENT, and 'contentErrorBanner' plus the
+-- degraded exercise view already say so with the same reload
+-- affordance; two alerts naming the same reload would be noise.
+langSplitFor :: Maybe Text -> Model -> Maybe (Text, Text)
+langSplitFor (Just _) _ = Nothing
+langSplitFor Nothing  m
+  | ui == content = Nothing
+  | otherwise     = Just (ui, content)
+  where
+    ui      = prfUiLang (mPrefs m)
+    content = mContentLang m
+
 viewModel :: [Deck] -> Text -> Maybe Text -> props -> Model -> View Model Action
-viewModel corpus exStatsTxt mContentErr _ m = viewRoute (modelLang m) ToggleJA (progHandlersFor m) (progDataFor corpus m) exStatsTxt (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson corpus m) (deviceStateJson m) mContentErr (exerciseBodyView corpus mContentErr m (mRoute m)) (mRoute m)
+viewModel corpus exStatsTxt mContentErr _ m = viewRoute (modelLang m) ToggleJA (progHandlersFor m) (progDataFor corpus m) exStatsTxt (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson corpus m) (deviceStateJson m) mContentErr (langSplitFor mContentErr m) (exerciseBodyView corpus mContentErr m (mRoute m)) (mRoute m)
