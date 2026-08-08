@@ -34,6 +34,117 @@ window.__sxc1Storage = {
 };
 
 
+// M6 W1 (briefs/M6-plan.md, ruling 1): the exercise corpus is no longer
+// embedded in app.wasm -- it ships as a per-language content bundle
+// (site/public/content/content.<lang>.txt, emitted by
+// scripts/emit-content-bundles.py) loaded HERE, on the JS side, with the
+// same guard discipline as the storage bridge above: the network call
+// and every failure live entirely in this file (a JS exception does not
+// unwind into Haskell -- it kills the boot computation), and the wasm
+// side only ever sees total, try/catch-wrapped bridge methods. A load
+// failure must NEVER kill boot: the app starts with an empty corpus plus
+// the failure reason and renders its visible degraded state (the
+// #sxc1-content-error banner; exercises show #btn-content-retry) while
+// the manuals -- still embedded -- keep working.
+//
+// The bundle is served as PLAIN .txt, deliberately not a pre-compressed
+// .txt.gz: GitHub Pages (like the local dev servers) compresses text
+// responses on the wire via ordinary Content-Encoding negotiation, but
+// it does NOT transparently serve a .gz sidecar as gzip-encoded content
+// -- a fetched .txt.gz would arrive as opaque bytes needing a manual
+// DecompressionStream pass. Plain text + on-the-wire compression is the
+// simplest robust choice; check-site.sh's bundle ledger measures the
+// gzip cost against the M6 ceiling.
+//
+// M6 W2: the language comes from the JS BOOT HINT -- the dedicated tiny
+// localStorage key "sxc1.uilang" (raw "en"/"ja", no envelope), written
+// by the app (Progress/Store.hs saveUiLangHint) alongside every prefs-
+// blob write that changes uiLang, and re-synced at every boot when the
+// two disagree. This deliberately does NOT read the SXC1PREFS blob:
+// parsing it here would duplicate the Haskell codec (SXC1.Progress.
+// Codec.decodePrefs) in a second language, and the two copies would
+// drift. The hint is a cache whose loss is harmless: a missing/corrupt
+// hint boots 'en' (the default bundle), the app notices the
+// disagreement against the real decoded pref at boot and rewrites the
+// hint, and the next reload fetches the right bundle. Anything but the
+// exact "ja" value is 'en' -- the same clamp the Haskell codec applies.
+function sxc1ContentLang() {
+  try {
+    return window.localStorage.getItem("sxc1.uilang") === "ja" ? "ja" : "en";
+  } catch (e) {
+    return "en";
+  }
+}
+
+// The document's own language tag follows the same pre-boot hint, so
+// screen readers pronounce the (localized) UI in the right language
+// from the first frame. Purely an attribute write; never throws into
+// boot (and localization of the strings themselves is wasm-side).
+const sxc1UiLang = sxc1ContentLang();
+try { document.documentElement.lang = sxc1UiLang; } catch (e) { /* harmless */ }
+
+// M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-5): THE
+// FETCH DEADLINE. The load below is awaited before hs_start, so a
+// server that accepts the connection and then never completes the body
+// (a stalled CDN edge, a captive portal, a half-open proxy) used to
+// block boot FOREVER: no app, no manuals, no retry -- only the static
+// loading state, which is precisely the failure mode the JS-side guard
+// exists to prevent. Neither fetch() nor Response.text() has a timeout
+// of its own, so the whole load (headers AND body) runs under one
+// AbortController armed with this deadline; a timeout resolves to the
+// same { ok: false, error } shape a 404 or an offline failure does, and
+// the app boots into its ordinary visible degraded state with the
+// #btn-content-retry affordance.
+//
+// 15 seconds: an order of magnitude above a realistic worst case for a
+// ~280 KB text response over a wire-compressed CDN link, and far below
+// any human tolerance for a blank page. The value is a constant, not a
+// setting -- scripts/check-site.sh's stalled-fetch stage serves a
+// deliberately hung endpoint and asserts the degraded surface appears
+// (the harness never injects a shorter deadline: the served endpoint
+// IS the input, exactly like --check-content-missing).
+const SXC1_CONTENT_TIMEOUT_MS = 15000;
+
+// Started BEFORE wasm instantiation so the two loads overlap; awaited
+// just before hs_start. This promise NEVER rejects -- all three failure
+// shapes (non-2xx, thrown, timed out) resolve to { ok: false, error }.
+const sxc1ContentPromise = (async () => {
+  const lang = sxc1ContentLang();
+  const rel = `./content/content.${lang}.txt`;
+  let controller = null;
+  let timer = null;
+  try {
+    controller = typeof AbortController === 'function' ? new AbortController() : null;
+  } catch (e) {
+    controller = null;
+  }
+  let timedOut = false;
+  if (controller) {
+    timer = setTimeout(() => {
+      timedOut = true;
+      try { controller.abort(); } catch (e) { /* already settled */ }
+    }, SXC1_CONTENT_TIMEOUT_MS);
+  }
+  try {
+    const resp = await fetch(rel, controller ? { signal: controller.signal } : undefined);
+    if (!resp.ok) {
+      return { lang, ok: false, error: `HTTP ${resp.status} fetching ${rel}` };
+    }
+    // The body is read under the SAME deadline: a server can send
+    // headers immediately and then stall the body indefinitely, which
+    // is the exact stall this guard exists for.
+    const text = await resp.text();
+    return { lang, ok: true, text };
+  } catch (err) {
+    if (timedOut) {
+      return { lang, ok: false, error: `${rel} timed out after ${SXC1_CONTENT_TIMEOUT_MS}ms (content load deadline)` };
+    }
+    return { lang, ok: false, error: `${rel} unreachable: ${err && err.message ? err.message : String(err)}` };
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+  }
+})();
+
 const bootStatus = document.getElementById("boot-status");
 
 try {
@@ -52,6 +163,19 @@ try {
     ghc_wasm_jsffi: ghc_wasm_jsffi(instanceExports),
   });
   Object.assign(instanceExports, instance.exports);
+
+  // The content bridge MUST be installed before hs_start: Main.main
+  // reads it synchronously at boot (Exercises.Bundle). Every method is
+  // total -- try/catch, sentinel returns -- mirroring __sxc1Storage, so
+  // no content failure can ever throw across the wasm boundary.
+  // undefined = "load failed" for text(); undefined = "load succeeded"
+  // for error().
+  const sxc1Content = await sxc1ContentPromise;
+  window.__sxc1Content = {
+    lang: () => { try { return sxc1Content.lang; } catch (e) { return "en"; } },
+    text: () => { try { return sxc1Content.ok ? sxc1Content.text : undefined; } catch (e) { return undefined; } },
+    error: () => { try { return sxc1Content.ok ? undefined : String(sxc1Content.error); } catch (e) { return "content bridge failure"; } },
+  };
 
   wasi.initialize(instance);          // runs _initialize, starting the Haskell RTS
   await instance.exports.hs_start();  // mounts the Miso app into <body>
@@ -97,6 +221,20 @@ document.addEventListener("click", (event) => {
     if (confirmBtn) confirmBtn.hidden = false;
   } else if (id === "btn-progress-wipe-confirm") {
     event.target.hidden = true;
+  } else if (id === "btn-content-retry" || id === "btn-lang-resync") {
+    // M6 W1: the degraded-content retry affordance. A full reload IS the
+    // retry -- it re-runs this file's guarded bundle load and the app's
+    // boot-time read of it, with no separate re-fetch path to keep in
+    // sync (re-fetch-on-language-switch is W2's seam).
+    //
+    // M6 gate round 1 (finding M6-R1-4): #btn-lang-resync -- inside the
+    // visible #sxc1-lang-split banner -- takes the same path. The app
+    // re-syncs the boot hint from the decoded pref at every boot, so
+    // once a hint write succeeds again this reload fetches the bundle
+    // the UI language actually calls for. It is LEARNER-INITIATED and
+    // therefore cannot loop, which is why no automatic corrective
+    // reload exists on the boot path (see Main.main).
+    window.location.reload();
   }
 });
 
@@ -123,6 +261,11 @@ document.addEventListener("input", (event) => {
   const preview = document.getElementById("sxc1-import-preview");
   if (!preview) return;
   const n = countPastedRecords(event.target.value);
-  preview.textContent =
-    n === 1 ? "1 record found in the pasted text." : `${n} records found in the pasted text.`;
+  // M6 W2: this file owns exactly these two learner-visible strings (the
+  // live preview overwrites the Haskell-rendered placeholder), so they
+  // localize HERE, keyed off the same boot hint the bundle fetch uses --
+  // the wasm-side I18n table cannot reach into this JS-only path.
+  preview.textContent = sxc1UiLang === "ja"
+    ? `貼り付けたテキストに${n}件のレコードが見つかりました。`
+    : n === 1 ? "1 record found in the pasted text." : `${n} records found in the pasted text.`;
 });
