@@ -321,7 +321,7 @@ Checks performed, in order:
      output is a property of the local gzip build, not of this tree --
      the same window the artifact figure already uses).
      M6 GATE ROUND 1 adds three more, all unconditional: the generated
-     site/app/Exercises/Manifest.hs -- the BUILD-TIME EXPECTATION
+     site/app/Bundle/Manifest.hs -- the BUILD-TIME EXPECTATION
      compiled into app.wasm, which the running app now checks every
      fetched bundle against -- must be byte-identical to a fresh
      --manifest-hs regeneration (M6-g); its deck list, deck count and
@@ -415,6 +415,65 @@ Checks performed, in order:
      VISIBLE #sxc1-lang-split alert names both languages and offers
      #btn-lang-resync, and document.documentElement.lang follows the
      in-memory switch. Skipped via skip() under --skip-browser.
+  27. M7 W1 MANUAL-BUNDLE CHECKS (unconditional): the manual-text
+     externalization re-baseline (briefs/M7-plan.md rulings 1/4/6).
+     content/manuals.en.txt and manuals.ja.txt are required files
+     (check 1); the M7_MANUAL_BUNDLE_CEILING=250000 and
+     M7_BUNDLE_TOTAL_CEILING=550000 constants are asserted in this
+     script's own source TOGETHER WITH THE ARITHMETIC that ties the
+     total to the untouched M6_BUNDLE_CEILING (M7-a, the V1 pattern --
+     raising a bundle ceiling stays a visible edit to THIS file); both
+     manual gzips are measured, recorded to
+     state/manual-bundle-ledger.tsv, and HARD-gated -- the manual pair
+     under the manual ceiling and ALL FOUR fetched bundles under the
+     total ceiling (M7-b); both shipped manual bundles must byte-match
+     a fresh scripts/emit-content-bundles.py emission from
+     translations/ (M7-c/M7-d, the stale-bundle detector and the
+     shipped-path counterpart of check 12); the committed
+     site/app/Bundle/Manifest.hs must re-derive from the SHIPPED manual
+     bundles -- ordered (slug, page count) pairs, doc count, per-language
+     fingerprints, page counts RE-COUNTED from each document's own body,
+     and every per-document language field checked legal (M7-h); the
+     emitter must REJECT a page-count-mismatched <slug>.ja.md, a
+     document not numbered 1..N and an unknown document in
+     translations/, while a well-formed synthetic <slug>.ja.md flips
+     exactly that document's record to `ja` and leaves the others `en`
+     -- wave 2's mechanism, proven now (M7-i); and briefs/M7-budget.json
+     must MATCH the pinned M7 re-baseline (m6_final==887732, the frozen
+     wasm ceiling, all three bundle ceilings, m7_final <= m6_final -
+     M7_SHRINK_MIN) AND describe THIS tree (M7-e, which since M7 owns
+     the LIVE artifact measurement that M6-e used to make -- see M6-e's
+     own comment for that documented handoff).
+  28. M7 W1 BAD-MANUAL-BUNDLE REJECTION (browser axis): seven sibling
+     copies of the bundle are served from one server -- six whose en
+     MANUAL bundle is broken in a DIFFERENT way (the ja bundle served
+     at the en URL; one document's text altered; the final document
+     truncated with every !SXC1-DOC delimiter and the header count
+     still intact; a syntactically perfect zero-document bundle; one
+     whole document removed with the header count adjusted to match;
+     and the file simply absent) and one untouched. Each sabotage is
+     verified structurally before the browser runs, and browser-check
+     --check-bad-manual-bundle must report exactly 14/14: every broken
+     copy shows the visible #sxc1-content-error alert AND renders the
+     named #sxc1-manual-degraded body with #btn-content-retry on a real
+     manual route WHILE THE EXERCISE COURSE STAYS WHOLE (52 decks --
+     the two bundles fail independently, which is the claim), while the
+     control shows no banner, a readable manual page and the whole
+     course. Skipped via skip() under --skip-browser.
+  29. M7 W1 MANUAL EN-FALLBACK NOTE (browser axis, ruling 4): on a
+     served copy of the SHIPPED bundles, browser-check
+     --check-manual-fallback must report exactly 5/5 across one EN boot
+     and the app's own JA switch (#btn-ui-lang, persist-then-reload):
+     under EN no #sxc1-manual-fallback exists anywhere; after the
+     switch the ja bundle really loaded (uiLang=ja, contentLang=ja, no
+     content-error banner), the VISIBLE role=note #sxc1-manual-fallback
+     carries the pinned Japanese sentence, the page body still renders
+     the English text (never a blank page) and is marked lang="en", and
+     the manual TOC and home card carry the same note. Both DIRECTIONS
+     of the mechanism are exercised on real served bytes -- absent when
+     a document IS in the reader's language, present when it is not --
+     which is what wave 2 flips, one document at a time. Skipped via
+     skip() under --skip-browser.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -617,7 +676,22 @@ info() {
 # their own pinned cardinalities (12/12 and 4/4, asserted literally by
 # the stages themselves), and none of them adds or removes an assertion
 # inside the two full stages.
-M5_CHECK_TOTAL=116
+# M7 W1 pin raise (the SAME documented procedure -- ADDING A CHECK
+# REQUIRES A VISIBLE EDIT TO THIS PIN): 116 -> 127 (+2 required manual
+# bundles in check 1, +1 the two M7 bundle-ceiling literals and their
+# arithmetic (M7-a), +1 manual bundle ledger and both ceilings (M7-b),
+# +2 manual bundle freshness en/ja (M7-c/M7-d), +1 manifest/shipped
+# manual bundle agreement (M7-h), +1 manual emitter rules with wave 2's
+# mechanism as its positive control (M7-i), +1 M7 budget re-baseline
+# (M7-e), +1 bad-manual-bundle browser stage (check 27), +1 manual
+# EN-fallback note browser stage (check 28)). The browser-stage floor is
+# UNCHANGED at 238: both additions are their own stages with their own
+# pinned cardinalities (14/14 and 5/5, asserted literally by the stages
+# themselves), and neither adds or removes an assertion inside the two
+# full stages -- the manual reader's own assertions there already cover
+# the fetched text, because they are the SAME assertions that covered
+# the embedded text and they never knew the difference.
+M5_CHECK_TOTAL=127
 M5_BROWSER_ASSERT_FLOOR=238
 
 # ---------------------------------------------------------------------------
@@ -810,6 +884,13 @@ REQUIRED_FILES=(
   # failure exactly like a missing app.wasm.
   "content/content.en.txt"
   "content/content.ja.txt"
+  # M7 W1 (briefs/M7-plan.md, ruling 1): the per-language MANUAL text
+  # bundles, emitted by the SAME script into the same directory under the
+  # same grammar. Since M7 the manual text is not in app.wasm either, so a
+  # build without these ships a reader with no manuals at all -- the same
+  # missing-required-file failure.
+  "content/manuals.en.txt"
+  "content/manuals.ja.txt"
 )
 for rel in "${REQUIRED_FILES[@]}"; do
   if [ -f "$DIR/$rel" ]; then
@@ -1424,7 +1505,7 @@ fi
 # app.wasm into per-language bundles (site/public/content/content.{en,ja}
 # .txt, emitted by build-site.sh step 7b via scripts/emit-content-
 # bundles.py and loaded at boot by site/static/index.js +
-# site/app/Exercises/Bundle.hs). Everything here is unconditional (pure
+# site/app/Bundle.hs). Everything here is unconditional (pure
 # artifact/file/python work, no toolchain, no browser); the behavioral
 # half -- the fetch-failure degradation stage -- lives on the browser
 # axis below.
@@ -1514,7 +1595,8 @@ fi
 BUNDLE_FRESH_TMP="$(mktemp -d -t sxc1-check-site-bundles.XXXXXX)"
 register_temp_dir "$BUNDLE_FRESH_TMP"
 BUNDLE_EMIT_OUT="$(python3 "$REPO_ROOT/scripts/emit-content-bundles.py" \
-  --exercises-dir "$REPO_ROOT/content/exercises" --out-dir "$BUNDLE_FRESH_TMP" 2>&1)" || BUNDLE_EMIT_OUT="EMIT-FAILED: $BUNDLE_EMIT_OUT"
+  --exercises-dir "$REPO_ROOT/content/exercises" --translations-dir "$REPO_ROOT/translations" \
+  --out-dir "$BUNDLE_FRESH_TMP" 2>&1)" || BUNDLE_EMIT_OUT="EMIT-FAILED: $BUNDLE_EMIT_OUT"
 for lang in en ja; do
   M6F_LABEL="bundle freshness/content.$lang.txt ($DIR/content/content.$lang.txt is byte-identical to a fresh scripts/emit-content-bundles.py emission from content/exercises/)"
   case "$BUNDLE_EMIT_OUT" in
@@ -1535,7 +1617,7 @@ done
 # THE BUILD-TIME BUNDLE EXPECTATION AND THE EMITTER'S STRUCTURAL RULES.
 #
 # The runtime now refuses any bundle that disagrees with
-# site/app/Exercises/Manifest.hs -- the generated module compiled INTO
+# site/app/Bundle/Manifest.hs -- the generated module compiled INTO
 # app.wasm (deck names in INDEX order, aggregate counts, one FNV-1a/32
 # fingerprint per language over the whole bundle). That expectation is
 # only worth anything if it is (M6-g) genuinely regenerated from the
@@ -1545,14 +1627,15 @@ done
 # produce the visible degraded state) is the bad-bundle browser stage
 # below.
 # ===========================================================================
-MANIFEST_HS="$REPO_ROOT/site/app/Exercises/Manifest.hs"
+MANIFEST_HS="$REPO_ROOT/site/app/Bundle/Manifest.hs"
 
 # --- M6-g: MANIFEST FRESHNESS (the exact-bytes discipline, again) ---------
-M6G_LABEL="bundle manifest freshness (site/app/Exercises/Manifest.hs is byte-identical to a fresh scripts/emit-content-bundles.py --manifest-hs regeneration from content/exercises/ -- the wasm-embedded expectation really describes THIS corpus)"
+M6G_LABEL="bundle manifest freshness (site/app/Bundle/Manifest.hs is byte-identical to a fresh scripts/emit-content-bundles.py --manifest-hs regeneration from content/exercises/ AND translations/ -- the ONE wasm-embedded expectation really describes THIS corpus and THESE manuals)"
 MANIFEST_FRESH_TMP="$(mktemp -d -t sxc1-check-site-manifest.XXXXXX)"
 register_temp_dir "$MANIFEST_FRESH_TMP"
 MANIFEST_EMIT_OUT="$(python3 "$REPO_ROOT/scripts/emit-content-bundles.py" \
   --exercises-dir "$REPO_ROOT/content/exercises" \
+  --translations-dir "$REPO_ROOT/translations" \
   --manifest-hs "$MANIFEST_FRESH_TMP/Manifest.hs" 2>&1)" || MANIFEST_EMIT_OUT="EMIT-FAILED: $MANIFEST_EMIT_OUT"
 case "$MANIFEST_EMIT_OUT" in
   EMIT-FAILED:*)
@@ -1642,7 +1725,7 @@ PYEOF
     *)      fail "$M6H_LABEL (observed: ${M6H_OUT#FAIL })" ;;
   esac
 else
-  fail "$M6H_LABEL (observed: site/app/Exercises/Manifest.hs, a shipped bundle, or python3 is missing)"
+  fail "$M6H_LABEL (observed: site/app/Bundle/Manifest.hs, a shipped bundle, or python3 is missing)"
 fi
 
 # --- M6-i: THE EMITTER'S PROSE STRUCTURAL-TOKEN REJECTION -----------------
@@ -1689,7 +1772,7 @@ ja: - [x] 正しい選択肢
 ja: - [ ] 誤った選択肢
 EOF
 M6I_PROBLEMS=""
-if ! python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$M6I_TMP/corpus" --out-dir "$M6I_TMP/out" >/dev/null 2>&1; then
+if ! python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$M6I_TMP/corpus" --translations-dir "$REPO_ROOT/translations" --out-dir "$M6I_TMP/out" >/dev/null 2>&1; then
   M6I_PROBLEMS="the UNMUTATED scratch corpus does not emit (the negative controls below would be vacuous)"
 else
   M6I_ANCHOR='ja: 置き換えてよい通常の散文。'
@@ -1719,7 +1802,7 @@ PYEOF
     fi
     if ! grep -qF "ja: $payload" "$M6I_TMP/corpus/900-scratch.ex.md"; then
       M6I_PROBLEMS="$M6I_PROBLEMS; grep-confirm IN failed for payload '$payload'"
-    elif python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$M6I_TMP/corpus" --out-dir "$M6I_TMP/out" >/dev/null 2>&1; then
+    elif python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$M6I_TMP/corpus" --translations-dir "$REPO_ROOT/translations" --out-dir "$M6I_TMP/out" >/dev/null 2>&1; then
       M6I_PROBLEMS="$M6I_PROBLEMS; the emitter ACCEPTED the structural prose payload '$payload'"
     fi
   done <<'EOF'
@@ -1739,17 +1822,25 @@ unregister_temp_dir "$M6I_TMP"
 
 # --- M6-e: THE WASM-SHRINK RE-BASELINE (briefs/M6-budget.json) ------------
 # The M5-R1-2 pattern applied to the M6 record: the file must MATCH the
-# pins (a doctored file fails even when internally consistent), the
+# pins (a doctored file fails even when internally consistent), and the
 # recorded m6_entry must show the externalization actually restored the
-# ceiling headroom (m6_entry <= m5_final - M6_SHRINK_MIN), and the FRESH
-# artifact must sit inside the M6 window [m6_entry - 3000,
-# WASM_GZIP_CEILING): the lower bound is baseline honesty (an artifact
-# far below the recorded entry means the record never described this
-# pipeline/tree), the upper bound stays the one frozen ceiling (ruling
-# 6: no new task-local wasm ceiling was granted for M6 -- later M6
-# waves' JA UI strings lawfully grow the artifact above m6_entry, under
-# the frozen 1,000,000).
-M6E_LABEL="briefs/M6-budget.json MATCHES the pinned M6 re-baseline (m5_final==933305, ceiling==1000000, bundle_ceiling==$M6_BUNDLE_CEILING; m6_entry <= m5_final - M6_SHRINK_MIN=$M6_SHRINK_MIN -- the externalization really shrank the wasm) and its recorded M6-FINAL figures describe THIS tree (artifact gzip in [m6_entry-3000, 1000000) and within 3000 of m6_final; recorded en+ja bundle gzips self-consistent, under the bundle ceiling and within 3000 of the live measurement)"
+# ceiling headroom (m6_entry <= m5_final - M6_SHRINK_MIN).
+#
+# M7 W1 HANDOFF (a deliberate, visible narrowing -- see briefs/
+# M7-budget.json): this check no longer judges the FRESH ARTIFACT. M6's
+# window was [m6_entry - 3000, WASM_GZIP_CEILING) with m6_entry =
+# 859,745, and M7 lawfully shed a further ~49K by externalizing the
+# manual text, so the live artifact now sits legitimately BELOW M6's
+# lower bound -- a bound whose whole purpose ("the record never
+# described this pipeline/tree") is now served by M7-e, which owns the
+# live measurement, the frozen ceiling and the m6_final -> m7_final
+# arithmetic. Everything M6-e can still honestly assert about the M6
+# RECORD it still asserts, unchanged: the pins, the shrink formula, the
+# bundle-figure self-consistency, and the live EXERCISE bundle gzips
+# (which M7 did not touch and which must still match what M6 recorded).
+# briefs/M6-budget.json itself is untouched -- it stays the historical
+# record.
+M6E_LABEL="briefs/M6-budget.json MATCHES the pinned M6 re-baseline (m5_final==933305, ceiling==1000000, bundle_ceiling==$M6_BUNDLE_CEILING; m6_entry <= m5_final - M6_SHRINK_MIN=$M6_SHRINK_MIN -- the externalization really shrank the wasm), its recorded shrink/bundle arithmetic is self-consistent and under the bundle ceiling, and its recorded en+ja EXERCISE bundle gzips are still within 3000 of the live measurement (the fresh ARTIFACT is judged by M7-e, which owns the M7 re-baseline)"
 if [ -f "$M6_BUDGET_JSON" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
   M6E_OUT="$(python3 -c '
 import json, sys
@@ -1783,12 +1874,9 @@ try:
         problems.append("bundle_ceiling_bytes=%d does not match the pinned M6_BUNDLE_CEILING=%d -- raising a ceiling is a visible check-site.sh edit, never a budget-file edit" % (bundle_ceiling, pin_bundle_ceiling))
     if m6_entry > m5_final - pin_shrink:
         problems.append("m6_entry_gzip_bytes=%d did not shrink by at least M6_SHRINK_MIN=%d from m5_final=%d (the externalization is not doing its job)" % (m6_entry, pin_shrink, m5_final))
-    if observed < m6_entry - 3000:
-        problems.append("fresh artifact gzip=%d is %d bytes BELOW the recorded m6_entry=%d (beyond the 3000-byte window) -- the recorded re-baseline never described this pipeline/tree" % (observed, m6_entry - observed, m6_entry))
-    if observed >= pin_ceiling:
-        problems.append("fresh artifact gzip=%d is at/over the frozen ceiling %d" % (observed, pin_ceiling))
-    if abs(observed - m6_final) > 3000:
-        problems.append("fresh artifact gzip=%d is %d bytes from the recorded m6_final_gzip_bytes=%d (beyond the 3000-byte window) -- re-measure and update briefs/M6-budget.json" % (observed, observed - m6_final, m6_final))
+    # M7 W1: the three fresh-ARTIFACT comparisons that used to live here
+    # moved to M7-e (see the M6-e comment above). The observed value is
+    # still read and reported so the two records stay legible together.
     if b_en + b_ja != b_combined:
         problems.append("bundle_combined_gzip_bytes=%d is not bundle_en_gzip_bytes=%d + bundle_ja_gzip_bytes=%d" % (b_combined, b_en, b_ja))
     if b_combined >= bundle_ceiling:
@@ -1813,8 +1901,8 @@ except KeyError as e:
 if problems:
     print("FAIL " + "; ".join(problems))
 else:
-    print("OK m5_final=%d, m6_entry=%d (shrink %d >= %d), m6_final=%d, fresh gzip %d in [%d, %d); bundles en=%d + ja=%d = %d of %d; ceiling headroom %d bytes"
-          % (m5_final, m6_entry, m5_final - m6_entry, pin_shrink, m6_final, observed, m6_entry - 3000, pin_ceiling, b_en, b_ja, b_combined, bundle_ceiling, pin_ceiling - observed))
+    print("OK m5_final=%d, m6_entry=%d (shrink %d >= %d), m6_final=%d [historical record]; exercise bundles en=%d + ja=%d = %d of %d; live artifact %d is judged by M7-e"
+          % (m5_final, m6_entry, m5_final - m6_entry, pin_shrink, m6_final, b_en, b_ja, b_combined, bundle_ceiling, observed))
 ' "$M6_BUDGET_JSON" "$WASM_GZIP_BYTES" "$M6_M5_FINAL" "$M6_SHRINK_MIN" "$WASM_GZIP_CEILING_BYTES" \
   "$M6_BUNDLE_CEILING" "${BUNDLE_EN_GZIP:--1}" "${BUNDLE_JA_GZIP:--1}" 2>&1)" || true
   case "$M6E_OUT" in
@@ -1823,6 +1911,482 @@ else:
   esac
 else
   fail "$M6E_LABEL (observed: briefs/M6-budget.json missing, app.wasm missing, or python3 missing)"
+fi
+
+# ===========================================================================
+# M7 W1 (briefs/M7-plan.md, rulings 1/4/6): MANUAL-TEXT EXTERNALIZATION.
+# The four EN translations were 193,460 raw bytes TH-embedded in
+# app.wasm; ruling 1 moved them OUT into per-language fetched bundles
+# (site/public/content/manuals.{en,ja}.txt, emitted by the SAME
+# scripts/emit-content-bundles.py run that emits the exercise bundles
+# and the wasm-embedded expectation, loaded at boot by
+# site/static/index.js + site/app/Bundle.hs) so that wave 2's Japanese
+# manual text costs the binary nothing. Everything here is
+# unconditional (pure artifact/file/python work); the behavioural halves
+# -- a bad manual bundle must produce the visible degraded state, and
+# the EN-fallback note must be visible exactly when a document is not in
+# the reader's language -- are the two browser stages below.
+#
+# COORDINATOR-RULING CONSTANTS (2026-08-09 M7 plan, ruling 6; pinned
+# here per the M5-R1-2 / M6 pattern -- the mutable briefs/M7-budget.json
+# may not authorize its own numbers, these literals are what it must
+# MATCH). THE BUNDLE-CEILING RAISE, WITH ITS ARITHMETIC:
+#
+#   M6_BUNDLE_CEILING            300,000  (unchanged, above) -- the
+#                                EXERCISE bundles' ceiling, holding
+#                                167,732. M6's own record is frozen and
+#                                its pin therefore cannot move.
+# + M7_MANUAL_BUNDLE_CEILING     250,000  -- the MANUAL bundles' own
+#                                ceiling, holding 115,638 at W1 (en
+#                                57,818 + ja 57,820, the ja bundle being
+#                                the documented per-document EN fallback
+#                                until wave 2). The 2.2x headroom is
+#                                deliberate and matches M6's reasoning:
+#                                wave 2 replaces the ja bundle with real
+#                                Japanese (108 pages, ~396 KB of OCR
+#                                ground truth, 3 bytes per character in
+#                                UTF-8), which compresses independently
+#                                of the EN bundle beside it.
+# = M7_BUNDLE_TOTAL_CEILING      550,000  -- the ceiling on ALL FOUR
+#                                bundles combined, i.e. everything the
+#                                app fetches at boot. 283,370 today.
+#
+# Raising a ceiling is a visible edit to THIS FILE, never a budget-file
+# edit -- and the raise is expressed as a sum of two named parts so the
+# M6 half stays exactly where the M6 gate left it.
+#
+#   M7_M6_FINAL   gzip of the M6-tagged shipping artifact -- 887,732
+#                 bytes, the pre-manual-externalization baseline this
+#                 re-baseline is measured against (briefs/M6-budget.json
+#                 m6_final_gzip_bytes, and check-site's own floor at M7
+#                 entry).
+#   M7_SHRINK_MIN the externalization must have RESTORED at least this
+#                 much wasm-ceiling headroom: m7_final <= m6_final -
+#                 30,000. Ruling 1 expected roughly -67K; measured
+#                 -48,942 on this tree (the embedded translations
+#                 compressed better inside the wasm than the linear
+#                 projection assumed -- the same direction M6's own
+#                 estimate missed in). The pin is a deliberate floor
+#                 UNDER the measurement, not a target.
+# Moving ANY of these is a coordinator decision, never a task's.
+# ===========================================================================
+M7_MANUAL_BUNDLE_CEILING=250000
+M7_BUNDLE_TOTAL_CEILING=550000
+M7_M6_FINAL=887732
+M7_SHRINK_MIN=30000
+M7_BUDGET_JSON="$REPO_ROOT/briefs/M7-budget.json"
+
+# --- M7-a: the two ceiling CONSTANTS themselves (the V1 pattern) ----------
+# Both literals, plus the arithmetic that ties them to the untouched M6
+# ceiling -- so a silent ceiling raise, or a total that stops being the
+# sum of its two named parts, is red here before anything is measured.
+M7A_LABEL="M7_MANUAL_BUNDLE_CEILING is literally 250000 and M7_BUNDLE_TOTAL_CEILING is literally 550000 == M6_BUNDLE_CEILING($M6_BUNDLE_CEILING) + M7_MANUAL_BUNDLE_CEILING(250000) (coordinator-ruling constants asserted in this script's own source; the artifact half is the manual bundle ledger below)"
+M7_MAN_ASSIGN_COUNT="$(grep -c '^M7_MANUAL_BUNDLE_CEILING=' "${BASH_SOURCE[0]}" || true)"
+M7_TOT_ASSIGN_COUNT="$(grep -c '^M7_BUNDLE_TOTAL_CEILING=' "${BASH_SOURCE[0]}" || true)"
+if [ "$M7_MANUAL_BUNDLE_CEILING" -eq 250000 ] \
+   && [ "$M7_BUNDLE_TOTAL_CEILING" -eq 550000 ] \
+   && [ "$M7_BUNDLE_TOTAL_CEILING" -eq $((M6_BUNDLE_CEILING + M7_MANUAL_BUNDLE_CEILING)) ] \
+   && [ "$M7_MAN_ASSIGN_COUNT" -eq 1 ] \
+   && [ "$M7_TOT_ASSIGN_COUNT" -eq 1 ] \
+   && grep -qx 'M7_MANUAL_BUNDLE_CEILING=250000' "${BASH_SOURCE[0]}" \
+   && grep -qx 'M7_BUNDLE_TOTAL_CEILING=550000' "${BASH_SOURCE[0]}"; then
+  ok "$M7A_LABEL"
+else
+  fail "$M7A_LABEL (observed: manual=$M7_MANUAL_BUNDLE_CEILING (assignments=$M7_MAN_ASSIGN_COUNT), total=$M7_BUNDLE_TOTAL_CEILING (assignments=$M7_TOT_ASSIGN_COUNT), M6=$M6_BUNDLE_CEILING, sum=$((M6_BUNDLE_CEILING + M7_MANUAL_BUNDLE_CEILING)) -- a bundle ceiling was moved; that is a coordinator decision, never a task's)"
+fi
+
+# --- M7-b: THE MANUAL BUNDLE LEDGER + both ceilings -----------------------
+# M6-b's sibling, and the ONE place the TOTAL fetched-bytes budget is
+# gated: the manual gzips are measured and RECORDED on every run
+# (state/manual-bundle-ledger.tsv, beside state/bundle-ledger.tsv), the
+# manual combined number is HARD-gated under M7_MANUAL_BUNDLE_CEILING,
+# and all four bundles together are HARD-gated under
+# M7_BUNDLE_TOTAL_CEILING.
+MANUAL_EN_FILE="$DIR/content/manuals.en.txt"
+MANUAL_JA_FILE="$DIR/content/manuals.ja.txt"
+MANUAL_LEDGER_FILE="$REPO_ROOT/state/manual-bundle-ledger.tsv"
+M7B_LABEL="manual bundles: combined gzip(manuals.en.txt)+gzip(manuals.ja.txt) is under the M7_MANUAL_BUNDLE_CEILING=$M7_MANUAL_BUNDLE_CEILING byte ceiling AND all four fetched bundles together are under M7_BUNDLE_TOTAL_CEILING=$M7_BUNDLE_TOTAL_CEILING, recorded to state/manual-bundle-ledger.tsv"
+if [ -f "$MANUAL_EN_FILE" ] && [ -f "$MANUAL_JA_FILE" ]; then
+  MANUAL_EN_GZIP="$(gzip -c "$MANUAL_EN_FILE" | wc -c | tr -d ' ')"
+  MANUAL_JA_GZIP="$(gzip -c "$MANUAL_JA_FILE" | wc -c | tr -d ' ')"
+  MANUAL_COMBINED_GZIP=$((MANUAL_EN_GZIP + MANUAL_JA_GZIP))
+  MANUAL_HEADROOM=$((M7_MANUAL_BUNDLE_CEILING - MANUAL_COMBINED_GZIP))
+  # ${BUNDLE_COMBINED_GZIP:-0}: M6-b already failed loudly when the
+  # exercise bundles were missing; the TOTAL then under-counts rather
+  # than silently passing on a partial tree, and the missing-file
+  # failure is the one that gets reported.
+  ALL_BUNDLES_GZIP=$((MANUAL_COMBINED_GZIP + ${BUNDLE_COMBINED_GZIP:-0}))
+  ALL_HEADROOM=$((M7_BUNDLE_TOTAL_CEILING - ALL_BUNDLES_GZIP))
+  mkdir -p "$REPO_ROOT/state"
+  if [ ! -f "$MANUAL_LEDGER_FILE" ]; then
+    printf 'timestamp\tmanual_en_gzip_bytes\tmanual_ja_gzip_bytes\tmanual_combined_gzip_bytes\tmanual_ceiling_bytes\tall_bundles_gzip_bytes\ttotal_ceiling_bytes\theadroom_bytes\n' > "$MANUAL_LEDGER_FILE"
+  fi
+  printf '%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MANUAL_EN_GZIP" "$MANUAL_JA_GZIP" \
+    "$MANUAL_COMBINED_GZIP" "$M7_MANUAL_BUNDLE_CEILING" "$ALL_BUNDLES_GZIP" \
+    "$M7_BUNDLE_TOTAL_CEILING" "$ALL_HEADROOM" >> "$MANUAL_LEDGER_FILE"
+  info "manual bundle ledger: manuals.en.txt gzip=$MANUAL_EN_GZIP, manuals.ja.txt gzip=$MANUAL_JA_GZIP, combined=$MANUAL_COMBINED_GZIP of $M7_MANUAL_BUNDLE_CEILING (headroom $MANUAL_HEADROOM); ALL bundles=$ALL_BUNDLES_GZIP of $M7_BUNDLE_TOTAL_CEILING (headroom $ALL_HEADROOM)"
+  if [ "$MANUAL_COMBINED_GZIP" -lt "$M7_MANUAL_BUNDLE_CEILING" ] && [ "$ALL_BUNDLES_GZIP" -lt "$M7_BUNDLE_TOTAL_CEILING" ]; then
+    ok "$M7B_LABEL (observed: manuals en=$MANUAL_EN_GZIP + ja=$MANUAL_JA_GZIP = $MANUAL_COMBINED_GZIP, headroom $MANUAL_HEADROOM; all four = $ALL_BUNDLES_GZIP, headroom $ALL_HEADROOM)"
+  else
+    fail "$M7B_LABEL (observed: manuals combined=$MANUAL_COMBINED_GZIP of $M7_MANUAL_BUNDLE_CEILING, all four=$ALL_BUNDLES_GZIP of $M7_BUNDLE_TOTAL_CEILING -- over a ceiling)"
+  fi
+else
+  fail "$M7B_LABEL (observed: $DIR/content/manuals.en.txt or manuals.ja.txt missing -- run ./scripts/build-site.sh first)"
+fi
+
+# --- M7-c/M7-d: MANUAL BUNDLE FRESHNESS (the exact-bytes discipline) ------
+# M6-c/M6-d's sibling, and the SHIPPED-PATH replacement for what check
+# 12's `content-check --dump-source` proves about the checker's own
+# embedded copy: a fresh emission from translations/ must byte-match
+# what is actually shipping at --dir, so a translation edited (or a
+# <slug>.ja.md added) without re-running build-site turns this red
+# instead of silently shipping a stale manual.
+#
+# BUNDLE_FRESH_TMP already holds a fresh emission of BOTH kinds -- the
+# emitter writes all four files in one run, exactly as build-site does,
+# which is itself part of the claim (they are always emitted together
+# from the same sources as the manifest).
+for lang in en ja; do
+  M7F_LABEL="manual bundle freshness/manuals.$lang.txt ($DIR/content/manuals.$lang.txt is byte-identical to a fresh scripts/emit-content-bundles.py emission from translations/)"
+  case "$BUNDLE_EMIT_OUT" in
+    EMIT-FAILED:*)
+      fail "$M7F_LABEL (observed: fresh emission failed -- ${BUNDLE_EMIT_OUT#EMIT-FAILED: })"
+      ;;
+    *)
+      if [ -f "$DIR/content/manuals.$lang.txt" ] && cmp -s "$BUNDLE_FRESH_TMP/manuals.$lang.txt" "$DIR/content/manuals.$lang.txt"; then
+        ok "$M7F_LABEL"
+      else
+        fail "$M7F_LABEL (observed: shipped manual bundle diverges from a fresh emission -- stale bundle, or translations/ edited without rebuilding)"
+      fi
+      ;;
+  esac
+done
+
+# --- M7-h: MANIFEST <-> SHIPPED MANUAL BUNDLES ----------------------------
+# M6-h's sibling for the manual half: re-derives the expectation
+# straight from the manual bundles actually shipping at --dir -- the
+# ordered (slug, page count) pairs from the !SXC1-DOC delimiters, the
+# doc count, and FNV-1a/32 over each whole file -- and compares it to
+# the literals in the committed manifest module. It additionally
+# re-counts each document's `<!-- page N -->` markers FROM THE BODY (the
+# delimiter's own claim is not evidence for itself) and checks the
+# per-document LANGUAGE field's legality: every document in the en
+# bundle must be `en`, and every document in the ja bundle must be `ja`
+# or the documented `en` fallback -- which is also what makes the
+# temporary fallback COUNTABLE here rather than invisible.
+M7H_LABEL="manual manifest agreement (the committed manifest's ordered (slug, page count) doc list, doc count and per-language FNV-1a/32 fingerprints re-derived independently from the SHIPPED $DIR/content manual bundles, with page counts re-counted from each document's own body and every per-document language field checked legal)"
+if [ -f "$MANIFEST_HS" ] && [ -f "$MANUAL_EN_FILE" ] && [ -f "$MANUAL_JA_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  M7H_PY="$(mktemp -t sxc1-check-site-manualmanifest.XXXXXX.py)"
+  register_temp_file "$M7H_PY"
+  cat > "$M7H_PY" <<'PYEOF'
+import re, sys
+
+MASK32 = 0xFFFFFFFF
+
+
+def fnv1a32(data):
+    h = 2166136261
+    for b in data:
+        h ^= b
+        h = (h * 16777619) & MASK32
+    return h
+
+
+# Vector-pinned before use, exactly like every other FNV re-derivation in
+# this script.
+for data, want in [(b"", 2166136261), (b"hello", 1335831723), ("⊕⊖".encode("utf-8"), 3369799694)]:
+    if fnv1a32(data) != want:
+        print("FAIL FNV-1a/32 self-check failed in the re-derivation itself")
+        raise SystemExit
+
+src = open(sys.argv[1], encoding="utf-8").read()
+# manifestManualDocs is the ONLY [(String, Int)] list in the module.
+docs = [(m.group(1), int(m.group(2)))
+        for m in re.finditer(r'^\s*[\[,]\s*\("([^"]+)",\s*(\d+)\)\s*$', src, re.M)]
+m_count = re.search(r'^manifestManualDocCount = (\d+)$', src, re.M)
+fps = dict((lang, int(v)) for lang, v in
+           re.findall(r'^manifestManualFingerprint "([a-z]+)" = Just (\d+)$', src, re.M))
+problems = []
+fallbacks = {}
+if not docs:
+    problems.append("could not read manifestManualDocs out of the manifest module")
+if not m_count:
+    problems.append("could not read manifestManualDocCount out of the manifest module")
+elif int(m_count.group(1)) != len(docs):
+    problems.append("manifestManualDocCount=%s but manifestManualDocs lists %d document(s)"
+                    % (m_count.group(1), len(docs)))
+
+PAGE_RE = re.compile(r"^<!-- page (\d+) -->$")
+
+for lang, path in (("en", sys.argv[2]), ("ja", sys.argv[3])):
+    data = open(path, "rb").read()
+    lines = data.decode("utf-8").split("\n")
+    hdr = lines[0] if lines else ""
+    want_hdr = "!SXC1-BUNDLE v1 %s %d" % (lang, len(docs))
+    if hdr != want_hdr:
+        problems.append("%s header is %r, expected %r" % (path, hdr[:60], want_hdr))
+    # Split into records so page markers are counted per document.
+    recs, cur = [], None
+    for l in lines[1:]:
+        if l.startswith("!SXC1-DOC "):
+            cur = [l[len("!SXC1-DOC "):].strip().split(), []]
+            recs.append(cur)
+        elif cur is not None:
+            cur[1].append(l)
+    got = []
+    langs = []
+    for fields, body in recs:
+        if len(fields) != 3:
+            problems.append("%s has an !SXC1-DOC delimiter that is not '<slug> <lang> <pages>': %r" % (path, fields))
+            continue
+        slug, doc_lang, pages = fields[0], fields[1], fields[2]
+        if not pages.isdigit():
+            problems.append("%s document %r declares a non-numeric page count %r" % (path, slug, pages))
+            continue
+        counted = len([l for l in body if PAGE_RE.match(l.strip())])
+        if counted != int(pages):
+            problems.append("%s document %r declares %s page(s) but its BODY carries %d page marker(s)"
+                            % (path, slug, pages, counted))
+        legal = (doc_lang == lang) or (lang != "en" and doc_lang == "en")
+        if not legal:
+            problems.append("%s document %r claims language %r, which is not legal in a %r bundle"
+                            % (path, slug, doc_lang, lang))
+        if doc_lang != lang:
+            fallbacks.setdefault(lang, []).append(slug)
+        got.append((slug, int(pages)))
+        langs.append(doc_lang)
+    if got != docs:
+        problems.append("%s !SXC1-DOC records %r do not equal manifestManualDocs %r in order" % (path, got, docs))
+    got_fp = fnv1a32(data)
+    if fps.get(lang) != got_fp:
+        problems.append("%s fingerprint is %d, manifest records %r" % (path, got_fp, fps.get(lang)))
+
+if problems:
+    print("FAIL " + "; ".join(problems))
+else:
+    note = ""
+    if fallbacks.get("ja"):
+        note = "; ja carries the documented EN fallback for %d/%d document(s): %s" % (
+            len(fallbacks["ja"]), len(docs), " ".join(fallbacks["ja"]))
+    print("OK %d documents (%s); fingerprints en=%d ja=%d re-derived from the shipped manual bundles%s"
+          % (len(docs), " ".join("%s:%d" % d for d in docs), fps["en"], fps["ja"], note))
+PYEOF
+  M7H_OUT="$(python3 "$M7H_PY" "$MANIFEST_HS" "$MANUAL_EN_FILE" "$MANUAL_JA_FILE" 2>&1)" || true
+  rm -f "$M7H_PY"
+  case "$M7H_OUT" in
+    "OK "*) ok "$M7H_LABEL (${M7H_OUT#OK })" ;;
+    *)      fail "$M7H_LABEL (observed: ${M7H_OUT#FAIL })" ;;
+  esac
+else
+  fail "$M7H_LABEL (observed: site/app/Bundle/Manifest.hs, a shipped manual bundle, or python3 is missing)"
+fi
+
+# --- M7-i: THE EMITTER'S MANUAL-SIDE RULES, AS NEGATIVE CONTROLS ----------
+# M6-i's sibling. Three claims the manual emitter makes, each proven by
+# a scratch translations/ directory that must make it EXIT NON-ZERO,
+# with the unmutated scratch corpus emitting cleanly first so the check
+# cannot pass by refusing everything:
+#
+#   1. a <slug>.ja.md whose page-marker count differs from its EN
+#      sibling is rejected (ruling 2's page-for-page invariant, which is
+#      what lets ONE per-doc page count in the manifest describe both
+#      languages and the reader index pages positionally in either);
+#   2. a document whose page markers are not exactly 1..N is rejected
+#      (the reader indexes docPages positionally);
+#   3. an UNKNOWN document appearing in translations/ is rejected (the
+#      order is a fixed product decision, but the SET is enumerated from
+#      the filesystem and must match -- a document added and forgotten
+#      is a loud failure, never a half-shipped reader).
+#
+# And the POSITIVE half of wave 2's mechanism, asserted here because it
+# cannot be asserted in the browser before the wasm that embeds the
+# matching fingerprint exists: adding a synthetic <slug>.ja.md flips
+# exactly that document's !SXC1-DOC record to `ja`, leaves the others
+# `en`, and changes the ja fingerprint the manifest records.
+M7I_LABEL="manual emitter rules: a page-count-mismatched <slug>.ja.md, a document whose page markers are not 1..N, and an unknown document in translations/ are each a build failure, while the unmutated scratch corpus emits cleanly AND adding a synthetic <slug>.ja.md flips exactly that document's record to 'ja' (wave 2's mechanism, proven now)"
+M7I_TMP="$(mktemp -d -t sxc1-check-site-manualemit.XXXXXX)"
+register_temp_dir "$M7I_TMP"
+mkdir -p "$M7I_TMP/tr" "$M7I_TMP/out"
+# The scratch corpus mirrors the real translations/ inventory exactly --
+# the emitter's fixed reading order names these four slugs and no others
+# -- with two pages each, which is all the manual side inspects.
+for slug in guide-book startup-guide midi oss; do
+  printf '# %s\n\n<!-- page 1 -->\n\nFirst page of %s.\n\n<!-- page 2 -->\n\nSecond page of %s.\n' "$slug" "$slug" "$slug" > "$M7I_TMP/tr/$slug.md"
+done
+printf '# Glossary\n\nA term.\n' > "$M7I_TMP/tr/glossary.md"
+M7I_PROBLEMS=""
+m7i_emit() { python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$REPO_ROOT/content/exercises" --translations-dir "$M7I_TMP/tr" --out-dir "$M7I_TMP/out" >/dev/null 2>&1; }
+if ! m7i_emit; then
+  M7I_PROBLEMS="the UNMUTATED scratch translations corpus does not emit (the negative controls below would be vacuous)"
+else
+  # (1) page-count mismatch between <slug>.md and <slug>.ja.md
+  printf '# midi\n\n<!-- page 1 -->\n\nJA first page.\n' > "$M7I_TMP/tr/midi.ja.md"
+  if ! grep -qx '<!-- page 1 -->' "$M7I_TMP/tr/midi.ja.md" || grep -qx '<!-- page 2 -->' "$M7I_TMP/tr/midi.ja.md"; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; grep-confirm IN failed for the short midi.ja.md"
+  elif m7i_emit; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; the emitter ACCEPTED a midi.ja.md with 1 page against a 2-page midi.md"
+  fi
+  rm -f "$M7I_TMP/tr/midi.ja.md"
+  if [ -e "$M7I_TMP/tr/midi.ja.md" ]; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; grep-confirm OUT failed: midi.ja.md still exists"
+  elif ! m7i_emit; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; the scratch corpus did not emit again after the exact-reverse restore"
+  fi
+  # (2) page markers that are not exactly 1..N
+  cp "$M7I_TMP/tr/oss.md" "$M7I_TMP/pristine-oss.md"
+  printf '# oss\n\n<!-- page 1 -->\n\nFirst.\n\n<!-- page 7 -->\n\nSeventh.\n' > "$M7I_TMP/tr/oss.md"
+  if ! grep -qx '<!-- page 7 -->' "$M7I_TMP/tr/oss.md"; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; grep-confirm IN failed for the 1,7 page numbering"
+  elif m7i_emit; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; the emitter ACCEPTED a document numbered 1,7"
+  fi
+  cp "$M7I_TMP/pristine-oss.md" "$M7I_TMP/tr/oss.md"
+  if grep -qx '<!-- page 7 -->' "$M7I_TMP/tr/oss.md"; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; grep-confirm OUT failed: the 1,7 numbering survived the restore"
+  elif ! m7i_emit; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; the scratch corpus did not emit again after restoring oss.md"
+  fi
+  # (3) an unknown document in translations/
+  printf '# extra\n\n<!-- page 1 -->\n\nOnly page.\n' > "$M7I_TMP/tr/extra-manual.md"
+  if [ ! -f "$M7I_TMP/tr/extra-manual.md" ]; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; could not create the unknown document"
+  elif m7i_emit; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; the emitter ACCEPTED an unknown document (extra-manual.md) in translations/"
+  fi
+  rm -f "$M7I_TMP/tr/extra-manual.md"
+  if [ -e "$M7I_TMP/tr/extra-manual.md" ]; then
+    M7I_PROBLEMS="$M7I_PROBLEMS; grep-confirm OUT failed: extra-manual.md still exists"
+  fi
+  # (4) THE POSITIVE CONTROL: a well-formed synthetic <slug>.ja.md is
+  #     picked up automatically -- exactly that record turns 'ja', the
+  #     others stay 'en', and the ja fingerprint moves.
+  if [ -z "$M7I_PROBLEMS" ]; then
+    if ! m7i_emit; then
+      M7I_PROBLEMS="$M7I_PROBLEMS; the scratch corpus did not emit before the positive control"
+    else
+      M7I_FP_BEFORE="$(grep -c . "$M7I_TMP/out/manuals.ja.txt" || true)"
+      cp "$M7I_TMP/out/manuals.ja.txt" "$M7I_TMP/ja-before.txt"
+      printf '# midi\n\n<!-- page 1 -->\n\n\xe6\x9c\x80\xe5\x88\x9d\xe3\x81\xae\xe3\x83\x9a\xe3\x83\xbc\xe3\x82\xb8\xe3\x80\x82\n\n<!-- page 2 -->\n\n\xe6\xac\xa1\xe3\x81\xae\xe3\x83\x9a\xe3\x83\xbc\xe3\x82\xb8\xe3\x80\x82\n' > "$M7I_TMP/tr/midi.ja.md"
+      if ! m7i_emit; then
+        M7I_PROBLEMS="$M7I_PROBLEMS; the emitter REJECTED a well-formed page-for-page midi.ja.md"
+      elif ! grep -qx '!SXC1-DOC midi ja 2' "$M7I_TMP/out/manuals.ja.txt"; then
+        M7I_PROBLEMS="$M7I_PROBLEMS; a well-formed midi.ja.md did not produce '!SXC1-DOC midi ja 2' in manuals.ja.txt"
+      elif ! grep -qx '!SXC1-DOC oss en 2' "$M7I_TMP/out/manuals.ja.txt"; then
+        M7I_PROBLEMS="$M7I_PROBLEMS; the documents WITHOUT a .ja.md stopped recording the 'en' fallback"
+      elif grep -qx '!SXC1-DOC midi ja 2' "$M7I_TMP/out/manuals.en.txt"; then
+        M7I_PROBLEMS="$M7I_PROBLEMS; the EN bundle picked up the ja document"
+      elif cmp -s "$M7I_TMP/ja-before.txt" "$M7I_TMP/out/manuals.ja.txt"; then
+        M7I_PROBLEMS="$M7I_PROBLEMS; the ja bundle is byte-identical before and after adding midi.ja.md"
+      fi
+      rm -f "$M7I_TMP/tr/midi.ja.md"
+      : "${M7I_FP_BEFORE:=0}"
+    fi
+  fi
+fi
+if [ -z "$M7I_PROBLEMS" ]; then
+  ok "$M7I_LABEL (observed: all three malformed inputs rejected, each exactly reversed; the synthetic midi.ja.md flipped exactly its own record to 'ja')"
+else
+  fail "$M7I_LABEL (observed:${M7I_PROBLEMS#; })"
+fi
+rm -rf "$M7I_TMP"
+unregister_temp_dir "$M7I_TMP"
+
+# --- M7-e: THE M7 RE-BASELINE (briefs/M7-budget.json) ---------------------
+# The M5-R1-2 / M6-e pattern applied to the M7 record, and -- per the
+# handoff documented at M6-e -- the check that now owns the LIVE
+# artifact: the file must MATCH the pins (a doctored file fails even
+# when internally consistent), the recorded m7_final must show the
+# manual externalization actually restored ceiling headroom (m7_final <=
+# m6_final - M7_SHRINK_MIN), the recorded bundle arithmetic must be
+# self-consistent and under both M7 ceilings, and the FRESH artifact
+# must sit within 3000 of the recorded m7_final and under the frozen
+# 1,000,000 (a window rather than an equality because gzip's exact
+# output is a property of the local gzip build).
+M7E_LABEL="briefs/M7-budget.json MATCHES the pinned M7 re-baseline (m6_final==$M7_M6_FINAL, ceiling==$WASM_GZIP_CEILING_BYTES, content_bundle_ceiling==$M6_BUNDLE_CEILING, manual_bundle_ceiling==$M7_MANUAL_BUNDLE_CEILING, total_bundle_ceiling==$M7_BUNDLE_TOTAL_CEILING; m7_final <= m6_final - M7_SHRINK_MIN=$M7_SHRINK_MIN -- the manual externalization really shrank the wasm) and describes THIS tree (fresh artifact gzip within 3000 of m7_final and under the frozen ceiling; recorded manual en+ja gzips self-consistent, under both ceilings, and within 3000 of the live measurement)"
+if [ -f "$M7_BUDGET_JSON" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  M7E_OUT="$(python3 -c '
+import json, sys
+try:
+    m7 = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception as e:
+    print("FAIL could not parse briefs/M7-budget.json: %s" % e)
+    raise SystemExit
+observed = int(sys.argv[2])
+pin_m6_final, pin_shrink, pin_ceiling = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+pin_content_ceiling, pin_manual_ceiling, pin_total_ceiling = int(sys.argv[6]), int(sys.argv[7]), int(sys.argv[8])
+# live manual gzips, or -1/-1 when the manual bundles were missing (M7-b
+# already failed loudly in that case; this check then skips only the
+# bundle COMPARISON, never the pin checks).
+live_en, live_ja = int(sys.argv[9]), int(sys.argv[10])
+live_content = int(sys.argv[11])
+problems = []
+try:
+    m6_final = int(m7["m6_final_gzip_bytes"])
+    m7_final = int(m7["m7_final_gzip_bytes"])
+    shrink = int(m7["shrink_bytes"])
+    ceiling = int(m7["ceiling_bytes"])
+    c_ceiling = int(m7["content_bundle_ceiling_bytes"])
+    man_ceiling = int(m7["manual_bundle_ceiling_bytes"])
+    tot_ceiling = int(m7["total_bundle_ceiling_bytes"])
+    b_en = int(m7["manual_bundle_en_gzip_bytes"])
+    b_ja = int(m7["manual_bundle_ja_gzip_bytes"])
+    b_combined = int(m7["manual_bundle_combined_gzip_bytes"])
+    c_combined = int(m7["content_bundle_combined_gzip_bytes"])
+    all_combined = int(m7["all_bundles_combined_gzip_bytes"])
+    if m6_final != pin_m6_final:
+        problems.append("m6_final_gzip_bytes=%d does not match the pinned M7_M6_FINAL=%d -- the record was doctored" % (m6_final, pin_m6_final))
+    if ceiling != pin_ceiling:
+        problems.append("ceiling_bytes=%d, not the frozen %d" % (ceiling, pin_ceiling))
+    for name, got, want in (("content_bundle_ceiling_bytes", c_ceiling, pin_content_ceiling),
+                            ("manual_bundle_ceiling_bytes", man_ceiling, pin_manual_ceiling),
+                            ("total_bundle_ceiling_bytes", tot_ceiling, pin_total_ceiling)):
+        if got != want:
+            problems.append("%s=%d does not match the pinned %d -- raising a ceiling is a visible check-site.sh edit, never a budget-file edit" % (name, got, want))
+    if tot_ceiling != c_ceiling + man_ceiling:
+        problems.append("total_bundle_ceiling_bytes=%d is not content(%d) + manual(%d) = %d" % (tot_ceiling, c_ceiling, man_ceiling, c_ceiling + man_ceiling))
+    if shrink != m6_final - m7_final:
+        problems.append("shrink_bytes=%d is not m6_final_gzip_bytes - m7_final_gzip_bytes = %d - %d = %d" % (shrink, m6_final, m7_final, m6_final - m7_final))
+    if m7_final > m6_final - pin_shrink:
+        problems.append("m7_final_gzip_bytes=%d did not shrink by at least M7_SHRINK_MIN=%d from m6_final=%d (the manual externalization is not doing its job)" % (m7_final, pin_shrink, m6_final))
+    if observed >= pin_ceiling:
+        problems.append("fresh artifact gzip=%d is at/over the frozen ceiling %d" % (observed, pin_ceiling))
+    if abs(observed - m7_final) > 3000:
+        problems.append("fresh artifact gzip=%d is %d bytes from the recorded m7_final_gzip_bytes=%d (beyond the 3000-byte window) -- re-measure and update briefs/M7-budget.json" % (observed, observed - m7_final, m7_final))
+    if b_en + b_ja != b_combined:
+        problems.append("manual_bundle_combined_gzip_bytes=%d is not en=%d + ja=%d" % (b_combined, b_en, b_ja))
+    if b_combined >= man_ceiling:
+        problems.append("recorded manual_bundle_combined_gzip_bytes=%d is at/over the manual ceiling %d" % (b_combined, man_ceiling))
+    if c_combined >= c_ceiling:
+        problems.append("recorded content_bundle_combined_gzip_bytes=%d is at/over the content ceiling %d" % (c_combined, c_ceiling))
+    if all_combined != b_combined + c_combined:
+        problems.append("all_bundles_combined_gzip_bytes=%d is not manual(%d) + content(%d) = %d" % (all_combined, b_combined, c_combined, b_combined + c_combined))
+    if all_combined >= tot_ceiling:
+        problems.append("recorded all_bundles_combined_gzip_bytes=%d is at/over the total ceiling %d" % (all_combined, tot_ceiling))
+    if live_en >= 0 and live_ja >= 0:
+        if abs(live_en - b_en) > 3000:
+            problems.append("live manuals.en.txt gzip=%d is %d bytes from the recorded %d (beyond the 3000-byte window) -- re-measure and update briefs/M7-budget.json" % (live_en, live_en - b_en, b_en))
+        if abs(live_ja - b_ja) > 3000:
+            problems.append("live manuals.ja.txt gzip=%d is %d bytes from the recorded %d (beyond the 3000-byte window) -- re-measure and update briefs/M7-budget.json" % (live_ja, live_ja - b_ja, b_ja))
+    if live_content >= 0 and abs(live_content - c_combined) > 3000:
+        problems.append("live combined content bundle gzip=%d is %d bytes from the recorded %d (beyond the 3000-byte window)" % (live_content, live_content - c_combined, c_combined))
+except KeyError as e:
+    problems.append("briefs/M7-budget.json is missing field %s" % e)
+if problems:
+    print("FAIL " + "; ".join(problems))
+else:
+    print("OK m6_final=%d -> m7_final=%d (shrink %d >= %d), fresh gzip %d under the frozen %d (headroom %d); manual bundles en=%d + ja=%d = %d of %d; all four = %d of %d"
+          % (m6_final, m7_final, shrink, pin_shrink, observed, pin_ceiling, pin_ceiling - observed,
+             b_en, b_ja, b_combined, man_ceiling, all_combined, tot_ceiling))
+' "$M7_BUDGET_JSON" "$WASM_GZIP_BYTES" "$M7_M6_FINAL" "$M7_SHRINK_MIN" "$WASM_GZIP_CEILING_BYTES" \
+  "$M6_BUNDLE_CEILING" "$M7_MANUAL_BUNDLE_CEILING" "$M7_BUNDLE_TOTAL_CEILING" \
+  "${MANUAL_EN_GZIP:--1}" "${MANUAL_JA_GZIP:--1}" "${BUNDLE_COMBINED_GZIP:--1}" 2>&1)" || true
+  case "$M7E_OUT" in
+    "OK "*) ok "$M7E_LABEL (${M7E_OUT#OK })" ;;
+    *)      fail "$M7E_LABEL (observed: ${M7E_OUT#FAIL })" ;;
+  esac
+else
+  fail "$M7E_LABEL (observed: briefs/M7-budget.json missing, app.wasm missing, or python3 missing)"
 fi
 
 # --- V3: the harness fake exists and carries its whole driver surface -----
@@ -2960,7 +3524,8 @@ else:
     register_temp_dir "$JADIFF_TMP"
     JADIFF_PROBLEMS=""
     if ! python3 "$REPO_ROOT/scripts/emit-content-bundles.py" \
-         --exercises-dir "$REPO_ROOT/content/exercises" --out-dir "$JADIFF_TMP" >/dev/null 2>&1; then
+         --exercises-dir "$REPO_ROOT/content/exercises" --translations-dir "$REPO_ROOT/translations" \
+         --out-dir "$JADIFF_TMP" >/dev/null 2>&1; then
       JADIFF_PROBLEMS="a fresh emission from content/exercises/ failed"
     else
       set +e
@@ -3965,9 +4530,9 @@ DEVICE_SUITE_LABEL="device assertions D1..D27 ran and passed inside check 7's ro
 # assertions -- see check 17's fallback note in usage()).
 # M6 W1: the fetch-failure degradation stage -- the behavioral half of
 # the corpus externalization (the structural half is the M6 bundle
-# section above). A COPY of the bundle at --dir is served WITHOUT its
-# content/ directory, so the boot-time bundle load 404s, and
-# browser-check --check-content-missing asserts the app still boots,
+# section above). A COPY of the bundle at --dir is served with its
+# EXERCISE content bundles deleted, so the boot-time content load 404s,
+# and browser-check --check-content-missing asserts the app still boots,
 # renders the visible #sxc1-content-error banner naming the failure,
 # keeps a real manual page readable, and offers #btn-content-retry on
 # the exercise routes. RED-FIRST: demonstrated by sabotaging the served
@@ -3976,7 +4541,18 @@ DEVICE_SUITE_LABEL="device assertions D1..D27 ran and passed inside check 7's ro
 # W1 report). Same owned-server discipline as the storage-refused stage
 # (M5-R1-3): reject a pre-occupied port, verify the child serves OUR
 # copy's index.html byte-for-byte, kill only our own child.
-CONTENT_MISSING_LABEL="fetch-failure degradation: served WITHOUT content/ bundles the app still boots, names the failure, keeps manuals readable, and offers a retry (browser-check --check-content-missing, 4/4)"
+#
+# M7 W1 CORRECTION: this stage used to delete the whole content/
+# directory, which was the same thing while the manuals were embedded in
+# the wasm. It is not any more -- manuals.{en,ja}.txt live there too --
+# so deleting the directory would take the manuals down with the course
+# and this stage's third assertion ("a real manual page stays
+# readable") would have been quietly re-scoped into a tautology. Only
+# the two EXERCISE bundles are removed now, which keeps every one of
+# the four M6 assertions meaning exactly what it meant; a MISSING manual
+# bundle is a case of its own in the bad-manual-bundle stage below,
+# where the mirror-image assertion (the course stays whole) is made.
+CONTENT_MISSING_LABEL="fetch-failure degradation: served without the exercise content bundles the app still boots, names the failure, keeps manuals readable, and offers a retry (browser-check --check-content-missing, 4/4)"
 # M6 gate round 1 (briefs/M6-codex-gate1.json, findings M6-R1-1 and
 # M6-R1-5) -- see usage() checks 24 and 25 and each stage's own comment.
 BAD_BUNDLE_LABEL="bad-bundle rejection: five 200-response bundles (wrong language, stale text, delimiter-complete truncation, zero decks, one deck missing) each produce the VISIBLE #sxc1-content-error alert with ZERO decks rendered, while an unsabotaged control served beside them renders the whole 52-deck course (browser-check --check-bad-bundle, 12/12)"
@@ -3984,6 +4560,10 @@ STALLED_LABEL="stalled-fetch deadline: with the content bundle answered 200-then
 HINT_SPLIT_LABEL="ui/content language split: with ONLY the sxc1.uilang key's writes failing, the UI-language toggle does NOT reload onto the stale hint -- it switches in memory, degrades storage honestly (uiLang=ja, contentLang=en, available=false), renders the VISIBLE #sxc1-lang-split alert with #btn-lang-resync, and moves document lang (browser-check --check-hint-write-failure, 4/4)"
 # M6 W2: the ui-language toggle roundtrip stage -- see usage() check 22.
 JA_TOGGLE_LABEL="ui-language toggle roundtrip: served copy of the SHIPPED bundles -- EN boot, JA switch via reload-as-refetch, header/pref/ruling-4 suggestion, the real corpus JA content title, JA device flow, back to EN (browser-check --check-ja-toggle, 9/9)"
+# M7 W1 (briefs/M7-plan.md, rulings 1/4) -- see usage() checks 28 and 29
+# and each stage's own comment.
+BAD_MANUAL_LABEL="bad-manual-bundle rejection: six broken manual bundles (wrong language, altered text, delimiter-complete truncation, zero documents, one document missing, file absent) each produce the VISIBLE #sxc1-content-error alert AND the named #sxc1-manual-degraded body with #btn-content-retry on a real manual route, while the EXERCISE course stays whole in every one of them and an unsabotaged control served beside them renders a readable manual page (browser-check --check-bad-manual-bundle, 14/14)"
+MANUAL_FALLBACK_LABEL="manual EN-fallback note (ruling 4): under EN no #sxc1-manual-fallback exists anywhere; after the app's own #btn-ui-lang switch the ja manual bundle loads and the VISIBLE role=note #sxc1-manual-fallback carries the pinned Japanese sentence while the page body still renders its English text marked lang=\"en\" (browser-check --check-manual-fallback, 5/5)"
 ROOT_CARDINALITY_LABEL="M5 cardinality contract: root browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 # M6 W4 (check 23): THE JA COURSE FLOOR -- V6's naming discipline
@@ -4085,6 +4665,8 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$STALLED_LABEL"
   skip "$HINT_SPLIT_LABEL"
   skip "$JA_TOGGLE_LABEL"
+  skip "$BAD_MANUAL_LABEL"
+  skip "$MANUAL_FALLBACK_LABEL"
   skip "$DEVICE_SUITE_LABEL"
   skip "$ROOT_CARDINALITY_LABEL"
   skip "$SUBPATH_CARDINALITY_LABEL"
@@ -4101,6 +4683,8 @@ else
     fail "$STALLED_LABEL (observed: no browser found, the stage never ran)"
     fail "$HINT_SPLIT_LABEL (observed: no browser found, the stage never ran)"
     fail "$JA_TOGGLE_LABEL (observed: no browser found, the stage never ran)"
+    fail "$BAD_MANUAL_LABEL (observed: no browser found, the stage never ran)"
+    fail "$MANUAL_FALLBACK_LABEL (observed: no browser found, the stage never ran)"
     fail "$DEVICE_SUITE_LABEL (observed: no browser found, the suite never ran)"
     fail "$ROOT_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
     fail "$SUBPATH_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
@@ -4202,7 +4786,9 @@ else
       CONTENT_MISSING_TMP="$(mktemp -d -t sxc1-check-site-nocontent.XXXXXX)"
       register_temp_dir "$CONTENT_MISSING_TMP"
       cp -R "$DIR"/. "$CONTENT_MISSING_TMP"/
-      rm -rf "$CONTENT_MISSING_TMP/content"
+      # ONLY the exercise bundles (see CONTENT_MISSING_LABEL's comment):
+      # the manual bundles must survive for assertion 3 to mean anything.
+      rm -f "$CONTENT_MISSING_TMP/content/content.en.txt" "$CONTENT_MISSING_TMP/content/content.ja.txt"
       python3 -m http.server "$CONTENT_MISSING_PORT" --bind 127.0.0.1 --directory "$CONTENT_MISSING_TMP" >/dev/null 2>&1 &
       CONTENT_MISSING_SRV_PID=$!
       SERVER_PIDS+=("$CONTENT_MISSING_SRV_PID")
@@ -4257,7 +4843,15 @@ else
         cp -al "$DIR"/. "$BAD_BUNDLE_TMP/$bb_case"/ 2>/dev/null || cp -R "$DIR"/. "$BAD_BUNDLE_TMP/$bb_case"/
         rm -rf "$BAD_BUNDLE_TMP/$bb_case/content"
         mkdir -p "$BAD_BUNDLE_TMP/$bb_case/content"
-        cp "$DIR/content/content.en.txt" "$DIR/content/content.ja.txt" "$BAD_BUNDLE_TMP/$bb_case/content/"
+        # M7 W1: the MANUAL bundles are copied in pristine and never
+        # touched here. This stage sabotages the EXERCISE bundle and
+        # nothing else, so leaving them out (as this line did while the
+        # manuals were still embedded in the wasm) would 404 them in
+        # every case -- including the healthy control, whose whole job
+        # is to render NO banner at all. Its own sibling stage
+        # (--check-bad-manual-bundle) breaks these two instead.
+        cp "$DIR/content/content.en.txt" "$DIR/content/content.ja.txt" \
+           "$DIR/content/manuals.en.txt" "$DIR/content/manuals.ja.txt" "$BAD_BUNDLE_TMP/$bb_case/content/"
       done
       BAD_BUNDLE_SABOTAGE_PY="$(mktemp -t sxc1-check-site-badbundle.XXXXXX.py)"
       register_temp_file "$BAD_BUNDLE_SABOTAGE_PY"
@@ -4354,10 +4948,20 @@ if m_lines[0] != "!SXC1-BUNDLE v1 en %d" % (len(p_delims) - 1):
 if read("healthy") != pristine:
     problems.append("healthy: the control was modified")
 
+# M7 W1: every case must also still ship BOTH manual bundles, untouched.
+# Without them the manual fetch 404s and the healthy control renders a
+# banner it is asserted not to have -- i.e. the control would be testing
+# the wrong thing while looking merely flaky.
+for case in ("healthy", "wrong-language", "stale", "truncated", "zero-deck", "missing-deck"):
+    for name in ("manuals.en.txt", "manuals.ja.txt"):
+        p = os.path.join(root, case, "content", name)
+        if not os.path.exists(p):
+            problems.append("%s: %s is missing -- this stage must break the EXERCISE bundle only" % (case, name))
+
 if problems:
     print("FAIL " + "; ".join(problems))
 else:
-    print("OK 5 sabotaged bundles built from a %d-deck control (truncated keeps all %d delimiters; missing-deck is internally consistent at %d)"
+    print("OK 5 sabotaged bundles built from a %d-deck control (truncated keeps all %d delimiters; missing-deck is internally consistent at %d), manual bundles untouched in all 6 cases"
           % (len(p_delims), len(p_delims), len(p_delims) - 1))
 PYEOF
       BAD_BUNDLE_PREP_OUT="$(python3 "$BAD_BUNDLE_SABOTAGE_PY" "$BAD_BUNDLE_TMP" 2>&1)" || BAD_BUNDLE_PREP_OUT="FAIL sabotage script error: $BAD_BUNDLE_PREP_OUT"
@@ -4405,6 +5009,264 @@ PYEOF
       fi
       rm -rf "$BAD_BUNDLE_TMP"
       unregister_temp_dir "$BAD_BUNDLE_TMP"
+    fi
+
+
+    # M7 W1 (briefs/M7-plan.md, ruling 1): the BAD-MANUAL-BUNDLE stage.
+    # The manual counterpart of the bad-bundle stage above, and the same
+    # claim: a 200 is not evidence of a healthy manual corpus. Six
+    # separately broken copies of the SHIPPED manual bundle -- each at
+    # the right URL, five of them ordinary HTTP successes -- must every
+    # one of them produce the visible degraded state, and (the part only
+    # this stage can prove) must leave the EXERCISE course completely
+    # alone. A seventh, UNSABOTAGED copy is the anti-vacuity control.
+    # The sabotage is verified here, before the browser runs, including
+    # the case the framing alone cannot see: a TRUNCATED body whose
+    # !SXC1-DOC delimiter count and header count are both still right.
+    BAD_MANUAL_PORT=$((PORT + 23))
+    if port_in_use "$BAD_MANUAL_PORT"; then
+      fail "$BAD_MANUAL_LABEL (observed: port $BAD_MANUAL_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
+    else
+      BAD_MANUAL_TMP="$(mktemp -d -t sxc1-check-site-badmanual.XXXXXX)"
+      register_temp_dir "$BAD_MANUAL_TMP"
+      BAD_MANUAL_PREP_ERR=""
+      for bm_case in m-healthy m-wrong-language m-stale m-truncated m-zero-doc m-missing-doc m-missing; do
+        mkdir -p "$BAD_MANUAL_TMP/$bm_case"
+        # Hard links for the 13MB of shared assets (never edited in
+        # place); the content/ directory alone is a real copy, so each
+        # case's sabotage cannot reach any other case or $DIR itself.
+        cp -al "$DIR"/. "$BAD_MANUAL_TMP/$bm_case"/ 2>/dev/null || cp -R "$DIR"/. "$BAD_MANUAL_TMP/$bm_case"/
+        rm -rf "$BAD_MANUAL_TMP/$bm_case/content"
+        mkdir -p "$BAD_MANUAL_TMP/$bm_case/content"
+        cp "$DIR/content/content.en.txt" "$DIR/content/content.ja.txt" \
+           "$DIR/content/manuals.en.txt" "$DIR/content/manuals.ja.txt" "$BAD_MANUAL_TMP/$bm_case/content/"
+      done
+      BAD_MANUAL_SABOTAGE_PY="$(mktemp -t sxc1-check-site-badmanual.XXXXXX.py)"
+      register_temp_file "$BAD_MANUAL_SABOTAGE_PY"
+      cat > "$BAD_MANUAL_SABOTAGE_PY" <<'PYEOF'
+# Build the six broken en manual bundles and PROVE each one is the
+# breakage it claims to be -- the grep-confirm discipline, in Python
+# because the claims are structural ("the delimiter count is still 4" is
+# the whole point of the truncated case).
+import os
+import sys
+
+root = sys.argv[1]
+DELIM = "!SXC1-DOC "
+problems = []
+
+
+def en(case):
+    return os.path.join(root, case, "content", "manuals.en.txt")
+
+
+def read(case):
+    return open(en(case), encoding="utf-8").read()
+
+
+def write(case, text):
+    open(en(case), "w", encoding="utf-8").write(text)
+
+
+pristine = read("m-healthy")
+plines = pristine.split("\n")
+p_delims = [l for l in plines if l.startswith(DELIM)]
+if plines[0] != "!SXC1-BUNDLE v1 en %d" % len(p_delims):
+    problems.append("the healthy control's own header/delimiter count disagree -- refusing to sabotage from it")
+if len(p_delims) < 2:
+    problems.append("the healthy control carries fewer than 2 documents -- the missing-doc case would be vacuous")
+
+# 1. wrong-language: the ja manual bundle served at the en URL.
+write("m-wrong-language", open(os.path.join(root, "m-wrong-language", "content", "manuals.ja.txt"), encoding="utf-8").read())
+if not read("m-wrong-language").startswith("!SXC1-BUNDLE v1 ja "):
+    problems.append("wrong-language: the served en manual bundle does not carry the ja header")
+
+# 2. stale: ONE document's text altered, framing untouched.
+sl = list(plines)
+changed = None
+for i, l in enumerate(sl):
+    if l.startswith("# ") and i > 1:
+        sl[i] = l + " (stale build)"
+        changed = i
+        break
+if changed is None:
+    problems.append("stale: no '# ' heading line found to alter")
+else:
+    write("m-stale", "\n".join(sl))
+    s = read("m-stale")
+    if s == pristine:
+        problems.append("stale: the bundle is byte-identical to the healthy one")
+    if s.split("\n")[0] != plines[0] or len([l for l in s.split("\n") if l.startswith(DELIM)]) != len(p_delims):
+        problems.append("stale: the framing changed (it must NOT -- only the text may differ)")
+
+# 3. truncated: the final document's body cut, every delimiter still
+#    present and the header count still right.
+last = max(i for i, l in enumerate(plines) if l.startswith(DELIM))
+tl = plines[: last + 3]          # delimiter + two body lines, then nothing
+write("m-truncated", "\n".join(tl) + "\n")
+t = read("m-truncated")
+t_lines = t.split("\n")
+if t_lines[0] != plines[0]:
+    problems.append("truncated: the header changed")
+if len([l for l in t_lines if l.startswith(DELIM)]) != len(p_delims):
+    problems.append("truncated: the delimiter count changed (%d vs %d) -- the whole point is that it does NOT"
+                    % (len([l for l in t_lines if l.startswith(DELIM)]), len(p_delims)))
+if len(t) >= len(pristine):
+    problems.append("truncated: the bundle did not get shorter")
+
+# 4. zero-doc: syntactically perfect, no documents at all.
+write("m-zero-doc", "!SXC1-BUNDLE v1 en 0\n")
+if read("m-zero-doc") != "!SXC1-BUNDLE v1 en 0\n":
+    problems.append("zero-doc: unexpected content")
+
+# 5. missing-doc: one whole document removed, header count adjusted so
+#    the bundle is INTERNALLY CONSISTENT.
+starts = [i for i, l in enumerate(plines) if l.startswith(DELIM)]
+drop_from = starts[1]
+drop_to = starts[2] if len(starts) > 2 else len(plines)
+ml = ["!SXC1-BUNDLE v1 en %d" % (len(p_delims) - 1)] + plines[1:drop_from] + plines[drop_to:]
+write("m-missing-doc", "\n".join(ml))
+m = read("m-missing-doc")
+m_lines = m.split("\n")
+if len([l for l in m_lines if l.startswith(DELIM)]) != len(p_delims) - 1:
+    problems.append("missing-doc: exactly one document was not removed")
+if m_lines[0] != "!SXC1-BUNDLE v1 en %d" % (len(p_delims) - 1):
+    problems.append("missing-doc: the header count was not adjusted (the bundle must be self-consistent)")
+
+# 6. missing: the file is simply not there (a 404).
+os.remove(en("m-missing"))
+if os.path.exists(en("m-missing")):
+    problems.append("missing: manuals.en.txt still exists")
+# ...and every case must still ship an intact EXERCISE bundle, which is
+# what makes "the course stays whole" a real assertion rather than an
+# accident of the copy.
+for case in ("m-healthy", "m-wrong-language", "m-stale", "m-truncated", "m-zero-doc", "m-missing-doc", "m-missing"):
+    p = os.path.join(root, case, "content", "content.en.txt")
+    if not os.path.exists(p):
+        problems.append("%s: the exercise bundle is missing -- the course-stays-whole assertion would be vacuous" % case)
+
+# The control must still be pristine.
+if read("m-healthy") != pristine:
+    problems.append("m-healthy: the control was modified")
+
+if problems:
+    print("FAIL " + "; ".join(problems))
+else:
+    print("OK 6 broken manual bundles built from a %d-document control (truncated keeps all %d delimiters; missing-doc is internally consistent at %d)"
+          % (len(p_delims), len(p_delims), len(p_delims) - 1))
+PYEOF
+      BAD_MANUAL_PREP_OUT="$(python3 "$BAD_MANUAL_SABOTAGE_PY" "$BAD_MANUAL_TMP" 2>&1)" || BAD_MANUAL_PREP_OUT="FAIL sabotage script error: $BAD_MANUAL_PREP_OUT"
+      rm -f "$BAD_MANUAL_SABOTAGE_PY"
+      case "$BAD_MANUAL_PREP_OUT" in
+        "OK "*) ;;
+        *) BAD_MANUAL_PREP_ERR="${BAD_MANUAL_PREP_OUT#FAIL }" ;;
+      esac
+      if [ -n "$BAD_MANUAL_PREP_ERR" ]; then
+        fail "$BAD_MANUAL_LABEL (observed: $BAD_MANUAL_PREP_ERR)"
+      else
+        python3 -m http.server "$BAD_MANUAL_PORT" --bind 127.0.0.1 --directory "$BAD_MANUAL_TMP" >/dev/null 2>&1 &
+        BAD_MANUAL_SRV_PID=$!
+        SERVER_PIDS+=("$BAD_MANUAL_SRV_PID")
+        BAD_MANUAL_VERIFIED=0
+        if ! wait_for_port "$BAD_MANUAL_PORT" 15; then
+          fail "$BAD_MANUAL_LABEL (observed: this stage's own python http.server (pid $BAD_MANUAL_SRV_PID) never came up on port $BAD_MANUAL_PORT within 15s)"
+        elif ! verify_server_healthy "$BAD_MANUAL_SRV_PID" "$BAD_MANUAL_PORT" "/m-healthy/index.html" "$BAD_MANUAL_TMP/m-healthy/index.html"; then
+          fail "$BAD_MANUAL_LABEL (observed: the listener on port $BAD_MANUAL_PORT is not provably this stage's own child serving the sabotage tree -- child dead, /m-healthy/index.html unfetchable, or served bytes mismatch; browser check not run)"
+        else
+          BAD_MANUAL_VERIFIED=1
+        fi
+        if [ "$BAD_MANUAL_VERIFIED" -eq 1 ]; then
+          BAD_MANUAL_LOG="$(mktemp -t sxc1-check-site-badmanual-log.XXXXXX)"
+          register_temp_file "$BAD_MANUAL_LOG"
+          set +e
+          "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-bad-manual-bundle --url "http://127.0.0.1:$BAD_MANUAL_PORT/" --timeout 240000 >"$BAD_MANUAL_LOG" 2>&1
+          BAD_MANUAL_RC=$?
+          set -e
+          BAD_MANUAL_SUMMARY="$(grep -E '^browser-check --check-bad-manual-bundle: [0-9]+/[0-9]+ assertions passed$' "$BAD_MANUAL_LOG" | tail -n1)"
+          # The cardinality is pinned, not merely "all passed": two
+          # assertions per broken case plus two for the control, so a
+          # case quietly dropped from BAD_MANUAL_CASES cannot hide
+          # behind a smaller all-green run.
+          if [ "$BAD_MANUAL_RC" -eq 0 ] && [ "$BAD_MANUAL_SUMMARY" = "browser-check --check-bad-manual-bundle: 14/14 assertions passed" ]; then
+            ok "$BAD_MANUAL_LABEL"
+          else
+            fail "$BAD_MANUAL_LABEL (browser-check --check-bad-manual-bundle exit $BAD_MANUAL_RC, summary: ${BAD_MANUAL_SUMMARY:-<none>}; expected 14/14)"
+            sed 's/^/    /' "$BAD_MANUAL_LOG" >&2
+          fi
+          rm -f "$BAD_MANUAL_LOG"
+        fi
+        kill "$BAD_MANUAL_SRV_PID" >/dev/null 2>&1 || true
+        wait "$BAD_MANUAL_SRV_PID" 2>/dev/null || true
+      fi
+      rm -rf "$BAD_MANUAL_TMP"
+      unregister_temp_dir "$BAD_MANUAL_TMP"
+    fi
+
+    # M7 W1 ruling 4: the MANUAL EN-FALLBACK NOTE stage. The bundle is
+    # served AS SHIPPED (a re-emitted manual bundle is not accepted by
+    # the app at all -- the wasm-embedded manifest fingerprint rejects
+    # it -- so this stage pins the app's OWN localized note string
+    # instead of an injected fixture, exactly as the ja-toggle stage
+    # had to). Before the browser runs, the served copy is checked to
+    # BE the W1 fallback state it is about to be judged on: every
+    # !SXC1-DOC record in manuals.ja.txt must say 'en', and every one in
+    # manuals.en.txt must say 'en' too -- so a tree in which wave 2 has
+    # already landed turns this stage's precondition red (loudly, with
+    # the reason) instead of quietly asserting a note that should by
+    # then be gone.
+    MANUAL_FALLBACK_PORT=$((PORT + 25))
+    if port_in_use "$MANUAL_FALLBACK_PORT"; then
+      fail "$MANUAL_FALLBACK_LABEL (observed: port $MANUAL_FALLBACK_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
+    else
+      MANUAL_FALLBACK_TMP="$(mktemp -d -t sxc1-check-site-manualfallback.XXXXXX)"
+      register_temp_dir "$MANUAL_FALLBACK_TMP"
+      cp -al "$DIR"/. "$MANUAL_FALLBACK_TMP"/ 2>/dev/null || cp -R "$DIR"/. "$MANUAL_FALLBACK_TMP"/
+      MANUAL_FALLBACK_PREP_ERR=""
+      MF_JA_DOCS="$(grep -c '^!SXC1-DOC ' "$MANUAL_FALLBACK_TMP/content/manuals.ja.txt" 2>/dev/null || echo 0)"
+      MF_JA_EN_DOCS="$(grep -cE '^!SXC1-DOC [a-z0-9-]+ en [0-9]+$' "$MANUAL_FALLBACK_TMP/content/manuals.ja.txt" 2>/dev/null || echo 0)"
+      MF_EN_EN_DOCS="$(grep -cE '^!SXC1-DOC [a-z0-9-]+ en [0-9]+$' "$MANUAL_FALLBACK_TMP/content/manuals.en.txt" 2>/dev/null || echo 0)"
+      if [ "$MF_JA_DOCS" -lt 1 ]; then
+        MANUAL_FALLBACK_PREP_ERR="the served copy's manuals.ja.txt carries no !SXC1-DOC records"
+      elif [ "$MF_JA_EN_DOCS" -ne "$MF_JA_DOCS" ]; then
+        MANUAL_FALLBACK_PREP_ERR="the served copy's manuals.ja.txt carries $MF_JA_EN_DOCS/$MF_JA_DOCS documents in the 'en' fallback -- wave 2 has landed for at least one document, so this stage's W1 precondition no longer holds: flip it to assert the note is ABSENT for the translated document(s) and present only for the rest"
+      elif [ "$MF_EN_EN_DOCS" -ne "$MF_JA_DOCS" ]; then
+        MANUAL_FALLBACK_PREP_ERR="the served copy's manuals.en.txt does not carry all $MF_JA_DOCS documents as 'en' (got $MF_EN_EN_DOCS) -- the EN-boot half of the assertion would be vacuous"
+      fi
+      if [ -n "$MANUAL_FALLBACK_PREP_ERR" ]; then
+        fail "$MANUAL_FALLBACK_LABEL (observed: $MANUAL_FALLBACK_PREP_ERR)"
+      else
+        python3 -m http.server "$MANUAL_FALLBACK_PORT" --bind 127.0.0.1 --directory "$MANUAL_FALLBACK_TMP" >/dev/null 2>&1 &
+        MANUAL_FALLBACK_SRV_PID=$!
+        SERVER_PIDS+=("$MANUAL_FALLBACK_SRV_PID")
+        MANUAL_FALLBACK_VERIFIED=0
+        if ! wait_for_port "$MANUAL_FALLBACK_PORT" 15; then
+          fail "$MANUAL_FALLBACK_LABEL (observed: this stage's own python http.server (pid $MANUAL_FALLBACK_SRV_PID) never came up on port $MANUAL_FALLBACK_PORT within 15s)"
+        elif ! verify_server_healthy "$MANUAL_FALLBACK_SRV_PID" "$MANUAL_FALLBACK_PORT" "/index.html" "$MANUAL_FALLBACK_TMP/index.html"; then
+          fail "$MANUAL_FALLBACK_LABEL (observed: the listener on port $MANUAL_FALLBACK_PORT is not provably this stage's own child serving our copy -- child dead, /index.html unfetchable, or served bytes mismatch; browser check not run)"
+        else
+          MANUAL_FALLBACK_VERIFIED=1
+        fi
+        if [ "$MANUAL_FALLBACK_VERIFIED" -eq 1 ]; then
+          MANUAL_FALLBACK_LOG="$(mktemp -t sxc1-check-site-manualfallback-log.XXXXXX)"
+          register_temp_file "$MANUAL_FALLBACK_LOG"
+          set +e
+          "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-manual-fallback --url "http://127.0.0.1:$MANUAL_FALLBACK_PORT/" --timeout 180000 >"$MANUAL_FALLBACK_LOG" 2>&1
+          MANUAL_FALLBACK_RC=$?
+          set -e
+          MANUAL_FALLBACK_SUMMARY="$(grep -E '^browser-check --check-manual-fallback: [0-9]+/[0-9]+ assertions passed$' "$MANUAL_FALLBACK_LOG" | tail -n1)"
+          if [ "$MANUAL_FALLBACK_RC" -eq 0 ] && [ "$MANUAL_FALLBACK_SUMMARY" = "browser-check --check-manual-fallback: 5/5 assertions passed" ]; then
+            ok "$MANUAL_FALLBACK_LABEL (observed: $MF_JA_EN_DOCS/$MF_JA_DOCS documents still on the documented W1 EN fallback)"
+          else
+            fail "$MANUAL_FALLBACK_LABEL (browser-check --check-manual-fallback exit $MANUAL_FALLBACK_RC, summary: ${MANUAL_FALLBACK_SUMMARY:-<none>}; expected 5/5)"
+            sed 's/^/    /' "$MANUAL_FALLBACK_LOG" >&2
+          fi
+          rm -f "$MANUAL_FALLBACK_LOG"
+        fi
+        kill "$MANUAL_FALLBACK_SRV_PID" >/dev/null 2>&1 || true
+        wait "$MANUAL_FALLBACK_SRV_PID" 2>/dev/null || true
+      fi
+      rm -rf "$MANUAL_FALLBACK_TMP"
+      unregister_temp_dir "$MANUAL_FALLBACK_TMP"
     fi
 
     # M6 gate round 1 (finding M6-R1-5): the STALLED-FETCH stage. The

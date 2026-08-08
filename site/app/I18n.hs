@@ -45,6 +45,9 @@ module I18n
   , describeSpecFor
     -- * The table (one named entry per learner-visible string)
   , iContentErrorBanner, iDegradedTitle, iDegradedBody, iDegradedManualsOk
+  , iManualErrorBanner, iBothErrorBanner
+  , iManualDegradedTitle, iManualDegradedBody, iManualDegradedTrainingOk
+  , iManualFallbackNote
   , iRetryButton, iBackToManuals
   , iLangSplitNotice, iLangSplitButton
   , iBreadcrumbAria, iTraining, iPageOf
@@ -156,6 +159,55 @@ iDegradedBody Ja err = "\28436\32722\12467\12531\12486\12531\12484\12496\12531\1
 iDegradedManualsOk :: Lang -> Text
 iDegradedManualsOk = t "The manuals are unaffected and remain fully readable."
                        "\12510\12491\12517\12450\12523\12395\24433\38911\12399\12394\12367\12289\24341\12365\32154\12365\12377\12409\12390\38322\35239\12391\12365\12414\12377\12290"
+
+--------------------------------------------------------------------------
+-- M7 W1 (briefs/M7-plan.md, rulings 1/4): the MANUAL bundle's own
+-- degraded state and the visible per-document EN-fallback note. The
+-- manual text is a fetched bundle now, so "the manuals are unaffected"
+-- (above) stopped being unconditionally true -- these three banner
+-- variants say which bundle actually failed instead of guessing, and
+-- the manual routes get the same named-failure-plus-retry treatment the
+-- exercise routes have had since M6 W1.
+--------------------------------------------------------------------------
+
+iManualErrorBanner :: Lang -> Text -> Text
+iManualErrorBanner En err = "Manual content failed to load: " <> err
+  <> " \8212 the training exercises are unaffected; the manuals are temporarily unavailable."
+iManualErrorBanner Ja err = "\12510\12491\12517\12450\12523\12467\12531\12486\12531\12484\12398\35501\12415\36796\12415\12395\22833\25943\12375\12414\12375\12383: " <> err
+  <> " \8212 \12488\12524\12540\12491\12531\12464\28436\32722\12395\24433\38911\12399\12354\12426\12414\12379\12435\12290\12510\12491\12517\12450\12523\12399\19968\26178\30340\12395\21033\29992\12391\12365\12414\12379\12435\12290"
+
+-- | Both bundles failed -- one banner, both reasons, one retry. (The
+-- degraded ROUTE bodies still differ, because each says what is missing
+-- from the route the learner is actually on.)
+iBothErrorBanner :: Lang -> Text -> Text -> Text
+iBothErrorBanner En c m = "No content could be loaded \8212 exercises: " <> c
+  <> "; manuals: " <> m <> "."
+iBothErrorBanner Ja c m = "\12467\12531\12486\12531\12484\12434\35501\12415\36796\12417\12414\12379\12435\12391\12375\12383 \8212 \28436\32722: " <> c
+  <> "\12289\12510\12491\12517\12450\12523: " <> m <> "\12290"
+
+iManualDegradedTitle :: Lang -> Text
+iManualDegradedTitle = t "The manuals are unavailable"
+                         "\12510\12491\12517\12450\12523\12399\21033\29992\12391\12365\12414\12379\12435"
+
+iManualDegradedBody :: Lang -> Text -> Text
+iManualDegradedBody En err = "The manual content bundle could not be loaded: " <> err
+iManualDegradedBody Ja err = "\12510\12491\12517\12450\12523\12467\12531\12486\12531\12484\12496\12531\12489\12523\12434\35501\12415\36796\12417\12414\12379\12435\12391\12375\12383: " <> err
+
+iManualDegradedTrainingOk :: Lang -> Text
+iManualDegradedTrainingOk = t "The training exercises are unaffected and remain fully usable."
+                              "\12488\12524\12540\12491\12531\12464\28436\32722\12395\24433\38911\12399\12394\12367\12289\24341\12365\32154\12365\21033\29992\12391\12365\12414\12377\12290"
+
+-- | RULING 4's VISIBLE FALLBACK. Wave 2 authors @\<slug\>.ja.md@ one
+-- document at a time, so a @ja@ bundle legitimately carries the English
+-- text for the documents that have none yet. That MUST NOT look like
+-- Japanese-that-happens-to-be-English: the document renders (a blank
+-- page is never acceptable) under this note, and disappears from
+-- ("View.Pages".@mnFallbacks@) the moment its file lands. Under
+-- @uiLang=en@ nothing falls back, so this string is never rendered.
+iManualFallbackNote :: Lang -> Text
+iManualFallbackNote = t
+  "Japanese text is not available for this document yet \8212 showing the English translation. The original Japanese page image is still available."
+  "\12371\12398\25991\26360\12398\26085\26412\35486\12486\12461\12473\12488\12399\12414\12384\29992\24847\12373\12428\12390\12356\12414\12379\12435\12290\33521\35486\12398\32763\35379\12434\34920\31034\12375\12390\12356\12414\12377\12290\26085\26412\35486\12398\21407\26412\12506\12540\12472\30011\20687\12399\24341\12365\32154\12365\34920\31034\12391\12365\12414\12377\12290"
 
 iRetryButton :: Lang -> Text
 iRetryButton = t "Reload and try again"

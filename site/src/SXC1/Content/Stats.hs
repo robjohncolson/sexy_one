@@ -133,7 +133,8 @@ extractDocTitle raw = fst (extractTitleAndRest (preambleLinesOf raw))
 
 -- | The APP's stats: every field, including 'stUnparsed', computed
 -- cheaply from raw text (see 'buildDocStats'). This is what
--- "SXC1.Content.Corpus" / @app\/View\/Pages.hs@ use, and is exactly what
+-- @app\/View\/Pages.hs@ uses (over the manual sources the boot path
+-- fetched -- M7 W1), and is exactly what
 -- must keep the 4.4 laziness contract -- it never forces a single
 -- 'SXC1.Content.Types.pageBlocks' thunk.
 buildStats :: [(Text, Text)] -> [DocStats]

@@ -32,12 +32,12 @@ import           Progress.Store         (loadPrefs, loadProgress, loadRaw, loadU
 import           Device.Midi            (DeviceStatus (..), DeviceVerifier (..), Hub,
                                          HubSnapshot (..), hubDisable, hubEnable, hubSetChannel,
                                          hubSnapshot, newHub, statusText, webMidiVerifier)
-import           Exercises.Bundle       (loadDeckSources)
+import           Bundle                 (loadDeckSources, loadManualSources)
 import           Exercises.Corpus       (checkedCorpusOf, exerciseStatsJsonOf, jArr, jBool, jInt, jInteger, jKV, jObj,
                                           jStr)
 import           View.Exercise          (DevView (..), ExHandlers (..))
 import qualified View.Exercise          as Exercise
-import           View.Pages             (contentDegradedView, viewRoute)
+import           View.Pages             (Manuals, contentDegradedView, emptyManuals, mkManuals, viewRoute)
 import           View.Progress          (ProgData (..), ProgHandlers (..))
 
 -- | Read window.location.hash via Miso's own DSL.
@@ -257,7 +257,7 @@ data Model = Model
     -- i.e. what the pre-boot @sxc1.uilang@ hint said, which is NOT
     -- necessarily what the decoded prefs blob says (a failed hint
     -- write, a wiped key, a first boot after an import). Set once at
-    -- boot from 'Exercises.Bundle.loadDeckSources' and never rewritten
+    -- boot from 'Bundle.loadDeckSources' and never rewritten
     -- by the no-reload in-memory language switch -- that path changes
     -- the UI language while the COURSE stays as loaded, which is
     -- exactly the split 'langSplitFor' below renders visibly.
@@ -354,20 +354,21 @@ main = do
   h    <- currentHash
   sink <- mkProgressSink
   -- M6 W1 (briefs/M6-plan.md, ruling 1): the exercise corpus arrives
-  -- through the static shell's JS-side-guarded loader ("Exercises.
-  -- Bundle") instead of a TH splice. Read ONCE, here, before the app
-  -- starts; a failure yields an EMPTY corpus plus the failure reason,
-  -- and the app boots into a visible degraded state (banner + per-route
-  -- notice with a retry affordance) -- the manuals, which stay
-  -- embedded, are unaffected. Retry is a plain page reload, delegated
+  -- through the static shell's JS-side-guarded loader ("Bundle")
+  -- instead of a TH splice. Read ONCE, here, before the app starts; a
+  -- failure yields an EMPTY corpus plus the failure reason, and the app
+  -- boots into a visible degraded state (banner + per-route notice with
+  -- a retry affordance). Retry is a plain page reload, delegated
   -- JS-side in site/static/index.js (#btn-content-retry), so the
-  -- re-load takes exactly this same boot path again.
+  -- re-load takes exactly this same boot path again -- and since M7 W1
+  -- it re-runs BOTH bundle loads, which is why one retry affordance is
+  -- the right number.
   --
   -- M6 gate round 1 (finding M6-R1-1): acceptance is ALL-OR-NOTHING. A
   -- 200 response is not evidence of a healthy corpus, so the bundle is
   -- checked against this build's own "Exercises.Manifest" -- language,
   -- exact INDEX-ordered deck list, aggregate counts, whole-body
-  -- fingerprint ("Exercises.Bundle") -- AND every deck must parse
+  -- fingerprint ("Bundle") -- AND every deck must parse
   -- ('checkedCorpusOf'). ANY disagreement takes exactly the same
   -- visible degraded path a 404 takes: an EMPTY corpus plus a reason,
   -- never a smaller-but-"healthy" course.
@@ -376,6 +377,19 @@ main = do
         Right (srcs, ds) -> (srcs, ds, Nothing)
         Left err         -> ([], [], Just err)
       exStatsTxt = exerciseStatsJsonOf deckSrcs
+  -- M7 W1 (briefs/M7-plan.md, ruling 1): the MANUAL text arrives the
+  -- same way, through the same bridge, under the same deadline, with
+  -- the same all-or-nothing acceptance -- 'Bundle.parseManualBundle'
+  -- against this build's own manifest, then 'mkManuals' as the parse
+  -- half (every document must really yield the pages the manifest
+  -- promises). A failure yields an EMPTY manual corpus plus the reason,
+  -- and the three manual routes render the named degraded view with the
+  -- SAME #btn-content-retry reload -- one retry, because the reload
+  -- re-runs both loads.
+  (_, bootManuals) <- loadManualSources
+  let (manuals, mManualErr) = case bootManuals >>= mkManuals contentLang of
+        Right mn  -> (mn, Nothing)
+        Left  err -> (emptyManuals, Just err)
   -- M4: the device hub. 'newHub' and 'dvAvailable' are feature detection
   -- ONLY (they read navigator.requestMIDIAccess and test undefined/null;
   -- they never call it), so both stay safe at boot -- the permission
@@ -429,7 +443,7 @@ main = do
                 else pure True
   (_, WallMs wall0) <- readClocks
   let st0 = case loadRes of { DecodeOk s -> s; _ -> emptyProgress }
-  startApp defaultEvents (readerApp corpus exStatsTxt mContentErr contentLang sink dev supported snap0 (avail && resyncOk) loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
+  startApp defaultEvents (readerApp corpus exStatsTxt manuals mContentErr mManualErr contentLang sink dev supported snap0 (avail && resyncOk) loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
 
 -- | H6: a cold @RExercise@ route (a deep link, or the very first paint --
 -- Miso's own \"hashchange\" DOM event never fires for the page's INITIAL
@@ -445,11 +459,11 @@ main = do
 -- runtime age as prompt age only because the browser's monotonic origin
 -- is page load -- see this task's final report).
 readerApp
-  :: [Deck] -> Text -> Maybe Text -> Text
+  :: [Deck] -> Text -> Manuals -> Maybe Text -> Maybe Text -> Text
   -> ProgressSink -> DevCtx -> Bool -> HubSnapshot -> Bool -> DecodeResult -> Maybe Text -> ProgressState -> Prefs -> DayNum -> Route
   -> App Model Action
-readerApp corpus exStatsTxt mContentErr contentLang sink dev supported snap0 avail loadRes rawBlob st0 prefs today0 r0 =
-  (component model0 (updateModel corpus sink dev) (viewModel corpus exStatsTxt mContentErr))
+readerApp corpus exStatsTxt manuals mContentErr mManualErr contentLang sink dev supported snap0 avail loadRes rawBlob st0 prefs today0 r0 =
+  (component model0 (updateModel corpus sink dev) (viewModel corpus exStatsTxt manuals mContentErr mManualErr))
     { subs  = [ windowSub "hashchange" emptyDecoder (const HashChanged) ]
     , mount = Just (SetRoute r0)
     }
@@ -1246,6 +1260,14 @@ progDataFor corpus m = ProgData
 -- "the other one", it is ABSENT, and 'contentErrorBanner' plus the
 -- degraded exercise view already say so with the same reload
 -- affordance; two alerts naming the same reload would be noise.
+-- | The first bundle failure reported, if any -- 'langSplitFor''s
+-- suppression input (M7 W1: EITHER bundle failing puts a
+-- #sxc1-content-error alert on screen with the same reload button, so
+-- a second alert naming the same reload would still be noise).
+firstErr :: Maybe Text -> Maybe Text -> Maybe Text
+firstErr (Just e) _ = Just e
+firstErr Nothing  m = m
+
 langSplitFor :: Maybe Text -> Model -> Maybe (Text, Text)
 langSplitFor (Just _) _ = Nothing
 langSplitFor Nothing  m
@@ -1255,5 +1277,5 @@ langSplitFor Nothing  m
     ui      = prfUiLang (mPrefs m)
     content = mContentLang m
 
-viewModel :: [Deck] -> Text -> Maybe Text -> props -> Model -> View Model Action
-viewModel corpus exStatsTxt mContentErr _ m = viewRoute (modelLang m) ToggleJA (progHandlersFor m) (progDataFor corpus m) exStatsTxt (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson corpus m) (deviceStateJson m) mContentErr (langSplitFor mContentErr m) (exerciseBodyView corpus mContentErr m (mRoute m)) (mRoute m)
+viewModel :: [Deck] -> Text -> Manuals -> Maybe Text -> Maybe Text -> props -> Model -> View Model Action
+viewModel corpus exStatsTxt manuals mContentErr mManualErr _ m = viewRoute (modelLang m) ToggleJA (progHandlersFor m) (progDataFor corpus m) exStatsTxt (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson corpus m) (deviceStateJson m) manuals mContentErr mManualErr (langSplitFor (firstErr mContentErr mManualErr) m) (exerciseBodyView corpus mContentErr m (mRoute m)) (mRoute m)

@@ -43,9 +43,11 @@ Environment:
 
 Output:
   site/public/  containing index.html, index.js, app.wasm,
-                ghc_wasm_jsffi.js, .nojekyll, vendor/browser_wasi_shim/
-                and content/content.{en,ja}.txt (the M6 exercise
-                content bundles, emitted from content/exercises/)
+                ghc_wasm_jsffi.js, .nojekyll, vendor/browser_wasi_shim/,
+                content/content.{en,ja}.txt (the M6 exercise content
+                bundles, emitted from content/exercises/) and
+                content/manuals.{en,ja}.txt (the M7 manual text bundles,
+                emitted from translations/)
 EOF
 }
 
@@ -90,12 +92,14 @@ if [ "$CABAL_UPDATE" -eq 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3a. M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-1):
-#     regenerate the BUILD-TIME BUNDLE EXPECTATION *before* compiling, so it
-#     is compiled INTO app.wasm. site/app/Exercises/Manifest.hs carries the
-#     INDEX-ordered deck names, the (decks, exercises, prompts) counts and
-#     one FNV-1a/32 fingerprint per language over the whole emitted bundle
-#     -- names, counts and hashes only, never corpus text.
+# 3a. M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-1) + M7 W1
+#     (briefs/M7-plan.md ruling 1): regenerate the BUILD-TIME BUNDLE
+#     EXPECTATION *before* compiling, so it is compiled INTO app.wasm.
+#     site/app/Bundle/Manifest.hs carries the INDEX-ordered deck names, the
+#     (decks, exercises, prompts) counts, the ordered manual doc slugs with
+#     their page counts, and one FNV-1a/32 fingerprint per language over
+#     each whole emitted bundle -- names, counts and hashes only, never
+#     corpus or manual text.
 #
 #     It must live in the WASM and not in the bundle: a bundle carrying its
 #     own manifest/fingerprint attests only to its own internal
@@ -104,12 +108,13 @@ fi
 #     a DIFFERENT artifact means acceptance requires agreement between two
 #     separately served files -- something only the build that produced
 #     both can supply. Step 7b below emits the bundles themselves from the
-#     same corpus with the same script, so the two always agree here;
+#     same corpora with the same script, so the two always agree here;
 #     check-site.sh independently re-derives both and fails on any drift.
 # ---------------------------------------------------------------------------
 python3 "$SCRIPT_DIR/emit-content-bundles.py" \
   --exercises-dir "$REPO_ROOT/content/exercises" \
-  --manifest-hs "$REPO_ROOT/site/app/Exercises/Manifest.hs"
+  --translations-dir "$REPO_ROOT/translations" \
+  --manifest-hs "$REPO_ROOT/site/app/Bundle/Manifest.hs"
 
 wasm32-wasi-cabal build -j"$JOBS" exe:app exe:content-check exe:exercise-check exe:progress-check exe:registry-check
 
@@ -148,11 +153,15 @@ cp -R "$REPO_ROOT/site/static/." "$REPO_ROOT/site/public/"
 cp "$WASM" "$REPO_ROOT/site/public/app.wasm"
 
 # ---------------------------------------------------------------------------
-# 7b. M6 W1 (briefs/M6-plan.md, ruling 1): emit the per-language exercise
-#     content bundles the app now loads at boot instead of embedding
-#     (site/app/Exercises/Bundle.hs consumes them; the format and the ja:
-#     substitution grammar are documented in scripts/emit-content-bundles.py
-#     and content/EXERCISE-FORMAT.md sec. 12).
+# 7b. M6 W1 (briefs/M6-plan.md, ruling 1) + M7 W1 (briefs/M7-plan.md,
+#     ruling 1): emit the per-language EXERCISE and MANUAL bundles the app
+#     now loads at boot instead of embedding (site/app/Bundle.hs consumes
+#     both under one grammar). The shared framing and the manual bundle's
+#     per-document language field are documented in
+#     scripts/emit-content-bundles.py's module docstring and in
+#     site/app/Bundle.hs's Haddock; the ja: substitution grammar the
+#     exercise emission uses is documented there and in
+#     content/EXERCISE-FORMAT.md sec. 12.
 #
 #     Served as PLAIN .txt, deliberately not pre-compressed .txt.gz:
 #     GitHub Pages compresses text responses on the wire via ordinary
@@ -165,6 +174,7 @@ cp "$WASM" "$REPO_ROOT/site/public/app.wasm"
 # ---------------------------------------------------------------------------
 python3 "$SCRIPT_DIR/emit-content-bundles.py" \
   --exercises-dir "$REPO_ROOT/content/exercises" \
+  --translations-dir "$REPO_ROOT/translations" \
   --out-dir "$REPO_ROOT/site/public/content"
 
 # ---------------------------------------------------------------------------
@@ -210,4 +220,6 @@ echo "build-site: app.wasm            -> $(wasm_size "$REPO_ROOT/site/public/app
 echo "build-site: ghc_wasm_jsffi.js    -> $(wasm_size "$REPO_ROOT/site/public/ghc_wasm_jsffi.js")"
 echo "build-site: content.en.txt       -> $(wasm_size "$REPO_ROOT/site/public/content/content.en.txt")"
 echo "build-site: content.ja.txt       -> $(wasm_size "$REPO_ROOT/site/public/content/content.ja.txt")"
+echo "build-site: manuals.en.txt       -> $(wasm_size "$REPO_ROOT/site/public/content/manuals.en.txt")"
+echo "build-site: manuals.ja.txt       -> $(wasm_size "$REPO_ROOT/site/public/content/manuals.ja.txt")"
 echo "build-site: exe:content-check    -> $CONTENT_CHECK_BIN"

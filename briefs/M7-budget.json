@@ -1,0 +1,25 @@
+{
+  "measured_at": "2026-08-09",
+  "m6_final_gzip_bytes": 887732,
+  "m7_final_gzip_bytes": 838748,
+  "shrink_bytes": 48984,
+  "ceiling_bytes": 1000000,
+  "content_bundle_en_gzip_bytes": 76602,
+  "content_bundle_ja_gzip_bytes": 91130,
+  "content_bundle_combined_gzip_bytes": 167732,
+  "content_bundle_ceiling_bytes": 300000,
+  "manual_bundle_en_gzip_bytes": 57818,
+  "manual_bundle_ja_gzip_bytes": 57820,
+  "manual_bundle_combined_gzip_bytes": 115638,
+  "manual_bundle_ceiling_bytes": 250000,
+  "all_bundles_combined_gzip_bytes": 283370,
+  "total_bundle_ceiling_bytes": 550000,
+  "ruling": "Coordinator, 2026-08-09 (briefs/M7-plan.md rulings 1/6), wave 1: the MANUAL TEXT moved OUT of app.wasm into per-language fetched bundles (site/public/content/manuals.{en,ja}.txt, emitted by the same scripts/emit-content-bundles.py run that emits the exercise bundles and the wasm-embedded expectation, loaded at boot via the same JS-side-guarded window.__sxc1Content bridge under the same single 15s deadline, and accepted all-or-nothing against site/app/Bundle/Manifest.hs). m6_final is the M6-tagged shipping artifact's gzip (887,732 -- the pre-manual-externalization baseline and check-site's floor at M7 entry); m7_final is the W1 shipping artifact (838,748; -48,984). Ruling 1 projected roughly -67K from shedding 193,460 raw bytes of embedded translations; the measured -48,984 is smaller because that prose compressed better INSIDE the wasm than the linear projection assumed -- the same direction M6's own estimate missed in, and comfortably above the pinned M7_SHRINK_MIN=30,000 floor. The frozen WASM_GZIP_CEILING_BYTES=1000000 is untouched and remains the only wasm ceiling: headroom at W1 is 161,252 bytes, which is what pays for wave 2's Japanese manual text costing the binary nothing at all (it lands in the ja BUNDLE, not the wasm). THE BUNDLE-CEILING RAISE, with its arithmetic, is a visible edit to scripts/check-site.sh and is pinned there as two literals plus their sum: the M6 exercise-bundle ceiling stays at 300,000 (unchanged, holding 167,732 -- briefs/M6-budget.json is frozen as the historical record and its pin therefore cannot move), a NEW M7_MANUAL_BUNDLE_CEILING=250,000 covers the manual pair (holding 115,638 at W1: en 57,818 + ja 57,820, the ja bundle being the documented per-document EN fallback until wave 2 authors translations/<slug>.ja.md), and M7_BUNDLE_TOTAL_CEILING=550,000 = 300,000 + 250,000 gates everything the app fetches at boot (283,370 today, headroom 266,630). check-site asserts this file MATCHES those pins -- including all three ceilings -- so raising a ceiling stays a visible check-site.sh edit and can never be authorized by this mutable file; m7_final and the bundle figures are additionally held to a 3,000-byte window around the live measurement (gzip's exact output is a property of the local gzip build). M7-e also took over the LIVE-ARTIFACT half of M6-e, a documented handoff recorded in check-site.sh: M6's window had a lower bound of m6_entry-3000 = 856,745, which this milestone lawfully shed past, and M6-e now judges only the M6 record and the (untouched) exercise-bundle figures.",
+  "evidence": [
+    "m6_final: briefs/M6-budget.json m6_final_gzip_bytes (887,732), the artifact and floor this wave started from.",
+    "m7_final: gzip -c of site/public/app.wasm after ./scripts/build-site.sh --optimize on the W1 tree (2,299,098 raw, 838,748 gzip; byte-stable across a repeated build). The shed is exactly the four TH-embedded translations: site/src/SXC1/Content/Corpus.hs is retired and nothing reachable from exe:app embeds manual text any more (the splices moved to site/test/EmbeddedTranslations.hs, which only exe:content-check links -- see that module's Haddock for why the CHECKER still needs a compile-time copy).",
+    "manual bundles: gzip -c | wc -c of the emitted manuals.en.txt / manuals.ja.txt (193,578 raw each -- the four documents' bytes verbatim plus 5 framing lines), the same measurement check-site's manual bundle ledger records; combined 115,638 of the 250,000 ceiling.",
+    "content bundles: unchanged by this wave (284,108 / 358,497 raw; 76,602 + 91,130 = 167,732 gzip), re-measured on this tree and equal to briefs/M6-budget.json's record byte for byte.",
+    "The manual bundles carry the EN text for all four documents in BOTH languages at W1 -- manuals.ja.txt's four !SXC1-DOC records each read 'en', which is the DOCUMENTED, VISIBLE fallback of ruling 4 (the app renders the localized 'Japanese text not available for this document yet' note, and check-site's manual-fallback browser stage asserts both directions of that). Wave 2 replaces it one document at a time by adding translations/<slug>.ja.md; the emitter picks each up automatically and flips only that document's record to 'ja'."
+  ]
+}

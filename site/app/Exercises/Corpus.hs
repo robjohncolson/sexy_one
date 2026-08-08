@@ -5,8 +5,8 @@
 -- (briefs\/M6-plan.md, ruling 1): the corpus is no longer a
 -- compile-time-embedded constant ("Exercises.Embed" is retired) --
 -- every projection here is now a pure FUNCTION of the deck sources the
--- boot path loaded through "Exercises.Bundle", applied exactly once in
--- Main.main and shared from there. Reads still never touch disk.
+-- boot path loaded through "Bundle", applied exactly once in Main.main
+-- and shared from there. Reads still never touch disk.
 --
 -- M3 gate (briefs\/M3-manifest.json, task \"size-split-and-format\"):
 -- reads via 'SXC1.Exercise.Reader.readDeck' -- the STRUCTURAL reader --
@@ -35,14 +35,14 @@ import qualified Data.Text           as T
 import           Data.Text           (Text)
 import           Data.Word           (Word32)
 
-import           Exercises.Manifest   (manifestDeckCount, manifestExercises, manifestPrompts)
+import           Bundle.Manifest      (manifestDeckCount, manifestExercises, manifestPrompts)
 import           SXC1.Content.Stats   (jsonEscape)
 import           SXC1.Exercise.Reader (readDeck)
 import           SXC1.Exercise.Types
 
 --------------------------------------------------------------------------
--- The parsed corpus. LAZY exactly as M1's manual corpus is (see
--- SXC1.Content.Corpus.docs): matching 'Just d' only forces 'parseDeck'
+-- The parsed corpus. LAZY exactly as the manual corpus is (see
+-- View.Pages.mkManuals): matching 'Just d' only forces 'parseDeck'
 -- to WHNF, never any individual 'Block' or prompt inside the resulting
 -- 'Deck' -- those stay unevaluated thunks until a view actually demands
 -- them.
@@ -67,7 +67,7 @@ exerciseCorpusOf srcs = [ d | (_, _, Just d) <- parsedDecksOf srcs ]
 -- SMALLER corpus and no error at all -- retired-looking progress
 -- records and a quietly shorter course. Here a parse failure is a hard,
 -- deck-NAMING error, and the corpus must additionally agree with this
--- build's "Exercises.Manifest" on all three aggregate counts and carry
+-- build's "Bundle.Manifest" on all three aggregate counts and carry
 -- no duplicate deck id. Any violation returns 'Left', which Main turns
 -- into the same visible alert\/retry state a failed fetch produces.
 checkedCorpusOf :: [(FilePath, Text)] -> Either Text [Deck]

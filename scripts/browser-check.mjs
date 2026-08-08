@@ -283,6 +283,10 @@ function parseArgs(argv) {
     checkContentStalled: false,
     checkHintWriteFailure: false,
     checkJaToggle: false,
+    // M7 W1 (briefs/M7-plan.md, rulings 1/4): the manual bundle's two
+    // behavioural modes.
+    checkBadManualBundle: false,
+    checkManualFallback: false,
     deviceOnly: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -338,6 +342,12 @@ function parseArgs(argv) {
         break;
       case '--check-ja-toggle':
         opts.checkJaToggle = true;
+        break;
+      case '--check-bad-manual-bundle':
+        opts.checkBadManualBundle = true;
+        break;
+      case '--check-manual-fallback':
+        opts.checkManualFallback = true;
         break;
       case '--device-only':
         opts.deviceOnly = true;
@@ -502,6 +512,38 @@ Options:
                        sentences with the describeSpec JA renderer, then
                        a device-confirmed JA sentence), and switch back
                        to EN. Exits 0 only when every assertion holds.
+  --check-bad-manual-bundle
+                       M7 W1 (briefs/M7-plan.md ruling 1) bad-body check
+                       for the MANUAL bundle -- the manual counterpart of
+                       --check-bad-bundle, and built on the same
+                       openCheckSession helper. check-site.sh serves
+                       seven sibling copies from one server: six whose en
+                       manual bundle is broken differently (wrong
+                       language, altered text, delimiter-complete
+                       truncation, zero documents, one document removed
+                       with the header adjusted, and the file absent) and
+                       one untouched. Every broken copy must show the
+                       VISIBLE #sxc1-content-error alert and the named
+                       #sxc1-manual-degraded body with #btn-content-retry
+                       on a real manual route, WHILE the exercise course
+                       still reports its whole 52 decks; the control must
+                       show no banner, a readable manual page and the
+                       whole course. 14/14. Nothing is injected: the
+                       SERVED BYTES are the input.
+  --check-manual-fallback
+                       M7 W1 ruling 4: the VISIBLE per-document
+                       EN-fallback note. Against a served copy of the
+                       SHIPPED bundles, on a fresh profile: under EN no
+                       #sxc1-manual-fallback exists at all; after the
+                       app's own #btn-ui-lang switch (persist + reload =
+                       refetch) the ja bundle really loaded, the visible
+                       role=note #sxc1-manual-fallback carries the pinned
+                       Japanese sentence, the page body still renders the
+                       English text and is marked lang="en", and the
+                       manual TOC and home card carry the same note.
+                       5/5. Both directions of the mechanism on real
+                       served bytes; wave 2 flips it one document at a
+                       time by adding translations/<slug>.ja.md.
   --help               Show this help and exit
 
 By default (no --quick) the page-route sweep visits all 108 routes in
@@ -6873,6 +6915,330 @@ async function runJaToggleCheck(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// M7 W1 (briefs/M7-plan.md, ruling 1): --check-bad-manual-bundle. The
+// manual counterpart of --check-bad-bundle, on the same openCheckSession
+// helper and with the same claim: a 200 response is not evidence of a
+// healthy manual corpus. Six separately broken copies of the SHIPPED
+// manual bundle -- each served at the correct URL, five of them with a
+// perfectly ordinary HTTP success -- must every one of them produce the
+// VISIBLE degraded state, never a shorter-but-"healthy" reader:
+//
+//   m-wrong-language  the ja bundle served at ./content/manuals.en.txt
+//   m-stale           one document's TEXT altered (framing untouched)
+//   m-truncated       the last document's body cut, every !SXC1-DOC
+//                     delimiter still present and the header count right
+//   m-zero-doc        "!SXC1-BUNDLE v1 en 0" and nothing else
+//   m-missing-doc     one whole document removed, header count adjusted
+//   m-missing         the file simply absent (a 404) -- the manual
+//                     mirror of --check-content-missing
+//
+// plus a HEALTHY control served from the same server in the same run --
+// the anti-vacuity floor. check-site.sh builds the seven directories and
+// verifies each sabotage structurally first; this mode never injects
+// anything.
+//
+// Each case asserts BOTH halves, because INDEPENDENCE is the actual
+// claim: the visible role=alert banner AND the named
+// #sxc1-manual-degraded body with #btn-content-retry on a real manual
+// route, WHILE #sxc1-exercise-stats still reports the whole 52-deck
+// course. A bad manual bundle must not take the course down with it,
+// and a shared "everything failed" state would hide exactly that.
+// ---------------------------------------------------------------------------
+const BAD_MANUAL_CASES = [
+  { dir: 'm-wrong-language', why: 'the ja manual bundle served at the en URL' },
+  { dir: 'm-stale', why: "one document's text altered, framing untouched" },
+  { dir: 'm-truncated', why: 'the final document truncated with every delimiter still present' },
+  { dir: 'm-zero-doc', why: 'a syntactically perfect zero-document bundle' },
+  { dir: 'm-missing-doc', why: 'one whole document removed, header count adjusted' },
+  { dir: 'm-missing', why: 'the manual bundle file absent altogether (404)' },
+];
+const BAD_MANUAL_HEALTHY_DIR = 'm-healthy';
+const BAD_MANUAL_EXPECT_DECKS = 52;
+const BAD_MANUAL_ROUTE = '#/m/guide-book/p/15';
+
+async function runBadManualBundleCheck(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const session = await openCheckSession(opts, '--check-bad-manual-bundle', deadline);
+  if (!session) return;
+  const { die, newTarget } = session;
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); }
+    else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+
+  const baseNoHash = opts.url.replace(/#.*$/, '').replace(/\/$/, '');
+
+  // What the running app says about itself on a real MANUAL route --
+  // plus, deliberately, what it says about the COURSE, which a manual
+  // failure must leave completely alone.
+  const surfaceOf = async (evaluate) => evaluate(`(async () => {
+    window.location.hash = ${JSON.stringify(BAD_MANUAL_ROUTE)};
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+      if (document.querySelector('#sxc1-manual-degraded') || document.querySelector('#sxc1-page .page-body')) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const banner = document.querySelector('#sxc1-content-error');
+    const stats = document.querySelector('#sxc1-exercise-stats');
+    let totals = null;
+    try { totals = JSON.parse(stats ? stats.textContent : 'null').totals; } catch (e) { totals = null; }
+    const body = document.querySelector('#sxc1-page .page-body');
+    return {
+      bannerExists: banner !== null,
+      bannerVisible: banner !== null && !banner.hidden && banner.offsetParent !== null,
+      bannerRole: banner ? banner.getAttribute('role') : null,
+      bannerText: banner ? (banner.textContent || '').trim().slice(0, 200) : '',
+      degraded: document.querySelector('#sxc1-manual-degraded') !== null,
+      retry: document.querySelector('#btn-content-retry') !== null,
+      bodyChars: body && body.textContent ? body.textContent.trim().length : 0,
+      manualCards: document.querySelectorAll('a.manual-card').length,
+      totals,
+    };
+  })()`);
+
+  for (const c of BAD_MANUAL_CASES) {
+    const alertName = `bad manual bundle (${c.dir}): a response carrying ${c.why} produces the VISIBLE #sxc1-content-error alert`;
+    const degradedName = `bad manual bundle (${c.dir}): the manual route renders the named #sxc1-manual-degraded body with #btn-content-retry and NO page text, while the exercise course stays whole (${BAD_MANUAL_EXPECT_DECKS} decks)`;
+    const t = await newTarget(`${baseNoHash}/${c.dir}/`, 30000);
+    if (!t.boot.ok) {
+      report(alertName, false, t.boot);
+      report(degradedName, false, 'skipped: app did not boot');
+      await t.close();
+      continue;
+    }
+    let s = null;
+    try { s = await surfaceOf(t.evaluate); } catch (err) { s = { error: String(err && err.message ? err.message : err) }; }
+    report(
+      alertName,
+      Boolean(s && s.bannerExists && s.bannerVisible && s.bannerRole === 'alert' && s.bannerText.length > 0),
+      s,
+    );
+    report(
+      degradedName,
+      Boolean(s && s.degraded && s.retry && s.bodyChars === 0
+        && s.totals && s.totals.decks === BAD_MANUAL_EXPECT_DECKS),
+      s,
+    );
+    await t.close();
+  }
+
+  // The control, from the same server, in the same run.
+  const healthyAlertName = 'bad manual bundle (healthy control): the UNSABOTAGED copy renders NO #sxc1-content-error banner at all';
+  const healthyManualName = `bad manual bundle (healthy control): the unsabotaged copy renders a real manual page's translated body, no degraded notice, and the whole ${BAD_MANUAL_EXPECT_DECKS}-deck course`;
+  const h = await newTarget(`${baseNoHash}/${BAD_MANUAL_HEALTHY_DIR}/`, 30000);
+  if (!h.boot.ok) {
+    report(healthyAlertName, false, h.boot);
+    report(healthyManualName, false, 'skipped: app did not boot');
+  } else {
+    let s = null;
+    try { s = await surfaceOf(h.evaluate); } catch (err) { s = { error: String(err && err.message ? err.message : err) }; }
+    report(healthyAlertName, Boolean(s && s.bannerExists === false), s);
+    report(
+      healthyManualName,
+      Boolean(s && s.bodyChars > 100 && !s.degraded
+        && s.totals && s.totals.decks === BAD_MANUAL_EXPECT_DECKS),
+      s,
+    );
+  }
+  await h.close();
+
+  console.log(`browser-check --check-bad-manual-bundle: ${passed}/${total} assertions passed`);
+  await die(passed === total ? 0 : 1, null);
+}
+
+// ---------------------------------------------------------------------------
+// M7 W1 ruling 4: --check-manual-fallback. Until wave 2 authors
+// translations/<slug>.ja.md for all four documents, the ja manual bundle
+// legitimately carries the ENGLISH text for the documents that have none
+// yet. Ruling 4 requires that to be VISIBLE, not silent -- so this mode
+// exercises BOTH directions of the mechanism against real served bytes:
+//
+//   * EN boot: every document IS in the reader's language, so
+//     #sxc1-manual-fallback must not exist ANYWHERE (absence, not
+//     hidden-ness -- the same discipline as #sxc1-content-error).
+//   * JA boot, reached through the app's OWN #btn-ui-lang switch
+//     (persist the pref + the boot hint, then reload -- the reload IS
+//     the refetch): the ja bundle really loaded (uiLang=ja AND
+//     contentLang=ja, with no content-error banner), the visible
+//     role=note #sxc1-manual-fallback carries the PINNED Japanese
+//     sentence, the page body still renders the English text (a blank
+//     page is never acceptable) and is marked lang="en" so a screen
+//     reader pronounces it correctly, and the manual TOC and the home
+//     card carry the same note.
+//
+// The pinned sentence is a LITERAL here (I18n.iManualFallbackNote Ja),
+// never derived from the page under test, so a note that renders empty,
+// unlocalized, or in the wrong language is red.
+//
+// WHAT THIS CANNOT DO BEFORE WAVE 2, AND WHY: it cannot serve a ja
+// bundle in which one document is REAL Japanese, because the app
+// (correctly) refuses any bundle whose whole-body FNV-1a/32 is not the
+// one THIS wasm was built with -- the same reason --check-ja-toggle had
+// to stop injecting fixture variants and pin the shipped corpus's own
+// strings. The emitter half of wave 2's mechanism -- adding
+// <slug>.ja.md flips exactly that document's !SXC1-DOC record to `ja`,
+// leaves the others `en`, and moves the ja fingerprint -- is therefore
+// asserted structurally by check-site's M7-i instead, and W1's report
+// records a one-off full rebuild against a synthetic Japanese document
+// that showed the note disappearing for exactly that document.
+const MANUAL_FALLBACK_ROUTE = '#/m/guide-book/p/15';
+const MANUAL_FALLBACK_TOC_ROUTE = '#/m/guide-book';
+// I18n.iManualFallbackNote Ja -- この文書の日本語テキストはまだ用意されていません。
+const MANUAL_FALLBACK_JA_TEXT =
+  'この文書の日本語テキストはまだ用意されていません。';
+
+async function runManualFallbackCheck(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const session = await openCheckSession(opts, '--check-manual-fallback', deadline);
+  if (!session) return;
+  const { die, newTarget } = session;
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); }
+    else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+
+  const baseNoHash = opts.url.replace(/#.*$/, '').replace(/\/$/, '');
+
+  const NAMES = {
+    enAbsent: 'manual fallback: under EN every document IS in the reader\'s language, so #sxc1-manual-fallback exists NOWHERE (page, TOC or home) while the page body renders normally with no lang override',
+    jaLoaded: 'manual fallback: the app\'s own #btn-ui-lang switch reloads into a real JA boot -- #sxc1-progress reports uiLang=ja AND contentLang=ja with no #sxc1-content-error banner (the ja manual bundle was accepted)',
+    jaNote: 'manual fallback: on a JA boot the VISIBLE role=note #sxc1-manual-fallback carries the pinned Japanese sentence (a literal here, never read off the page)',
+    jaBody: 'manual fallback: the fallback page still renders its English text (never a blank page) and the body is marked lang="en" for screen readers',
+    jaOther: 'manual fallback: the manual TOC route and the home manual card carry the same .manual-fallback-note',
+  };
+
+  const t = await newTarget(`${baseNoHash}/`, 30000);
+  if (!t.boot.ok) {
+    for (const n of Object.values(NAMES)) report(n, false, t.boot);
+    console.log(`browser-check --check-manual-fallback: ${passed}/${total} assertions passed`);
+    await die(1, null);
+    return;
+  }
+
+  const probe = async (evaluate) => evaluate(`(async () => {
+    const wait = async (sel) => {
+      const start = Date.now();
+      while (Date.now() - start < 8000) {
+        if (document.querySelector(sel)) return true;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return false;
+    };
+    window.location.hash = ${JSON.stringify(MANUAL_FALLBACK_ROUTE)};
+    await wait('#sxc1-page .page-body');
+    const body = document.querySelector('#sxc1-page .page-body');
+    const note = document.querySelector('#sxc1-manual-fallback');
+    let prog = null;
+    try { prog = JSON.parse(document.querySelector('#sxc1-progress').textContent); } catch (e) { prog = null; }
+    const page = {
+      noteExists: note !== null,
+      noteVisible: note !== null && !note.hidden && note.offsetParent !== null,
+      noteRole: note ? note.getAttribute('role') : null,
+      noteText: note ? (note.textContent || '').trim() : '',
+      bodyChars: body && body.textContent ? body.textContent.trim().length : 0,
+      bodyLang: body ? body.getAttribute('lang') : null,
+      banner: document.querySelector('#sxc1-content-error') !== null,
+      uiLang: prog ? prog.uiLang : null,
+      contentLang: prog ? prog.contentLang : null,
+    };
+    window.location.hash = ${JSON.stringify(MANUAL_FALLBACK_TOC_ROUTE)};
+    await wait('#sxc1-toc');
+    const tocNotes = document.querySelectorAll('#sxc1-toc .manual-fallback-note').length;
+    window.location.hash = '#/';
+    await wait('#sxc1-home');
+    const homeNotes = document.querySelectorAll('#sxc1-home .manual-fallback-note').length;
+    return Object.assign(page, { tocNotes, homeNotes });
+  })()`);
+
+  let en = null;
+  try { en = await probe(t.evaluate); } catch (err) { en = { error: String(err && err.message ? err.message : err) }; }
+  report(
+    NAMES.enAbsent,
+    Boolean(en && en.noteExists === false && en.tocNotes === 0 && en.homeNotes === 0
+      && en.bodyChars > 100 && en.bodyLang === null && en.uiLang === 'en'),
+    en,
+  );
+
+  // The app's own switch: persist the pref + the sxc1.uilang boot hint,
+  // then reload -- which is what makes the shell fetch manuals.ja.txt.
+  let switched = null;
+  try {
+    switched = await t.evaluate(`(async () => {
+      window.location.hash = '#/';
+      const start = Date.now();
+      while (Date.now() - start < 8000 && !document.querySelector('#btn-ui-lang')) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      const btn = document.querySelector('#btn-ui-lang');
+      if (!btn) return { ok: false, why: 'no #btn-ui-lang' };
+      window.__SXC1_PRE_RELOAD = true;
+      btn.click();
+      return { ok: true };
+    })()`);
+  } catch (err) { switched = { ok: false, why: String(err && err.message ? err.message : err) }; }
+
+  // Wait for the reload to produce a fresh, booted document.
+  let ja = null;
+  if (switched && switched.ok) {
+    const waitUntil = Math.min(deadline, Date.now() + 30000);
+    let ready = false;
+    while (Date.now() < waitUntil) {
+      let st = null;
+      try {
+        st = await t.evaluate(`(() => ({
+          booted: window.__SXC1_BOOTED === true,
+          stale: window.__SXC1_PRE_RELOAD === true,
+          error: typeof window.__SXC1_BOOT_ERROR === 'string' ? window.__SXC1_BOOT_ERROR : null,
+        }))()`);
+      } catch (err) { st = null; }   // mid-navigation
+      if (st && st.booted && !st.stale) { ready = true; break; }
+      await sleep(100);
+    }
+    if (ready) {
+      try { ja = await probe(t.evaluate); } catch (err) { ja = { error: String(err && err.message ? err.message : err) }; }
+    } else {
+      ja = { error: 'the document never reloaded into a fresh booted app after #btn-ui-lang' };
+    }
+  } else {
+    ja = { error: `switch failed: ${switched && switched.why ? switched.why : 'unknown'}` };
+  }
+
+  report(
+    NAMES.jaLoaded,
+    Boolean(ja && ja.uiLang === 'ja' && ja.contentLang === 'ja' && ja.banner === false),
+    ja,
+  );
+  report(
+    NAMES.jaNote,
+    Boolean(ja && ja.noteExists && ja.noteVisible && ja.noteRole === 'note'
+      && ja.noteText.includes(MANUAL_FALLBACK_JA_TEXT)),
+    ja,
+  );
+  report(
+    NAMES.jaBody,
+    Boolean(ja && ja.bodyChars > 100 && ja.bodyLang === 'en'),
+    ja,
+  );
+  report(
+    NAMES.jaOther,
+    Boolean(ja && ja.tocNotes === 1 && ja.homeNotes >= 1),
+    ja,
+  );
+
+  await t.close();
+  console.log(`browser-check --check-manual-fallback: ${passed}/${total} assertions passed`);
+  await die(passed === total ? 0 : 1, null);
+}
+
+// ---------------------------------------------------------------------------
 // M4: --device-only. Launches its own throwaway browser and runs ONLY
 // runDeviceAssertions against --url -- the fast dev loop the sabotage
 // sweep uses (each app mutation needs a rebuild + one targeted run, not
@@ -7634,6 +8000,14 @@ async function main() {
   }
   if (opts.checkJaToggle) {
     await runJaToggleCheck(opts);
+    return;
+  }
+  if (opts.checkBadManualBundle) {
+    await runBadManualBundleCheck(opts);
+    return;
+  }
+  if (opts.checkManualFallback) {
+    await runManualFallbackCheck(opts);
     return;
   }
   if (opts.checkStorageRefused) {

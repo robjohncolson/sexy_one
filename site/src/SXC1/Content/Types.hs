@@ -2,8 +2,9 @@
 --
 -- This module is deliberately inert: it defines the shape of a parsed
 -- document and nothing else. See "SXC1.Content.Markdown" for how values of
--- these types are produced, and "SXC1.Content.Corpus" for where the raw
--- text they are built from comes from.
+-- these types are produced, and "Bundle" (@site\/app@) for where the raw
+-- text they are built from comes from: since M7 W1 the manual text is
+-- FETCHED at boot as a per-language bundle, never embedded in the wasm.
 --
 -- LAZINESS CONTRACT: 'pageBlocks' must remain a thunk. A document is split
 -- into pages by one linear pass over its embedded text; the block parser

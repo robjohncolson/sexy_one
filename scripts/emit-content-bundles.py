@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
-"""emit-content-bundles.py -- build the per-language exercise content
-bundles (M6 W1, briefs/M6-plan.md ruling 1/2).
+"""emit-content-bundles.py -- build the per-language fetched content
+bundles: the EXERCISE corpus (M6 W1, briefs/M6-plan.md ruling 1/2) and
+the MANUAL text (M7 W1, briefs/M7-plan.md rulings 1/4/6).
 
-Reads content/exercises/INDEX and every deck file it names, and emits
+Reads content/exercises/INDEX and every deck file it names, plus
+translations/<slug>.md (and translations/<slug>.ja.md when it exists),
+and emits
 
-    <out-dir>/content.en.txt      the EN bundle          (--out-dir)
-    <out-dir>/content.ja.txt      the JA bundle          (--out-dir)
-    site/app/Exercises/Manifest.hs the BUILD-TIME EXPECTATION (--manifest-hs)
+    <out-dir>/content.en.txt      the EN exercise bundle  (--out-dir)
+    <out-dir>/content.ja.txt      the JA exercise bundle  (--out-dir)
+    <out-dir>/manuals.en.txt      the EN manual bundle    (--out-dir)
+    <out-dir>/manuals.ja.txt      the JA manual bundle    (--out-dir)
+    site/app/Bundle/Manifest.hs   the BUILD-TIME EXPECTATION (--manifest-hs)
+
+ONE EMITTER, ONE GRAMMAR, ONE MANIFEST (M7 W1). The manual text is
+externalized under exactly the discipline M6's gate forced on the
+course, and deliberately NOT as a second mechanism: both kinds share the
+framing below, the reserved-prefix rule, the FNV-1a/32 fingerprint and
+the wasm-embedded expectation, and the expectation is ONE generated
+Haskell module regenerated atomically from both corpora (two scripts
+each writing half of one generated file could not be kept consistent).
 
 THE MANIFEST (M6 gate round 1, finding M6-R1-1b). The app must be able to
 reject a wrong/stale/truncated/deck-shuffled bundle that is nevertheless
@@ -15,25 +28,43 @@ bundle carrying its own manifest+fingerprint attests only to its own
 internal consistency, so a COMPLETE OLDER BUILD (or any self-consistent
 forgery) would pass. The expectation therefore lives in the OTHER
 artifact -- it is generated HERE, before the wasm is compiled, and
-compiled INTO app.wasm as site/app/Exercises/Manifest.hs, so accepting a
+compiled INTO app.wasm as site/app/Bundle/Manifest.hs, so accepting a
 bundle requires agreement between two separately served files that only
 the build that produced BOTH can satisfy. It carries only names, counts
 and hashes (never the corpus text): the INDEX-ordered deck file names,
-the aggregate (decks, exercises, prompts) counts, and one FNV-1a/32
-fingerprint per language over the WHOLE emitted bundle.
+the aggregate (decks, exercises, prompts) counts, the ordered manual doc
+slugs with their per-doc page counts, and one FNV-1a/32 fingerprint per
+language over each WHOLE emitted bundle.
 
-THE BUNDLE FORMAT (consumed by site/app/Exercises/Bundle.hs's
-parseBundle -- keep the two in sync):
+THE BUNDLE FORMAT -- ONE grammar, two record kinds (consumed by
+site/app/Bundle.hs's parseBundle -- keep the two in sync):
 
-    !SXC1-BUNDLE v1 <lang> <deck-count>
-    !SXC1-DECK <file name, the bare INDEX entry>
-    <that deck's emitted text>
-    !SXC1-DECK <next file name>
+    !SXC1-BUNDLE v1 <lang> <record-count>
+    !SXC1-<KIND> <fields...>
+    <that record's emitted text>
+    !SXC1-<KIND> <fields...>
     ...
 
-Decks appear in INDEX order. "!SXC1-" at column 0 is the reserved
-delimiter prefix: no source line may start with it (enforced below), so
-splitting the bundle back into decks is unambiguous.
+    exercise bundle   !SXC1-DECK <file name, the bare INDEX entry>
+    manual bundle     !SXC1-DOC <slug> <the language THIS doc carries> <page count>
+
+Decks appear in INDEX order; documents appear in MANUAL_SLUGS order.
+"!SXC1-" at column 0 is the reserved delimiter prefix: no source line
+may start with it (enforced below), so splitting a bundle back into its
+records is unambiguous whichever kind it is.
+
+THE MANUAL BUNDLE'S PER-DOC LANGUAGE FIELD (M7 ruling 4, the VISIBLE
+fallback). translations/<slug>.ja.md is authored in W2, one document at
+a time, so until every one exists the JA bundle necessarily carries EN
+text for some documents. That fallback is RECORDED, never silent: each
+!SXC1-DOC line names the language its own body is actually written in,
+so a doc whose language differs from the bundle header's language is a
+fallback and the app renders the localized "Japanese text not available
+for this document yet" note instead of passing English off as Japanese.
+The field needs no separate manifest entry -- the whole-bundle
+fingerprint already pins every byte of these lines -- and W2 flips a
+document simply by adding its .ja.md file: this emitter picks it up
+automatically and the note disappears for that document alone.
 
 THE ja: VARIANT GRAMMAR (the emission half; the reading half lives in
 SXC1.Exercise.Reader.isJaLine/jaPayloadOf and is documented in
@@ -74,9 +105,9 @@ content/EXERCISE-FORMAT.md sec. 12):
 Every violation is a loud, file:line-named build failure -- never a
 silently skipped line.
 
-Per-file preconditions (all hold for the whole committed corpus): UTF-8,
-no CR, ends with exactly one trailing newline run boundary (a final
-"\\n"), no line starting with "!SXC1-".
+Per-file preconditions (all hold for the whole committed corpus and for
+every translations/*.md): UTF-8, no CR, ends with exactly one trailing
+newline run boundary (a final "\\n"), no line starting with "!SXC1-".
 """
 
 import argparse
@@ -492,6 +523,153 @@ def build_bundles(exercises_dir, names):
     return bundles, (len(names), counts["en"][0], counts["en"][1])
 
 
+# ---------------------------------------------------------------------------
+# THE MANUAL HALF (M7 W1, briefs/M7-plan.md rulings 1/2/4).
+#
+# The four manual documents live one file per document in translations/,
+# with an optional parallel <slug>.ja.md carrying the Japanese TEXT for
+# the same pages. This half emits them into the same bundle grammar the
+# decks use (see the module docstring) with a !SXC1-DOC record per
+# document.
+#
+# ORDER vs SET. MANUAL_SLUGS below fixes the ORDER -- it is the reader's
+# own presentation order (home cards, #sxc1-content-stats), which is a
+# product decision and not derivable from a directory listing. The SET
+# is still enumerated FROM THE FILESYSTEM and required to match exactly
+# (check_manual_inventory), so a document added to or removed from
+# translations/ is a loud build failure here instead of a silently
+# half-shipped reader. Anything that is not a manual -- the glossary
+# (a checker-only lexicon, never a reader route) and the *.qa-notes.md
+# review files -- is named explicitly rather than skipped by accident.
+# ---------------------------------------------------------------------------
+
+MANUAL_SLUGS = ["guide-book", "startup-guide", "midi", "oss"]
+MANUAL_NON_DOC_SLUGS = {"glossary"}
+MANUAL_JA_SUFFIX = ".ja.md"
+MANUAL_QA_SUFFIX = ".qa-notes.md"
+
+PAGE_MARKER_RE = re.compile(r"^<!-- page (\d+) -->$")
+
+
+def page_marker_num(line):
+    """The page number a line declares, or None. Mirrors
+    SXC1.Content.Markdown.pageMarkerNum: the line is STRIPPED, must be
+    exactly "<!-- page N -->" with N a run of digits, and nothing may
+    follow the "-->"."""
+    m = PAGE_MARKER_RE.match(line.strip())
+    return int(m.group(1)) if m else None
+
+
+def page_numbers_of(name, text):
+    """The document's page-marker numbers in file order, validated to be
+    exactly 1..N. mkDoc itself tolerates any ascending numbering, but the
+    manifest records ONE page count per document and the reader indexes
+    pages positionally (docPages !! (n - 1)), so 1..N is the invariant
+    the app actually depends on -- and it holds for every committed
+    translation. A document with no page markers has no pages to read
+    and is rejected outright."""
+    nums = [n for n in (page_marker_num(l) for l in text.split("\n")) if n is not None]
+    if not nums:
+        fail("%s carries no '<!-- page N -->' markers -- it has no readable pages" % name)
+    want = list(range(1, len(nums) + 1))
+    if nums != want:
+        fail("%s's page markers are not exactly 1..%d in order (got %s%s)"
+             % (name, len(nums), nums[:8], " ..." if len(nums) > 8 else ""))
+    return nums
+
+
+def read_doc_file(path, name):
+    """One document's text plus the per-file preconditions every bundle
+    record must satisfy -- the same three the deck emitter enforces, so
+    T.lines/T.unlines round-trips each record byte-identically on the
+    Haskell side and no body line can be mistaken for a delimiter."""
+    text = open(path, encoding="utf-8").read()
+    if "\r" in text:
+        fail("%s contains a CR byte -- the corpus is LF-only" % name)
+    if not text.endswith("\n"):
+        fail("%s does not end with a newline -- required for byte-exact bundle round-tripping" % name)
+    for idx, l in enumerate(text.split("\n")[:-1]):
+        if l.startswith(DELIM_PREFIX):
+            fail("%s:%d starts with the reserved bundle delimiter prefix %r" % (name, idx + 1, DELIM_PREFIX))
+    return text
+
+
+def check_manual_inventory(translations_dir):
+    """The SET half of the order/set split described above: every
+    <slug>.md in translations/ that is not explicitly a non-document must
+    be a MANUAL_SLUGS entry, and every MANUAL_SLUGS entry must exist."""
+    try:
+        entries = sorted(os.listdir(translations_dir))
+    except OSError as e:
+        fail("cannot list %s: %s" % (translations_dir, e))
+    found = set()
+    for e in entries:
+        if not e.endswith(".md") or e.endswith(MANUAL_QA_SUFFIX) or e.endswith(MANUAL_JA_SUFFIX):
+            continue
+        slug = e[: -len(".md")]
+        if slug in MANUAL_NON_DOC_SLUGS:
+            continue
+        found.add(slug)
+    want = set(MANUAL_SLUGS)
+    if found != want:
+        fail("translations/ holds documents %s but this emitter's fixed reading order names %s "
+             "(extra: %s; missing: %s) -- add or remove the slug in MANUAL_SLUGS, and in the "
+             "reader's own order, deliberately"
+             % (sorted(found), MANUAL_SLUGS, sorted(found - want), sorted(want - found)))
+
+
+def build_manual_bundles(translations_dir):
+    """Emit both manual bundles IN MEMORY. Returns (bundles, docs) where
+    bundles maps lang -> the exact bytes written and docs is the ordered
+    [(slug, page count)] pair list the manifest records.
+
+    The EN bundle carries every document's EN text verbatim. The JA
+    bundle carries translations/<slug>.ja.md when that file exists and
+    the EN text otherwise -- the DOCUMENTED, TEMPORARY per-document
+    fallback W2 retires one file at a time. Each !SXC1-DOC line names
+    the language its own body is in, so the fallback is visible to the
+    app (ruling 4) rather than passed off as Japanese.
+
+    A .ja.md file must be PAGE-FOR-PAGE with its EN sibling (ruling 2):
+    the same number of page markers, so both languages agree with the
+    single per-doc page count in the manifest and the reader's
+    positional page index means the same thing in either language. A
+    divergence is a loud failure here, not a page that silently renders
+    the wrong text."""
+    check_manual_inventory(translations_dir)
+    docs = []
+    per_lang = {"en": [], "ja": []}
+    for slug in MANUAL_SLUGS:
+        en_path = os.path.join(translations_dir, slug + ".md")
+        if not os.path.isfile(en_path):
+            fail("manual document %s is missing (%s)" % (slug, en_path))
+        en_text = read_doc_file(en_path, slug + ".md")
+        en_pages = page_numbers_of(slug + ".md", en_text)
+        ja_path = os.path.join(translations_dir, slug + MANUAL_JA_SUFFIX)
+        if os.path.isfile(ja_path):
+            ja_text = read_doc_file(ja_path, slug + MANUAL_JA_SUFFIX)
+            ja_pages = page_numbers_of(slug + MANUAL_JA_SUFFIX, ja_text)
+            if len(ja_pages) != len(en_pages):
+                fail("%s%s has %d page(s) but %s.md has %d -- the Japanese document must be "
+                     "PAGE-FOR-PAGE with the English one (briefs/M7-plan.md ruling 2)"
+                     % (slug, MANUAL_JA_SUFFIX, len(ja_pages), slug, len(en_pages)))
+            ja_entry = ("ja", ja_text)
+        else:
+            ja_entry = ("en", en_text)
+        docs.append((slug, len(en_pages)))
+        per_lang["en"].append((slug, "en", en_text))
+        per_lang["ja"].append((slug, ja_entry[0], ja_entry[1]))
+
+    bundles = {}
+    for lang in ("en", "ja"):
+        out_lines = ["!SXC1-BUNDLE v1 %s %d" % (lang, len(MANUAL_SLUGS))]
+        for (slug, doc_lang, text), (_, pages) in zip(per_lang[lang], docs):
+            out_lines.append("!SXC1-DOC %s %s %d" % (slug, doc_lang, pages))
+            out_lines.extend(text.split("\n")[:-1])
+        bundles[lang] = ("\n".join(out_lines) + "\n").encode("utf-8")
+    return bundles, docs
+
+
 MANIFEST_HEADER = '''{-# LANGUAGE OverloadedStrings #-}
 
 -- | GENERATED FILE -- do not edit by hand. Regenerated by
@@ -501,26 +679,37 @@ MANIFEST_HEADER = '''{-# LANGUAGE OverloadedStrings #-}
 -- byte-identical to this file.
 --
 -- THE BUILD-TIME EXPECTATION the running app checks every fetched
--- content bundle against (M6 gate round 1, finding M6-R1-1). The
--- expectation deliberately lives HERE -- compiled into app.wasm -- and
--- NOT in the bundle: a bundle that carries its own manifest and
--- fingerprint proves only that it is internally consistent, so a
--- complete OLDER build, or any self-consistent forgery served at the
--- right URL, would satisfy it. Checking the fetched bytes against a
--- constant baked into a DIFFERENT artifact means acceptance requires
--- agreement between two separately served files, which only the build
--- that produced both can supply.
+-- bundle against -- BOTH kinds (M6 gate round 1, finding M6-R1-1; M7
+-- W1, briefs\\/M7-plan.md ruling 1). The expectation deliberately lives
+-- HERE -- compiled into app.wasm -- and NOT in the bundle: a bundle
+-- that carries its own manifest and fingerprint proves only that it is
+-- internally consistent, so a complete OLDER build, or any
+-- self-consistent forgery served at the right URL, would satisfy it.
+-- Checking the fetched bytes against a constant baked into a DIFFERENT
+-- artifact means acceptance requires agreement between two separately
+-- served files, which only the build that produced both can supply.
 --
--- It carries names, counts and hashes ONLY -- never corpus text -- so
--- re-embedding it costs the wasm a fraction of a percent of what the
--- retired \\"Exercises.Embed\\" corpus cost (see this milestone's report
--- for the measured delta).
-module Exercises.Manifest
+-- ONE module, not two: the exercise corpus and the manual text ship in
+-- the same bundle grammar under the same acceptance rules, and their
+-- expectations are regenerated together by one emitter run, so keeping
+-- them in one generated file is what makes \\"the manifest describes THIS
+-- build\\" checkable in a single byte-comparison (check-site's M6-g).
+--
+-- It carries names, counts and hashes ONLY -- never corpus or manual
+-- text -- so re-embedding it costs the wasm a fraction of a percent of
+-- what the retired \\"Exercises.Embed\\" corpus and the retired
+-- TH-embedded translations cost (see each milestone's report for the
+-- measured deltas).
+module Bundle.Manifest
   ( manifestDecks
   , manifestDeckCount
   , manifestExercises
   , manifestPrompts
   , manifestFingerprint
+    -- * M7 W1: the manual half
+  , manifestManualDocs
+  , manifestManualDocCount
+  , manifestManualFingerprint
   ) where
 
 import           Data.Text (Text)
@@ -533,7 +722,21 @@ manifestDecks =
 '''
 
 
-def manifest_hs(names, totals, bundles):
+MANIFEST_MANUAL_HEADER = '''
+-- | Every manual document slug, in the reader's fixed presentation
+-- order, paired with its page count (the number of
+-- @\\<!-- page N --\\>@ markers, which are exactly 1..N) -- the precise
+-- @!SXC1-DOC@ sequence a healthy manual bundle must carry. The per-doc
+-- LANGUAGE each @!SXC1-DOC@ line also names is deliberately NOT pinned
+-- here: it changes as wave 2 lands one document at a time, and the
+-- whole-bundle fingerprint below already pins every byte of those
+-- lines.
+manifestManualDocs :: [(Text, Int)]
+manifestManualDocs =
+'''
+
+
+def manifest_hs(names, totals, bundles, manual_docs, manual_bundles):
     decks, exercises, prompts = totals
     out = [MANIFEST_HEADER]
     for i, name in enumerate(names):
@@ -552,25 +755,43 @@ manifestExercises = %d
 manifestPrompts :: Int
 manifestPrompts = %d
 
--- | FNV-1a\\/32 over the WHOLE emitted bundle's UTF-8 bytes -- the
--- catch-all identity check ("Exercises.Corpus".'Exercises.Corpus.fnv1a32'
--- recomputes it over the fetched text). 'Nothing' for a language this
--- build did not emit.
+-- | FNV-1a\\/32 over the WHOLE emitted exercise bundle's UTF-8 bytes --
+-- the catch-all identity check
+-- ("Exercises.Corpus".'Exercises.Corpus.fnv1a32' recomputes it over the
+-- fetched text). 'Nothing' for a language this build did not emit.
 manifestFingerprint :: Text -> Maybe Word32
 ''' % (decks, exercises, prompts))
     for lang in ("en", "ja"):
         out.append('manifestFingerprint "%s" = Just %d\n' % (lang, fnv1a32(bundles[lang])))
     out.append("manifestFingerprint _    = Nothing\n")
+
+    out.append(MANIFEST_MANUAL_HEADER)
+    for i, (slug, pages) in enumerate(manual_docs):
+        out.append("  %s (%s, %d)\n" % ("[" if i == 0 else ",", hs_string(slug), pages))
+    out.append("  ]\n")
+    out.append('''
+manifestManualDocCount :: Int
+manifestManualDocCount = %d
+
+-- | FNV-1a\\/32 over the WHOLE emitted manual bundle's UTF-8 bytes --
+-- the manual half's catch-all identity check, computed and consumed
+-- exactly like 'manifestFingerprint'.
+manifestManualFingerprint :: Text -> Maybe Word32
+''' % (len(manual_docs),))
+    for lang in ("en", "ja"):
+        out.append('manifestManualFingerprint "%s" = Just %d\n' % (lang, fnv1a32(manual_bundles[lang])))
+    out.append("manifestManualFingerprint _    = Nothing\n")
     return "".join(out)
 
 
 def hs_string(s):
     """A Haskell string literal. Deck file names are ASCII by the
-    filename grammar (SXC1.Exercise.Reader.validFileName), which this
-    re-checks rather than assuming."""
+    filename grammar (SXC1.Exercise.Reader.validFileName) and manual
+    slugs are ASCII by the route grammar, which this re-checks rather
+    than assuming."""
     for ch in s:
         if not (" " <= ch <= "~") or ch in ('"', "\\"):
-            fail("deck file name %r is not printable ASCII -- refusing to emit it as a Haskell literal" % s)
+            fail("name %r is not printable ASCII -- refusing to emit it as a Haskell literal" % s)
     return '"%s"' % s
 
 
@@ -588,8 +809,10 @@ def index_entries(index_path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exercises-dir", required=True)
-    ap.add_argument("--out-dir", help="write content.{en,ja}.txt here")
-    ap.add_argument("--manifest-hs", help="write the generated Exercises.Manifest module here")
+    ap.add_argument("--translations-dir", required=True,
+                    help="the manual documents' directory (translations/)")
+    ap.add_argument("--out-dir", help="write content.{en,ja}.txt and manuals.{en,ja}.txt here")
+    ap.add_argument("--manifest-hs", help="write the generated Bundle.Manifest module here")
     args = ap.parse_args()
     if not args.out_dir and not args.manifest_hs:
         fail("nothing to do: pass --out-dir, --manifest-hs, or both")
@@ -606,15 +829,23 @@ def main():
         fail("%s names the same deck file more than once" % index_path)
 
     bundles, totals = build_bundles(args.exercises_dir, names)
+    # BOTH corpora are built before ANYTHING is written, so a manual-side
+    # failure can never leave a half-updated pair of artifacts behind (a
+    # fresh manifest describing bundles that were never re-emitted is
+    # exactly the disagreement the app refuses to boot on).
+    manual_bundles, manual_docs = build_manual_bundles(args.translations_dir)
 
     if args.manifest_hs:
-        text = manifest_hs(names, totals, bundles)
+        text = manifest_hs(names, totals, bundles, manual_docs, manual_bundles)
         os.makedirs(os.path.dirname(os.path.abspath(args.manifest_hs)), exist_ok=True)
         with open(args.manifest_hs, "w", encoding="utf-8") as fh:
             fh.write(text)
-        print("emit-content-bundles: %s -> %d decks, %d exercises, %d prompts, fingerprints en=%d ja=%d"
+        print("emit-content-bundles: %s -> %d decks, %d exercises, %d prompts, fingerprints en=%d ja=%d; "
+              "%d manual docs (%s), manual fingerprints en=%d ja=%d"
               % (args.manifest_hs, totals[0], totals[1], totals[2],
-                 fnv1a32(bundles["en"]), fnv1a32(bundles["ja"])))
+                 fnv1a32(bundles["en"]), fnv1a32(bundles["ja"]),
+                 len(manual_docs), " ".join("%s:%d" % d for d in manual_docs),
+                 fnv1a32(manual_bundles["en"]), fnv1a32(manual_bundles["ja"])))
 
     if args.out_dir:
         os.makedirs(args.out_dir, exist_ok=True)
@@ -626,6 +857,20 @@ def main():
             gz = len(gzip.compress(data, 9))
             print("emit-content-bundles: content.%s.txt -> %d bytes raw, %d bytes gzipped (%d decks, fnv1a=%d)"
                   % (lang, len(data), gz, len(names), fnv1a32(data)))
+        for lang in ("en", "ja"):
+            data = manual_bundles[lang]
+            out_path = os.path.join(args.out_dir, "manuals.%s.txt" % lang)
+            with open(out_path, "wb") as fh:
+                fh.write(data)
+            gz = len(gzip.compress(data, 9))
+            # The per-doc language summary makes the temporary EN
+            # fallback (ruling 4) legible in the build log itself, not
+            # only in the app.
+            langs = [l.split(" ")[2] for l in data.decode("utf-8").split("\n") if l.startswith("!SXC1-DOC ")]
+            fallbacks = [MANUAL_SLUGS[i] for i, l in enumerate(langs) if l != lang]
+            print("emit-content-bundles: manuals.%s.txt -> %d bytes raw, %d bytes gzipped (%d docs, fnv1a=%d%s)"
+                  % (lang, len(data), gz, len(manual_docs), fnv1a32(data),
+                     "" if not fallbacks else ", %d falling back to en: %s" % (len(fallbacks), " ".join(fallbacks))))
 
 
 if __name__ == "__main__":

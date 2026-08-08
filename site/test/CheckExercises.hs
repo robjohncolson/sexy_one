@@ -796,7 +796,7 @@ runListCodes opts = do
 --
 -- Its own bundle splitter is deliberately a small independent
 -- re-implementation of the framing (this binary cannot import
--- exe:app's Exercises.Bundle), so an error in the app-side splitter
+-- exe:app's Bundle module), so an error in the app-side splitter
 -- cannot hide here.
 --------------------------------------------------------------------------
 

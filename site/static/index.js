@@ -34,27 +34,34 @@ window.__sxc1Storage = {
 };
 
 
-// M6 W1 (briefs/M6-plan.md, ruling 1): the exercise corpus is no longer
-// embedded in app.wasm -- it ships as a per-language content bundle
-// (site/public/content/content.<lang>.txt, emitted by
-// scripts/emit-content-bundles.py) loaded HERE, on the JS side, with the
-// same guard discipline as the storage bridge above: the network call
-// and every failure live entirely in this file (a JS exception does not
-// unwind into Haskell -- it kills the boot computation), and the wasm
-// side only ever sees total, try/catch-wrapped bridge methods. A load
-// failure must NEVER kill boot: the app starts with an empty corpus plus
-// the failure reason and renders its visible degraded state (the
-// #sxc1-content-error banner; exercises show #btn-content-retry) while
-// the manuals -- still embedded -- keep working.
+// M6 W1 (briefs/M6-plan.md, ruling 1) + M7 W1 (briefs/M7-plan.md,
+// ruling 1): NEITHER corpus is embedded in app.wasm any more. The
+// exercise course ships as content.<lang>.txt and the manual text as
+// manuals.<lang>.txt (both emitted by scripts/emit-content-bundles.py
+// into site/public/content/), and BOTH are loaded HERE, on the JS side,
+// with the same guard discipline as the storage bridge above: the
+// network calls and every failure live entirely in this file (a JS
+// exception does not unwind into Haskell -- it kills the boot
+// computation), and the wasm side only ever sees total,
+// try/catch-wrapped bridge methods. A load failure must NEVER kill
+// boot: the app starts with an empty corpus (or empty manuals) plus the
+// failure reason and renders its visible degraded state (the ONE
+// #sxc1-content-error banner, which names whichever bundle failed; the
+// affected routes show #btn-content-retry).
 //
-// The bundle is served as PLAIN .txt, deliberately not a pre-compressed
+// ONE FETCH DISCIPLINE, not two: both requests are issued together,
+// share ONE AbortController and ONE deadline (below), and resolve into
+// one result object. Whatever succeeded is used; whatever failed
+// degrades. A reload -- the retry -- re-runs both.
+//
+// The bundles are served as PLAIN .txt, deliberately not pre-compressed
 // .txt.gz: GitHub Pages (like the local dev servers) compresses text
 // responses on the wire via ordinary Content-Encoding negotiation, but
 // it does NOT transparently serve a .gz sidecar as gzip-encoded content
 // -- a fetched .txt.gz would arrive as opaque bytes needing a manual
 // DecompressionStream pass. Plain text + on-the-wire compression is the
-// simplest robust choice; check-site.sh's bundle ledger measures the
-// gzip cost against the M6 ceiling.
+// simplest robust choice; check-site.sh's bundle ledgers measure the
+// gzip cost against the M6 and M7 ceilings.
 //
 // M6 W2: the language comes from the JS BOOT HINT -- the dedicated tiny
 // localStorage key "sxc1.uilang" (raw "en"/"ja", no envelope), written
@@ -103,14 +110,20 @@ try { document.documentElement.lang = sxc1UiLang; } catch (e) { /* harmless */ }
 // deliberately hung endpoint and asserts the degraded surface appears
 // (the harness never injects a shorter deadline: the served endpoint
 // IS the input, exactly like --check-content-missing).
+//
+// M7 W1: the SAME single deadline now covers BOTH bundles. The two
+// requests are issued together and share one AbortController, so the
+// worst case is still one 15s wait -- not one per bundle -- and a
+// server that stalls either one cannot extend boot beyond it.
 const SXC1_CONTENT_TIMEOUT_MS = 15000;
 
-// Started BEFORE wasm instantiation so the two loads overlap; awaited
-// just before hs_start. This promise NEVER rejects -- all three failure
-// shapes (non-2xx, thrown, timed out) resolve to { ok: false, error }.
+// Started BEFORE wasm instantiation so the loads overlap the compile;
+// awaited just before hs_start. This promise NEVER rejects -- all three
+// failure shapes (non-2xx, thrown, timed out) resolve, PER BUNDLE, to
+// { ok: false, error }, so one failing bundle never hides or aborts the
+// other's result.
 const sxc1ContentPromise = (async () => {
   const lang = sxc1ContentLang();
-  const rel = `./content/content.${lang}.txt`;
   let controller = null;
   let timer = null;
   try {
@@ -125,21 +138,38 @@ const sxc1ContentPromise = (async () => {
       try { controller.abort(); } catch (e) { /* already settled */ }
     }, SXC1_CONTENT_TIMEOUT_MS);
   }
+  // ONE loader for both bundles: identical guard, identical failure
+  // shapes, identical deadline -- there is no second fetch discipline
+  // to keep in sync.
+  const loadOne = async (rel) => {
+    try {
+      const resp = await fetch(rel, controller ? { signal: controller.signal } : undefined);
+      if (!resp.ok) {
+        return { ok: false, error: `HTTP ${resp.status} fetching ${rel}` };
+      }
+      // The body is read under the SAME deadline: a server can send
+      // headers immediately and then stall the body indefinitely, which
+      // is the exact stall this guard exists for.
+      const text = await resp.text();
+      return { ok: true, text };
+    } catch (err) {
+      if (timedOut) {
+        return { ok: false, error: `${rel} timed out after ${SXC1_CONTENT_TIMEOUT_MS}ms (content load deadline)` };
+      }
+      return { ok: false, error: `${rel} unreachable: ${err && err.message ? err.message : String(err)}` };
+    }
+  };
   try {
-    const resp = await fetch(rel, controller ? { signal: controller.signal } : undefined);
-    if (!resp.ok) {
-      return { lang, ok: false, error: `HTTP ${resp.status} fetching ${rel}` };
-    }
-    // The body is read under the SAME deadline: a server can send
-    // headers immediately and then stall the body indefinitely, which
-    // is the exact stall this guard exists for.
-    const text = await resp.text();
-    return { lang, ok: true, text };
+    const [content, manual] = await Promise.all([
+      loadOne(`./content/content.${lang}.txt`),
+      loadOne(`./content/manuals.${lang}.txt`),
+    ]);
+    return { lang, content, manual };
   } catch (err) {
-    if (timedOut) {
-      return { lang, ok: false, error: `${rel} timed out after ${SXC1_CONTENT_TIMEOUT_MS}ms (content load deadline)` };
-    }
-    return { lang, ok: false, error: `${rel} unreachable: ${err && err.message ? err.message : String(err)}` };
+    // Unreachable in practice (loadOne never rejects), but boot must
+    // never depend on that being true.
+    const reason = `content load failed: ${err && err.message ? err.message : String(err)}`;
+    return { lang, content: { ok: false, error: reason }, manual: { ok: false, error: reason } };
   } finally {
     if (timer !== null) clearTimeout(timer);
   }
@@ -165,16 +195,24 @@ try {
   Object.assign(instanceExports, instance.exports);
 
   // The content bridge MUST be installed before hs_start: Main.main
-  // reads it synchronously at boot (Exercises.Bundle). Every method is
-  // total -- try/catch, sentinel returns -- mirroring __sxc1Storage, so
-  // no content failure can ever throw across the wasm boundary.
-  // undefined = "load failed" for text(); undefined = "load succeeded"
-  // for error().
+  // reads it synchronously at boot (Bundle). Every method is total --
+  // try/catch, sentinel returns -- mirroring __sxc1Storage, so no
+  // content failure can ever throw across the wasm boundary.
+  // undefined = "load failed" for text()/manualText(); undefined =
+  // "load succeeded" for error()/manualError().
+  //
+  // M7 W1: ONE bridge, one requested language, two payloads -- the
+  // exercise course and the manual text. Adding a THIRD pair of methods
+  // rather than a second bridge keeps the wasm side's read (Bundle.
+  // loadVia) one parameterised function instead of two copies.
   const sxc1Content = await sxc1ContentPromise;
+  const part = (name) => { try { return sxc1Content[name] || { ok: false, error: "content bridge failure" }; } catch (e) { return { ok: false, error: "content bridge failure" }; } };
   window.__sxc1Content = {
     lang: () => { try { return sxc1Content.lang; } catch (e) { return "en"; } },
-    text: () => { try { return sxc1Content.ok ? sxc1Content.text : undefined; } catch (e) { return undefined; } },
-    error: () => { try { return sxc1Content.ok ? undefined : String(sxc1Content.error); } catch (e) { return "content bridge failure"; } },
+    text: () => { const p = part("content"); return p.ok ? p.text : undefined; },
+    error: () => { const p = part("content"); return p.ok ? undefined : String(p.error); },
+    manualText: () => { const p = part("manual"); return p.ok ? p.text : undefined; },
+    manualError: () => { const p = part("manual"); return p.ok ? undefined : String(p.error); },
   };
 
   wasi.initialize(instance);          // runs _initialize, starting the Haskell RTS

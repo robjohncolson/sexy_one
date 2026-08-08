@@ -45,7 +45,10 @@ import           System.Exit           (ExitCode (ExitFailure), exitFailure, exi
 import           System.IO             (hPutStrLn, hSetEncoding, hSetNewlineMode, noNewlineTranslation,
                                          stderr, stdout, utf8)
 
-import           SXC1.Content.Corpus   (corpusSources, docs, glossarySource)
+-- M7 W1: the splices moved here from the (now retired) library module
+-- SXC1.Content.Corpus -- see EmbeddedTranslations' own Haddock for why
+-- the CHECKER keeps a compile-time copy while the APP fetches bundles.
+import           EmbeddedTranslations  (corpusSources, docs, glossarySource)
 import           SXC1.Content.Markdown (LineShape (..), classifyLine, countStrictTableSeparators,
                                          dedupeSlugs, headingLineOf, mkDoc, orderedItemOf,
                                          pagesCellInlines, parseBlocksEngineWith)

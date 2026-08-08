@@ -4,13 +4,25 @@
 -- header\/breadcrumb, and the footer -- per the M1 DOM contract
 -- (briefs\/M1-manifest.json). No manual chapter title, section title or
 -- body text is ever typed literally here: every such string comes from
--- the parsed corpus (via "SXC1.Content.Corpus", "SXC1.Content.Outline" and
+-- the parsed corpus (via "Bundle", "SXC1.Content.Outline" and
 -- "SXC1.Content.Stats"). The handful of literal strings in this module are
 -- UI chrome (the disclaimer text mandated by the brief, "not found"
 -- copy, button labels) -- never manual content.
+--
+-- M7 W1 (briefs\/M7-plan.md, ruling 1): the manual text is no longer a
+-- compile-time constant. The module-level @corpusSources@\/@allDocStats@\/
+-- @statsJsonText@ CAFs are gone; every one of them is now a field of the
+-- 'Manuals' value 'mkManuals' builds ONCE at boot from the fetched
+-- bundle and Main threads through. Nothing else about the reader
+-- changed: the same 'SXC1.Content.Markdown' parse, the same outline, the
+-- same stats payload, the same laziness contract.
 module View.Pages
   ( viewRoute
   , contentDegradedView
+    -- * M7 W1: the fetched manual corpus
+  , Manuals
+  , mkManuals
+  , emptyManuals
   ) where
 
 import           Data.List              (find)
@@ -23,16 +35,102 @@ import           Miso.Html.Element      as H
 import           Miso.Html.Event        as E
 import           Miso.Html.Property     as P
 
+import           Bundle                 (ManualDoc (..))
 import           I18n
-import           SXC1.Content.Corpus    (corpusSources, lookupDoc)
+import           SXC1.Content.Markdown  (mkDoc)
 import           SXC1.Content.Outline
 import           SXC1.Content.Stats
-import           SXC1.Content.Types     (Doc (docPages), Page (pageBlocks, pageHeader, pageNumber))
+import           SXC1.Content.Types     (Doc (docPages, docSlug, docTitle),
+                                         Page (pageBlocks, pageHeader, pageNumber))
 import           SXC1.Route
 
 import qualified View.Blocks            as Blocks
 import           View.Progress          (ProgData (..), ProgHandlers)
 import qualified View.Progress          as Progress
+
+--------------------------------------------------------------------------
+-- THE FETCHED MANUAL CORPUS (M7 W1).
+--------------------------------------------------------------------------
+
+-- | Everything the reader derives from the manual bundle, computed
+-- exactly once at boot and threaded through every view -- the
+-- replacement for M1's module-level CAFs over the TH-embedded sources.
+--
+-- 'mnFallbacks' is ruling 4's VISIBLE half: the slugs whose text is NOT
+-- in the language the learner asked for (until wave 2 authors
+-- @translations\/\<slug\>.ja.md@, a @ja@ bundle legitimately carries the
+-- English text for some documents). Those documents still render -- a
+-- blank page is never acceptable -- but they render UNDER a localized
+-- note that says so, and their body carries @lang=\"en\"@ so a screen
+-- reader pronounces it correctly instead of reading English with
+-- Japanese phonetics.
+data Manuals = Manuals
+  { mnSources   :: [(T.Text, T.Text)]   -- ^ (slug, raw markdown), bundle order
+  , mnDocs      :: [Doc]
+  , mnStats     :: [DocStats]
+  , mnStatsJson :: T.Text
+  , mnFallbacks :: [T.Text]
+  }
+
+-- | THE PARSE HALF OF ALL-OR-NOTHING MANUAL-BUNDLE ACCEPTANCE -- the
+-- manual counterpart of "Exercises.Corpus".'Exercises.Corpus.checkedCorpusOf'.
+-- "Bundle".'Bundle.parseManualBundle' has already agreed the framing,
+-- the slug order, the declared page counts and the whole-bundle
+-- fingerprint with this build's "Bundle.Manifest"; what only a real
+-- parse can establish is that each document's TEXT actually yields the
+-- pages the manifest promises. A document whose body was truncated
+-- mid-way still carries a perfectly good @!SXC1-DOC@ line, and would
+-- otherwise render as a quietly shorter manual with dead nav links.
+--
+-- 'Left' takes exactly the same visible degraded path a 404 takes.
+--
+-- Laziness: this forces each document's page SPLIT and title (both
+-- cheap line-level passes, the same work @buildStats@ already did at
+-- first render) and never a single 'pageBlocks' thunk -- the
+-- "SXC1.Content.Types" contract is untouched.
+mkManuals :: T.Text -> [ManualDoc] -> Either T.Text Manuals
+mkManuals bundleLang mds = do
+  docs <- mapM checkOne mds
+  let srcs = [ (mdSlug md, mdText md) | md <- mds ]
+  Right Manuals
+    { mnSources   = srcs
+    , mnDocs      = docs
+    , mnStats     = buildStats srcs
+    , mnStatsJson = renderStatsJson srcs
+      -- Ruling 4: a document whose own text is not in the language the
+      -- learner asked for. 'Bundle.parseManualBundle' has already
+      -- rejected any language that is neither the requested one nor the
+      -- documented "en" fallback, so this comparison is total.
+    , mnFallbacks = [ mdSlug md | md <- mds, mdLang md /= bundleLang ]
+    }
+  where
+    tshow :: Int -> T.Text
+    tshow = T.pack . show
+
+    checkOne md =
+      let d = mkDoc (mdSlug md) (mdText md)
+          n = length (docPages d)
+      in if T.null (T.strip (docTitle d))
+           then Left ("manual bundle document '" <> mdSlug md
+                        <> "' has no title heading (truncated or corrupted body)")
+           else if n /= mdPages md
+             then Left ("manual bundle document '" <> mdSlug md <> "' parses to " <> tshow n
+                          <> " page(s) but declares " <> tshow (mdPages md)
+                          <> " (truncated or corrupted body)")
+             else Right d
+
+-- | The corpus a FAILED manual load leaves behind: empty, so every
+-- manual route takes 'manualDegradedView' rather than rendering a
+-- half-built reader. Mirrors Main's empty @[Deck]@ on a failed content
+-- bundle.
+emptyManuals :: Manuals
+emptyManuals = Manuals
+  { mnSources = [], mnDocs = [], mnStats = [], mnStatsJson = renderStatsJson [], mnFallbacks = [] }
+
+-- | Is this document's body in a language other than the one the
+-- learner asked for? Drives ruling 4's visible note.
+isFallbackDoc :: Manuals -> T.Text -> Bool
+isFallbackDoc mn slug = slug `elem` mnFallbacks mn
 
 -- | The whole Miso root for the given route: header, the two hidden
 -- stats\/log blobs (M1's own @#sxc1-content-stats@ plus M2's
@@ -55,9 +153,13 @@ viewRoute
   -> T.Text                     -- ^ #sxc1-prompt-baseline JSON (M2 re-gate: see Main.promptBaselineJson)
   -> T.Text                     -- ^ #sxc1-progress JSON (M3: see Main.progressJson)
   -> T.Text                     -- ^ #sxc1-device-state JSON (M4: see Main.deviceStateJson)
-  -> Maybe T.Text               -- ^ M6: 'Just' the content-bundle load-failure reason -- renders the
-                                --   visible \#sxc1-content-error banner on EVERY route (never rendered,
-                                --   not merely hidden, on a healthy boot)
+  -> Manuals                    -- ^ M7 W1: the manual corpus this boot's bundle produced
+                                --   ('emptyManuals' when that load failed)
+  -> Maybe T.Text               -- ^ M6: 'Just' the content-bundle load-failure reason
+  -> Maybe T.Text               -- ^ M7 W1: 'Just' the MANUAL-bundle load-failure reason. Either
+                                --   (or both) renders the visible \#sxc1-content-error banner on
+                                --   EVERY route, naming what actually failed (never rendered, not
+                                --   merely hidden, on a healthy boot)
   -> Maybe (T.Text, T.Text)     -- ^ M6 gate round 1 (M6-R1-4): 'Just' (UI language code, LOADED course
                                 --   language code) when the two disagree -- renders the visible
                                 --   \#sxc1-lang-split banner on EVERY route; 'Nothing' (the healthy
@@ -65,44 +167,54 @@ viewRoute
   -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
   -> Route
   -> View model action
-viewRoute lang toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mContentErr mLangSplit mExerciseBody route = H.main_ [ P.id_ "app" ]
-  ( headerView ph pd route
-  : contentErrorBanner lang mContentErr
+viewRoute lang toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mn mContentErr mManualErr mLangSplit mExerciseBody route = H.main_ [ P.id_ "app" ]
+  ( headerView lang mn ph pd route
+  : contentErrorBanner lang mContentErr mManualErr
   ++ langSplitBanner lang mLangSplit
-  ++ [ statsView
+  ++ [ statsView mn
      , exerciseStatsView exStatsJson
      , eventLogView eventLogJson
      , promptBaselineView baselineJson
      , progressPayloadView progressJson
      , deviceStateView deviceJson
-     , routeBody lang toggleAction ph pd mExerciseBody route
+     , routeBody lang toggleAction mn ph pd mManualErr mExerciseBody route
      , footerView lang
      ]
   )
 
 --------------------------------------------------------------------------
--- M6 W1 (briefs/M6-plan.md, ruling 1): the DEGRADED content state. The
--- exercise corpus is loaded at boot (site/static/index.js +
--- Exercises.Bundle); when that load fails the app must still boot, name
--- the failure visibly, keep the manuals fully working, and offer a
--- retry. Two pieces:
+-- M6 W1 (briefs/M6-plan.md, ruling 1) + M7 W1 (briefs/M7-plan.md,
+-- ruling 1): the DEGRADED bundle state. BOTH corpora are loaded at boot
+-- (site/static/index.js + Bundle); when either load fails the app must
+-- still boot, name the failure visibly, keep whatever DID load fully
+-- usable, and offer a retry. ONE degraded state, three pieces:
 --   * 'contentErrorBanner' -- a VISIBLE role="alert" banner under the
---     header, on every route, naming the failure. Absent entirely (not
---     hidden) on a healthy boot -- the harness asserts both directions.
+--     header, on every route, naming the failure. ONE banner, one
+--     #sxc1-content-error id, one retry path, whichever bundle (or
+--     both) failed -- only the sentence changes, because "the manuals
+--     are unaffected" stopped being unconditionally true the moment the
+--     manuals became a fetched bundle too. Absent entirely (not hidden)
+--     on a healthy boot -- the harness asserts both directions.
 --   * 'contentDegradedView' -- what Main.exerciseBodyView renders on
 --     the three exercise routes instead of an empty index/deck/runner.
+--   * 'manualDegradedView' -- its manual-route counterpart, so a failed
+--     manual bundle is a NAMED failure with a retry rather than an
+--     empty home page and "no manual page matches" everywhere.
 --     #btn-content-retry is handled JS-side (site/static/index.js
 --     click delegation -> location.reload()), like the wipe-confirm
 --     toggle: a reload re-runs the guarded boot-time load, which is
---     the retry.
+--     the retry -- and it re-runs BOTH loads, which is exactly why one
+--     retry affordance is the right number.
 --------------------------------------------------------------------------
 
-contentErrorBanner :: Lang -> Maybe T.Text -> [View model action]
-contentErrorBanner _    Nothing    = []
-contentErrorBanner lang (Just err) =
-  [ H.div_ [ P.id_ "sxc1-content-error", textProp "role" "alert" ]
-      [ text (ms (iContentErrorBanner lang err)) ]
-  ]
+contentErrorBanner :: Lang -> Maybe T.Text -> Maybe T.Text -> [View model action]
+contentErrorBanner lang mContentErr mManualErr = case (mContentErr, mManualErr) of
+  (Nothing, Nothing) -> []
+  (Just c,  Nothing) -> [ bannerEl (iContentErrorBanner lang c) ]
+  (Nothing, Just m)  -> [ bannerEl (iManualErrorBanner lang m) ]
+  (Just c,  Just m)  -> [ bannerEl (iBothErrorBanner lang c m) ]
+  where
+    bannerEl t = H.div_ [ P.id_ "sxc1-content-error", textProp "role" "alert" ] [ text (ms t) ]
 
 -- | M6 gate round 1 (finding M6-R1-4): the UI\/CONTENT LANGUAGE SPLIT
 -- banner. The shell picks the bundle from the pre-boot @sxc1.uilang@
@@ -145,17 +257,36 @@ contentDegradedView lang err = H.section_ [ P.id_ "sxc1-exercise-degraded" ]
   , H.p_ [] [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RHome)) ] [ text (ms (iBackToManuals lang)) ] ]
   ]
 
-routeBody :: Lang -> action -> ProgHandlers action -> ProgData -> Maybe (View model action) -> Route -> View model action
-routeBody lang _   ph pd _             RHome              = homeView lang ph pd
-routeBody lang _   _  _  _             (RManual slug)      = tocView lang slug
-routeBody lang act _  pd _             (RPage slug n ja)    = pageView lang act (pdJaFirst pd) slug n ja
-routeBody _    _   _  _  (Just exBody) RExercises           = exBody
-routeBody _    _   _  _  (Just exBody) (RDeck _)            = exBody
-routeBody _    _   _  _  (Just exBody) (RExercise _ _)      = exBody
-routeBody lang _   _  _  Nothing       r@RExercises         = notFoundView lang (renderRoute r)
-routeBody lang _   _  _  Nothing       r@(RDeck _)          = notFoundView lang (renderRoute r)
-routeBody lang _   _  _  Nothing       r@(RExercise _ _)    = notFoundView lang (renderRoute r)
-routeBody lang _   _  _  _             (RNotFound path)     = notFoundView lang path
+-- | M7 W1: the manual-route counterpart of 'contentDegradedView'. Same
+-- id vocabulary, same single retry affordance, same "what still works"
+-- reassurance in the other direction.
+manualDegradedView :: Lang -> T.Text -> View model action
+manualDegradedView lang err = H.section_ [ P.id_ "sxc1-manual-degraded" ]
+  [ H.h1_ [] [ text (ms (iManualDegradedTitle lang)) ]
+  , H.p_ [] [ text (ms (iManualDegradedBody lang err)) ]
+  , H.p_ [] [ text (ms (iManualDegradedTrainingOk lang)) ]
+  , H.button_ [ P.id_ "btn-content-retry" ] [ text (ms (iRetryButton lang)) ]
+  , H.p_ [] [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RExercises)) ] [ text (ms (iBackToTraining lang)) ] ]
+  ]
+
+-- | M7 W1: the three MANUAL routes degrade exactly as the three
+-- exercise routes do when their bundle failed -- a named failure with a
+-- retry, never an empty home page or a spurious "no manual page
+-- matches".
+routeBody :: Lang -> action -> Manuals -> ProgHandlers action -> ProgData -> Maybe T.Text -> Maybe (View model action) -> Route -> View model action
+routeBody lang _   _  _  _  (Just err) _             RHome             = manualDegradedView lang err
+routeBody lang _   _  _  _  (Just err) _             (RManual _)        = manualDegradedView lang err
+routeBody lang _   _  _  _  (Just err) _             (RPage _ _ _)      = manualDegradedView lang err
+routeBody lang _   mn ph pd _          _             RHome              = homeView lang mn ph pd
+routeBody lang _   mn _  _  _          _             (RManual slug)      = tocView lang mn slug
+routeBody lang act mn _  pd _          _             (RPage slug n ja)   = pageView lang act mn (pdJaFirst pd) slug n ja
+routeBody _    _   _  _  _  _          (Just exBody) RExercises          = exBody
+routeBody _    _   _  _  _  _          (Just exBody) (RDeck _)           = exBody
+routeBody _    _   _  _  _  _          (Just exBody) (RExercise _ _)     = exBody
+routeBody lang _   _  _  _  _          Nothing       r@RExercises        = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  _  _          Nothing       r@(RDeck _)         = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  _  _          Nothing       r@(RExercise _ _)   = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  _  _          _             (RNotFound path)    = notFoundView lang path
 
 --------------------------------------------------------------------------
 -- Corpus-wide, text-level lookups shared by several views below. None of
@@ -163,17 +294,14 @@ routeBody lang _   _  _  _             (RNotFound path)     = notFoundView lang 
 -- "SXC1.Content.Types".
 --------------------------------------------------------------------------
 
-allDocStats :: [DocStats]
-allDocStats = buildStats corpusSources
+statsFor :: Manuals -> T.Text -> Maybe DocStats
+statsFor mn slug = find ((== slug) . stSlug) (mnStats mn)
 
-statsFor :: T.Text -> Maybe DocStats
-statsFor slug = find ((== slug) . stSlug) allDocStats
+rawFor :: Manuals -> T.Text -> Maybe T.Text
+rawFor mn slug = lookup slug (mnSources mn)
 
-rawFor :: T.Text -> Maybe T.Text
-rawFor slug = lookup slug corpusSources
-
-statsJsonText :: T.Text
-statsJsonText = renderStatsJson corpusSources
+lookupDocIn :: Manuals -> T.Text -> Maybe Doc
+lookupDocIn mn slug = find ((== slug) . docSlug) (mnDocs mn)
 
 --------------------------------------------------------------------------
 -- Header: brand + route-dependent breadcrumb.
@@ -182,12 +310,12 @@ statsJsonText = renderStatsJson corpusSources
 -- | The brand line is deliberately NOT localized: "SEXY ONE" and
 -- "SXC-1 Trainer" are product names (the same discipline that keeps
 -- on-device labels Latin), and the browser gate pins the brand text.
-headerView :: ProgHandlers action -> ProgData -> Route -> View model action
-headerView ph pd route = H.header_ [ P.id_ "sxc1-header" ]
+headerView :: Lang -> Manuals -> ProgHandlers action -> ProgData -> Route -> View model action
+headerView _ mn ph pd route = H.header_ [ P.id_ "sxc1-header" ]
   ( [ H.a_ [ P.class_ "brand", P.href_ (ms (renderRoute RHome)) ] [ "SEXY ONE — SXC-1 Trainer" ]
     , Progress.reviewBadgeEl (pdLang pd) (Progress.dueCountLive pd)
     ]
-    ++ breadcrumbFor (pdLang pd) route
+    ++ breadcrumbFor (pdLang pd) mn route
     ++ Progress.jaFirstHeaderEls ph pd route
     ++ Progress.uiLangHeaderEls ph pd
   )
@@ -196,18 +324,18 @@ headerView ph pd route = H.header_ [ P.id_ "sxc1-header" ]
 -- @aria-label@ ("Breadcrumb") so the landmark is distinguishable from
 -- the page-nav landmark (two unnamed navs read as interchangeable
 -- "navigation" to a screen reader).
-breadcrumbFor :: Lang -> Route -> [View model action]
-breadcrumbFor _ RHome = []
-breadcrumbFor lang (RManual slug) = case statsFor slug of
+breadcrumbFor :: Lang -> Manuals -> Route -> [View model action]
+breadcrumbFor _ _ RHome = []
+breadcrumbFor lang mn (RManual slug) = case statsFor mn slug of
   Just st -> [ H.nav_ [ textProp "aria-label" (ms (iBreadcrumbAria lang)) ] [ text (ms (stTitle st)) ] ]
   Nothing -> []
-breadcrumbFor lang (RPage slug n _ja) = case (statsFor slug, rawFor slug) of
+breadcrumbFor lang mn (RPage slug n _ja) = case (statsFor mn slug, rawFor mn slug) of
   (Just st, Just raw) | n >= 1 && n <= stPages st -> [ pageBreadcrumb lang slug st (buildOutline raw) n ]
   _                                                 -> []
-breadcrumbFor lang RExercises      = [ trainingCrumb lang ]
-breadcrumbFor lang (RDeck _)       = [ trainingCrumb lang ]
-breadcrumbFor lang (RExercise _ _) = [ trainingCrumb lang ]
-breadcrumbFor _ (RNotFound _) = []
+breadcrumbFor lang _ RExercises      = [ trainingCrumb lang ]
+breadcrumbFor lang _ (RDeck _)       = [ trainingCrumb lang ]
+breadcrumbFor lang _ (RExercise _ _) = [ trainingCrumb lang ]
+breadcrumbFor _ _ (RNotFound _) = []
 
 trainingCrumb :: Lang -> View model action
 trainingCrumb lang =
@@ -267,8 +395,8 @@ pageBreadcrumb lang slug st outline n =
 -- #sxc1-content-stats: always [hidden]; never rendered visibly.
 --------------------------------------------------------------------------
 
-statsView :: View model action
-statsView = H.div_ [ P.id_ "sxc1-content-stats", P.hidden_ True ] [ text (ms statsJsonText) ]
+statsView :: Manuals -> View model action
+statsView mn = H.div_ [ P.id_ "sxc1-content-stats", P.hidden_ True ] [ text (ms (mnStatsJson mn)) ]
 
 --------------------------------------------------------------------------
 -- #sxc1-exercise-stats / #sxc1-event-log: always [hidden]; M2's own
@@ -307,10 +435,10 @@ deviceStateView t = H.div_ [ P.id_ "sxc1-device-state", P.hidden_ True ] [ text 
 -- Home ("#/"): project blurb + one card per manual.
 --------------------------------------------------------------------------
 
-homeView :: Lang -> ProgHandlers action -> ProgData -> View model action
-homeView lang ph pd = H.section_ [ P.id_ "sxc1-home" ]
+homeView :: Lang -> Manuals -> ProgHandlers action -> ProgData -> View model action
+homeView lang mn ph pd = H.section_ [ P.id_ "sxc1-home" ]
   ( [ H.p_ [] [ text (ms (iHomeBlurb lang)) ]
-    , H.ul_ [ P.class_ "manual-list" ] (map (manualCard lang) allDocStats ++ [ trainingCard lang ])
+    , H.ul_ [ P.class_ "manual-list" ] (map (manualCard lang mn) (mnStats mn) ++ [ trainingCard lang ])
     ]
     ++ Progress.progressHomeView ph pd
   )
@@ -326,29 +454,47 @@ trainingCard lang = H.li_ []
       ]
   ]
 
-manualCard :: Lang -> DocStats -> View model action
-manualCard lang st = H.li_ []
+-- | M7 W1 (ruling 4): a document still rendered in English because its
+-- Japanese text has not been authored yet is FLAGGED on the card the
+-- learner clicks, not only once they are inside it.
+manualCard :: Lang -> Manuals -> DocStats -> View model action
+manualCard lang mn st = H.li_ []
   [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute (RManual (stSlug st)))) ]
-      [ H.strong_ [] [ text (ms (stTitle st)) ]
-      , H.small_ []
-          [ text (ms (iPagesSections lang (stPages st) (stSections st))) ]
-      ]
+      ( [ H.strong_ [] [ text (ms (stTitle st)) ]
+        , H.small_ []
+            [ text (ms (iPagesSections lang (stPages st) (stSections st))) ]
+        ]
+        ++ manualFallbackEls lang mn (stSlug st)
+      )
   ]
+
+-- | Ruling 4's VISIBLE note, rendered wherever a fallback document is
+-- offered or read. Absent ENTIRELY (never merely hidden) for a document
+-- whose text really is in the learner's language -- which is what makes
+-- the same assertion prove both directions, and what makes wave 2
+-- flipping one document at a time observable.
+manualFallbackEls :: Lang -> Manuals -> T.Text -> [View model action]
+manualFallbackEls lang mn slug
+  | isFallbackDoc mn slug =
+      [ H.p_ [ P.class_ "manual-fallback-note", textProp "role" "note" ]
+          [ text (ms (iManualFallbackNote lang)) ] ]
+  | otherwise = []
 
 --------------------------------------------------------------------------
 -- Manual contents ("#/m/<slug>"): the grouped outline.
 --------------------------------------------------------------------------
 
-tocView :: Lang -> T.Text -> View model action
-tocView lang slug = case rawFor slug of
+tocView :: Lang -> Manuals -> T.Text -> View model action
+tocView lang mn slug = case rawFor mn slug of
   Nothing  -> notFoundView lang slug
   Just raw ->
     let outline   = buildOutline raw
-        titleText = maybe slug stTitle (statsFor slug)
+        titleText = maybe slug stTitle (statsFor mn slug)
         groups    = case outGroups outline of
           Just gs -> gs
           Nothing -> [ Group titleText (outSections outline) ]
-    in H.section_ [ P.id_ "sxc1-toc" ] (map (renderGroup lang slug) groups)
+    in H.section_ [ P.id_ "sxc1-toc" ]
+         (manualFallbackEls lang mn slug ++ map (renderGroup lang slug) groups)
 
 renderGroup :: Lang -> T.Text -> Group -> View model action
 renderGroup lang slug g = H.section_ [ P.class_ "toc-group" ]
@@ -374,10 +520,10 @@ renderSub slug (p, t) = H.li_ [] [ H.a_ [ P.href_ (ms (renderRoute (RPage slug p
 -- Page ("#/m/<slug>/p/<n>", "+/ja"): the rendered blocks + the JA panel.
 --------------------------------------------------------------------------
 
-pageView :: Lang -> action -> Bool -> T.Text -> Int -> Bool -> View model action
-pageView lang toggleAction jaFirst slug n ja = case (statsFor slug, lookupDoc slug) of
+pageView :: Lang -> action -> Manuals -> Bool -> T.Text -> Int -> Bool -> View model action
+pageView lang toggleAction mn jaFirst slug n ja = case (statsFor mn slug, lookupDocIn mn slug) of
   (Just st, Just doc) | n >= 1 && n <= stPages st ->
-    renderPage lang toggleAction jaFirst slug (stPages st) ja (docPages doc !! (n - 1))
+    renderPage lang toggleAction mn jaFirst slug (stPages st) ja (docPages doc !! (n - 1))
   _ -> notFoundView lang (slug <> "/p/" <> T.pack (show n))
 
 -- | @jaFirst@ (M3 owner addendum, item 8) governs ONLY the DOM order of
@@ -386,10 +532,21 @@ pageView lang toggleAction jaFirst slug n ja = case (statsFor slug, lookupDoc sl
 -- so a phone (which stacks in DOM order; the >=60rem grid below pins the
 -- panel by NAMED AREA regardless of DOM order, so a wide reader's layout
 -- is unaffected either way) shows the original page before the English.
-renderPage :: Lang -> action -> Bool -> T.Text -> Int -> Bool -> Page -> View model action
-renderPage lang toggleAction jaFirst slug total ja pg =
+--
+-- M7 W1 (ruling 4): the body renders whatever language the bundle
+-- actually carried for this document -- Japanese once wave 2 authors
+-- @translations\/\<slug\>.ja.md@, English until then -- and the ORIGINAL
+-- PAGE IMAGE beside it keeps its exact previous meaning (it is the
+-- scan, and \/ja still shows it). When the body IS the English
+-- fallback, ruling 4's localized note is rendered ABOVE it (never a
+-- blank page, never English passed off as Japanese) and the body itself
+-- is marked @lang=\"en\"@ so a screen reader does not pronounce English
+-- with Japanese phonetics.
+renderPage :: Lang -> action -> Manuals -> Bool -> T.Text -> Int -> Bool -> Page -> View model action
+renderPage lang toggleAction mn jaFirst slug total ja pg =
   H.article_ articleAttrs
     ( runningHeaderEl
+        ++ fallbackEls
         ++ bodyOrderedEls
         ++ [ H.button_ [ P.id_ "btn-ja-toggle", E.onClick toggleAction ]
                [ text (ms ((if ja then iHideOriginal else iShowOriginal) lang)) ]
@@ -402,11 +559,25 @@ renderPage lang toggleAction jaFirst slug total ja pg =
 
     articleAttrs = P.id_ "sxc1-page" : [ P.class_ "ja-visible" | ja ]
 
+    isFallback = isFallbackDoc mn slug
+
+    -- The note carries its OWN id (not just the shared class the card
+    -- and TOC use) so the harness can assert its presence and, once
+    -- wave 2 lands a document, its ABSENCE on a real reading route.
+    fallbackEls
+      | isFallback =
+          [ H.p_ [ P.id_ "sxc1-manual-fallback", P.class_ "manual-fallback-note"
+                 , P.hidden_ False, textProp "role" "note" ]
+              [ text (ms (iManualFallbackNote lang)) ] ]
+      | otherwise = []
+
     runningHeaderEl = case pageHeader pg of
       Just h  -> [ H.p_ [ P.class_ "page-running-header" ] [ text (ms h) ] ]
       Nothing -> []
 
-    pageBodyEl = H.div_ [ P.class_ "page-body", P.id_ (ms ("page-" <> T.pack (show n))) ]
+    pageBodyEl = H.div_
+      ( [ P.class_ "page-body", P.id_ (ms ("page-" <> T.pack (show n))) ]
+          ++ [ textProp "lang" "en" | isFallback ] )
       (Blocks.renderBlocks slug (pageBlocks pg))
 
     bodyOrderedEls
