@@ -1466,6 +1466,9 @@
 
        #sxc1-header > #sxc1-review-badge   nav-wide due-count badge
        #sxc1-header > #btn-ja-first        manual routes only (TOC + page)
+       #sxc1-header > #btn-ui-lang         every route (M6 W2: the JA/EN
+                                           UI-language toggle -- same
+                                           .nav-toggle pill system)
 
        "#/" (home), appended after .manual-list:
          #sxc1-corrupt-banner.progress-banner?  (state == "corrupt")
@@ -1493,7 +1496,8 @@
      ===================================================================== */
 
   #sxc1-header > #sxc1-review-badge,
-  #sxc1-header > #btn-ja-first {
+  #sxc1-header > #btn-ja-first,
+  #sxc1-header > #btn-ui-lang {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -1516,7 +1520,9 @@
   #sxc1-header > #sxc1-review-badge:hover,
   #sxc1-header > #sxc1-review-badge:focus-visible,
   #sxc1-header > #btn-ja-first:hover,
-  #sxc1-header > #btn-ja-first:focus-visible {
+  #sxc1-header > #btn-ja-first:focus-visible,
+  #sxc1-header > #btn-ui-lang:hover,
+  #sxc1-header > #btn-ui-lang:focus-visible {
     border-color: var(--accent);
     color: var(--accent);
   }

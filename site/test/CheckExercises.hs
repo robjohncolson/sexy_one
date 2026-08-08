@@ -41,7 +41,7 @@ import           SXC1.Exercise.Engine
 import           SXC1.Exercise.Lint
 import           SXC1.Exercise.Parse
 import           SXC1.Exercise.Reader   (DeckSyn (..), ExSyn (..), FieldLine (..), StepSyn (..),
-                                          readDeck, readDeckSyn)
+                                          isJaLine, readDeck, readDeckSyn)
 import           SXC1.Exercise.Report
 import           SXC1.Exercise.Types
 import           SXC1.Exercise.Verify
@@ -321,7 +321,16 @@ collectFromDirs bindInventory contentDir translationsDir = do
         let fp = exercisesDir </> T.unpack nm
         raw <- readUtf8FileOrHarnessError fp
         let (issues, mDeck) = resolveDeckIssues ctx bindInventory fp raw
-        pure (nm, issues, mDeck, T.length raw, bindInventory)
+            -- M6 W2 seam repair: sourceChars reports the EN EMISSION's
+            -- length (column-0 ja: variant lines deleted -- the same
+            -- rule scripts/emit-content-bundles.py applies), because
+            -- that is the text the app actually loads and reports in
+            -- #sxc1-exercise-stats; a RAW length went red against the
+            -- app the moment W3 landed real ja: lines. T.unlines
+            -- round-trips byte-identically here because every source
+            -- file ends with a newline (the emitter enforces it).
+            enChars = T.length (T.unlines (filter (not . isJaLine) (T.lines raw)))
+        pure (nm, issues, mDeck, enChars, bindInventory)
 
       let allIssues  = ctxIssues ++ orphanIssues ++ danglingIssues ++ concat [ i | (_, i, _, _, _) <- perDeck ]
           decks      = mapMaybe (\(_, _, d, _, _) -> d) perDeck

@@ -35,9 +35,9 @@ import           Miso.Html.Event        as E
 import           Miso.Html.Property     as P
 
 import           Device.Midi            (DeviceStatus (..), HubSnapshot (..))
+import           I18n
 import           SXC1.Exercise.Engine   (ConfirmSource (..), ExerciseState (..), Outcome (..), Response (..))
 import           SXC1.Exercise.Types
-import           SXC1.Midi.Spec         (describeSpec)
 import           SXC1.Progress.Types    (ProgressState)
 import           SXC1.Route             (Route (..), parseDigits, renderRoute)
 
@@ -120,10 +120,8 @@ kindClass KQuiz   = "quiz"
 kindClass KDrill  = "drill"
 kindClass KLookup = "lookup"
 
-kindLabel :: Kind -> Text
-kindLabel KQuiz   = "Quiz"
-kindLabel KDrill  = "Drill"
-kindLabel KLookup = "Lookup"
+kindLabel :: Lang -> Kind -> Text
+kindLabel lang k = iKindLabel lang (kindClass k)
 
 -- | Milliseconds -> "M:SS" (matches the DOM contract's
 -- @^[0-9]+:[0-9][0-9]$@ for @#ex-elapsed@).
@@ -136,11 +134,11 @@ formatElapsed millis =
     s = totalSec `mod` 60
     pad2 n = let t = T.pack (show n) in if T.length t < 2 then "0" <> t else t
 
-exerciseNotFound :: Text -> View model action
-exerciseNotFound label = H.section_ [ P.id_ "sxc1-not-found" ]
-  [ H.h1_ [] [ "Not found" ]
-  , H.p_ [] [ text (ms ("No exercise matches: " <> label)) ]
-  , H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RExercises)) ] [ "Back to Training" ]
+exerciseNotFound :: Lang -> Text -> View model action
+exerciseNotFound lang label = H.section_ [ P.id_ "sxc1-not-found" ]
+  [ H.h1_ [] [ text (ms (iExNotFoundTitle lang)) ]
+  , H.p_ [] [ text (ms (iNoExerciseMatches lang label)) ]
+  , H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RExercises)) ] [ text (ms (iBackToTraining lang)) ]
   ]
 
 --------------------------------------------------------------------------
@@ -157,8 +155,8 @@ exerciseNotFound label = H.section_ [ P.id_ "sxc1-not-found" ]
 -- already carries @.ex-deck-card@ (one @class_@, not two -- see that
 -- function's Haddock), so the M2 DOM contract (@.ex-deck-card@) and the
 -- M3 one (@.deck-card@) are the same element, not a duplicated list.
-viewExerciseIndex :: ProgressState -> [Deck] -> View model action
-viewExerciseIndex prog decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (map renderChapter chapters)
+viewExerciseIndex :: Lang -> ProgressState -> [Deck] -> View model action
+viewExerciseIndex lang prog decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (map renderChapter chapters)
   where
     chapterOrder = uniqueInOrder (map dkChapter decks)
     chapters = [ (ch, [ d | d <- decks, dkChapter d == ch ]) | ch <- chapterOrder ]
@@ -184,8 +182,8 @@ viewExerciseIndex prog decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (map r
       [ H.a_ ( P.href_ (ms (renderRoute (RDeck (unDeckId (dkId d))))) : Progress.deckCardAttrs "ex-deck-card" d )
           ( H.span_ [ P.class_ "ex-deck-title" ] [ text (ms (dkTitle d)) ]
           : H.span_ [ P.class_ "ex-deck-count" ]
-              [ text (ms (T.pack (show (length (dkExercises d))) <> " exercises")) ]
-          : Progress.deckMetaEls prog decks d
+              [ text (ms (iNExercises lang (length (dkExercises d)))) ]
+          : Progress.deckMetaEls lang prog decks d
           )
       ]
 
@@ -193,13 +191,13 @@ viewExerciseIndex prog decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (map r
 -- "#/x/<deck>": the ordered exercise list.
 --------------------------------------------------------------------------
 
-viewDeck :: ProgressState -> [Deck] -> Text -> View model action
-viewDeck prog decks slug = case findDeckBySlug decks slug of
-  Nothing -> exerciseNotFound slug
+viewDeck :: Lang -> ProgressState -> [Deck] -> Text -> View model action
+viewDeck lang prog decks slug = case findDeckBySlug decks slug of
+  Nothing -> exerciseNotFound lang slug
   Just d  -> H.section_ [ P.id_ "sxc1-deck" ]
     [ H.h1_ [ P.id_ "ex-deck-title" ] [ text (ms (dkTitle d)) ]
     , H.p_ [ P.id_ "ex-deck-summary" ] (Blocks.renderInlines "" (dkSummary d))
-    , H.div_ (Progress.deckCardAttrs "" d) (Progress.deckMetaEls prog decks d)
+    , H.div_ (Progress.deckCardAttrs "" d) (Progress.deckMetaEls lang prog decks d)
     , H.ol_ [ P.class_ "ex-list" ] (map (renderExLink d) (dkExercises d))
     ]
   where
@@ -207,7 +205,7 @@ viewDeck prog decks slug = case findDeckBySlug decks slug of
       [ H.a_ [ P.class_ "ex-link"
              , P.href_ (ms (renderRoute (RExercise (unDeckId (dkId d)) (unExId (exId ex)))))
              ]
-          [ H.span_ [ P.class_ (ms ("ex-kind kind-" <> kindClass (exKind ex))) ] [ text (ms (kindLabel (exKind ex))) ]
+          [ H.span_ [ P.class_ (ms ("ex-kind kind-" <> kindClass (exKind ex))) ] [ text (ms (kindLabel lang (exKind ex))) ]
           , H.span_ [ P.class_ "ex-title" ] [ text (ms (exTitle ex)) ]
           ]
       ]
@@ -220,17 +218,18 @@ viewDeck prog decks slug = case findDeckBySlug decks slug of
 -- "SXC1.Exercise.Engine"'s own 'SXC1.Exercise.Engine.ProgressEvent's --
 -- see Main.hs), so correctness is never re-derived here; only rendered.
 viewExerciseRunner
-  :: ExHandlers action
+  :: Lang
+  -> ExHandlers action
   -> DevView
   -> [Deck] -> Text -> Text
   -> ExerciseState
   -> Maybe (Outcome, Int)
   -> View model action
-viewExerciseRunner h dv decks deckSlug exSlug st mResult =
+viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
   case findDeckBySlug decks deckSlug of
-    Nothing -> exerciseNotFound (deckSlug <> "/" <> exSlug)
+    Nothing -> exerciseNotFound lang (deckSlug <> "/" <> exSlug)
     Just d -> case findExerciseBySlug d exSlug of
-      Nothing -> exerciseNotFound (deckSlug <> "/" <> exSlug)
+      Nothing -> exerciseNotFound lang (deckSlug <> "/" <> exSlug)
       Just ex -> renderRunner ex
 
   where
@@ -247,7 +246,7 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
         ++ devicePanelEl ex
         ++ bodyEls ex
         ++ hintsEl ex
-        ++ [ H.button_ [ P.id_ "btn-ex-restart", E.onClick (exOnRestart h) ] [ "Restart" ] ]
+        ++ [ H.button_ [ P.id_ "btn-ex-restart", E.onClick (exOnRestart h) ] [ text (ms (iRestart lang)) ] ]
         ++ summaryEl
       )
       where
@@ -276,15 +275,15 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
         kindBodyEl i prompt = case prBody prompt of
           Choice opts ->
             [ H.ul_ [ P.id_ "ex-options" ] (map (renderOption i) opts)
-            , H.button_ [ P.id_ "btn-ex-submit", E.onClick (exOnSubmit h i) ] [ "Submit" ]
+            , H.button_ [ P.id_ "btn-ex-submit", E.onClick (exOnSubmit h i) ] [ text (ms (iSubmit lang)) ]
             ]
           Recall answerBlocks ->
             if IntSet.member i (esRevealed st)
               then [ H.div_ [ P.id_ "ex-answer" ] (Blocks.renderBlocks "" answerBlocks)
-                   , H.button_ [ P.id_ "btn-ex-got", E.onClick (exOnGot h i) ] [ "I got it" ]
-                   , H.button_ [ P.id_ "btn-ex-missed", E.onClick (exOnMissed h i) ] [ "I missed it" ]
+                   , H.button_ [ P.id_ "btn-ex-got", E.onClick (exOnGot h i) ] [ text (ms (iGotIt lang)) ]
+                   , H.button_ [ P.id_ "btn-ex-missed", E.onClick (exOnMissed h i) ] [ text (ms (iMissedIt lang)) ]
                    ]
-              else [ H.button_ [ P.id_ "btn-ex-reveal", E.onClick (exOnReveal h i) ] [ "Reveal answer" ] ]
+              else [ H.button_ [ P.id_ "btn-ex-reveal", E.onClick (exOnReveal h i) ] [ text (ms (iRevealAnswer lang)) ] ]
           -- M6: 'prStem' here is LITERALLY 'exIntro' (both are the same
           -- 'exIntroBlocks' value out of "SXC1.Exercise.Parse" -- a
           -- lookup has exactly one 'Prompt' and no separate task text of
@@ -298,11 +297,11 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
           -- input and its label.
           FindPage _target _limit ->
             [ H.div_ [ P.id_ "ex-find-task" ]
-                [ H.label_ [ textProp "for" "ex-find-input" ] [ "Page number:" ]
+                [ H.label_ [ textProp "for" "ex-find-input" ] [ text (ms (iPageNumberLabel lang)) ]
                 , H.input_ [ P.id_ "ex-find-input", P.type_ "number", textProp "inputmode" "numeric"
                            , E.onInput (exOnFindInput h i)
                            ]
-                , H.button_ [ P.id_ "btn-ex-find-submit", E.onClick (exOnFindSubmit h i) ] [ "Submit" ]
+                , H.button_ [ P.id_ "btn-ex-find-submit", E.onClick (exOnFindSubmit h i) ] [ text (ms (iSubmit lang)) ]
                 ]
             ] ++ elapsedEl
           Confirm _ _ -> []  -- drills never reach here; see drillStepsEl
@@ -339,7 +338,7 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
           feedbackEl
             ++ [ H.div_ [ P.id_ "ex-note" ] (Blocks.renderBlocks "" (exNote ex)) | mAttempted, not (null (exNote ex)) ]
             ++ [ H.ul_ [ P.id_ "ex-cites" ] (map renderCite citesForFeedback) | mAttempted, not (null citesForFeedback) ]
-            ++ [ H.button_ [ P.id_ "btn-ex-next", E.onClick (exOnNext h) ] [ "Next" ] | mAttempted ]
+            ++ [ H.button_ [ P.id_ "btn-ex-next", E.onClick (exOnNext h) ] [ text (ms (iNextButton lang)) ] | mAttempted ]
 
         feedbackEl = case mResult of
           Nothing -> []
@@ -348,12 +347,12 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
             in [ H.p_ [ P.id_ "ex-feedback", P.class_ (if isCorrect then "correct" else "incorrect")
                       , textProp "role" "status"
                       ]
-                   [ text (if isCorrect then "Correct." else "Not quite. Try again.") ]
+                   [ text (ms ((if isCorrect then iCorrectFeedback else iIncorrectFeedback) lang)) ]
                ]
 
         renderCite c = H.li_ []
           [ H.a_ [ P.class_ "cite", P.href_ (ms (renderRoute (RPage (citSlug c) (citPage c) False))) ]
-              [ text (ms (citSlug c <> " p. " <> T.pack (show (citPage c)))) ]
+              [ text (ms (iCitePage lang (citSlug c) (citPage c))) ]
           ]
 
         drillStepsEl ex' = H.ol_ [ P.id_ "ex-steps" ] (zipWith renderStep [1 ..] (exPrompts ex'))
@@ -434,11 +433,10 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
                 (stateClass, sentence)
                   | confirmedByDevice =
                       ( "ex-verify-confirmed" :: Text
-                      , "Confirmed by the device: " <> describeSpec v <> "." )
+                      , iVerifyConfirmed lang (describeSpecFor lang v) )
                   | armed =
                       ( "ex-verify-waiting"
-                      , "Waiting for the device: " <> describeSpec v
-                          <> " on MIDI channel " <> tshow (snapChannel (dvwSnap dv)) <> "." )
+                      , iVerifyWaiting lang (describeSpecFor lang v) (snapChannel (dvwSnap dv)) )
                   -- M5 item 11: verification is ON but this hooked step is
                   -- not the armed one (the watch names the cursor's step,
                   -- or nothing is watched at all -- cursor on an unhooked
@@ -447,11 +445,11 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
                   | devOn =
                       ( "ex-verify-idle"
                       , case dvwWatching dv of
-                          Just _  -> "Device verification is watching the current step — confirm this one manually."
-                          Nothing -> "Device verification is on — confirm this step manually." )
+                          Just _  -> iVerifyIdleWatching lang
+                          Nothing -> iVerifyIdleOn lang )
                   | otherwise =
                       ( "ex-verify-idle"
-                      , "Device verification is off — confirm manually, or turn it on above." )
+                      , iVerifyIdleOff lang )
 
             confirmEl idx0
               | idx0 == esCursor st =
@@ -459,14 +457,14 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
                       [ P.class_ "btn-ex-confirm", P.id_ (ms ("btn-ex-confirm-" <> T.pack (show (idx0 + 1))))
                       , E.onClick (exOnConfirm h idx0)
                       ]
-                      [ "Confirm" ]
+                      [ text (ms (iConfirm lang)) ]
                   ]
               | otherwise = []
 
         hintsEl ex'
           | null (exHints ex') = []
           | otherwise =
-              [ H.button_ [ P.id_ "btn-ex-hint", E.onClick (exOnShowHint h cursor) ] [ "Show a hint" ]
+              [ H.button_ [ P.id_ "btn-ex-hint", E.onClick (exOnShowHint h cursor) ] [ text (ms (iShowHint lang)) ]
               | shownCount < length (exHints ex')
               ]
               ++ [ H.ul_ [ P.id_ "ex-hints" ]
@@ -478,7 +476,7 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
         -- M5 a11y: the summary is the focus target for the FINAL advance
         -- (the whole exercise completing) -- see #ex-title's comment.
         summaryEl
-          | esDone st = [ H.section_ [ P.id_ "ex-summary", textProp "tabindex" "-1" ] [ H.p_ [] [ "You've completed this exercise." ] ] ]
+          | esDone st = [ H.section_ [ P.id_ "ex-summary", textProp "tabindex" "-1" ] [ H.p_ [] [ text (ms (iExerciseCompleted lang)) ] ] ]
           | otherwise = []
 
         -- M4 (briefs/M4-plan.md section 3.8): the device panel --
@@ -502,7 +500,7 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
                     , H.p_ [ P.id_ "device-status", textProp "aria-live" "polite" ] [ text (ms statusSentence) ]
                     , H.select_
                         [ P.id_ "sel-device-channel"
-                        , textProp "aria-label" "MIDI listening channel"
+                        , textProp "aria-label" (ms (iChannelAria lang))
                         , E.onChange (\raw -> case parseDigits (fromMisoString raw) of
                             Just cn | cn >= 1 && cn <= 16 -> exOnDevChannel h cn
                             _                             -> exOnDevChannel h chan)
@@ -534,34 +532,31 @@ viewExerciseRunner h dv decks deckSlug exSlug st mResult =
 
             enableLabel :: Text
             enableLabel = case snapStatus snap of
-              DevGranted -> "Disable device verification"
-              DevPending -> "Requesting MIDI access\x2026"
-              DevDenied  -> "Retry device access"
-              _          -> "Enable device verification"
+              DevGranted -> iDevDisable lang
+              DevPending -> iDevRequesting lang
+              DevDenied  -> iDevRetryAccess lang
+              _          -> iDevEnable lang
 
             statusSentence :: Text
             statusSentence = case snapStatus snap of
-              DevOff         -> "Device verification is off."
-              DevPending     -> "Waiting for the browser to grant MIDI access."
-              DevDenied      -> "The browser denied MIDI access. Confirm each step manually, or re-grant access in your browser's site settings and try again."
-              DevUnsupported -> "This browser has no Web MIDI support; confirm each step manually."
+              DevOff         -> iDevStatusOff lang
+              DevPending     -> iDevStatusPending lang
+              DevDenied      -> iDevStatusDenied lang
+              DevUnsupported -> iDevStatusUnsupported lang
               DevGranted     -> case mismatch of
-                Just c  -> "Received MIDI on channel " <> tshow c
-                             <> "; this drill is listening on channel " <> tshow chan <> "."
-                Nothing -> "Device verification is on, listening on MIDI channel " <> tshow chan <> "."
+                Just c  -> iDevStatusMismatch lang c chan
+                Nothing -> iDevStatusOn lang chan
 
             portsText :: Text
             portsText = case snapStatus snap of
               DevGranted
-                | null (snapPorts snap) ->
-                    "No MIDI input detected — check the USB cable and that the unit is on."
-                | otherwise ->
-                    "Bound MIDI input: " <> T.intercalate ", " (snapPorts snap)
-              _ -> "No device bound yet."
+                | null (snapPorts snap) -> iDevNoInput lang
+                | otherwise -> iDevBoundInput lang (T.intercalate ", " (snapPorts snap))
+              _ -> iDevNoneBound lang
 
             useChannelEl = case mismatch of
               Nothing -> []
               Just c  ->
                 [ H.button_ [ P.id_ "btn-device-use-channel", E.onClick (exOnDevChannel h c) ]
-                    [ text (ms ("Use channel " <> tshow c)) ]
+                    [ text (ms (iUseChannel lang c)) ]
                 ]

@@ -32,6 +32,7 @@
 module Progress.Store
   ( storageKey
   , prefsKey
+  , uiLangHintKey
   , storageAvailable
   , loadProgress
   , saveProgress
@@ -39,6 +40,8 @@ module Progress.Store
   , loadRaw
   , loadPrefs
   , savePrefs
+  , loadUiLangHint
+  , saveUiLangHint
   ) where
 
 import           Data.Text            (Text)
@@ -55,6 +58,19 @@ storageKey = "sxc1.progress"
 
 prefsKey :: MisoString
 prefsKey = "sxc1.prefs"
+
+-- | M6 W2: THE JS BOOT HINT. @site\/static\/index.js@ must pick the
+-- content bundle's language BEFORE the wasm (and therefore the prefs
+-- codec) exists, and it must not re-implement the Haskell codec to get
+-- it -- so the app mirrors ONLY the uiLang value into this dedicated
+-- tiny key ("sxc1.uilang", raw value "en"\/"ja", no envelope) whenever
+-- the preference changes, and re-syncs it at boot when it disagrees
+-- with the decoded prefs blob. The hint is a CACHE of the pref, never
+-- the pref itself: losing it is harmless (the shell falls back to
+-- "en", the app notices the disagreement at the next boot and rewrites
+-- it, and the next reload fetches the right bundle again).
+uiLangHintKey :: MisoString
+uiLangHintKey = "sxc1.uilang"
 
 -- | Call one method on the @window.__sxc1Storage@ bridge. The bridge is
 -- installed by the static shell before the wasm boots; every method is
@@ -122,4 +138,18 @@ loadPrefs = do
 savePrefs :: Prefs -> IO Bool
 savePrefs p = do
   r <- fromJSValUnchecked =<< bridge "set" [prefsKey, ms (encodePrefs p)]
+  pure (r == Just (1 :: Int))
+
+-- | The raw boot hint as stored, if any -- see 'uiLangHintKey'. Only
+-- ever compared against the DECODED prefs value; never decoded itself.
+loadUiLangHint :: IO (Maybe Text)
+loadUiLangHint = fmap (fmap fromMisoString) (bridgeGet uiLangHintKey)
+
+-- | Write the boot hint (raw "en"\/"ja" -- the caller passes the
+-- already-normalized code out of 'Prefs'). Same NEW9 contract as
+-- 'saveProgress'; a failed write is harmless here beyond the
+-- storage-lost degradation the caller already signals.
+saveUiLangHint :: Text -> IO Bool
+saveUiLangHint code = do
+  r <- fromJSValUnchecked =<< bridge "set" [uiLangHintKey, ms code]
   pure (r == Just (1 :: Int))

@@ -36,6 +36,7 @@ module View.Progress
   , ProgData (..)
   , progressHomeView
   , jaFirstHeaderEls
+  , uiLangHeaderEls
   , reviewBadgeEl
   , dueCountLive
   , deckDoneCount
@@ -57,6 +58,7 @@ import           Miso.Html.Event        as E
 import           Miso.Html.Property     as P
 import           Miso.JSON              (withObject, (.:))
 
+import           I18n
 import           SXC1.Exercise.Types    (Deck (..), DeckId (..), ExId (..), Exercise (..),
                                          PromptId (..), promptIdFor)
 import           SXC1.Progress.Codec    (DecodeResult (..))
@@ -78,6 +80,8 @@ data ProgHandlers action = ProgHandlers
   , phWipe    :: action         -- ^ #btn-progress-wipe-confirm
   , phJaFirst :: action         -- ^ #btn-ja-first -- ALREADY the negated next state; this
                                  --   module only ever renders the CURRENT one ('pdJaFirst')
+  , phUiLang  :: action         -- ^ M6 W2: #btn-ui-lang -- flip the UI language (Main owns
+                                 --   the persist-then-reload semantics)
   }
 
 data ProgData = ProgData
@@ -86,6 +90,7 @@ data ProgData = ProgData
   , pdToday      :: !DayNum
   , pdLoad       :: DecodeResult
   , pdJaFirst    :: !Bool
+  , pdLang       :: !Lang       -- ^ M6 W2: the active UI language every string renders through
   , pdExportBlob :: Maybe Text
   , pdImportMsg  :: Maybe Text
   , pdRawCorrupt :: Maybe Text  -- ^ the undecoded blob, for the corrupt banner's own export
@@ -207,11 +212,11 @@ deckCardAttrs baseClass d =
   , textProp "data-tier" (ms (dkTier d))
   ]
 
-deckMetaEls :: ProgressState -> [Deck] -> Deck -> [View model action]
-deckMetaEls prog decks d =
+deckMetaEls :: Lang -> ProgressState -> [Deck] -> Deck -> [View model action]
+deckMetaEls lang prog decks d =
   [ H.span_ [ P.class_ (ms ("tier-badge tier-" <> dkTier d)) ] [ text (ms (dkTier d)) ]
   , H.span_ [ P.class_ "deck-progress" ]
-      [ text (ms (T.pack (show done) <> "/" <> T.pack (show total) <> " done")) ]
+      [ text (ms (iDeckDone lang done total)) ]
   ]
   ++ requiresEls
   where
@@ -220,7 +225,7 @@ deckMetaEls prog decks d =
       | null (dkRequires d) = []
       | otherwise =
           [ H.span_ [ P.class_ "deck-requires" ]
-              [ text (ms ("Requires: " <> T.intercalate ", " (map (requireLabel decks) (dkRequires d)))) ]
+              [ text (ms (iRequiresLabel lang <> T.intercalate ", " (map (requireLabel decks) (dkRequires d)))) ]
           ]
 
 requireLabel :: [Deck] -> Text -> Text
@@ -233,12 +238,29 @@ requireLabel decks slug = maybe slug dkTitle (find ((== slug) . unDeckId . dkId)
 -- | The visible text ("Review N") IS the accessible name -- no separate
 -- @aria-label@, which would otherwise have to repeat it verbatim (WCAG
 -- 2.5.3 Label in Name) rather than duplicate it awkwardly.
-reviewBadgeEl :: Int -> View model action
-reviewBadgeEl due = H.a_
+reviewBadgeEl :: Lang -> Int -> View model action
+reviewBadgeEl lang due = H.a_
   [ P.id_ "sxc1-review-badge", P.class_ "nav-badge"
   , P.href_ (ms (renderRoute RHome))
   ]
-  [ text (ms ("Review " <> T.pack (show due))) ]
+  [ text (ms (iReviewBadge lang due)) ]
+
+-- | M6 W2: @#btn-ui-lang@ -- the header JA\/EN UI-language toggle, on
+-- EVERY route (unlike #btn-ja-first, which is a manual-reader-only
+-- preference, the UI language governs the whole app). Styled through
+-- the same @.nav-toggle@ system as #btn-ja-first. Its label is the
+-- language it SWITCHES TO, written in that language, and carries a
+-- matching @lang@ attribute for SR pronunciation ('iUiLangButton' \/
+-- 'iUiLangButtonLangAttr').
+uiLangHeaderEls :: ProgHandlers action -> ProgData -> [View model action]
+uiLangHeaderEls ph pd =
+  [ H.button_
+      [ P.id_ "btn-ui-lang", P.class_ "nav-toggle"
+      , textProp "lang" (ms (iUiLangButtonLangAttr (pdLang pd)))
+      , E.onClick (phUiLang ph)
+      ]
+      [ text (ms (iUiLangButton (pdLang pd))) ]
+  ]
 
 -- | @#btn-ja-first@: present only on the manual reader's own routes (the
 -- TOC and a page), never on Home\/Training -- \"the manual reader
@@ -251,7 +273,7 @@ jaFirstHeaderEls ph pd route
           , textProp "aria-pressed" (if pdJaFirst pd then "true" else "false")
           , E.onClick (phJaFirst ph)
           ]
-          [ text (if pdJaFirst pd then "Japanese first: on" else "Japanese first: off") ]
+          [ text (ms ((if pdJaFirst pd then iJaFirstOn else iJaFirstOff) (pdLang pd))) ]
       ]
   | otherwise = []
   where
@@ -269,8 +291,8 @@ jaFirstHeaderEls ph pd route
 
 progressHomeView :: ProgHandlers action -> ProgData -> [View model action]
 progressHomeView ph pd =
-  storageNoteEls (pdStorageOk pd)
-  ++ corruptBannerEls (pdLoad pd) (pdRawCorrupt pd)
+  storageNoteEls (pdLang pd) (pdStorageOk pd)
+  ++ corruptBannerEls (pdLang pd) (pdLoad pd) (pdRawCorrupt pd)
   ++ precedenceOrdered
   ++ streakEls
   ++ retiredEls
@@ -284,16 +306,13 @@ progressHomeView ph pd =
     streakLen = psStreakLen (pdProgress pd)
     streakEls =
       [ H.p_ [ P.id_ "sxc1-streak" ]
-          [ text (ms ("Study streak: " <> T.pack (show streakLen)
-                        <> (if streakLen == 1 then " day" else " days"))) ]
+          [ text (ms (iStudyStreak (pdLang pd) streakLen)) ]
       ]
 
     retiredEls
       | retiredCountLive pd > 0 =
           [ H.p_ [ P.id_ "sxc1-retired-note" ]
-              [ text (ms ("Note: " <> T.pack (show (retiredCountLive pd))
-                            <> " saved item(s) refer to exercises that have since been revised, "
-                            <> "and are excluded from review.")) ]
+              [ text (ms (iRetiredNote (pdLang pd) (retiredCountLive pd))) ]
           ]
       | otherwise = []
 
@@ -301,11 +320,11 @@ reviewQueueEls :: ProgData -> [(Text, Rec)] -> [View model action]
 reviewQueueEls pd items = [ H.section_ [ P.id_ "sxc1-review-queue" ] queueBody ]
   where
     queueBody
-      | null items = H.p_ [] [ "Nothing is due for review right now." ] : nextUpEls pd
+      | null items = H.p_ [] [ text (ms (iNothingDue (pdLang pd))) ] : nextUpEls pd
       | otherwise  = [ H.ol_ [ P.class_ "queue-list" ] (map (queueItemEl pd) items) ]
 
 nextUpEls :: ProgData -> [View model action]
-nextUpEls pd = maybe [] (\d -> [ deckPointerEl "Start the next deck: " d ]) (nextUnstartedDeck pd)
+nextUpEls pd = maybe [] (\d -> [ deckPointerEl (iStartNextDeck (pdLang pd)) d ]) (nextUnstartedDeck pd)
 
 queueItemEl :: ProgData -> (Text, Rec) -> View model action
 queueItemEl pd (pid, rec) = case exerciseForPromptId (pdDecks pd) pid of
@@ -314,14 +333,14 @@ queueItemEl pd (pid, rec) = case exerciseForPromptId (pdDecks pd) pid of
     [ H.a_ [ P.href_ (exerciseHref d ex) ]
         [ H.span_ [ P.class_ "queue-deck" ] [ text (ms (dkTitle d)) ]
         , H.span_ [ P.class_ "queue-ex" ] [ text (ms (exTitle ex)) ]
-        , H.span_ [ P.class_ "queue-due" ] [ text (ms (dueLabel (pdToday pd) rec)) ]
+        , H.span_ [ P.class_ "queue-due" ] [ text (ms (dueLabel (pdLang pd) (pdToday pd) rec)) ]
         ]
     ]
 
-dueLabel :: DayNum -> Rec -> Text
-dueLabel today rec
-  | overdue <= 0 = "due today"
-  | otherwise    = T.pack (show overdue) <> " day(s) overdue"
+dueLabel :: Lang -> DayNum -> Rec -> Text
+dueLabel lang today rec
+  | overdue <= 0 = iDueToday lang
+  | otherwise    = iDaysOverdue lang overdue
   where overdue = unDayNum today - unDayNum (rcDue rec)
 
 continueEls :: ProgData -> [View model action]
@@ -330,42 +349,42 @@ continueEls pd = [ H.section_ [ P.id_ "sxc1-continue" ] continueBody ]
     continueBody = case mostRecentPromptId (pdProgress pd) >>= exerciseForPromptId (pdDecks pd) of
       Just (d, ex) ->
         [ H.a_ [ P.href_ (exerciseHref d ex) ]
-            [ text (ms ("Continue: " <> dkTitle d <> " \8212 " <> exTitle ex)) ]
+            [ text (ms (iContinueLabel (pdLang pd) <> dkTitle d <> " \8212 " <> exTitle ex)) ]
         ]
       Nothing -> case nextUnstartedDeck pd of
-        Just d  -> [ deckPointerEl "Get started: " d ]
-        Nothing -> [ H.a_ [ P.href_ (ms (renderRoute RExercises)) ] [ "Browse the training decks" ] ]
+        Just d  -> [ deckPointerEl (iGetStarted (pdLang pd)) d ]
+        Nothing -> [ H.a_ [ P.href_ (ms (renderRoute RExercises)) ] [ text (ms (iBrowseDecks (pdLang pd))) ] ]
 
 -- | NEW9: the explicit refused-mode notice. Renders when storage probed
 -- unavailable at boot OR a later write failed (quota, revocation): the
 -- trainer keeps working fully, but nothing outlives the tab, and the
 -- learner deserves to know that rather than discover it tomorrow.
-storageNoteEls :: Bool -> [View model action]
-storageNoteEls True  = []
-storageNoteEls False =
+storageNoteEls :: Lang -> Bool -> [View model action]
+storageNoteEls _    True  = []
+storageNoteEls lang False =
   [ H.div_ [ P.id_ "sxc1-storage-note", P.class_ "progress-banner" ]
-      [ H.strong_ [] [ "Progress is not being saved. " ]
-      , text "This browser is refusing storage (private mode, exhausted quota, or storage disabled), so everything works but nothing survives closing the tab. Use Export below to copy your progress out before you leave."
+      [ H.strong_ [] [ text (ms (iStorageNoteStrong lang)) ]
+      , text (ms (iStorageNoteBody lang))
       ]
   ]
 
-corruptBannerEls :: DecodeResult -> Maybe Text -> [View model action]
-corruptBannerEls (DecodeCorrupt reason) mRaw =
+corruptBannerEls :: Lang -> DecodeResult -> Maybe Text -> [View model action]
+corruptBannerEls lang (DecodeCorrupt reason) mRaw =
   [ H.section_ [ P.id_ "sxc1-corrupt-banner", P.class_ "progress-banner" ]
       ( H.p_ []
-          [ text (ms ("Your saved progress could not be read (" <> reason
-                        <> "). It has NOT been deleted.")) ]
-      : H.p_ [] [ "Copy the raw text below to keep it safe, or use Export/Wipe further down." ]
+          [ text (ms (iCorruptBanner lang reason)) ]
+      : H.p_ [] [ text (ms (iCorruptCopyHint lang)) ]
       : rawEls
       )
   ]
   where
     -- M5 a11y: no <label> element exists for this readonly textarea, so
-    -- aria-label carries its accessible name.
+    -- aria-label carries its accessible name (localized -- ruling 3's
+    -- a11y parity).
     rawEls = case mRaw of
-      Just raw -> [ H.textarea_ [ P.id_ "sxc1-corrupt-raw", P.readonly_ True, textProp "aria-label" "Raw saved progress data", P.value_ (ms raw) ] ]
-      Nothing  -> [ H.p_ [] [ "(No raw data could be read either.)" ] ]
-corruptBannerEls _ _ = []
+      Just raw -> [ H.textarea_ [ P.id_ "sxc1-corrupt-raw", P.readonly_ True, textProp "aria-label" (ms (iCorruptRawAria lang)), P.value_ (ms raw) ] ]
+      Nothing  -> [ H.p_ [] [ text (ms (iCorruptNoRaw lang)) ] ]
+corruptBannerEls _ _ _ = []
 
 --------------------------------------------------------------------------
 -- Export / import / wipe. The wipe two-step confirm and the import
@@ -400,27 +419,28 @@ importFormDecoder = Decoder
 exportImportEls :: ProgHandlers action -> ProgData -> [View model action]
 exportImportEls ph pd =
   [ H.section_ [ P.id_ "sxc1-progress-tools" ]
-      ( [ H.h2_ [] [ "Your saved progress" ]
-        , H.button_ [ P.id_ "btn-progress-export", P.type_ "button", E.onClick (phExport ph) ] [ "Export" ]
+      ( [ H.h2_ [] [ text (ms (iYourProgress lang)) ]
+        , H.button_ [ P.id_ "btn-progress-export", P.type_ "button", E.onClick (phExport ph) ] [ text (ms (iExport lang)) ]
           -- M5 a11y: like #sxc1-corrupt-raw, no <label> element exists,
-          -- so aria-label carries the accessible name.
-        , H.textarea_ [ P.id_ "sxc1-export-blob", P.readonly_ True, textProp "aria-label" "Exported progress data", P.value_ (ms (fromMaybe "" (pdExportBlob pd))) ]
+          -- so aria-label carries the accessible name (localized).
+        , H.textarea_ [ P.id_ "sxc1-export-blob", P.readonly_ True, textProp "aria-label" (ms (iExportAria lang)), P.value_ (ms (fromMaybe "" (pdExportBlob pd))) ]
         , H.form_ [ P.id_ "sxc1-import-form", onImportSubmit (phImport ph) ]
-            ( H.label_ [ P.for_ "sxc1-import-input" ] [ "Paste an exported blob to import:" ]
+            ( H.label_ [ P.for_ "sxc1-import-input" ] [ text (ms (iImportLabel lang)) ]
             : H.textarea_ [ P.id_ "sxc1-import-input", P.name_ "sxc1-import-input" ]
             : H.p_ [ P.id_ "sxc1-import-preview" ]
-                [ "Paste text above to see how many records it contains." ]
-            : H.button_ [ P.id_ "btn-progress-import", P.type_ "submit" ] [ "Import" ]
+                [ text (ms (iImportPreviewInit lang)) ]
+            : H.button_ [ P.id_ "btn-progress-import", P.type_ "submit" ] [ text (ms (iImport lang)) ]
             : importMsgEls
             )
-        , H.button_ [ P.id_ "btn-progress-wipe", P.type_ "button" ] [ "Wipe all progress" ]
+        , H.button_ [ P.id_ "btn-progress-wipe", P.type_ "button" ] [ text (ms (iWipe lang)) ]
         , H.button_
             [ P.id_ "btn-progress-wipe-confirm", P.type_ "button", P.hidden_ True, E.onClick (phWipe ph) ]
-            [ "Yes, permanently wipe my progress" ]
+            [ text (ms (iWipeConfirm lang)) ]
         ]
       )
   ]
   where
+    lang = pdLang pd
     importMsgEls = case pdImportMsg pd of
-      Just msg -> [ H.p_ [ P.id_ "sxc1-import-error" ] [ text (ms ("Import could not be read: " <> msg)) ] ]
+      Just msg -> [ H.p_ [ P.id_ "sxc1-import-error" ] [ text (ms (iImportError lang msg)) ] ]
       Nothing  -> []

@@ -24,7 +24,9 @@ import           SXC1.Progress.Scheduler (applyEvents, dueCount, retention, revi
 import           SXC1.Progress.Types    (DayNum (..), ProgressState (..), dayOf, emptyProgress)
 import           SXC1.Route             (Route (..), parseDigits, parseRoute, renderRoute)
 
-import           Progress.Store         (loadPrefs, loadProgress, loadRaw, savePrefs, saveProgress,
+import           I18n                   (Lang, iImportEmptyReason, langFromCode)
+import           Progress.Store         (loadPrefs, loadProgress, loadRaw, loadUiLangHint,
+                                         savePrefs, saveProgress, saveUiLangHint,
                                          storageAvailable, wipeProgress)
 
 import           Device.Midi            (DeviceStatus (..), DeviceVerifier (..), Hub,
@@ -70,6 +72,20 @@ setHash :: T.Text -> IO ()
 setHash h = do
   loc <- jsg ("window" :: MisoString) ! ("location" :: MisoString)
   setProp ("hash" :: MisoString) (ms h) (Object loc)
+
+-- | M6 W2: a full page reload -- W1's reload-as-refetch, promoted to the
+-- LANGUAGE-SWITCH mechanism (briefs\/M6-plan.md W2): the static shell's
+-- boot path re-reads the @sxc1.uilang@ hint and fetches the newly
+-- selected language's content bundle, with no separate re-fetch path to
+-- keep in sync (exactly the #btn-content-retry discipline, but
+-- triggered from the Haskell side because the pref write it follows
+-- lives here). Called ONLY after the pref write SUCCEEDED -- reloading
+-- after a failed write would silently undo the learner's switch.
+reloadPage :: IO ()
+reloadPage = do
+  loc <- jsg ("window" :: MisoString) ! ("location" :: MisoString)
+  _ <- (loc # ("reload" :: MisoString)) ([] :: [MisoString])
+  pure ()
 
 --------------------------------------------------------------------------
 -- Clocks (briefs/M2-manifest.json, task "exercise-ui").
@@ -299,6 +315,7 @@ data ProgressOp
   | PImport Text        -- ^ learner submitted import text
   | PWipe               -- ^ learner confirmed a wipe
   | PJaFirst Bool       -- ^ learner flipped the JA-first reader preference
+  | PUiLangToggle       -- ^ M6 W2: learner clicked the header JA\/EN UI-language toggle
   | PSetToday DayNum    -- ^ NEW13: today refreshed from a real wall reading on navigation
   | PStorageLost        -- ^ NEW9: a write failed after boot; storage is no longer trusted
   | PSaved ProgressState -- ^ NEW8: a save landed; DecodeEmpty graduates to DecodeOk
@@ -351,6 +368,19 @@ main = do
   -- 'DecodeCorrupt'; reading it never writes anything back.
   rawBlob <- loadRaw
   prefs   <- loadPrefs
+  -- M6 W2: re-sync the JS boot hint (Progress.Store.uiLangHintKey) with
+  -- the DECODED preference whenever the two disagree -- the hint is a
+  -- cache the static shell reads pre-wasm to pick the content bundle,
+  -- and a lost/stale hint must self-heal without waiting for the next
+  -- toggle click. No reload here (this session already fetched a
+  -- bundle; reloading at boot on a mere cache miss could loop) -- the
+  -- NEXT load picks the right bundle up. Skipped when storage probed
+  -- unavailable: writing would fail anyway, and the shell's "en"
+  -- fallback is the documented harmless degradation.
+  hint    <- loadUiLangHint
+  if avail && hint /= Just (prfUiLang prefs)
+    then () <$ saveUiLangHint (prfUiLang prefs)
+    else pure ()
   (_, WallMs wall0) <- readClocks
   let st0 = case loadRes of { DecodeOk s -> s; _ -> emptyProgress }
   startApp defaultEvents (readerApp corpus exStatsTxt mContentErr sink dev supported snap0 avail loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
@@ -458,6 +488,12 @@ updateModel corpus sink dev = \case
     (mono, wall) <- readClocks
     pure (ExBatch exid (mk mono wall))
 
+-- | M6 W2: the active UI language, decoded once per use from the
+-- (already-normalized) prefs field -- the ONE derivation every render
+-- and handler goes through.
+modelLang :: Model -> Lang
+modelLang = langFromCode . prfUiLang . mPrefs
+
 -- | May THIS model save progress? True only when storage probed
 -- available AND the startup load was not corrupt -- the never-overwrite-
 -- what-you-could-not-decode rule. Import and wipe are the two explicit
@@ -486,7 +522,12 @@ handleProg op = case op of
           pure (if okW then NoOp else Prog PStorageLost)
         else pure ()
     DecodeCorrupt reason -> modify (\m -> m { mImportMsg = Just reason })
-    DecodeEmpty -> modify (\m -> m { mImportMsg = Just "import text was empty" })
+    -- M6 W2: localized at set time -- safe, because a language switch
+    -- reloads the page (PUiLangToggle), which clears mImportMsg with the
+    -- rest of the Model.
+    DecodeEmpty -> do
+      lang <- gets modelLang
+      modify (\m -> m { mImportMsg = Just (iImportEmptyReason lang) })
   PWipe ->
     -- An explicit learner decision -- but the state resets ONLY if the
     -- delete actually landed (M3 re-gate NEW9 residual): a wipe the
@@ -500,12 +541,51 @@ handleProg op = case op of
     modify (\m -> m { mProgress = emptyProgress, mLoad = DecodeEmpty
                     , mExportBlob = Nothing, mImportMsg = Nothing })
   PJaFirst b -> do
-    modify (\m -> m { mPrefs = Prefs b })
+    -- M6 W2: the JA-first toggle is THE explicit jaFirst choice, so it
+    -- also records prfJaFirstSet -- the flag that keeps ruling 4's
+    -- one-time uiLang suggestion (PUiLangToggle below) from ever
+    -- overriding a choice the learner actually made. The suggestion
+    -- itself never sets this flag.
+    prefs0 <- gets mPrefs
+    let prefs' = prefs0 { prfJaFirst = b, prfJaFirstSet = True }
+    modify (\m -> m { mPrefs = prefs' })
     -- NEW9: a failed prefs write degrades to storage-unavailable mode
     -- (visible in the payload/notice) instead of being discarded.
     io $ do
-      okW <- savePrefs (Prefs b)
+      okW <- savePrefs prefs'
       pure (if okW then NoOp else Prog PStorageLost)
+  -- M6 W2 (briefs/M6-plan.md ruling 4 + W2): the header JA/EN toggle.
+  -- Flip uiLang; on the FIRST-EVER switch to ja ALSO flip the jaFirst
+  -- reading default on -- a suggestion, not a lock: it fires only while
+  -- jaFirst is off AND was never explicitly set (prfJaFirstSet -- see
+  -- SXC1.Progress.Codec's prefsSchema note for how "explicitly set" is
+  -- represented, including the v1-blob migration that infers it), and
+  -- it deliberately does NOT mark jaFirstSet itself, so the learner's
+  -- own later choice always wins. Persistence order: prefs blob first,
+  -- then the JS boot hint (Progress.Store.saveUiLangHint), then --
+  -- ONLY when the pref write landed -- the reload that makes the shell
+  -- fetch the other language's bundle (reload-as-refetch, W1's
+  -- mechanism). When storage is refused the switch still applies
+  -- IN-MEMORY (every UI string re-renders through the table in the new
+  -- language) but no reload happens: reloading would lose the unsaved
+  -- pref and silently undo the switch, and the content bundle simply
+  -- stays the boot language for this degraded session (the storage-lost
+  -- notice explains that nothing persists).
+  PUiLangToggle -> do
+    prefs0 <- gets mPrefs
+    let newCode = if prfUiLang prefs0 == "ja" then "en" else "ja"
+        suggest = newCode == "ja" && not (prfJaFirst prefs0) && not (prfJaFirstSet prefs0)
+        prefs'  = prefs0 { prfUiLang = newCode
+                         , prfJaFirst = prfJaFirst prefs0 || suggest }
+    modify (\m -> m { mPrefs = prefs' })
+    io $ do
+      okW <- savePrefs prefs'
+      if okW
+        then do
+          _ <- saveUiLangHint newCode
+          reloadPage
+          pure NoOp
+        else pure (Prog PStorageLost)
   PSetToday d -> modify (\m -> m { mToday = max (mToday m) d })
   PStorageLost -> modify (\m -> m { mStorageOk = False })
   PSaved st -> modify (\m -> case mLoad m of
@@ -962,17 +1042,19 @@ currentResult corpus m exid st = do
 -- built from the empty corpus -- the manuals routes are untouched.
 exerciseBodyView :: [Deck] -> Maybe Text -> Model -> Route -> Maybe (View Model Action)
 exerciseBodyView corpus mContentErr m route = case route of
-  RExercises   | Just err <- mContentErr -> Just (contentDegradedView err)
-  RDeck _      | Just err <- mContentErr -> Just (contentDegradedView err)
-  RExercise _ _ | Just err <- mContentErr -> Just (contentDegradedView err)
-  RExercises -> Just (Exercise.viewExerciseIndex (mProgress m) corpus)
-  RDeck slug -> Just (Exercise.viewDeck (mProgress m) corpus slug)
+  RExercises   | Just err <- mContentErr -> Just (contentDegradedView lang err)
+  RDeck _      | Just err <- mContentErr -> Just (contentDegradedView lang err)
+  RExercise _ _ | Just err <- mContentErr -> Just (contentDegradedView lang err)
+  RExercises -> Just (Exercise.viewExerciseIndex lang (mProgress m) corpus)
+  RDeck slug -> Just (Exercise.viewDeck lang (mProgress m) corpus slug)
   RExercise deckSlug exSlug ->
     let exid   = ExId exSlug
         st     = Map.findWithDefault (initialState exid (MonoMs 0)) (unExId exid) (mExStates m)
         result = currentResult corpus m exid st
-    in Just (Exercise.viewExerciseRunner (exHandlersFor exid) (devViewFor m) corpus deckSlug exSlug st result)
+    in Just (Exercise.viewExerciseRunner lang (exHandlersFor exid) (devViewFor m) corpus deckSlug exSlug st result)
   _ -> Nothing
+  where
+    lang = modelLang m
 
 eventLogJson :: [ProgressEvent] -> Text
 eventLogJson evs = jArr (map eventJson evs)
@@ -1043,6 +1125,9 @@ progressJson corpus m = jObj
   , jKV "retention" (jInt (retention today liveState))
   , jKV "queue" (jArr (map (jStr . fst) (reviewQueue today liveState)))
   , jKV "jaFirst" (jBool (prfJaFirst (mPrefs m)))
+    -- M6 W2: the active UI language, for the harness's toggle-roundtrip
+    -- and JA-flow assertions (a wire code, never localized).
+  , jKV "uiLang" (jStr (prfUiLang (mPrefs m)))
   ]
   where
     st    = mProgress m
@@ -1063,6 +1148,7 @@ progHandlersFor m = ProgHandlers
   , phImport  = Prog . PImport
   , phWipe    = Prog PWipe
   , phJaFirst = Prog (PJaFirst (not (prfJaFirst (mPrefs m))))
+  , phUiLang  = Prog PUiLangToggle
   }
 
 -- | M3: everything "View.Progress" renders from, assembled fresh each
@@ -1074,6 +1160,7 @@ progDataFor corpus m = ProgData
   , pdToday      = mToday m
   , pdLoad       = mLoad m
   , pdJaFirst    = prfJaFirst (mPrefs m)
+  , pdLang       = modelLang m
   , pdExportBlob = mExportBlob m
   , pdImportMsg  = mImportMsg m
   , pdRawCorrupt = mRawCorrupt m
@@ -1081,4 +1168,4 @@ progDataFor corpus m = ProgData
   }
 
 viewModel :: [Deck] -> Text -> Maybe Text -> props -> Model -> View Model Action
-viewModel corpus exStatsTxt mContentErr _ m = viewRoute ToggleJA (progHandlersFor m) (progDataFor corpus m) exStatsTxt (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson corpus m) (deviceStateJson m) mContentErr (exerciseBodyView corpus mContentErr m (mRoute m)) (mRoute m)
+viewModel corpus exStatsTxt mContentErr _ m = viewRoute (modelLang m) ToggleJA (progHandlersFor m) (progDataFor corpus m) exStatsTxt (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson corpus m) (deviceStateJson m) mContentErr (exerciseBodyView corpus mContentErr m (mRoute m)) (mRoute m)

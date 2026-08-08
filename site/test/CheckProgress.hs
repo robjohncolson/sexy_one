@@ -335,19 +335,72 @@ group9 cl = do
 
 group10 :: CheckLog -> IO ()
 group10 cl = do
-  record cl 10 "decodePrefs \"\" is defaultPrefs (jaFirst OFF)"
-    (decodePrefs "" == defaultPrefs && not (prfJaFirst defaultPrefs)) "default is not OFF"
-  record cl 10 "prefs round trip (True)"
-    (prfJaFirst (decodePrefs (encodePrefs (Prefs True)))) "True did not survive"
-  record cl 10 "prefs round trip (False)"
-    (not (prfJaFirst (decodePrefs (encodePrefs (Prefs False))))) "False did not survive"
+  -- M6 W2: the prefs blob is now schema v2 (jaFirst + jaFirstSet +
+  -- uiLang -- see SXC1.Progress.Codec's prefsSchema note). Everything
+  -- below is the prefs codec's OWN contract; the final checks in this
+  -- group pin that the schema bump touched NOTHING in the (frozen)
+  -- progress codec.
+  record cl 10 "decodePrefs \"\" is defaultPrefs (jaFirst OFF, jaFirstSet OFF, uiLang en)"
+    (decodePrefs "" == defaultPrefs && not (prfJaFirst defaultPrefs)
+      && not (prfJaFirstSet defaultPrefs) && prfUiLang defaultPrefs == "en")
+    "default drifted from (False, False, en)"
+  let pAll = Prefs { prfJaFirst = True, prfJaFirstSet = True, prfUiLang = "ja" }
+  record cl 10 "prefs v2 round trip (jaFirst=1/jaFirstSet=1/uiLang=ja all survive)"
+    (decodePrefs (encodePrefs pAll) == pAll) (T.unpack (encodePrefs pAll))
+  record cl 10 "prefs v2 round trip (all defaults survive)"
+    (decodePrefs (encodePrefs defaultPrefs) == defaultPrefs) (T.unpack (encodePrefs defaultPrefs))
   record cl 10 "short header -> defaults"
     (decodePrefs "SXC1PREFS\n" == defaultPrefs) "short header not defaulted"
   record cl 10 "version above prefsSchema -> defaults"
-    (decodePrefs ("SXC1PREFS\t" <> T.pack (show (prefsSchema + 1)) <> "\nP\tjaFirst\t1\n") == defaultPrefs)
+    (decodePrefs ("SXC1PREFS\t" <> T.pack (show (prefsSchema + 1)) <> "\nP\tjaFirst\t1\nP\tuiLang\tja\n") == defaultPrefs)
     "future version was honoured"
   record cl 10 "unknown P name skipped while jaFirst still decodes"
-    (prfJaFirst (decodePrefs "SXC1PREFS\t1\nP\tfontSize\tbig\nP\tjaFirst\t1\n")) "jaFirst lost after unknown name"
+    (prfJaFirst (decodePrefs "SXC1PREFS\t2\nP\tfontSize\tbig\nP\tjaFirst\t1\n")) "jaFirst lost after unknown name"
+  -- The v1 MIGRATION (regenerable-blob style: lenient defaulting, no
+  -- migrateWith): a v1 blob has no uiLang field -> "en"; and a v1
+  -- blob's EXISTENCE is the evidence jaFirst was explicitly chosen (the
+  -- only pre-W2 writer was the JA-first toggle handler), so
+  -- prfJaFirstSet decodes True -- ruling 4's never-override-an-
+  -- explicit-choice depends on exactly this.
+  record cl 10 "v1 blob (jaFirst=1) -> uiLang defaults en, jaFirstSet inferred True"
+    (decodePrefs "SXC1PREFS\t1\nP\tjaFirst\t1\n"
+      == Prefs { prfJaFirst = True, prfJaFirstSet = True, prfUiLang = "en" })
+    "v1 migration drifted"
+  record cl 10 "v1 blob (jaFirst=0) -> chosen-OFF is still marked explicitly set"
+    (decodePrefs "SXC1PREFS\t1\nP\tjaFirst\t0\n"
+      == defaultPrefs { prfJaFirstSet = True })
+    "v1 explicit-off lost its explicitness"
+  record cl 10 "v2 blob missing uiLang/jaFirstSet lines -> field defaults (en, False)"
+    (decodePrefs "SXC1PREFS\t2\nP\tjaFirst\t1\n"
+      == defaultPrefs { prfJaFirst = True })
+    "missing v2 field did not default"
+  record cl 10 "uiLang ja decodes alone; anything but the exact ja code clamps to en"
+    (prfUiLang (decodePrefs "SXC1PREFS\t2\nP\tuiLang\tja\n") == "ja"
+      && not (prfJaFirstSet (decodePrefs "SXC1PREFS\t2\nP\tuiLang\tja\n"))
+      && prfUiLang (decodePrefs "SXC1PREFS\t2\nP\tuiLang\tzz\n") == "en")
+    "uiLang clamp drifted"
+  record cl 10 "encodePrefs normalizes a hand-built garbage uiLang on the way out"
+    (prfUiLang (decodePrefs (encodePrefs (defaultPrefs { prfUiLang = "xx" }))) == "en")
+    "garbage uiLang escaped onto the wire"
+  -- THE FROZEN-PROGRESS PIN (M6 W2 brief: "the progress codec
+  -- untouched -- pin that"): the prefs schema bump must not have moved
+  -- the PROGRESS codec's schema or wire bytes. currentSchema stays 2,
+  -- and a canonical one-record state encodes byte-identically to this
+  -- golden literal (any field/format/ordering drift in encodeState
+  -- turns this red).
+  record cl 10 "progress codec untouched: currentSchema is still 2"
+    (currentSchema == 2) ("currentSchema = " ++ show currentSchema)
+  let goldenSt = emptyProgress
+        { psStreakDay = DayNum 3, psStreakLen = 2, psFirstDay = DayNum 1
+        , psLastPrompt = "q-1-01#1"
+        , psRecs = Map.fromList
+            [ ("q-1-01#1", Rec { rcReps = 1, rcLapses = 0, rcEase = 2600, rcInterval = 2
+                               , rcDue = DayNum 5, rcLastSeen = DayNum 3, rcSeen = 1 }) ]
+        , psDone = Map.fromList [("q-1-01", 1)]
+        }
+      goldenWire = "SXC1PROGRESS\t2\nM\t3\t2\t1\tq-1-01#1\nR\tq-1-01#1\t1\t0\t2600\t2\t5\t3\t1\nD\tq-1-01\t1\n"
+  record cl 10 "progress codec untouched: canonical state encodes byte-identically to the golden wire literal"
+    (encodeState goldenSt == goldenWire) (T.unpack (encodeState goldenSt))
 
 group11 :: CheckLog -> IO ()
 group11 cl = do

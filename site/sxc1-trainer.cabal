@@ -54,6 +54,7 @@ executable app
                     Progress.Store
                     View.Progress
                     Device.Midi
+                    I18n
   build-depends:    base < 5, miso == 1.12.0.0, sxc1-trainer, text, containers
   default-language: Haskell2010
   ghc-options:      -O1 -Wall -ferror-spans

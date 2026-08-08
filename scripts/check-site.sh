@@ -320,6 +320,24 @@ Checks performed, in order:
      names the failure, a real manual page stays readable, and the
      exercise routes offer #btn-content-retry. Skipped via skip() under
      --skip-browser, like every other browser-axis stage.
+  22. M6 W2 UI-LANGUAGE TOGGLE ROUNDTRIP (browser axis): a COPY of the
+     bundle is served whose content bundles are RE-EMITTED from a COPY
+     of content/exercises carrying ONE injected ja: fixture variant
+     (content/ itself is never touched -- the M6-c/d freshness checks
+     pin that), and browser-check --check-ja-toggle must report 9/9 on
+     a fresh profile: boots EN fetching content.en.txt; #btn-ui-lang
+     switches to JA through the app's own persist-then-reload
+     (reload-as-refetch, proven by the fresh document's resource
+     entries naming content.ja.txt); Japanese header + document lang;
+     the sxc1.uilang boot hint and the SXC1PREFS uiLang line survive;
+     ruling 4's one-time jaFirst suggestion fires (fresh profile ==
+     never explicitly set) without marking the choice taken; the
+     injected JA exercise title renders from the ja bundle; a JA
+     device flow (fake-midi) pins the JA status/waiting/confirmed
+     sentences including the describeSpec JA renderer; and switching
+     back restores EN. The injection is grep-confirmed both into the
+     served copy's ja bundle AND absent from its en bundle before the
+     browser ever runs. Skipped via skip() under --skip-browser.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -498,8 +516,14 @@ info() {
 # degradation stage) and 175 -> 176 (+1: the degraded-content
 # absent-scenario parity assertion in runExerciseAssertions, present in
 # both full stages).
-M5_CHECK_TOTAL=107
-M5_BROWSER_ASSERT_FLOOR=176
+# M6 W2 pin raise (same documented procedure): 107 -> 108 (+1: the
+# ui-language toggle roundtrip stage, check 22) and 176 -> 233 (the
+# UI-language JA flow in both full stages: the toggle's own six
+# assertions plus the ENTIRE runExerciseAssertions/a11y set re-run
+# under lang='ja' with every learner-visible text pin pinning the JA
+# string -- measured 233/233 on both full stages at this raise).
+M5_CHECK_TOTAL=108
+M5_BROWSER_ASSERT_FLOOR=233
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -2754,11 +2778,22 @@ def load_decks():
     for fname in deck_files:
         path = os.path.join(EXERCISES_DIR, fname)
         text = open(path, encoding="utf-8").read()
-        raw_bytes = open(path, "rb").read()
-        chars = len(text)
+        # M6 W2 seam repair: the app's per-deck chars/lines/fnv1a derive
+        # from the CONTENT BUNDLE it fetched, i.e. the EN EMISSION (every
+        # column-0 "ja:" variant line deleted, byte-identical otherwise --
+        # scripts/emit-content-bundles.py's EN rule / SXC1.Exercise.
+        # Reader.isJaLine). This derivation went red the moment W3 landed
+        # the first real ja: lines, because it still measured the RAW
+        # file. It now models the same EN emission; whole-bundle
+        # staleness (BOTH languages, byte-for-byte) is the M6-c/d
+        # freshness checks' own job. lines_list stays RAW on purpose --
+        # structural counting (headings, type:, cite:) is emission-
+        # invariant, and a ja: payload can never match those patterns.
+        en_text = "".join(l for l in text.splitlines(True) if not l.startswith("ja:"))
+        chars = len(en_text)
         lines_list = text.split("\n")
-        n_lines = len(lines_list)
-        fnv = fnv1a32(raw_bytes)
+        n_lines = len(en_text.split("\n"))
+        fnv = fnv1a32(en_text.encode("utf-8"))
 
         title = ""
         for l in lines_list:
@@ -3524,6 +3559,8 @@ DEVICE_SUITE_LABEL="device assertions D1..D27 ran and passed inside check 7's ro
 # (M5-R1-3): reject a pre-occupied port, verify the child serves OUR
 # copy's index.html byte-for-byte, kill only our own child.
 CONTENT_MISSING_LABEL="fetch-failure degradation: served WITHOUT content/ bundles the app still boots, names the failure, keeps manuals readable, and offers a retry (browser-check --check-content-missing, 4/4)"
+# M6 W2: the ui-language toggle roundtrip stage -- see usage() check 22.
+JA_TOGGLE_LABEL="ui-language toggle roundtrip: served copy with one injected ja: fixture variant -- EN boot, JA switch via reload-as-refetch, header/pref/ruling-4 suggestion, JA content title, JA device flow, back to EN (browser-check --check-ja-toggle, 9/9)"
 ROOT_CARDINALITY_LABEL="M5 cardinality contract: root browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 
@@ -3558,6 +3595,7 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$SUBPATH_BROWSER_LABEL"
   skip "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation)"
   skip "$CONTENT_MISSING_LABEL"
+  skip "$JA_TOGGLE_LABEL"
   skip "$DEVICE_SUITE_LABEL"
   skip "$ROOT_CARDINALITY_LABEL"
   skip "$SUBPATH_CARDINALITY_LABEL"
@@ -3569,6 +3607,7 @@ else
     fail "$SUBPATH_BROWSER_LABEL"
     fail "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation) (observed: no browser found, the stage never ran)"
     fail "$CONTENT_MISSING_LABEL (observed: no browser found, the stage never ran)"
+    fail "$JA_TOGGLE_LABEL (observed: no browser found, the stage never ran)"
     fail "$DEVICE_SUITE_LABEL (observed: no browser found, the suite never ran)"
     fail "$ROOT_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
     fail "$SUBPATH_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
@@ -3696,6 +3735,97 @@ else
       wait "$CONTENT_MISSING_SRV_PID" 2>/dev/null || true
       rm -rf "$CONTENT_MISSING_TMP"
       unregister_temp_dir "$CONTENT_MISSING_TMP"
+    fi
+
+    # M6 W2: the ui-language toggle roundtrip stage -- see
+    # JA_TOGGLE_LABEL's comment / usage() check 22. The served copy's
+    # bundles are re-emitted from a COPY of content/exercises carrying
+    # one injected ja: heading variant for q-2-01 (the same exercise the
+    # D-suite's DEVICE_REAL_CFG already pins), so the stage proves the
+    # WHOLE pipe: ja: variant -> emit-content-bundles.py ja substitution
+    # -> boot-hint bundle pick -> the wasm renders the Japanese title.
+    # Injection is grep-confirmed IN (ja bundle) and OUT (en bundle)
+    # before the browser runs; content/ itself is never touched.
+    JA_TOGGLE_PORT=$((PORT + 13))
+    if port_in_use "$JA_TOGGLE_PORT"; then
+      fail "$JA_TOGGLE_LABEL (observed: port $JA_TOGGLE_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
+    else
+      JA_TOGGLE_TMP="$(mktemp -d -t sxc1-check-site-jatoggle.XXXXXX)"
+      register_temp_dir "$JA_TOGGLE_TMP"
+      cp -R "$DIR"/. "$JA_TOGGLE_TMP"/
+      JA_EX_TMP="$(mktemp -d -t sxc1-check-site-jaex.XXXXXX)"
+      register_temp_dir "$JA_EX_TMP"
+      cp -R "$REPO_ROOT/content/exercises"/. "$JA_EX_TMP"/
+      JA_TOGGLE_PREP_ERR=""
+      JA_FIXTURE_TITLE='「BANK」とは'
+      if ! python3 - "$JA_EX_TMP/024-pad-01.ex.md" <<'PYEOF2'
+import sys
+path = sys.argv[1]
+ANCHOR = '## What a "BANK" is'
+VARIANT = 'ja: ## \u300cBANK\u300d\u3068\u306f\n'
+lines = open(path, encoding='utf-8').read().splitlines(True)
+out, done, skipping = [], False, False
+for ln in lines:
+    # W3 lands real ja: variants concurrently: if the anchor already
+    # carries a variant run, REPLACE it with the pinned fixture variant
+    # (two variant lines after a heading anchor would be an emitter
+    # error; and the stage pins the exact fixture title).
+    if skipping:
+        if ln.startswith('ja:'):
+            continue
+        skipping = False
+    out.append(ln)
+    if not done and ln.rstrip('\n') == ANCHOR:
+        out.append(VARIANT)
+        done = True
+        skipping = True
+if not done:
+    print('anchor heading %r not found in %s' % (ANCHOR, path))
+    raise SystemExit(1)
+open(path, 'w', encoding='utf-8').write(''.join(out))
+PYEOF2
+      then
+        JA_TOGGLE_PREP_ERR="could not inject the ja: fixture variant (anchor heading missing from 024-pad-01.ex.md?)"
+      elif ! grep -qF "$JA_FIXTURE_TITLE" "$JA_EX_TMP/024-pad-01.ex.md"; then
+        JA_TOGGLE_PREP_ERR="grep-confirm IN failed: the injected ja: variant is not in the temp deck copy"
+      elif ! python3 "$REPO_ROOT/scripts/emit-content-bundles.py" --exercises-dir "$JA_EX_TMP" --out-dir "$JA_TOGGLE_TMP/content" >/dev/null 2>&1; then
+        JA_TOGGLE_PREP_ERR="emit-content-bundles.py failed on the variant-injected temp corpus"
+      elif ! grep -qF "$JA_FIXTURE_TITLE" "$JA_TOGGLE_TMP/content/content.ja.txt"; then
+        JA_TOGGLE_PREP_ERR="grep-confirm IN failed: the served copy's content.ja.txt does not carry the injected JA title"
+      elif grep -qF "$JA_FIXTURE_TITLE" "$JA_TOGGLE_TMP/content/content.en.txt"; then
+        JA_TOGGLE_PREP_ERR="grep-confirm OUT failed: the injected JA title leaked into the served copy's content.en.txt"
+      fi
+      if [ -n "$JA_TOGGLE_PREP_ERR" ]; then
+        fail "$JA_TOGGLE_LABEL (observed: $JA_TOGGLE_PREP_ERR)"
+      else
+        python3 -m http.server "$JA_TOGGLE_PORT" --bind 127.0.0.1 --directory "$JA_TOGGLE_TMP" >/dev/null 2>&1 &
+        JA_TOGGLE_SRV_PID=$!
+        SERVER_PIDS+=("$JA_TOGGLE_SRV_PID")
+        JA_TOGGLE_VERIFIED=0
+        if ! wait_for_port "$JA_TOGGLE_PORT" 15; then
+          fail "$JA_TOGGLE_LABEL (observed: this stage's own python http.server (pid $JA_TOGGLE_SRV_PID) never came up on port $JA_TOGGLE_PORT within 15s)"
+        elif ! verify_server_healthy "$JA_TOGGLE_SRV_PID" "$JA_TOGGLE_PORT" "/index.html" "$JA_TOGGLE_TMP/index.html"; then
+          fail "$JA_TOGGLE_LABEL (observed: the listener on port $JA_TOGGLE_PORT is not provably this stage's own child serving the variant-injected copy -- child dead, /index.html unfetchable, or served bytes mismatch; browser check not run)"
+        else
+          JA_TOGGLE_VERIFIED=1
+        fi
+        if [ "$JA_TOGGLE_VERIFIED" -eq 1 ]; then
+          set +e
+          "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-ja-toggle --url "http://127.0.0.1:$JA_TOGGLE_PORT/" --timeout 120000 >/dev/null 2>&1
+          JA_TOGGLE_RC=$?
+          set -e
+          if [ "$JA_TOGGLE_RC" -eq 0 ]; then
+            ok "$JA_TOGGLE_LABEL"
+          else
+            fail "$JA_TOGGLE_LABEL (browser-check --check-ja-toggle exit $JA_TOGGLE_RC)"
+          fi
+        fi
+        kill "$JA_TOGGLE_SRV_PID" >/dev/null 2>&1 || true
+        wait "$JA_TOGGLE_SRV_PID" 2>/dev/null || true
+      fi
+      rm -rf "$JA_TOGGLE_TMP" "$JA_EX_TMP"
+      unregister_temp_dir "$JA_TOGGLE_TMP"
+      unregister_temp_dir "$JA_EX_TMP"
     fi
 
     # V6 (M4, task "verification"; floor widened to D1..D27 by the M5

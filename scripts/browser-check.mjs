@@ -279,6 +279,7 @@ function parseArgs(argv) {
     expectExerciseJson: null,
     checkStorageRefused: false,
     checkContentMissing: false,
+    checkJaToggle: false,
     deviceOnly: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -322,6 +323,9 @@ function parseArgs(argv) {
         break;
       case '--check-content-missing':
         opts.checkContentMissing = true;
+        break;
+      case '--check-ja-toggle':
+        opts.checkJaToggle = true;
         break;
       case '--device-only':
         opts.deviceOnly = true;
@@ -432,6 +436,24 @@ Options:
                        demonstrated by breaking the index.js guard
                        (rethrowing from the load path kills boot, which
                        this mode reports as its own FAIL).
+  --check-ja-toggle    M6 W2 UI-language roundtrip check, invoked by
+                       check-site.sh against a served COPY of the bundle
+                       whose ja content bundle carries ONE injected ja:
+                       fixture variant (never content/ itself): on a
+                       FRESH profile the app must boot EN (fetching
+                       content.en.txt), switch to JA through the real
+                       #btn-ui-lang (persisting the pref + the
+                       sxc1.uilang boot hint, then reloading -- the
+                       reload IS the refetch, proven by the fresh
+                       document's own resource entries naming
+                       content.ja.txt), render the Japanese header and
+                       the injected JA exercise title, fire ruling 4's
+                       one-time jaFirst suggestion (fresh profile ==
+                       never explicitly set), drive a JA device flow
+                       (fake-midi injected: enable, JA status/waiting
+                       sentences with the describeSpec JA renderer, then
+                       a device-confirmed JA sentence), and switch back
+                       to EN. Exits 0 only when every assertion holds.
   --help               Show this help and exit
 
 By default (no --quick) the page-route sweep visits all 108 routes in
@@ -855,6 +877,36 @@ window.__SXC1_BOOTED = true;
   var PROGRESS_DECK_TIER = ${JSON.stringify(PROGRESS_SELF_TEST_TIER)};
   var MANUAL_TOTAL_PAGES = 2;
 
+  // -----------------------------------------------------------------------
+  // M6 W2 mirror: the UI-language boot hint + header toggle. Mirrors the
+  // real pipeline exactly: site/static/index.js reads the sxc1.uilang
+  // hint pre-boot (anything but exactly "ja" is "en") and stamps
+  // document.documentElement.lang; the app's PUiLangToggle persists the
+  // prefs blob + hint and reloads. trFx() is the fixture's own two-entry
+  // string table for the strings the JA-flow assertions pin.
+  //   SABOTAGE 'uiLangPref'   (-> UILANG_PREF): the switch keeps the
+  //     language in sessionStorage ONLY -- the UI switches (the
+  //     rendering keeps working off the session value, so every other
+  //     ja assertion stays green) but nothing survives on disk, which
+  //     exactly the on-disk assertion must catch.
+  //   SABOTAGE 'uiLangHeader' (-> UILANG_HEADER): the header strings
+  //     (badge + toggle label) stay EN under ja.
+  //   SABOTAGE 'uiLangText'   (-> the ja-pass feedback/verify pins):
+  //     the learner-visible body strings stay EN under ja.
+  //   SABOTAGE 'uiLangAria'   (-> SR-labels [ja]): the localized
+  //     aria-label accessible names stay EN under ja.
+  // -----------------------------------------------------------------------
+  var UILANG = (function () {
+    try {
+      var sab = window.sessionStorage.getItem('sxc1.selftest.uilang');
+      if (sab === 'ja' || sab === 'en') return sab;
+    } catch (e) { /* fall through */ }
+    try { return window.localStorage.getItem('sxc1.uilang') === 'ja' ? 'ja' : 'en'; } catch (e) { return 'en'; }
+  })();
+  try { document.documentElement.lang = UILANG; } catch (e) { /* harmless */ }
+  function trFx(en, ja) { return UILANG === 'ja' ? ja : en; }
+  function trBody(en, ja) { return sel('uiLangText') ? en : trFx(en, ja); }
+
   // M6 W1 SABOTAGE 'contentDegraded' (-> CONTENT_ABSENT_ASSERTION_NAME):
   // render the degraded-content surface on a HEALTHY boot -- the exact
   // defect the absent-scenario parity assertion exists to catch (a
@@ -900,7 +952,10 @@ window.__SXC1_BOOTED = true;
   var CTL_TAG = sel('a11yKeyboard') ? 'span' : 'button';
   var ARIA_LIVE_ATTR = sel('a11ySrLabels') ? '' : ' aria-live="polite"';
   var CHAN_LABEL_ATTR = sel('a11ySrLabels') ? '' : ' aria-label="MIDI listening channel"';
-  var EXPORT_LABEL_ATTR = sel('a11ySrLabels') ? '' : ' aria-label="Exported progress data"';
+  // M6 W2: the export textarea's accessible name localizes (a11y parity
+  // -- the SR-labels assertion pins the EXACT per-language string).
+  var EXPORT_ARIA_NAME = sel('uiLangAria') ? 'Exported progress data' : trFx('Exported progress data', 'エクスポートされた進捗データ');
+  var EXPORT_LABEL_ATTR = sel('a11ySrLabels') ? '' : (' aria-label="' + EXPORT_ARIA_NAME + '"');
   var SUMMARY_HTML = '<section id="ex-summary" tabindex="-1"><p>You have completed this exercise.</p></section>';
 
   // -----------------------------------------------------------------------
@@ -1344,7 +1399,10 @@ window.__SXC1_BOOTED = true;
         : 'Device verification is on ' + String.fromCharCode(8212) + ' confirm this step manually.';
     } else {
       cls = 'ex-verify-idle';
-      sentence = 'Device verification is off ' + String.fromCharCode(8212) + ' confirm manually, or turn it on above.';
+      sentence = trBody(
+        'Device verification is off ' + String.fromCharCode(8212) + ' confirm manually, or turn it on above.',
+        'デバイス検証はオフです ' + String.fromCharCode(8212) + ' 手動で確認するか、上でオンにしてください。'
+      );
     }
     return '<p class="ex-verify ' + cls + '" id="ex-step-' + stepN + '-verify"' + ARIA_LIVE_ATTR + '>' + sentence + '</p>';
   }
@@ -1583,17 +1641,48 @@ window.__SXC1_BOOTED = true;
   var CURRENT_PREFS = (function () {
     var raw = null;
     try { raw = window.localStorage.getItem(PREFS_KEY); } catch (e) { /* treated as default */ }
-    if (raw == null || raw.trim() === '') return { jaFirst: false };
+    // M6 W2: the blob is v2 now (jaFirst + jaFirstSet + uiLang --
+    // mirrors SXC1.Progress.Codec's own defaults/lenience). The
+    // fixture's DISPLAY language still comes from the sxc1.uilang boot
+    // hint (UILANG above), exactly like the real static shell.
+    var defaults = { jaFirst: false, jaFirstSet: false, uiLang: 'en' };
+    if (raw == null || raw.trim() === '') return defaults;
     var lines = raw.split(NL);
     var header = (lines[0] || '').split(TAB);
-    if (header[0] !== 'SXC1PREFS') return { jaFirst: false };
-    var jaFirst = false;
+    if (header[0] !== 'SXC1PREFS') return defaults;
+    var out = { jaFirst: false, jaFirstSet: false, uiLang: 'en' };
     for (var i = 1; i < lines.length; i++) {
       var f = lines[i].split(TAB);
-      if (f[0] === 'P' && f[1] === 'jaFirst') jaFirst = (f[2] === '1');
+      if (f[0] === 'P' && f[1] === 'jaFirst') out.jaFirst = (f[2] === '1');
+      if (f[0] === 'P' && f[1] === 'jaFirstSet') out.jaFirstSet = (f[2] === '1');
+      if (f[0] === 'P' && f[1] === 'uiLang') out.uiLang = (f[2] === 'ja' ? 'ja' : 'en');
     }
-    return { jaFirst: jaFirst };
+    return out;
   })();
+
+  // One writer for the whole v2 blob (the app's savePrefs always writes
+  // every field; a partial write would clobber the others).
+  function writePrefsBlob() {
+    try {
+      window.localStorage.setItem(PREFS_KEY, 'SXC1PREFS' + TAB + '2' + NL +
+        'P' + TAB + 'jaFirst' + TAB + (CURRENT_PREFS.jaFirst ? '1' : '0') + NL +
+        'P' + TAB + 'jaFirstSet' + TAB + (CURRENT_PREFS.jaFirstSet ? '1' : '0') + NL +
+        'P' + TAB + 'uiLang' + TAB + CURRENT_PREFS.uiLang + NL);
+    } catch (e) { /* best effort */ }
+  }
+
+  // M6 W2 mirror of Main.hs's PUiLangToggle: persist prefs + hint, then
+  // reload (reload-as-refetch). See the UILANG block's own comment for
+  // the 'uiLangPref' sabotage this carries.
+  function saveUiLang(code) {
+    CURRENT_PREFS.uiLang = code;
+    if (sel('uiLangPref')) {
+      try { window.sessionStorage.setItem('sxc1.selftest.uilang', code); } catch (e) { /* best effort */ }
+      return;
+    }
+    writePrefsBlob();
+    try { window.localStorage.setItem('sxc1.uilang', code); } catch (e) { /* best effort */ }
+  }
 
   // SABOTAGE, selector 'jaFirstPersist' (or legacy-all) -- deliberately
   // maps to BOTH "jaFirstPersistsValue" AND "jaFirstPersistsOrder", which
@@ -1607,7 +1696,8 @@ window.__SXC1_BOOTED = true;
   // leftover of the old megamutant -- see M3_SELECTOR_ASSERTIONS' own
   // comment.
   function saveJaFirst(v) {
-    CURRENT_PREFS = { jaFirst: v };
+    CURRENT_PREFS.jaFirst = v;
+    CURRENT_PREFS.jaFirstSet = true;
     // NEW10: legacy-all skips EVERY write, unchanged from the old
     // combined behaviour (so D2/D3 still fail under legacy-all too, as
     // LEGACY_EXPECTED_TO_FAIL already lists). 'jaFirstPersist' selected
@@ -1619,11 +1709,7 @@ window.__SXC1_BOOTED = true;
     // already broke.
     var skipWrite = LEGACY_ALL || (v === true && sel('jaFirstPersist') && ST.jaFirstOnSaves === 0);
     if (v === true) { ST.jaFirstOnSaves += 1; writeSelfTestState(); }
-    if (!skipWrite) {
-      try {
-        window.localStorage.setItem(PREFS_KEY, 'SXC1PREFS' + TAB + '1' + NL + 'P' + TAB + 'jaFirst' + TAB + (v ? '1' : '0') + NL);
-      } catch (e) { /* best effort */ }
-    }
+    if (!skipWrite) writePrefsBlob();
   }
 
   function mergeRec(recs, pid, rec) {
@@ -1728,6 +1814,8 @@ window.__SXC1_BOOTED = true;
       // sabotaged): always reports true here regardless of the real
       // preference.
       jaFirst: (sel('freshJaFirst') || LEGACY_ALL) ? true : (CURRENT_PREFS.jaFirst === true),
+      // M6 W2: the active UI language (mirrors Main.progressJson).
+      uiLang: UILANG,
     };
     document.getElementById('sxc1-progress').textContent = JSON.stringify(payload);
   }
@@ -1746,11 +1834,18 @@ window.__SXC1_BOOTED = true;
   // simply unioned with every named selector's own sabotage).
   function renderHeader(onManualRoute) {
     var due = sel('reviewBadgeMatchesDue') ? 0 : (currentDue() + (LEGACY_ALL ? 1 : 0));
-    var html = '<a id="sxc1-review-badge" href="#/">Review ' + due + '</a>';
+    // M6 W2: header strings localize; SABOTAGE 'uiLangHeader' keeps them
+    // EN under ja (exactly the UILANG_HEADER assertion's defect).
+    var trHeader = function (en, ja) { return sel('uiLangHeader') ? en : trFx(en, ja); };
+    var html = '<a id="sxc1-review-badge" href="#/">' + trHeader('Review ', '復習 ') + due + '</a>';
     if (onManualRoute) {
       html += '<button id="btn-ja-first" type="button" aria-pressed="' + (CURRENT_PREFS.jaFirst ? 'true' : 'false') + '">' +
-        (CURRENT_PREFS.jaFirst ? 'Japanese first: on' : 'Japanese first: off') + '</button>';
+        (CURRENT_PREFS.jaFirst ? trHeader('Japanese first: on', '日本語を先に表示: オン') : trHeader('Japanese first: off', '日本語を先に表示: オフ')) + '</button>';
     }
+    // #btn-ui-lang on EVERY route, mirroring View.Progress.uiLangHeaderEls:
+    // the label is the language it switches TO, written in that language.
+    html += '<button id="btn-ui-lang" type="button" class="nav-toggle">' +
+      (UILANG === 'ja' ? trHeader('日本語', 'English') : '日本語') + '</button>';
     document.getElementById('sxc1-header').innerHTML = html;
     if (onManualRoute) {
       document.getElementById('btn-ja-first').addEventListener('click', function () {
@@ -1758,6 +1853,10 @@ window.__SXC1_BOOTED = true;
         render();
       });
     }
+    document.getElementById('btn-ui-lang').addEventListener('click', function () {
+      saveUiLang(UILANG === 'ja' ? 'en' : 'ja');
+      location.reload();
+    });
   }
 
   // NEW11: mirrors View.Progress.reviewQueueEls's real DOM contract
@@ -1894,7 +1993,7 @@ window.__SXC1_BOOTED = true;
       CURRENT_PROGRESS = { kind: 'empty', recs: {}, streakDay: 0, streakLen: 0 };
       try { window.localStorage.removeItem(PROG_KEY); } catch (e) { /* best effort */ }
       if (alsoClearPrefs) {
-        CURRENT_PREFS = { jaFirst: false };
+        CURRENT_PREFS = { jaFirst: false, jaFirstSet: false, uiLang: CURRENT_PREFS.uiLang };
         try { window.localStorage.removeItem(PREFS_KEY); } catch (e) { /* best effort */ }
       }
       ST.wipeCount = wipeIndexBefore + 1;
@@ -2051,7 +2150,7 @@ window.__SXC1_BOOTED = true;
       ? '<ul id="ex-cites"><li><a class="cite" href="#/m/' + FIXTURE.quiz.citeSlug + '/p/' + FIXTURE.quiz.citePage + '">cite</a></li></ul>'
       : citesHtml;
     return '<p id="ex-feedback" class="' + (correct ? 'correct' : 'incorrect') + '" role="status">' +
-      (correct ? 'Correct.' : 'Not quite. Try again.') + '</p>' +
+      (correct ? trBody('Correct.', '正解。') : trBody('Not quite. Try again.', '不正解。もう一度。')) + '</p>' +
       (correct ? ('<div id="ex-note"><p>Why: demo note.</p></div>' + cites +
         '<button id="btn-ex-next">Next</button>') : '');
   }
@@ -2519,6 +2618,74 @@ const SR_LABELS_ASSERTION_NAME =
 const CONTENT_ABSENT_ASSERTION_NAME =
   'degraded-content surface absent on a healthy boot: no #sxc1-content-error banner, no #btn-content-retry anywhere in the DOM';
 
+// ---------------------------------------------------------------------------
+// M6 W2 (briefs/M6-plan.md ruling 3 + W2): THE UI-TEXT TABLE -- the ONE
+// place both language passes read every learner-visible string a browser
+// assertion PINS. Mirrors site/app/I18n.hs (the app's own table) entry
+// for entry for exactly the strings pinned here; the JA flow runs the
+// SAME assertion code with lang='ja' (parameterize, never duplicate --
+// ruling 7), so a pinned string can only ever drift in one file.
+// ---------------------------------------------------------------------------
+const UI_TEXT = {
+  en: {
+    correctPrefix: 'Correct',
+    notQuitePrefix: 'Not quite',
+    exportAria: 'Exported progress data',
+    verifyIdleOff: 'Device verification is off \u2014 confirm manually, or turn it on above.',
+    // What #btn-ui-lang SHOWS while this language is active: the
+    // switch-to label, written in the target language (I18n.iUiLangButton).
+    uiLangButton: '\u65e5\u672c\u8a9e', // 日本語
+    reviewBadgePrefix: 'Review ',
+    devStatusOn1: 'Device verification is on, listening on MIDI channel 1.',
+    devVerifyWaitingCc: 'Waiting for the device: CC 80 = 127 on MIDI channel 1.',
+    devVerifyConfirmedCc: 'Confirmed by the device: CC 80 = 127.',
+  },
+  ja: {
+    correctPrefix: '\u6b63\u89e3',       // 正解
+    notQuitePrefix: '\u4e0d\u6b63\u89e3', // 不正解
+    exportAria: '\u30a8\u30af\u30b9\u30dd\u30fc\u30c8\u3055\u308c\u305f\u9032\u6357\u30c7\u30fc\u30bf', // エクスポートされた進捗データ
+    verifyIdleOff: '\u30c7\u30d0\u30a4\u30b9\u691c\u8a3c\u306f\u30aa\u30d5\u3067\u3059 \u2014 \u624b\u52d5\u3067\u78ba\u8a8d\u3059\u308b\u304b\u3001\u4e0a\u3067\u30aa\u30f3\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002',
+    uiLangButton: 'English',
+    reviewBadgePrefix: '\u5fa9\u7fd2 ', // 復習
+    devStatusOn1: '\u30c7\u30d0\u30a4\u30b9\u691c\u8a3c\u306f\u30aa\u30f3\u3067\u3059\u3002MIDI\u30c1\u30e3\u30f3\u30cd\u30eb1\u3067\u5f85\u3061\u53d7\u3051\u3066\u3044\u307e\u3059\u3002',
+    devVerifyWaitingCc: '\u30c7\u30d0\u30a4\u30b9\u3092\u5f85\u6a5f\u4e2d: CC 80 = 127\uff08MIDI\u30c1\u30e3\u30f3\u30cd\u30eb1\uff09\u3002',
+    devVerifyConfirmedCc: '\u30c7\u30d0\u30a4\u30b9\u3067\u78ba\u8a8d\u6e08\u307f: CC 80 = 127\u3002',
+  },
+};
+
+// The ja-pass instances of runExerciseAssertions' own fixed names carry
+// this suffix (the en pass stays byte-identical to before W2, so the
+// LEGACY_EXPECTED_TO_FAIL list and every existing map keep matching).
+const JA_NAME_SUFFIX = ' [ja]';
+
+// Fixed names for the feedback-pinning assertions (previously inline
+// literals), so the M6 W2 negative map can reference their ja instances.
+const WRONG_QUIZ_FEEDBACK_ASSERTION_NAME =
+  'wrong quiz answer: #ex-feedback starts with "Not quite" and carries class "incorrect"';
+const CORRECT_QUIZ_FEEDBACK_ASSERTION_NAME =
+  'correct quiz answer: #ex-feedback starts with "Correct", class "correct", #ex-note visible, #btn-ex-next present';
+const LOOKUP_WRONG_ASSERTION_NAME =
+  'lookup: wrong page submits to "Not quite"';
+const LOOKUP_CORRECT_ASSERTION_NAME =
+  'lookup: correct page submits to "Correct" and #ex-elapsed matches ^[0-9]+:[0-9][0-9]$';
+
+// M6 W2: the UI-language toggle flow's own fixed names (shared by the
+// self-test fixture and the real run through runUiLangJaAssertions).
+const UILANG_SWITCH_ASSERTION_NAME =
+  'UI language toggle: #btn-ui-lang shows the switch-to-ja label under EN and clicking it comes back REBOOTED with uiLang "ja" (reload-as-refetch is the switch mechanism)';
+const UILANG_HEADER_ASSERTION_NAME =
+  'UI language ja: the header renders Japanese (review badge and #btn-ui-lang labels) and document.documentElement.lang is "ja"';
+const UILANG_PREF_ASSERTION_NAME =
+  'UI language ja: the pref survives on disk -- the sxc1.uilang boot hint is "ja" and the SXC1PREFS blob carries P uiLang ja';
+const UILANG_JAFIRST_RESPECT_ASSERTION_NAME =
+  'ruling-4 guard: switching to ja never overrides an explicitly chosen jaFirst=off (the blob keeps P jaFirst 0 alongside P jaFirstSet 1)';
+const UILANG_BUNDLE_ASSERTION_NAME =
+  'UI language ja: the reloaded document fetched content/content.ja.txt and not content.en.txt (the reload IS the refetch)';
+const UILANG_VERIFY_JA_ASSERTION_NAME =
+  'UI language ja: a verify-hooked drill step renders the JA idle verify sentence in its aria-live region (learner-visible device text localizes)';
+const UILANG_ROUNDTRIP_ASSERTION_NAME =
+  'UI language toggle roundtrip: switching back restores EN (uiLang "en" after another reboot, #btn-ui-lang shows the switch-to-ja label again)';
+
 // Trusted keyboard input for a session: returns pressKey(key) driving the
 // full keyDown/keyUp pair through CDP's Input domain. 'Tab'/'Enter' are
 // the navigation/activation pair the keyboard flows live on; single
@@ -2540,7 +2707,8 @@ function keyPresserFor(cdp, sessionId) {
   };
 }
 
-async function assertColdFirstTryElapsed(coldH, fixture, waitMs) {
+async function assertColdFirstTryElapsed(coldH, fixture, waitMs, lang = 'en') {
+  const T = UI_TEXT[lang] || UI_TEXT.en;
   const baselinePoll = await coldH.evaluate(`(async () => {
     const budgetMs = ${BASELINE_POLL_BUDGET_MS};
     const intervalMs = ${BASELINE_POLL_INTERVAL_MS};
@@ -2588,7 +2756,7 @@ async function assertColdFirstTryElapsed(coldH, fixture, waitMs) {
     let fb;
     while (Date.now() - start < 5000) {
       fb = document.querySelector('#ex-feedback');
-      if (fb && /^Correct/.test(fb.textContent)) break;
+      if (fb && fb.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0) break;
       await new Promise((r) => setTimeout(r, 20));
     }
     let log = null;
@@ -2632,11 +2800,19 @@ async function assertColdFirstTryElapsed(coldH, fixture, waitMs) {
 // assertion already uses. Returns the list of {name, ok} results (in
 // order), so callers (both --self-test-negative and a real run) can
 // inspect individual outcomes, not just the total.
-async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadFn) {
+async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadFn, lang = 'en') {
+  // M6 W2: the SAME assertion code runs under both languages (ruling 7:
+  // parameterize, never duplicate). Every learner-visible text pin below
+  // reads UI_TEXT[lang]; under ja every fixed assertion name gains
+  // JA_NAME_SUFFIX so the two passes stay distinguishable in the results
+  // (and the en pass stays byte-identical to before W2).
+  const T = UI_TEXT[lang] || UI_TEXT.en;
+  const SUF = lang === 'en' ? '' : JA_NAME_SUFFIX;
   const results = [];
   const report = (name, ok, observed) => {
-    results.push({ name, ok });
-    h.report(name, ok, observed);
+    const n = name + SUF;
+    results.push({ name: n, ok });
+    h.report(n, ok, observed);
   };
 
   // 1. "#/x" renders #sxc1-exercise-index containing the fixture's deck.
@@ -2675,7 +2851,7 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
   // first-try-correct (never wrong-then-right) and why elapsedMs itself,
   // not the M:SS string.
   if (typeof coldLoadFn === 'function') {
-    await coldLoadFn(fixture, report);
+    await coldLoadFn(fixture, report, lang);
   } else {
     report(COLD_ELAPSED_ASSERTION_NAME, false, 'no coldLoadFn was wired for this harness');
   }
@@ -2714,8 +2890,8 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     return e ? { text: e.textContent, cls: e.className } : null;
   })()`);
   report(
-    'wrong quiz answer: #ex-feedback starts with "Not quite" and carries class "incorrect"',
-    Boolean(wrongFeedback && /^Not quite/.test(wrongFeedback.text) && wrongFeedback.cls.split(/\s+/).includes('incorrect')),
+    WRONG_QUIZ_FEEDBACK_ASSERTION_NAME,
+    Boolean(wrongFeedback && wrongFeedback.text.startsWith(T.notQuitePrefix) && wrongFeedback.cls.split(/\s+/).includes('incorrect')),
     wrongFeedback,
   );
   // M2 gate fix (H1/M5): this wrong-answer submit is the exercise's
@@ -2758,7 +2934,7 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     let fb;
     while (Date.now() - start < 3000) {
       fb = document.querySelector('#ex-feedback');
-      if (fb && /^Correct/.test(fb.textContent)) break;
+      if (fb && fb.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0) break;
       await new Promise((r) => setTimeout(r, 20));
     }
     const note = document.querySelector('#ex-note');
@@ -2770,8 +2946,8 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     } : null;
   })()`);
   report(
-    'correct quiz answer: #ex-feedback starts with "Correct", class "correct", #ex-note visible, #btn-ex-next present',
-    Boolean(rightFeedback && /^Correct/.test(rightFeedback.text) && rightFeedback.cls.split(/\s+/).includes('correct')
+    CORRECT_QUIZ_FEEDBACK_ASSERTION_NAME,
+    Boolean(rightFeedback && rightFeedback.text.startsWith(T.correctPrefix) && rightFeedback.cls.split(/\s+/).includes('correct')
       && rightFeedback.noteVisible && rightFeedback.nextPresent),
     rightFeedback,
   );
@@ -2943,7 +3119,7 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     }
     return e ? e.textContent : null;
   })()`);
-  report('lookup: wrong page submits to "Not quite"', Boolean(lookupWrong && /^Not quite/.test(lookupWrong)), lookupWrong);
+  report(LOOKUP_WRONG_ASSERTION_NAME, Boolean(lookupWrong && lookupWrong.startsWith(T.notQuitePrefix)), lookupWrong);
   await h.typeText('#ex-find-input', String(fixture.lookup.targetPage));
   await h.clickAssert('#btn-ex-find-submit', 'submit the correct lookup page');
   const lookupRight = await h.evaluate(`(async () => {
@@ -2951,15 +3127,15 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     let fb;
     while (Date.now() - start < 3000) {
       fb = document.querySelector('#ex-feedback');
-      if (fb && /^Correct/.test(fb.textContent)) break;
+      if (fb && fb.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0) break;
       await new Promise((r) => setTimeout(r, 20));
     }
     const el = document.querySelector('#ex-elapsed');
     return { text: fb ? fb.textContent : null, elapsed: el ? el.textContent : null };
   })()`);
   report(
-    'lookup: correct page submits to "Correct" and #ex-elapsed matches ^[0-9]+:[0-9][0-9]$',
-    Boolean(lookupRight.text && /^Correct/.test(lookupRight.text) && lookupRight.elapsed && /^[0-9]+:[0-9][0-9]$/.test(lookupRight.elapsed)),
+    LOOKUP_CORRECT_ASSERTION_NAME,
+    Boolean(lookupRight.text && lookupRight.text.startsWith(T.correctPrefix) && lookupRight.elapsed && /^[0-9]+:[0-9][0-9]$/.test(lookupRight.elapsed)),
     lookupRight,
   );
 
@@ -3062,7 +3238,7 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     await waitFor("document.querySelector('#ex-feedback') === null");
     await fClick(`#${fixture.quiz.correctOpt}`);
     await fClick('#btn-ex-submit');
-    await waitFor("(() => { const e = document.querySelector('#ex-feedback'); return e && /^Correct/.test(e.textContent); })()");
+    await waitFor(`(() => { const e = document.querySelector('#ex-feedback'); return e && e.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0; })()`);
     await fClick('#btn-ex-next');
     const fqSummary = await waitFor("document.querySelector('#ex-summary') !== null");
     const fqFocus = await waitFocusOn('ex-summary');
@@ -3112,7 +3288,7 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     kbq.pressed = await waitFor(`(() => { const o = document.querySelector('#${fixture.quiz.correctOpt}'); return o && o.getAttribute('aria-pressed') === 'true'; })()`);
     kbq.submit = await kbTabTo('btn-ex-submit');
     if (kbq.submit.found) await h.pressKey('Enter');
-    kbq.correct = await waitFor("(() => { const e = document.querySelector('#ex-feedback'); return e && /^Correct/.test(e.textContent); })()");
+    kbq.correct = await waitFor(`(() => { const e = document.querySelector('#ex-feedback'); return e && e.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0; })()`);
     kbq.next = await kbTabTo('btn-ex-next');
     if (kbq.next.found) await h.pressKey('Enter');
     kbq.summary = await waitFor("document.querySelector('#ex-summary') !== null");
@@ -3158,7 +3334,7 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     kbl.typed = await waitFor(`(() => { const e = document.querySelector('#ex-find-input'); return e && e.value === ${JSON.stringify(String(fixture.lookup.targetPage))}; })()`);
     kbl.submit = await kbTabTo('btn-ex-find-submit');
     if (kbl.submit.found) await h.pressKey('Enter');
-    kbl.correct = await waitFor("(() => { const e = document.querySelector('#ex-feedback'); return e && /^Correct/.test(e.textContent); })()");
+    kbl.correct = await waitFor(`(() => { const e = document.querySelector('#ex-feedback'); return e && e.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0; })()`);
     kbl.next = await kbTabTo('btn-ex-next');
     if (kbl.next.found) await h.pressKey('Enter');
     kbl.summary = await waitFor("document.querySelector('#ex-summary') !== null");
@@ -3182,11 +3358,14 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     }
     await h.goto('#/', '#sxc1-progress-tools');
     const srExport = await h.evaluate("(() => { const e = document.querySelector('#sxc1-export-blob'); return e ? e.getAttribute('aria-label') : null; })()");
+    // M6 W2: strengthened from non-empty to the EXACT localized
+    // accessible name (UI_TEXT[lang].exportAria), so ARIA parity is a
+    // real pin under BOTH languages, not merely presence.
     report(
       SR_LABELS_ASSERTION_NAME,
-      typeof srExport === 'string' && srExport.length > 0
+      srExport === T.exportAria
         && (!srVerify.checked || srVerify.live === 'polite'),
-      { srExport, srVerify },
+      { srExport, wantAria: T.exportAria, srVerify },
     );
 
     // Restore the pre-existing route context: section 8 below has always
@@ -3225,6 +3404,159 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
   // 9. Console hygiene.
   const hygiene = h.consoleHygiene();
   report('zero console errors and uncaught exceptions during the exercise run', hygiene.ok, hygiene);
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// M6 W2: THE UI-LANGUAGE (JA) FLOW -- shared, exactly like
+// runExerciseAssertions, between the self-test fixture (whose header
+// mirrors #btn-ui-lang and the sxc1.uilang boot hint -- see the fixture's
+// own M6 W2 block) and the real app. Assumes the caller has already run
+// runProgressAssertionsPost on this session, whose final step leaves
+// jaFirst EXPLICITLY off (jaFirstSet recorded) -- which is precisely what
+// lets this flow POSITIVELY assert ruling 4's never-override-an-explicit-
+// choice half. (The suggestion-DOES-fire half needs a fresh profile and
+// lives in --check-ja-toggle, driven by check-site's own stage.)
+//
+// Steps: switch EN->JA through the real #btn-ui-lang (the app persists
+// the pref + boot hint and reloads itself -- reload-as-refetch); assert
+// header/pref/(optionally bundle-fetch); re-run the ENTIRE
+// runExerciseAssertions under lang='ja' (every learner-visible text pin
+// now pins the JA string -- ruling 7's parameterize-not-duplicate,
+// a11y assertions included); pin the JA verify idle sentence; then
+// switch back to EN and assert the roundtrip, so everything after this
+// flow (mobile sweep, D-suite) still runs under the language it pins.
+// `cfg.checkBundleFetch` gates the resource-entry assertion to the real
+// run (the file:// fixture fetches no bundle -- documented, never
+// silently skipped: the fixture caller passes false).
+// ---------------------------------------------------------------------------
+async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
+  const results = [];
+  const report = (name, ok, observed) => {
+    results.push({ name, ok });
+    h.report(name, ok, observed);
+  };
+  const readUiLang = async () => {
+    const payload = await h.evaluate("(() => { const e = document.querySelector('#sxc1-progress'); try { return JSON.parse(e ? e.textContent : 'null'); } catch (err) { return null; } })()");
+    return payload ? payload.uiLang : null;
+  };
+  const btnLabel = () => h.evaluate("(() => { const e = document.querySelector('#btn-ui-lang'); return e ? e.textContent : null; })()");
+  const clickUiLang = () => h.evaluate("(() => { const e = document.querySelector('#btn-ui-lang'); if (!e) return false; e.click(); return true; })()");
+
+  // -- 1. THE SWITCH. The click persists prefs + hint and triggers a
+  // real reload; waitBooted (never Page.reload -- the PAGE reloads
+  // itself) then a settled uiLang === 'ja' payload.
+  await h.goto('#/', '#sxc1-progress-tools');
+  const labelBefore = await btnLabel();
+  const uiLangBefore = await readUiLang();
+  const clicked = await clickUiLang();
+  let rebootedJa = false;
+  if (clicked) {
+    rebootedJa = await h.waitBooted(20000)
+      && await waitForTrue(h.evaluate, "(() => { const e = document.querySelector('#sxc1-progress'); try { return JSON.parse(e ? e.textContent : 'null').uiLang === 'ja'; } catch (err) { return false; } })()", 8000);
+  }
+  report(
+    UILANG_SWITCH_ASSERTION_NAME,
+    labelBefore === UI_TEXT.en.uiLangButton && uiLangBefore === 'en' && clicked && rebootedJa === true,
+    { labelBefore, uiLangBefore, clicked, rebootedJa },
+  );
+
+  // -- 2. Header renders Japanese; the document's own lang tag follows.
+  await h.goto('#/', '#sxc1-progress-tools');
+  const headerJa = await h.evaluate(`(() => {
+    const btn = document.querySelector('#btn-ui-lang');
+    const badge = document.querySelector('#sxc1-review-badge');
+    return {
+      btnLabel: btn ? btn.textContent : null,
+      badgeText: badge ? badge.textContent : null,
+      docLang: document.documentElement.lang,
+    };
+  })()`);
+  report(
+    UILANG_HEADER_ASSERTION_NAME,
+    Boolean(headerJa)
+      && headerJa.btnLabel === UI_TEXT.ja.uiLangButton
+      && typeof headerJa.badgeText === 'string' && headerJa.badgeText.startsWith(UI_TEXT.ja.reviewBadgePrefix)
+      && headerJa.docLang === 'ja',
+    { headerJa, wantBtn: UI_TEXT.ja.uiLangButton, wantBadgePrefix: UI_TEXT.ja.reviewBadgePrefix },
+  );
+
+  // -- 3. The pref really survives on disk: the dedicated boot hint AND
+  // the prefs blob's own uiLang line (read raw -- house standard 4's
+  // independent re-derivation of the wire format, never the app's own
+  // decoder).
+  const hintJa = await readLocalStorageRaw(h.evaluate, 'sxc1.uilang');
+  const prefsRawJa = await readLocalStorageRaw(h.evaluate, PREFS_KEY);
+  report(
+    UILANG_PREF_ASSERTION_NAME,
+    hintJa === 'ja' && /(^|\n)P\tuiLang\tja(\n|$)/.test(prefsRawJa || ''),
+    { hintJa, prefsRawJa },
+  );
+
+  // -- 4. Ruling 4's guard, positive half: runProgressAssertionsPost's
+  // final step explicitly chose jaFirst=off (and PJaFirst records
+  // jaFirstSet), so this ja switch must NOT have flipped it.
+  report(
+    UILANG_JAFIRST_RESPECT_ASSERTION_NAME,
+    /(^|\n)P\tjaFirst\t0(\n|$)/.test(prefsRawJa || '') && /(^|\n)P\tjaFirstSet\t1(\n|$)/.test(prefsRawJa || ''),
+    { prefsRawJa },
+  );
+
+  // -- 5. The reload really fetched the OTHER bundle (real run only:
+  // the file:// fixture fetches no bundle at all).
+  if (cfg && cfg.checkBundleFetch) {
+    const fetched = await h.evaluate(`(() => {
+      const names = performance.getEntriesByType('resource').map((e) => e.name);
+      return {
+        ja: names.some((n) => n.indexOf('content/content.ja.txt') !== -1),
+        en: names.some((n) => n.indexOf('content/content.en.txt') !== -1),
+      };
+    })()`);
+    report(UILANG_BUNDLE_ASSERTION_NAME, Boolean(fetched) && fetched.ja === true && fetched.en === false, fetched);
+  }
+
+  // -- 6. THE JA PASS: the same exercise/a11y assertion code, lang='ja'
+  // -- every learner-visible text pin now pins the JA string.
+  // expectedExerciseJson is deliberately null: #sxc1-exercise-stats
+  // derives from the FETCHED (ja) bundle, whose per-deck chars/fnv1a
+  // lawfully diverge from the EN disk derivation once W3 fills the ja:
+  // fields -- the stats identity is the EN pass's claim.
+  const jaResults = await runExerciseAssertions(h, fixture, null, coldLoadFn, 'ja');
+  results.push(...jaResults);
+
+  // -- 7. The verify line's learner-visible device sentence, in JA, in
+  // its aria-live region (a11y parity for the no-fake idle state; the
+  // waiting/confirmed sentences are pinned against the real wasm by
+  // --check-ja-toggle's device flow).
+  if (fixture.drill.hasVerify) {
+    await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
+    const verifyJa = await h.evaluate("(() => { const e = document.querySelector('.ex-verify'); return e ? { text: e.textContent, live: e.getAttribute('aria-live') } : null; })()");
+    report(
+      UILANG_VERIFY_JA_ASSERTION_NAME,
+      Boolean(verifyJa) && verifyJa.text === UI_TEXT.ja.verifyIdleOff && verifyJa.live === 'polite',
+      { verifyJa, want: UI_TEXT.ja.verifyIdleOff },
+    );
+  }
+
+  // -- 8. ROUNDTRIP: back to EN, so every assertion after this flow
+  // still runs under the language it pins. (The boot hint's restoration
+  // is UILANG_PREF's own concern on the ja side; deliberately not
+  // re-checked here so a hint-only sabotage fails exactly one name.)
+  await h.goto('#/', '#sxc1-progress-tools');
+  const clickedBack = await clickUiLang();
+  let rebootedEn = false;
+  if (clickedBack) {
+    rebootedEn = await h.waitBooted(20000)
+      && await waitForTrue(h.evaluate, "(() => { const e = document.querySelector('#sxc1-progress'); try { return JSON.parse(e ? e.textContent : 'null').uiLang === 'en'; } catch (err) { return false; } })()", 8000);
+  }
+  await h.goto('#/', '#sxc1-progress-tools');
+  const labelAfterBack = await btnLabel();
+  report(
+    UILANG_ROUNDTRIP_ASSERTION_NAME,
+    clickedBack && rebootedEn === true && labelAfterBack === UI_TEXT.en.uiLangButton,
+    { clickedBack, rebootedEn, labelAfterBack },
+  );
 
   return results;
 }
@@ -4106,6 +4438,40 @@ const M6_SELECTOR_ASSERTIONS = {
   contentDegraded: {
     expectedToFail: [CONTENT_ABSENT_ASSERTION_NAME],
     includeDevice: false,
+  },
+};
+
+// M6 W2: the UI-language sabotage points -- each one isolates one layer
+// of the JA flow (see the fixture's own UILANG block for how), and every
+// pass carries includeJaFlow so the flow actually runs. 'uiLangText'
+// maps to several names ON PURPOSE: unlocalized learner-visible body
+// strings are ONE root cause observed at every feedback/verify pin the
+// ja pass makes (the devPanelAlways/jaFirstPersist honest-grouping
+// precedent).
+const M6W2_SELECTOR_ASSERTIONS = {
+  uiLangHeader: {
+    expectedToFail: [UILANG_HEADER_ASSERTION_NAME],
+    includeDevice: false, includeJaFlow: true,
+  },
+  uiLangPref: {
+    expectedToFail: [UILANG_PREF_ASSERTION_NAME],
+    includeDevice: false, includeJaFlow: true,
+  },
+  uiLangText: {
+    expectedToFail: [
+      WRONG_QUIZ_FEEDBACK_ASSERTION_NAME + JA_NAME_SUFFIX,
+      CORRECT_QUIZ_FEEDBACK_ASSERTION_NAME + JA_NAME_SUFFIX,
+      LOOKUP_WRONG_ASSERTION_NAME + JA_NAME_SUFFIX,
+      LOOKUP_CORRECT_ASSERTION_NAME + JA_NAME_SUFFIX,
+      KB_QUIZ_ASSERTION_NAME + JA_NAME_SUFFIX,
+      KB_LOOKUP_ASSERTION_NAME + JA_NAME_SUFFIX,
+      UILANG_VERIFY_JA_ASSERTION_NAME,
+    ],
+    includeDevice: false, includeJaFlow: true,
+  },
+  uiLangAria: {
+    expectedToFail: [SR_LABELS_ASSERTION_NAME + JA_NAME_SUFFIX],
+    includeDevice: false, includeJaFlow: true,
   },
 };
 
@@ -5463,6 +5829,287 @@ async function runContentMissingCheck(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// M6 W2: --check-ja-toggle -- see printHelp's own entry. The pinned
+// route/title constants live here (the DEVICE_REAL_CFG precedent: the
+// harness pins real seed-corpus identities); the JA title is the one
+// temporary ja: variant check-site's stage injects into ITS SERVED COPY
+// of the corpus (content/ itself is never touched -- the shipped
+// bundles' freshness check would catch that).
+// ---------------------------------------------------------------------------
+const JA_TOGGLE_CFG = {
+  quizRoute: '#/x/pad-01/q-2-01',
+  quizReady: '.kind-quiz',
+  // 「BANK」とは -- the injected ja: heading variant for q-2-01's title.
+  jaQuizTitle: '\u300cBANK\u300d\u3068\u306f',
+  drillRoute: DEVICE_REAL_CFG.drill.route,
+  goodBytes: DEVICE_REAL_CFG.drill.good,
+  // デバイス検証を有効にする -- I18n.iDevEnable (Ja).
+  jaDevEnableLabel: '\u30c7\u30d0\u30a4\u30b9\u691c\u8a3c\u3092\u6709\u52b9\u306b\u3059\u308b',
+};
+
+async function runJaToggleCheck(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const cleanupFns = [];
+  const runCleanup = async () => {
+    for (const fn of cleanupFns.splice(0).reverse()) {
+      try { await fn(); } catch { /* best-effort cleanup */ }
+    }
+  };
+  const die = async (code, message) => {
+    if (message) console.log(message);
+    await runCleanup();
+    process.exit(code);
+  };
+
+  const browserPath = resolveBrowser(opts.browser);
+  if (!browserPath) {
+    await die(2, 'error: no browser found for --check-ja-toggle. Install Google Chrome/Chromium, or set ' +
+      'SXC1_BROWSER to a browser executable path, or pass --browser <path>.');
+    return;
+  }
+
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sxc1-jatoggle-profile-'));
+  cleanupFns.push(() => removeDirWithRetry(userDataDir));
+  const debugPort = await findFreePort();
+  const browserProc = spawn(browserPath, [
+    '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
+    '--disable-dev-shm-usage', `--user-data-dir=${userDataDir}`, `--remote-debugging-port=${debugPort}`, 'about:blank',
+  ], { stdio: 'ignore', detached: true });
+  let cdp = null;
+  let browserFailure = null;
+  const noteBrowserFailure = (message) => {
+    if (!browserFailure) browserFailure = new Error(message);
+    if (cdp) cdp.failFatally(browserFailure);
+  };
+  browserProc.on('exit', (code, signal) => {
+    noteBrowserFailure(`browser process exited unexpectedly (code=${code === null ? 'null' : code}, signal=${signal || 'none'})`);
+  });
+  browserProc.on('error', (err) => {
+    noteBrowserFailure(`browser process error: ${err && err.message ? err.message : err}`);
+  });
+  cleanupFns.push(() => new Promise((resolve) => {
+    const killGroup = (signal) => { try { process.kill(-browserProc.pid, signal); } catch { /* group already gone */ } };
+    if (browserProc.exitCode !== null || browserProc.signalCode !== null) { killGroup('SIGKILL'); resolve(); return; }
+    const forceKillTimer = setTimeout(() => killGroup('SIGKILL'), 3000);
+    browserProc.once('exit', () => { clearTimeout(forceKillTimer); killGroup('SIGKILL'); resolve(); });
+    killGroup('SIGTERM');
+  }));
+
+  let versionInfo = null;
+  while (Date.now() < deadline) {
+    if (browserFailure) {
+      await die(2, `error: ${browserFailure.message} (before DevTools became reachable at ${browserPath})`);
+      return;
+    }
+    try {
+      const info = await withDeadline(
+        httpGetJson(`http://127.0.0.1:${debugPort}/json/version`),
+        deadline,
+        'DevTools /json/version request',
+      );
+      if (info && info.webSocketDebuggerUrl) { versionInfo = info; break; }
+    } catch { /* not up yet */ }
+    await sleep(200);
+  }
+  if (!versionInfo) {
+    await die(2, 'error: timed out waiting for DevTools (--check-ja-toggle)');
+    return;
+  }
+
+  const ws = await withDeadline(connectWebSocket(versionInfo.webSocketDebuggerUrl), deadline, 'WebSocket connect');
+  cleanupFns.push(() => { try { ws.close(); } catch { /* ignore */ } });
+  cdp = new CDPClient(ws, { getRemaining: () => remaining(deadline) });
+  ws.addEventListener('close', () => cdp.failFatally(new Error('CDP WebSocket closed unexpectedly')));
+  ws.addEventListener('error', (ev) => cdp.failFatally(new Error(`CDP WebSocket error: ${formatWsErrorEvent(ev)}`)));
+
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+  await cdp.send('Page.enable', {}, sessionId);
+  await cdp.send('Runtime.enable', {}, sessionId);
+
+  // The JA device flow needs a grantable Web MIDI: inject the committed
+  // harness fake (P-B: BEFORE the first navigation; it reinstalls on
+  // every navigation of this target, so the app's own language-switch
+  // reload keeps a fresh grant+port fake too).
+  const fakeSrc = fs.readFileSync(FAKE_MIDI_PATH, 'utf8');
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `${fakeSrc}\n;(function () { try { ${DEV_PRE_GRANT_SXC} } catch (e) { console.error('fake-midi preamble failed: ' + e); } })();`,
+  }, sessionId);
+
+  const evaluate = async (expression) => {
+    const res = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+    if (res.exceptionDetails) {
+      const d = res.exceptionDetails;
+      throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
+    }
+    return res.result ? res.result.value : undefined;
+  };
+  const waitBootedHere = async (timeoutMs = 20000) => {
+    await sleep(300);
+    const bootDeadline = Date.now() + timeoutMs;
+    while (Date.now() < bootDeadline) {
+      let b;
+      try { b = await evaluate('window.__SXC1_BOOTED === true'); } catch { b = false; }
+      if (b === true) return true;
+      await sleep(50);
+    }
+    return false;
+  };
+  const gotoHash = (hash, readySelector, timeoutMs = 8000) => evaluate(`(async () => {
+    window.location.hash = ${JSON.stringify(hash)};
+    const start = Date.now();
+    while (Date.now() - start < ${timeoutMs}) {
+      if (document.querySelector(${JSON.stringify(readySelector)})) return true;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return document.querySelector(${JSON.stringify(readySelector)}) !== null;
+  })()`);
+  const readUiLang = async () => {
+    try {
+      return await evaluate("(() => { const e = document.querySelector('#sxc1-progress'); try { return JSON.parse(e ? e.textContent : 'null').uiLang; } catch (err) { return null; } })()");
+    } catch { return null; }
+  };
+  const resourceLangs = () => evaluate(`(() => {
+    const names = performance.getEntriesByType('resource').map((e) => e.name);
+    return {
+      ja: names.some((n) => n.indexOf('content/content.ja.txt') !== -1),
+      en: names.some((n) => n.indexOf('content/content.en.txt') !== -1),
+    };
+  })()`);
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); }
+    else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+  const NAMES = {
+    bootsEn: 'ja-toggle: fresh profile boots EN -- document lang "en", #btn-ui-lang shows the switch-to-ja label, content.en.txt fetched',
+    switchJa: 'ja-toggle: clicking #btn-ui-lang persists and RELOADS into uiLang "ja" (reload-as-refetch)',
+    bundleJa: 'ja-toggle: the reloaded document fetched content/content.ja.txt and not content.en.txt',
+    headerJa: 'ja-toggle: the header renders Japanese and document.documentElement.lang is "ja"',
+    prefSuggest: 'ja-toggle: ruling-4 suggestion on a fresh profile -- sxc1.uilang "ja", P uiLang ja, and the FIRST switch flipped jaFirst on WITHOUT marking it explicitly set (P jaFirst 1, P jaFirstSet 0)',
+    jaContent: 'ja-toggle: the injected ja: fixture variant renders -- the quiz title under ja is the Japanese heading from content.ja.txt',
+    devWaitingJa: 'ja-toggle: JA device flow -- enable renders the JA enable label/status sentence and the JA waiting sentence (describeSpec JA renderer) in the aria-live verify line',
+    devConfirmedJa: 'ja-toggle: JA device flow -- the matching bytes flip the verify line to the JA device-confirmed sentence',
+    backToEn: 'ja-toggle: switching back restores EN -- uiLang "en" after another reload, content.en.txt fetched, EN quiz title again',
+  };
+
+  await cdp.send('Page.navigate', { url: opts.url }, sessionId);
+  const booted = await waitBootedHere(Math.min(30000, Math.max(1, deadline - Date.now())));
+  if (!booted) {
+    report(NAMES.bootsEn, false, 'the app never reported __SXC1_BOOTED');
+    for (const n of [NAMES.switchJa, NAMES.bundleJa, NAMES.headerJa, NAMES.prefSuggest, NAMES.jaContent, NAMES.devWaitingJa, NAMES.devConfirmedJa, NAMES.backToEn]) {
+      report(n, false, 'skipped: app did not boot');
+    }
+    console.log(`browser-check --check-ja-toggle: ${passed}/${total} assertions passed`);
+    await die(1, null);
+    return;
+  }
+
+  // -- 1. Fresh profile boots EN.
+  const en0 = await evaluate(`(() => ({
+    docLang: document.documentElement.lang,
+    btn: (document.querySelector('#btn-ui-lang') || {}).textContent || null,
+  }))()`);
+  const res0 = await resourceLangs();
+  const uiLang0 = await readUiLang();
+  report(
+    NAMES.bootsEn,
+    Boolean(en0) && en0.docLang === 'en' && en0.btn === UI_TEXT.en.uiLangButton
+      && uiLang0 === 'en' && res0.en === true && res0.ja === false,
+    { en0, res0, uiLang0 },
+  );
+
+  // -- 2. Switch to JA (the click triggers the app's own persist+reload).
+  const clicked = await evaluate("(() => { const e = document.querySelector('#btn-ui-lang'); if (!e) return false; e.click(); return true; })()");
+  const rebooted = clicked && await waitBootedHere(20000);
+  const jaSettled = rebooted && await waitForTrue(evaluate, "(() => { const e = document.querySelector('#sxc1-progress'); try { return JSON.parse(e ? e.textContent : 'null').uiLang === 'ja'; } catch (err) { return false; } })()", 8000);
+  report(NAMES.switchJa, clicked && rebooted && jaSettled, { clicked, rebooted, jaSettled });
+
+  // -- 3. The reload really fetched the ja bundle.
+  const res1 = await resourceLangs();
+  report(NAMES.bundleJa, Boolean(res1) && res1.ja === true && res1.en === false, res1);
+
+  // -- 4. Japanese header + document lang.
+  const jaHdr = await evaluate(`(() => ({
+    docLang: document.documentElement.lang,
+    btn: (document.querySelector('#btn-ui-lang') || {}).textContent || null,
+    badge: (document.querySelector('#sxc1-review-badge') || {}).textContent || null,
+  }))()`);
+  report(
+    NAMES.headerJa,
+    Boolean(jaHdr) && jaHdr.docLang === 'ja' && jaHdr.btn === UI_TEXT.ja.uiLangButton
+      && typeof jaHdr.badge === 'string' && jaHdr.badge.startsWith(UI_TEXT.ja.reviewBadgePrefix),
+    jaHdr,
+  );
+
+  // -- 5. Persistence + the one-time jaFirst suggestion (fresh profile).
+  const hint = await evaluate("(() => { try { return window.localStorage.getItem('sxc1.uilang'); } catch (e) { return null; } })()");
+  const prefsRaw = await evaluate(`(() => { try { return window.localStorage.getItem(${JSON.stringify(PREFS_KEY)}); } catch (e) { return null; } })()`);
+  report(
+    NAMES.prefSuggest,
+    hint === 'ja'
+      && /(^|\n)P\tuiLang\tja(\n|$)/.test(prefsRaw || '')
+      && /(^|\n)P\tjaFirst\t1(\n|$)/.test(prefsRaw || '')
+      && /(^|\n)P\tjaFirstSet\t0(\n|$)/.test(prefsRaw || ''),
+    { hint, prefsRaw },
+  );
+
+  // -- 6. The injected ja: fixture variant renders from the ja bundle.
+  await gotoHash(JA_TOGGLE_CFG.quizRoute, JA_TOGGLE_CFG.quizReady);
+  const jaTitle = await evaluate("(() => { const e = document.querySelector('#ex-title'); return e ? e.textContent : null; })()");
+  report(NAMES.jaContent, jaTitle === JA_TOGGLE_CFG.jaQuizTitle, { jaTitle, want: JA_TOGGLE_CFG.jaQuizTitle });
+
+  // -- 7/8. The JA device flow (fake granted, SXC-1 port added).
+  await gotoHash(JA_TOGGLE_CFG.drillRoute, '.kind-drill');
+  const enableLabel = await evaluate("(() => { const e = document.querySelector('#btn-device-enable'); return e ? e.textContent : null; })()");
+  await evaluate("(() => { const e = document.querySelector('#btn-device-enable'); if (e) e.click(); return true; })()");
+  const grantedSettled = await waitDeviceState(evaluate, "p.status === 'granted'", 8000);
+  const devJa = await evaluate(`(() => ({
+    status: (document.querySelector('#device-status') || {}).textContent || null,
+    verify: (document.querySelector('#ex-step-1-verify') || {}).textContent || null,
+    verifyLive: (document.querySelector('#ex-step-1-verify') || { getAttribute: () => null }).getAttribute('aria-live'),
+  }))()`);
+  report(
+    NAMES.devWaitingJa,
+    enableLabel === JA_TOGGLE_CFG.jaDevEnableLabel && grantedSettled === true
+      && Boolean(devJa) && devJa.status === UI_TEXT.ja.devStatusOn1
+      && devJa.verify === UI_TEXT.ja.devVerifyWaitingCc && devJa.verifyLive === 'polite',
+    { enableLabel, wantEnable: JA_TOGGLE_CFG.jaDevEnableLabel, grantedSettled, devJa,
+      wantStatus: UI_TEXT.ja.devStatusOn1, wantVerify: UI_TEXT.ja.devVerifyWaitingCc },
+  );
+
+  await evaluate(fakeEmitExpr(JA_TOGGLE_CFG.goodBytes));
+  const confirmedJa = await waitForTrue(
+    evaluate,
+    `(() => { const e = document.querySelector('#ex-step-1-verify'); return Boolean(e && e.textContent === ${JSON.stringify(UI_TEXT.ja.devVerifyConfirmedCc)}); })()`,
+    8000,
+  );
+  const verifyAfter = await evaluate("(() => { const e = document.querySelector('#ex-step-1-verify'); return e ? e.textContent : null; })()");
+  report(NAMES.devConfirmedJa, confirmedJa === true, { verifyAfter, want: UI_TEXT.ja.devVerifyConfirmedCc });
+
+  // -- 9. Roundtrip back to EN.
+  await gotoHash('#/', '#sxc1-progress-tools');
+  const clickedBack = await evaluate("(() => { const e = document.querySelector('#btn-ui-lang'); if (!e) return false; e.click(); return true; })()");
+  const rebootedEn = clickedBack && await waitBootedHere(20000)
+    && await waitForTrue(evaluate, "(() => { const e = document.querySelector('#sxc1-progress'); try { return JSON.parse(e ? e.textContent : 'null').uiLang === 'en'; } catch (err) { return false; } })()", 8000);
+  const res2 = await resourceLangs();
+  await gotoHash(JA_TOGGLE_CFG.quizRoute, JA_TOGGLE_CFG.quizReady);
+  const enTitle = await evaluate("(() => { const e = document.querySelector('#ex-title'); return e ? e.textContent : null; })()");
+  report(
+    NAMES.backToEn,
+    clickedBack && rebootedEn === true && Boolean(res2) && res2.en === true && res2.ja === false
+      && typeof enTitle === 'string' && enTitle !== JA_TOGGLE_CFG.jaQuizTitle && enTitle.length > 0,
+    { clickedBack, rebootedEn, res2, enTitle },
+  );
+
+  console.log(`browser-check --check-ja-toggle: ${passed}/${total} assertions passed`);
+  await die(passed === total ? 0 : 1, null);
+}
+
+// ---------------------------------------------------------------------------
 // M4: --device-only. Launches its own throwaway browser and runs ONLY
 // runDeviceAssertions against --url -- the fast dev loop the sabotage
 // sweep uses (each app mutation needs a rebuild + one targeted run, not
@@ -5618,7 +6265,7 @@ const LEGACY_EXPECTED_TO_FAIL = [
 // one pass, selector=null; --self-test-negative: many passes, one per
 // selector) can each decide what "done" means. Always cleans up its own
 // browser/profile/fixture file before returning OR throwing.
-async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, includeDevice }) {
+async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, includeDevice, includeJaFlow }) {
   const deadline = Date.now() + opts.timeout;
   const cleanupFns = [];
   const runCleanup = async () => {
@@ -5806,6 +6453,22 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, inc
     // module-scope vars reinitialised) while localStorage -- the very
     // thing under test -- survives, exactly mirroring the real run's own
     // reload (see that one's comment for the full rationale).
+    // M6 W2: wait out a reload the PAGE started itself (#btn-ui-lang's
+    // own location.reload) -- never issues Page.reload. A short grace
+    // sleep first, so a poll racing ahead of the navigation cannot read
+    // the OLD document's still-true __SXC1_BOOTED.
+    const waitBooted = async (timeoutMs = 20000) => {
+      await sleep(300);
+      const bootDeadline = Date.now() + timeoutMs;
+      while (Date.now() < bootDeadline) {
+        let b;
+        try { b = await evaluate('window.__SXC1_BOOTED === true'); } catch { b = false; }
+        if (b === true) return true;
+        await sleep(50);
+      }
+      return false;
+    };
+
     const reload = async (readySelector, timeoutMs = 15000) => {
       await cdp.send('Page.reload', {}, sessionId);
       const bootDeadline = Date.now() + timeoutMs;
@@ -5835,7 +6498,7 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, inc
     // cold-load assertion. Kept on a separate target (rather than
     // Page.navigate-ing the primary session) so it can never leak state
     // into, or read stale state left by, the rest of runExerciseAssertions.
-    const coldLoadFn = async (fx, cbReport) => {
+    const coldLoadFn = async (fx, cbReport, lang = 'en') => {
       const waitMs = 1200;
       const coldUrl = `file://${fixturePath}#/x/${fx.quiz.deck}/${fx.quiz.id}`;
       let coldTargetId = null;
@@ -5873,7 +6536,7 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, inc
           cbReport(label, true, null);
           return true;
         };
-        await assertColdFirstTryElapsed({ evaluate: coldEvaluate, clickAssert: coldClickAssert, report: cbReport }, fx, waitMs);
+        await assertColdFirstTryElapsed({ evaluate: coldEvaluate, clickAssert: coldClickAssert, report: cbReport }, fx, waitMs, lang);
       } catch (err) {
         cbReport(COLD_ELAPSED_ASSERTION_NAME, false, `harness error: ${err && err.message ? err.message : String(err)}`);
       } finally {
@@ -5926,6 +6589,22 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, inc
     // it starts with its own wipe + reload.
     await runProgressAssertionsPost(progressHandle, progressCfg);
     results.push(...progressResults);
+
+    // M6 W2: the UI-language JA flow -- runs the whole exercise/a11y
+    // assertion set a second time under lang='ja' plus the toggle's own
+    // assertions, exactly as the real run does. Gated by includeJaFlow
+    // (the plain --self-test, the negative sweep's 'clean' pass and the
+    // M6W2 'uiLang*' passes) so every pre-W2 negative pass keeps its
+    // expected-failure set and runtime byte-identical.
+    if (includeJaFlow) {
+      const jaFlowResults = await runUiLangJaAssertions(
+        { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene, pressKey, reload, waitBooted },
+        SELF_TEST_FIXTURE,
+        coldLoadFn,
+        { checkBundleFetch: false },
+      );
+      results.push(...jaFlowResults);
+    }
 
     // M4: the device suite (D1..D25), driven against THIS SAME fixture
     // file through freshly created targets with scripts/fake-midi.js
@@ -5981,7 +6660,7 @@ async function runSelfTest(opts, negative) {
     // is raised here the same way the negative sweep already raises its
     // own. An explicit larger --timeout is still honoured.
     const passOpts = { ...opts, timeout: Math.max(opts.timeout, SELF_TEST_MIN_TIMEOUT_MS) };
-    outcome = await runOneSelfTestPass(passOpts, null, { expectedExJson, verbose: true, includeDevice: true });
+    outcome = await runOneSelfTestPass(passOpts, null, { expectedExJson, verbose: true, includeDevice: true, includeJaFlow: true });
   } catch (err) {
     console.error(`error: ${err && err.message ? err.message : err}`);
     process.exit(2);
@@ -6026,7 +6705,7 @@ async function runSelfTestNegative(opts) {
   // and every M4 'dev*' pass also run the device suite, with the higher
   // budget floor that suite needs.
   const passesInOrder = [
-    { key: 'clean', selector: null, expectedToFail: [], includeDevice: true },
+    { key: 'clean', selector: null, expectedToFail: [], includeDevice: true, includeJaFlow: true },
     { key: 'legacy-all', selector: 'legacy-all', expectedToFail: LEGACY_EXPECTED_TO_FAIL, includeDevice: false },
     ...Object.keys(M3_SELECTOR_ASSERTIONS).map((key) => ({
       key, selector: key, expectedToFail: M3_SELECTOR_ASSERTIONS[key], includeDevice: false,
@@ -6049,6 +6728,14 @@ async function runSelfTestNegative(opts) {
       selector: key,
       expectedToFail: M6_SELECTOR_ASSERTIONS[key].expectedToFail,
       includeDevice: M6_SELECTOR_ASSERTIONS[key].includeDevice,
+    })),
+    // M6 W2 passes -- the UI-language sabotage points (sweep 38 -> 42).
+    ...Object.keys(M6W2_SELECTOR_ASSERTIONS).map((key) => ({
+      key,
+      selector: key,
+      expectedToFail: M6W2_SELECTOR_ASSERTIONS[key].expectedToFail,
+      includeDevice: M6W2_SELECTOR_ASSERTIONS[key].includeDevice,
+      includeJaFlow: M6W2_SELECTOR_ASSERTIONS[key].includeJaFlow,
     })),
   ];
 
@@ -6077,7 +6764,7 @@ async function runSelfTestNegative(opts) {
         timeout: Math.max(opts.timeout, pass.includeDevice ? SELF_TEST_MIN_TIMEOUT_MS : NEGATIVE_SWEEP_MIN_TIMEOUT_MS),
       };
       // eslint-disable-next-line no-await-in-loop
-      outcome = await runOneSelfTestPass(passOpts, pass.selector, { expectedExJson: SELF_TEST_EXERCISE_STATS, verbose: false, includeDevice: pass.includeDevice });
+      outcome = await runOneSelfTestPass(passOpts, pass.selector, { expectedExJson: SELF_TEST_EXERCISE_STATS, verbose: false, includeDevice: pass.includeDevice, includeJaFlow: pass.includeJaFlow === true });
     } catch (err) {
       const message = `harness error: ${err && err.message ? err.message : err}`;
       console.error(`  FAIL - ${message}`);
@@ -6168,6 +6855,10 @@ async function main() {
   // text and runStorageRefusedCheck's comment.
   if (opts.checkContentMissing) {
     await runContentMissingCheck(opts);
+    return;
+  }
+  if (opts.checkJaToggle) {
+    await runJaToggleCheck(opts);
     return;
   }
   if (opts.checkStorageRefused) {
@@ -7115,7 +7806,7 @@ async function main() {
         // Added to trackedSessions so its console errors/exceptions
         // count toward the whole-run hygiene tracking too, same as the
         // JA cold target.
-        const coldLoadFn = async (fx, cbReport) => {
+        const coldLoadFn = async (fx, cbReport, lang = 'en') => {
           const waitMs = 1200;
           const coldBase = targetUrl.replace(/#.*$/, '');
           const coldUrl = `${coldBase}#/x/${fx.quiz.deck}/${fx.quiz.id}`;
@@ -7157,7 +7848,7 @@ async function main() {
               cbReport(label, true, null);
               return true;
             };
-            await assertColdFirstTryElapsed({ evaluate: coldEvaluate, clickAssert: coldClickAssert, report: cbReport }, fx, waitMs);
+            await assertColdFirstTryElapsed({ evaluate: coldEvaluate, clickAssert: coldClickAssert, report: cbReport }, fx, waitMs, lang);
           } catch (err) {
             cbReport(COLD_ELAPSED_ASSERTION_NAME, false, `harness error: ${err && err.message ? err.message : String(err)}`);
           } finally {
@@ -7241,6 +7932,34 @@ async function main() {
         // behind (it starts with its own wipe + reload) -- see
         // runProgressAssertionsPost's own comment.
         await runProgressAssertionsPost(progressHandle, progressCfg);
+
+        // M6 W2: THE UI-LANGUAGE JA FLOW -- the real #btn-ui-lang toggle
+        // (persist + reload-as-refetch), then the ENTIRE exercise/a11y
+        // assertion set again under lang='ja' (every learner-visible
+        // text pin pins the JA string), the JA verify sentence, the
+        // bundle-refetch proof, and the roundtrip back to EN -- so the
+        // mobile sweep and the D-suite below still run under the
+        // language whose strings they pin. Runs AFTER POST on purpose:
+        // POST's final step leaves jaFirst EXPLICITLY off, which is the
+        // precondition for the ruling-4 never-override assertion (see
+        // runUiLangJaAssertions' own comment).
+        const waitBooted = async (timeoutMs = 20000) => {
+          await sleep(300);
+          const bootDeadline = Date.now() + timeoutMs;
+          while (Date.now() < bootDeadline) {
+            let b;
+            try { b = await evaluate('window.__SXC1_BOOTED === true'); } catch { b = false; }
+            if (b === true) return true;
+            await sleep(50);
+          }
+          return false;
+        };
+        await runUiLangJaAssertions(
+          { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene, pressKey, reload, waitBooted },
+          exerciseFixture,
+          coldLoadFn,
+          { checkBundleFetch: true },
+        );
       }
 
       // -- 13b (M5). MOBILE POLISH SWEEP: the main routes at the two

@@ -56,11 +56,32 @@ window.__sxc1Storage = {
 // simplest robust choice; check-site.sh's bundle ledger measures the
 // gzip cost against the M6 ceiling.
 //
-// W2 seam: the language will come from the SXC1PREFS blob's uiLang field
-// once it exists; W1 pins 'en' here, in the one place W2 must edit.
+// M6 W2: the language comes from the JS BOOT HINT -- the dedicated tiny
+// localStorage key "sxc1.uilang" (raw "en"/"ja", no envelope), written
+// by the app (Progress/Store.hs saveUiLangHint) alongside every prefs-
+// blob write that changes uiLang, and re-synced at every boot when the
+// two disagree. This deliberately does NOT read the SXC1PREFS blob:
+// parsing it here would duplicate the Haskell codec (SXC1.Progress.
+// Codec.decodePrefs) in a second language, and the two copies would
+// drift. The hint is a cache whose loss is harmless: a missing/corrupt
+// hint boots 'en' (the default bundle), the app notices the
+// disagreement against the real decoded pref at boot and rewrites the
+// hint, and the next reload fetches the right bundle. Anything but the
+// exact "ja" value is 'en' -- the same clamp the Haskell codec applies.
 function sxc1ContentLang() {
-  return "en";
+  try {
+    return window.localStorage.getItem("sxc1.uilang") === "ja" ? "ja" : "en";
+  } catch (e) {
+    return "en";
+  }
 }
+
+// The document's own language tag follows the same pre-boot hint, so
+// screen readers pronounce the (localized) UI in the right language
+// from the first frame. Purely an attribute write; never throws into
+// boot (and localization of the strings themselves is wasm-side).
+const sxc1UiLang = sxc1ContentLang();
+try { document.documentElement.lang = sxc1UiLang; } catch (e) { /* harmless */ }
 
 // Started BEFORE wasm instantiation so the two loads overlap; awaited
 // just before hs_start. This promise NEVER rejects -- both failure
@@ -188,6 +209,11 @@ document.addEventListener("input", (event) => {
   const preview = document.getElementById("sxc1-import-preview");
   if (!preview) return;
   const n = countPastedRecords(event.target.value);
-  preview.textContent =
-    n === 1 ? "1 record found in the pasted text." : `${n} records found in the pasted text.`;
+  // M6 W2: this file owns exactly these two learner-visible strings (the
+  // live preview overwrites the Haskell-rendered placeholder), so they
+  // localize HERE, keyed off the same boot hint the bundle fetch uses --
+  // the wasm-side I18n table cannot reach into this JS-only path.
+  preview.textContent = sxc1UiLang === "ja"
+    ? `貼り付けたテキストに${n}件のレコードが見つかりました。`
+    : n === 1 ? "1 record found in the pasted text." : `${n} records found in the pasted text.`;
 });

@@ -23,6 +23,7 @@ import           Miso.Html.Element      as H
 import           Miso.Html.Event        as E
 import           Miso.Html.Property     as P
 
+import           I18n
 import           SXC1.Content.Corpus    (corpusSources, lookupDoc)
 import           SXC1.Content.Outline
 import           SXC1.Content.Stats
@@ -44,7 +45,9 @@ import qualified View.Progress          as Progress
 -- itself, only slots one in, keeping "View.Exercise" reusable and this
 -- module free of a Main-import cycle.
 viewRoute
-  :: action
+  :: Lang                       -- ^ M6 W2: the active UI language -- every learner-visible
+                                --   string below renders through the I18n table with it
+  -> action
   -> ProgHandlers action        -- ^ M3: export\/import\/wipe\/JA-first action bundle
   -> ProgData                   -- ^ M3: everything the progress panel and JA-first switch render from
   -> T.Text                     -- ^ #sxc1-exercise-stats JSON
@@ -58,17 +61,17 @@ viewRoute
   -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
   -> Route
   -> View model action
-viewRoute toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mContentErr mExerciseBody route = H.main_ [ P.id_ "app" ]
+viewRoute lang toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mContentErr mExerciseBody route = H.main_ [ P.id_ "app" ]
   ( headerView ph pd route
-  : contentErrorBanner mContentErr
+  : contentErrorBanner lang mContentErr
   ++ [ statsView
      , exerciseStatsView exStatsJson
      , eventLogView eventLogJson
      , promptBaselineView baselineJson
      , progressPayloadView progressJson
      , deviceStateView deviceJson
-     , routeBody toggleAction ph pd mExerciseBody route
-     , footerView
+     , routeBody lang toggleAction ph pd mExerciseBody route
+     , footerView lang
      ]
   )
 
@@ -89,34 +92,33 @@ viewRoute toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson 
 --     the retry.
 --------------------------------------------------------------------------
 
-contentErrorBanner :: Maybe T.Text -> [View model action]
-contentErrorBanner Nothing    = []
-contentErrorBanner (Just err) =
+contentErrorBanner :: Lang -> Maybe T.Text -> [View model action]
+contentErrorBanner _    Nothing    = []
+contentErrorBanner lang (Just err) =
   [ H.div_ [ P.id_ "sxc1-content-error", textProp "role" "alert" ]
-      [ text (ms ("Exercise content failed to load: " <> err
-                    <> " — the manuals are unaffected; training exercises are temporarily unavailable.")) ]
+      [ text (ms (iContentErrorBanner lang err)) ]
   ]
 
-contentDegradedView :: T.Text -> View model action
-contentDegradedView err = H.section_ [ P.id_ "sxc1-exercise-degraded" ]
-  [ H.h1_ [] [ "Training is unavailable" ]
-  , H.p_ [] [ text (ms ("The exercise content bundle could not be loaded: " <> err)) ]
-  , H.p_ [] [ "The manuals are unaffected and remain fully readable." ]
-  , H.button_ [ P.id_ "btn-content-retry" ] [ "Reload and try again" ]
-  , H.p_ [] [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RHome)) ] [ "Back to the manuals" ] ]
+contentDegradedView :: Lang -> T.Text -> View model action
+contentDegradedView lang err = H.section_ [ P.id_ "sxc1-exercise-degraded" ]
+  [ H.h1_ [] [ text (ms (iDegradedTitle lang)) ]
+  , H.p_ [] [ text (ms (iDegradedBody lang err)) ]
+  , H.p_ [] [ text (ms (iDegradedManualsOk lang)) ]
+  , H.button_ [ P.id_ "btn-content-retry" ] [ text (ms (iRetryButton lang)) ]
+  , H.p_ [] [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RHome)) ] [ text (ms (iBackToManuals lang)) ] ]
   ]
 
-routeBody :: action -> ProgHandlers action -> ProgData -> Maybe (View model action) -> Route -> View model action
-routeBody _   ph pd _             RHome              = homeView ph pd
-routeBody _   _  _  _             (RManual slug)      = tocView slug
-routeBody act _  pd _             (RPage slug n ja)    = pageView act (pdJaFirst pd) slug n ja
-routeBody _   _  _  (Just exBody) RExercises           = exBody
-routeBody _   _  _  (Just exBody) (RDeck _)            = exBody
-routeBody _   _  _  (Just exBody) (RExercise _ _)      = exBody
-routeBody _   _  _  Nothing       r@RExercises         = notFoundView (renderRoute r)
-routeBody _   _  _  Nothing       r@(RDeck _)          = notFoundView (renderRoute r)
-routeBody _   _  _  Nothing       r@(RExercise _ _)    = notFoundView (renderRoute r)
-routeBody _   _  _  _             (RNotFound path)     = notFoundView path
+routeBody :: Lang -> action -> ProgHandlers action -> ProgData -> Maybe (View model action) -> Route -> View model action
+routeBody lang _   ph pd _             RHome              = homeView lang ph pd
+routeBody lang _   _  _  _             (RManual slug)      = tocView lang slug
+routeBody lang act _  pd _             (RPage slug n ja)    = pageView lang act (pdJaFirst pd) slug n ja
+routeBody _    _   _  _  (Just exBody) RExercises           = exBody
+routeBody _    _   _  _  (Just exBody) (RDeck _)            = exBody
+routeBody _    _   _  _  (Just exBody) (RExercise _ _)      = exBody
+routeBody lang _   _  _  Nothing       r@RExercises         = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  Nothing       r@(RDeck _)          = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  Nothing       r@(RExercise _ _)    = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  _             (RNotFound path)     = notFoundView lang path
 
 --------------------------------------------------------------------------
 -- Corpus-wide, text-level lookups shared by several views below. None of
@@ -140,34 +142,43 @@ statsJsonText = renderStatsJson corpusSources
 -- Header: brand + route-dependent breadcrumb.
 --------------------------------------------------------------------------
 
+-- | The brand line is deliberately NOT localized: "SEXY ONE" and
+-- "SXC-1 Trainer" are product names (the same discipline that keeps
+-- on-device labels Latin), and the browser gate pins the brand text.
 headerView :: ProgHandlers action -> ProgData -> Route -> View model action
 headerView ph pd route = H.header_ [ P.id_ "sxc1-header" ]
   ( [ H.a_ [ P.class_ "brand", P.href_ (ms (renderRoute RHome)) ] [ "SEXY ONE — SXC-1 Trainer" ]
-    , Progress.reviewBadgeEl (Progress.dueCountLive pd)
+    , Progress.reviewBadgeEl (pdLang pd) (Progress.dueCountLive pd)
     ]
-    ++ breadcrumbFor route
+    ++ breadcrumbFor (pdLang pd) route
     ++ Progress.jaFirstHeaderEls ph pd route
+    ++ Progress.uiLangHeaderEls ph pd
   )
 
--- | M5 a11y: every breadcrumb \<nav\> carries @aria-label="Breadcrumb"@
--- so the landmark is distinguishable from the page-nav landmark (two
--- unnamed navs read as interchangeable "navigation" to a screen reader).
-breadcrumbFor :: Route -> [View model action]
-breadcrumbFor RHome = []
-breadcrumbFor (RManual slug) = case statsFor slug of
-  Just st -> [ H.nav_ [ textProp "aria-label" "Breadcrumb" ] [ text (ms (stTitle st)) ] ]
+-- | M5 a11y: every breadcrumb \<nav\> carries a localized
+-- @aria-label@ ("Breadcrumb") so the landmark is distinguishable from
+-- the page-nav landmark (two unnamed navs read as interchangeable
+-- "navigation" to a screen reader).
+breadcrumbFor :: Lang -> Route -> [View model action]
+breadcrumbFor _ RHome = []
+breadcrumbFor lang (RManual slug) = case statsFor slug of
+  Just st -> [ H.nav_ [ textProp "aria-label" (ms (iBreadcrumbAria lang)) ] [ text (ms (stTitle st)) ] ]
   Nothing -> []
-breadcrumbFor (RPage slug n _ja) = case (statsFor slug, rawFor slug) of
-  (Just st, Just raw) | n >= 1 && n <= stPages st -> [ pageBreadcrumb slug st (buildOutline raw) n ]
+breadcrumbFor lang (RPage slug n _ja) = case (statsFor slug, rawFor slug) of
+  (Just st, Just raw) | n >= 1 && n <= stPages st -> [ pageBreadcrumb lang slug st (buildOutline raw) n ]
   _                                                 -> []
-breadcrumbFor RExercises      = [ H.nav_ [ textProp "aria-label" "Breadcrumb" ] [ text "Training" ] ]
-breadcrumbFor (RDeck _)       = [ H.nav_ [ textProp "aria-label" "Breadcrumb" ] [ text "Training" ] ]
-breadcrumbFor (RExercise _ _) = [ H.nav_ [ textProp "aria-label" "Breadcrumb" ] [ text "Training" ] ]
-breadcrumbFor (RNotFound _) = []
+breadcrumbFor lang RExercises      = [ trainingCrumb lang ]
+breadcrumbFor lang (RDeck _)       = [ trainingCrumb lang ]
+breadcrumbFor lang (RExercise _ _) = [ trainingCrumb lang ]
+breadcrumbFor _ (RNotFound _) = []
 
-pageBreadcrumb :: T.Text -> DocStats -> Outline -> Int -> View model action
-pageBreadcrumb slug st outline n =
-  H.nav_ [ textProp "aria-label" "Breadcrumb" ] ( manualCrumb : groupCrumb ++ sectionCrumb ++ pageCrumb )
+trainingCrumb :: Lang -> View model action
+trainingCrumb lang =
+  H.nav_ [ textProp "aria-label" (ms (iBreadcrumbAria lang)) ] [ text (ms (iTraining lang)) ]
+
+pageBreadcrumb :: Lang -> T.Text -> DocStats -> Outline -> Int -> View model action
+pageBreadcrumb lang slug st outline n =
+  H.nav_ [ textProp "aria-label" (ms (iBreadcrumbAria lang)) ] ( manualCrumb : groupCrumb ++ sectionCrumb ++ pageCrumb )
   where
     manualCrumb = H.a_ [ P.href_ (ms (renderRoute (RManual slug))) ] [ text (ms (stTitle st)) ]
 
@@ -210,7 +221,7 @@ pageBreadcrumb slug st outline n =
         | otherwise -> [ crumbSep, text (ms (secTitle sec)) ]
 
     pageCrumb = [ crumbSep
-                , text (ms ("page " <> T.pack (show n) <> " of " <> T.pack (show (stPages st))))
+                , text (ms (iPageOf lang n (stPages st)))
                 ]
 
     crumbSep = text " / "
@@ -259,13 +270,10 @@ deviceStateView t = H.div_ [ P.id_ "sxc1-device-state", P.hidden_ True ] [ text 
 -- Home ("#/"): project blurb + one card per manual.
 --------------------------------------------------------------------------
 
-homeView :: ProgHandlers action -> ProgData -> View model action
-homeView ph pd = H.section_ [ P.id_ "sxc1-home" ]
-  ( [ H.p_ []
-        [ "An interactive reader for the SXC-1 manuals: browse each translated "
-        , "document page by page, with the original Japanese page a tap away."
-        ]
-    , H.ul_ [ P.class_ "manual-list" ] (map manualCard allDocStats ++ [ trainingCard ])
+homeView :: Lang -> ProgHandlers action -> ProgData -> View model action
+homeView lang ph pd = H.section_ [ P.id_ "sxc1-home" ]
+  ( [ H.p_ [] [ text (ms (iHomeBlurb lang)) ]
+    , H.ul_ [ P.class_ "manual-list" ] (map (manualCard lang) allDocStats ++ [ trainingCard lang ])
     ]
     ++ Progress.progressHomeView ph pd
   )
@@ -273,21 +281,20 @@ homeView ph pd = H.section_ [ P.id_ "sxc1-home" ]
 -- | The Training entry point (briefs/M2-manifest.json, task
 -- "exercise-ui", item 4): links to "#/x", the exercise index -- reuses
 -- M1's own @.manual-card@ styling rather than inventing a new one.
-trainingCard :: View model action
-trainingCard = H.li_ []
+trainingCard :: Lang -> View model action
+trainingCard lang = H.li_ []
   [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RExercises)) ]
-      [ H.strong_ [] [ "Training" ]
-      , H.small_ [] [ "Quizzes, drills and lookups from the manuals" ]
+      [ H.strong_ [] [ text (ms (iTraining lang)) ]
+      , H.small_ [] [ text (ms (iTrainingCardSub lang)) ]
       ]
   ]
 
-manualCard :: DocStats -> View model action
-manualCard st = H.li_ []
+manualCard :: Lang -> DocStats -> View model action
+manualCard lang st = H.li_ []
   [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute (RManual (stSlug st)))) ]
       [ H.strong_ [] [ text (ms (stTitle st)) ]
       , H.small_ []
-          [ text (ms (T.pack (show (stPages st)) <> " pages, "
-                        <> T.pack (show (stSections st)) <> " sections")) ]
+          [ text (ms (iPagesSections lang (stPages st) (stSections st))) ]
       ]
   ]
 
@@ -295,27 +302,27 @@ manualCard st = H.li_ []
 -- Manual contents ("#/m/<slug>"): the grouped outline.
 --------------------------------------------------------------------------
 
-tocView :: T.Text -> View model action
-tocView slug = case rawFor slug of
-  Nothing  -> notFoundView slug
+tocView :: Lang -> T.Text -> View model action
+tocView lang slug = case rawFor slug of
+  Nothing  -> notFoundView lang slug
   Just raw ->
     let outline   = buildOutline raw
         titleText = maybe slug stTitle (statsFor slug)
         groups    = case outGroups outline of
           Just gs -> gs
           Nothing -> [ Group titleText (outSections outline) ]
-    in H.section_ [ P.id_ "sxc1-toc" ] (map (renderGroup slug) groups)
+    in H.section_ [ P.id_ "sxc1-toc" ] (map (renderGroup lang slug) groups)
 
-renderGroup :: T.Text -> Group -> View model action
-renderGroup slug g = H.section_ [ P.class_ "toc-group" ]
+renderGroup :: Lang -> T.Text -> Group -> View model action
+renderGroup lang slug g = H.section_ [ P.class_ "toc-group" ]
   [ H.h2_ [ P.class_ "toc-group-title" ] [ text (ms (grpTitle g)) ]
-  , H.ol_ [ P.class_ "toc-sections" ] (map (renderSection slug) (grpSections g))
+  , H.ol_ [ P.class_ "toc-sections" ] (map (renderSection lang slug) (grpSections g))
   ]
 
-renderSection :: T.Text -> Section -> View model action
-renderSection slug sec = H.li_ []
+renderSection :: Lang -> T.Text -> Section -> View model action
+renderSection lang slug sec = H.li_ []
   ( H.a_ [ P.href_ (ms (renderRoute (RPage slug (secPage sec) False))) ] [ text (ms (secTitle sec)) ]
-  : H.span_ [ P.class_ "toc-page" ] [ text (ms ("p. " <> T.pack (show (secPage sec)))) ]
+  : H.span_ [ P.class_ "toc-page" ] [ text (ms (iTocPageAbbrev lang (secPage sec))) ]
   : subsEl
   )
   where
@@ -330,11 +337,11 @@ renderSub slug (p, t) = H.li_ [] [ H.a_ [ P.href_ (ms (renderRoute (RPage slug p
 -- Page ("#/m/<slug>/p/<n>", "+/ja"): the rendered blocks + the JA panel.
 --------------------------------------------------------------------------
 
-pageView :: action -> Bool -> T.Text -> Int -> Bool -> View model action
-pageView toggleAction jaFirst slug n ja = case (statsFor slug, lookupDoc slug) of
+pageView :: Lang -> action -> Bool -> T.Text -> Int -> Bool -> View model action
+pageView lang toggleAction jaFirst slug n ja = case (statsFor slug, lookupDoc slug) of
   (Just st, Just doc) | n >= 1 && n <= stPages st ->
-    renderPage toggleAction jaFirst slug (stPages st) ja (docPages doc !! (n - 1))
-  _ -> notFoundView (slug <> "/p/" <> T.pack (show n))
+    renderPage lang toggleAction jaFirst slug (stPages st) ja (docPages doc !! (n - 1))
+  _ -> notFoundView lang (slug <> "/p/" <> T.pack (show n))
 
 -- | @jaFirst@ (M3 owner addendum, item 8) governs ONLY the DOM order of
 -- the JA panel relative to the translated body -- OFF (the default) keeps
@@ -342,15 +349,15 @@ pageView toggleAction jaFirst slug n ja = case (statsFor slug, lookupDoc slug) o
 -- so a phone (which stacks in DOM order; the >=60rem grid below pins the
 -- panel by NAMED AREA regardless of DOM order, so a wide reader's layout
 -- is unaffected either way) shows the original page before the English.
-renderPage :: action -> Bool -> T.Text -> Int -> Bool -> Page -> View model action
-renderPage toggleAction jaFirst slug total ja pg =
+renderPage :: Lang -> action -> Bool -> T.Text -> Int -> Bool -> Page -> View model action
+renderPage lang toggleAction jaFirst slug total ja pg =
   H.article_ articleAttrs
     ( runningHeaderEl
         ++ bodyOrderedEls
         ++ [ H.button_ [ P.id_ "btn-ja-toggle", E.onClick toggleAction ]
-               [ if ja then "Hide original page" else "Show original page (JA)" ]
-             -- M5 a11y: named nav landmark (see 'breadcrumbFor').
-           , H.nav_ [ P.class_ "page-nav", textProp "aria-label" "Manual pages" ] (navLinks slug n total)
+               [ text (ms ((if ja then iHideOriginal else iShowOriginal) lang)) ]
+             -- M5 a11y: named nav landmark (see 'breadcrumbFor'), localized.
+           , H.nav_ [ P.class_ "page-nav", textProp "aria-label" (ms (iManualPagesAria lang)) ] (navLinks lang slug n total)
            ]
     )
   where
@@ -378,20 +385,20 @@ renderPage toggleAction jaFirst slug total ja pg =
                       [ P.id_ "ja-image"
                       , P.loading_ "lazy"
                       , textProp "decoding" "async"
-                      , P.alt_ (ms ("Original Japanese page " <> T.pack (show n)))
+                      , P.alt_ (ms (iJaImageAlt lang n))
                       , P.src_ (ms imgSrc)
                       ]
                   ]
-              , H.figcaption_ [] [ text (ms ("Page " <> T.pack (show n) <> ", original Japanese")) ]
+              , H.figcaption_ [] [ text (ms (iJaImageCaption lang n)) ]
               ]
           ]
       where
         imgSrc = "pages/" <> slug <> "/page-" <> zeroPad2 n <> ".webp"
 
-navLinks :: T.Text -> Int -> Int -> [View model action]
-navLinks slug n total =
-  [ navLink "btn-prev-page" "Previous page" prevHref
-  , navLink "btn-next-page" "Next page"     nextHref
+navLinks :: Lang -> T.Text -> Int -> Int -> [View model action]
+navLinks lang slug n total =
+  [ navLink "btn-prev-page" (iPrevPage lang) prevHref
+  , navLink "btn-next-page" (iNextPage lang) nextHref
   ]
   where
     prevHref = if n > 1     then Just (renderRoute (RPage slug (n - 1) False)) else Nothing
@@ -412,21 +419,19 @@ zeroPad2 n
 -- Not found: unknown slug or an out-of-range page. Never a blank screen.
 --------------------------------------------------------------------------
 
-notFoundView :: T.Text -> View model action
-notFoundView label = H.section_ [ P.id_ "sxc1-not-found" ]
-  [ H.h1_ [] [ "Page not found" ]
-  , H.p_ [] [ text (ms ("No manual page matches: " <> label)) ]
-  , H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RHome)) ] [ "Back to the manuals" ]
+notFoundView :: Lang -> T.Text -> View model action
+notFoundView lang label = H.section_ [ P.id_ "sxc1-not-found" ]
+  [ H.h1_ [] [ text (ms (iNotFoundTitle lang)) ]
+  , H.p_ [] [ text (ms (iNoPageMatches lang label)) ]
+  , H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RHome)) ] [ text (ms (iBackToManuals lang)) ]
   ]
 
 --------------------------------------------------------------------------
 -- Footer / disclaimer, verbatim on every route.
 --------------------------------------------------------------------------
 
-footerView :: View model action
-footerView = H.footer_ [ P.id_ "sxc1-footer" ]
+footerView :: Lang -> View model action
+footerView lang = H.footer_ [ P.id_ "sxc1-footer" ]
   [ H.p_ [ P.id_ "sxc1-disclaimer" ]
-      [ "Unofficial fan translation. Not affiliated with, or endorsed by, "
-      , "CASIO COMPUTER CO., LTD. Original manual content (c) CASIO COMPUTER CO., LTD."
-      ]
+      [ text (ms (iDisclaimer lang)) ]
   ]

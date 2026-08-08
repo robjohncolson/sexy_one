@@ -334,32 +334,75 @@ unescapeChar c    = c
 magicPrefs :: Text
 magicPrefs = "SXC1PREFS"
 
+-- | Prefs schema history (the prefs blob's OWN, separate versioning --
+-- never coupled to 'currentSchema', and migrated by lenient defaulting
+-- rather than 'migrateWith', because a preference is regenerable and a
+-- lost field simply resumes its default -- asymmetry (1)):
+--
+--   * v1 (M3): @P jaFirst 0|1@ only. CRUCIALLY, the ONLY writer of a v1
+--     blob was ever the JA-first toggle handler (Main's @PJaFirst@ ->
+--     @Progress.Store.savePrefs@ -- no other call site existed before
+--     M6 W2), so THE EXISTENCE of a v1 blob is itself evidence the
+--     learner explicitly chose a jaFirst value at some point. The v1
+--     decode path therefore seeds 'prfJaFirstSet' = 'True' -- the
+--     honest migration of "explicitly set" into the new field.
+--   * v2 (M6 W2): adds @P uiLang en|ja@ (briefs\/M6-plan.md ruling 4 --
+--     the UI language preference; any value other than the exact "ja"
+--     code decodes as "en", the same clamp the reader applies
+--     everywhere) and @P jaFirstSet 0|1@ -- whether jaFirst was ever
+--     EXPLICITLY set by the learner, which is what lets ruling 4's
+--     one-time suggestion ("first switch to ja also flips the jaFirst
+--     reading default on") never override an explicit choice: the
+--     suggestion fires only while @jaFirst == False && jaFirstSet ==
+--     False@, and the JA-first toggle handler is the only writer of
+--     @jaFirstSet = True@. The suggestion itself deliberately does NOT
+--     set it (a suggestion is not a choice). KNOWN LIMIT, recorded
+--     honestly: a v2 blob whose @jaFirstSet@ line was lost or
+--     hand-edited away decodes as never-explicitly-set, so the
+--     suggestion may fire once more -- acceptable for a REGENERABLE
+--     preference (the learner flips one switch back), never for
+--     history.
 prefsSchema :: Int
-prefsSchema = 1
+prefsSchema = 2
 
-data Prefs = Prefs { prfJaFirst :: !Bool }
-  deriving Eq
+data Prefs = Prefs
+  { prfJaFirst    :: !Bool
+  , prfJaFirstSet :: !Bool  -- ^ v2: jaFirst was explicitly chosen at least once
+  , prfUiLang     :: !Text  -- ^ v2: \"en\" or \"ja\" -- always one of exactly these two after decode
+  } deriving Eq
 
 -- | @jaFirst = False@ -- OFF by default, which is the safety property
 -- the whole JA-first feature rests on: a fresh profile behaves
 -- byte-identically to before the feature existed. Sabotage-checked in
 -- @exe:progress-check --self-test@ group 10: flipping this literal to
--- 'True' must fail that group.
+-- 'True' must fail that group. @uiLang = \"en\"@ for the same reason
+-- (briefs\/M6-plan.md ruling 4: defaults uiLang=en), and
+-- @jaFirstSet = False@ (a fresh profile has chosen nothing).
 defaultPrefs :: Prefs
-defaultPrefs = Prefs { prfJaFirst = False }
+defaultPrefs = Prefs { prfJaFirst = False, prfJaFirstSet = False, prfUiLang = "en" }
 
 encodePrefs :: Prefs -> Text
 encodePrefs p = T.unlines
   [ T.intercalate "\t" [magicPrefs, tshow prefsSchema]
   , T.intercalate "\t" ["P", "jaFirst", if prfJaFirst p then "1" else "0"]
+  , T.intercalate "\t" ["P", "jaFirstSet", if prfJaFirstSet p then "1" else "0"]
+  , T.intercalate "\t" ["P", "uiLang", normLang (prfUiLang p)]
   ]
+
+-- | The one uiLang clamp, applied on BOTH sides of the wire: anything
+-- but the exact @\"ja\"@ code is @\"en\"@.
+normLang :: Text -> Text
+normLang v = if v == "ja" then "ja" else "en"
 
 -- | UNLIKE 'decodeState', this never fails to a corrupt-marker value --
 -- see the module Haddock's asymmetry (1). A missing\/short header, a
 -- version above 'prefsSchema', or anything unparseable simply yields
 -- 'defaultPrefs'. An unknown @P@ name is skipped (same degrade-not-
--- reject rule as the progress blob) while any @P jaFirst@ line
--- elsewhere in the same blob still decodes.
+-- reject rule as the progress blob) while any known @P@ line elsewhere
+-- in the same blob still decodes. A v1 blob decodes with
+-- @uiLang = \"en\"@ (the field did not exist) and
+-- @jaFirstSet = 'True'@ -- see 'prefsSchema' for why v1-blob-existence
+-- IS the explicit-choice evidence.
 decodePrefs :: Text -> Prefs
 decodePrefs raw
   | T.null (T.strip raw) = defaultPrefs
@@ -367,11 +410,15 @@ decodePrefs raw
       []                       -> defaultPrefs
       (headerLine : bodyLines) -> case tagFields headerLine of
         (tag, [verTxt]) | tag == magicPrefs -> case parseDigits verTxt of
-          Just v | v >= 1 && v <= prefsSchema -> foldl' applyPrefLine defaultPrefs bodyLines
-          _                                    -> defaultPrefs
+          Just v | v >= 1 && v <= prefsSchema ->
+            let seed = if v == 1 then defaultPrefs { prfJaFirstSet = True } else defaultPrefs
+            in foldl' applyPrefLine seed bodyLines
+          _ -> defaultPrefs
         _ -> defaultPrefs
 
 applyPrefLine :: Prefs -> Text -> Prefs
 applyPrefLine p line = case tagFields line of
-  ("P", ["jaFirst", v]) -> p { prfJaFirst = v == "1" }
-  _                      -> p
+  ("P", ["jaFirst", v])    -> p { prfJaFirst = v == "1" }
+  ("P", ["jaFirstSet", v]) -> p { prfJaFirstSet = v == "1" }
+  ("P", ["uiLang", v])     -> p { prfUiLang = normLang v }
+  _                         -> p
