@@ -531,19 +531,22 @@ Options:
                        whole course. 14/14. Nothing is injected: the
                        SERVED BYTES are the input.
   --check-manual-fallback
-                       M7 W1 ruling 4: the VISIBLE per-document
-                       EN-fallback note. Against a served copy of the
-                       SHIPPED bundles, on a fresh profile: under EN no
+                       M7 ruling 4, FLIPPED BY W3 now that every document
+                       is Japanese. Against a served copy of the SHIPPED
+                       bundles, on a fresh profile: under EN no
                        #sxc1-manual-fallback exists at all; after the
                        app's own #btn-ui-lang switch (persist + reload =
-                       refetch) the ja bundle really loaded, the visible
-                       role=note #sxc1-manual-fallback carries the pinned
-                       Japanese sentence, the page body still renders the
-                       English text and is marked lang="en", and the
-                       manual TOC and home card carry the same note.
-                       5/5. Both directions of the mechanism on real
-                       served bytes; wave 2 flips it one document at a
-                       time by adding translations/<slug>.ja.md.
+                       refetch) the ja bundle really loaded, the note
+                       exists NOWHERE under ja either (no reading route,
+                       no TOC, no home card), the page body carries no
+                       lang override, and ALL FOUR documents render their
+                       own pinned Japanese sentence. 5/5, ids MF1..MF5.
+                       The MECHANISM is unchanged -- View.Pages still
+                       renders the note for any document whose record
+                       names another language -- so a future
+                       untranslated document is caught by check-site's
+                       precondition for this stage (every !SXC1-DOC in
+                       the served manuals.ja.txt must say 'ja').
   --help               Show this help and exit
 
 By default (no --quick) the page-route sweep visits all 108 routes in
@@ -2842,6 +2845,71 @@ const JA_COURSE_PINS = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// M7 W3: THE JA MANUAL PINS -- the milestone's own claim, inside both
+// full stages.
+//
+// M6 gave the learner a Japanese COURSE; M7's claim is the other half:
+// with uiLang=ja the MANUAL BODY is real Japanese text -- selectable,
+// searchable, copyable, reflowable -- and the original page IMAGE is
+// still right there beside it (ruling 4: "/ja still shows it"). Through
+// waves 1-2 the ja manual bundle carried ENGLISH for every document, and
+// every assertion in these stages stayed green, because none of them
+// looked at the manual body's LANGUAGE.
+//
+// WHY THESE ARE LITERALS AND NOT DERIVED FROM THE BUNDLE: the same
+// reason JA_COURSE_PINS gives -- a check that reads its expectations out
+// of the artifact it is checking cannot fail. These sentences are copied
+// from wave 2's transcriptions of the page IMAGES
+// (translations/<slug>.ja.md), so a ja bundle that fell back to English
+// for a document turns the pin for that document red. RED-FIRST:
+// demonstrated by rebuilding against a scratch translations/ with one
+// .ja.md removed and serving the resulting EN-fallback bundle (see the
+// W3 report).
+//
+// Two documents, deliberately: guide-book (71 pages, the bulk of the
+// corpus) and midi (6 pages, a different transcription batch with tables
+// and device labels in Latin caps).
+const JA_MANUAL_PINS = {
+  page: {
+    slug: 'guide-book',
+    route: '#/m/guide-book/p/2',
+    jaRoute: '#/m/guide-book/p/2/ja',
+    // The page body's own id (View.Pages: "page-<n>"), so the wait
+    // cannot be satisfied by a different page's body.
+    readySelector: '#page-2',
+    // ## あらかじめご了承ください
+    headingJa: 'あらかじめご了承ください',
+    // 本書の説明・表示例やイラストなどは、実際の製品と異なる場合があります。
+    bodyJa: '本書の説明・表示例やイラストなどは、実際の製品と異なる場合があります。',
+    // The ORIGINAL page image ruling 4 keeps beside the text.
+    imageSuffix: 'pages/guide-book/page-02.webp',
+  },
+  midi: {
+    route: '#/m/midi/p/1',
+    readySelector: '#page-1',
+    // 本書は本機に搭載された MIDI 機能及びそのインプリメンテーションに関して記載しています。
+    bodyJa: '本書は本機に搭載された MIDI 機能及びそのインプリメンテーションに関して記載しています。',
+    // MIDI IN Ch. -- ruling 3: on-device labels stay in Latin caps even
+    // in the Japanese text, so this must survive TOO.
+    deviceLabel: 'MIDI IN Ch.',
+  },
+  toc: {
+    route: '#/m/guide-book',
+    // ## 使用環境について -- a section link in the manual outline
+    sectionJa: '使用環境について',
+  },
+};
+
+const JA_MANUAL_PAGE_ASSERTION_NAME =
+  'ja manual: [JAM1] the SHIPPED ja manual bundle renders REAL JAPANESE on a real reading route -- the pinned heading and body sentence from guide-book p.2, document lang=ja, no #sxc1-manual-fallback and no lang override on the body (an EN-fallback ja bundle fails here)';
+const JA_MANUAL_SECOND_DOC_ASSERTION_NAME =
+  'ja manual: [JAM2] a SECOND document is Japanese too -- midi p.1 renders its pinned Japanese sentence and still carries the on-device label in Latin caps (ruling 3)';
+const JA_MANUAL_IMAGE_ASSERTION_NAME =
+  'ja manual: [JAM3] on the /ja route the ORIGINAL page image is still reachable BESIDE the Japanese text -- #ja-image points at the page scan, that URL really fetches, and the Japanese body is still rendered';
+const JA_MANUAL_TOC_ASSERTION_NAME =
+  'ja manual: [JAM4] the manual TOC renders the Japanese outline (a pinned JA section link) with no .manual-fallback-note anywhere';
+
 const JA_COURSE_BUNDLE_ASSERTION_NAME =
   'ja course: [JAC1] the SHIPPED ja bundle carries the whole course -- #sxc1-exercise-stats reports 52 decks / 435 exercises and the pinned deck\'s title is its JAPANESE title (an EN-fallback ja bundle fails here)';
 const JA_COURSE_INDEX_ASSERTION_NAME =
@@ -3820,6 +3888,121 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
       JA_COURSE_DRILL_ASSERTION_NAME,
       typeof drillCheckJa === 'string' && drillCheckJa.indexOf(P.drill.step1CheckJa) !== -1,
       { drillCheckJa, want: P.drill.step1CheckJa },
+    );
+  }
+
+  // -- 6c (M7 W3). THE JA MANUALS: real Japanese manual TEXT from the
+  // bundle the site ships, on real reading routes, with the original
+  // page scan still beside it. Real run only, for the same reason 6b is
+  // (the file:// self-test fixture fetches no bundle at all), and
+  // documented here rather than silently skipped. See JA_MANUAL_PINS.
+  if (cfg && cfg.jaManuals) {
+    const M = cfg.jaManuals;
+
+    // (a) A real reading route in the reader's own language.
+    // EVERY manual hop goes via home first, and waits on a selector the
+    // page being LEFT does not carry: goto() resolves the moment its
+    // ready selector exists, so hopping page-route -> page-route on
+    // '#sxc1-page .page-body' reads the page we are leaving (the same
+    // race JA_COURSE_PINS' (c) documents, measured green on the fast
+    // stage and red on the slow one).
+    await h.goto('#/', '#sxc1-home');
+    await h.goto(M.page.route, M.page.readySelector);
+    const manualJa = await h.evaluate(`(() => {
+      const body = document.querySelector('#sxc1-page .page-body');
+      const t = body && body.textContent ? body.textContent : '';
+      return {
+        chars: t.trim().length,
+        heading: t.indexOf(${JSON.stringify(M.page.headingJa)}) !== -1,
+        sentence: t.indexOf(${JSON.stringify(M.page.bodyJa)}) !== -1,
+        bodyLang: body ? body.getAttribute('lang') : null,
+        note: document.querySelector('#sxc1-manual-fallback') !== null,
+        docLang: document.documentElement.lang,
+      };
+    })()`);
+    report(
+      JA_MANUAL_PAGE_ASSERTION_NAME,
+      Boolean(manualJa) && manualJa.heading === true && manualJa.sentence === true
+        && manualJa.bodyLang === null && manualJa.note === false
+        && manualJa.docLang === 'ja' && manualJa.chars > 100,
+      { manualJa, want: { heading: M.page.headingJa, sentence: M.page.bodyJa } },
+    );
+
+    // (b) A second document, from a different transcription batch.
+    await h.goto('#/', '#sxc1-home');
+    await h.goto(M.midi.route, M.midi.readySelector);
+    const midiJa = await h.evaluate(`(() => {
+      const body = document.querySelector('#sxc1-page .page-body');
+      const t = body && body.textContent ? body.textContent : '';
+      return {
+        sentence: t.indexOf(${JSON.stringify(M.midi.bodyJa)}) !== -1,
+        deviceLabel: t.indexOf(${JSON.stringify(M.midi.deviceLabel)}) !== -1,
+        bodyLang: body ? body.getAttribute('lang') : null,
+        note: document.querySelector('#sxc1-manual-fallback') !== null,
+      };
+    })()`);
+    report(
+      JA_MANUAL_SECOND_DOC_ASSERTION_NAME,
+      Boolean(midiJa) && midiJa.sentence === true && midiJa.deviceLabel === true
+        && midiJa.bodyLang === null && midiJa.note === false,
+      { midiJa, want: { sentence: M.midi.bodyJa, deviceLabel: M.midi.deviceLabel } },
+    );
+
+    // (c) The /ja route: ruling 4 keeps the ORIGINAL page image exactly
+    // as it was -- the body being Japanese now must not have cost the
+    // scan. Reachability is a real same-origin fetch of the img's own
+    // resolved src (loading="lazy" makes naturalWidth an unreliable
+    // proxy for a panel below the fold).
+    await h.goto('#/', '#sxc1-home');
+    await h.goto(M.page.jaRoute, '#ja-image');
+    const jaPanel = await h.evaluate(`(async () => {
+      const img = document.querySelector('#ja-image');
+      const body = document.querySelector('#sxc1-page .page-body');
+      const t = body && body.textContent ? body.textContent : '';
+      const src = img ? img.src : null;
+      let status = null;
+      let bytes = 0;
+      if (src) {
+        try {
+          const r = await fetch(src, { cache: 'no-store' });
+          status = r.status;
+          const b = await r.blob();
+          bytes = b.size;
+        } catch (e) { status = String(e && e.message ? e.message : e); }
+      }
+      return {
+        src,
+        panel: document.querySelector('#ja-panel') !== null,
+        status,
+        bytes,
+        sentence: t.indexOf(${JSON.stringify(M.page.bodyJa)}) !== -1,
+      };
+    })()`);
+    report(
+      JA_MANUAL_IMAGE_ASSERTION_NAME,
+      Boolean(jaPanel) && jaPanel.panel === true
+        && typeof jaPanel.src === 'string'
+        && jaPanel.src.indexOf(M.page.imageSuffix) !== -1
+        && jaPanel.status === 200 && jaPanel.bytes > 1000
+        && jaPanel.sentence === true,
+      { jaPanel, want: M.page.imageSuffix },
+    );
+
+    // (d) The outline the learner navigates by.
+    await h.goto('#/', '#sxc1-home');
+    await h.goto(M.toc.route, '#sxc1-toc');
+    const tocJa = await h.evaluate(`(() => {
+      const links = Array.from(document.querySelectorAll('#sxc1-toc a')).map((a) => a.textContent.trim());
+      return {
+        hasSection: links.indexOf(${JSON.stringify(M.toc.sectionJa)}) !== -1,
+        links: links.length,
+        notes: document.querySelectorAll('#sxc1-toc .manual-fallback-note').length,
+      };
+    })()`);
+    report(
+      JA_MANUAL_TOC_ASSERTION_NAME,
+      Boolean(tocJa) && tocJa.hasSection === true && tocJa.notes === 0 && tocJa.links > 10,
+      { tocJa, want: M.toc.sectionJa },
     );
   }
 
@@ -7051,11 +7234,18 @@ async function runBadManualBundleCheck(opts) {
 }
 
 // ---------------------------------------------------------------------------
-// M7 W1 ruling 4: --check-manual-fallback. Until wave 2 authors
-// translations/<slug>.ja.md for all four documents, the ja manual bundle
-// legitimately carries the ENGLISH text for the documents that have none
-// yet. Ruling 4 requires that to be VISIBLE, not silent -- so this mode
-// exercises BOTH directions of the mechanism against real served bytes:
+// M7 ruling 4: --check-manual-fallback.
+//
+// W1 SHIPPED THIS MODE ASSERTING THE NOTE IS PRESENT under ja, because
+// the ja manual bundle then carried the ENGLISH text for every document
+// (wave 2 had not authored translations/<slug>.ja.md yet) and ruling 4
+// requires that state to be VISIBLE rather than silent. W2 landed all
+// 108 pages in Japanese, so the note is now correct only by its
+// ABSENCE, and W3 FLIPS THE STAGE accordingly: under ja, no
+// #sxc1-manual-fallback may exist anywhere and every document's body
+// must render REAL JAPANESE.
+//
+// What the flipped mode exercises, against real served bytes:
 //
 //   * EN boot: every document IS in the reader's language, so
 //     #sxc1-manual-fallback must not exist ANYWHERE (absence, not
@@ -7063,33 +7253,65 @@ async function runBadManualBundleCheck(opts) {
 //   * JA boot, reached through the app's OWN #btn-ui-lang switch
 //     (persist the pref + the boot hint, then reload -- the reload IS
 //     the refetch): the ja bundle really loaded (uiLang=ja AND
-//     contentLang=ja, with no content-error banner), the visible
-//     role=note #sxc1-manual-fallback carries the PINNED Japanese
-//     sentence, the page body still renders the English text (a blank
-//     page is never acceptable) and is marked lang="en" so a screen
-//     reader pronounces it correctly, and the manual TOC and the home
-//     card carry the same note.
+//     contentLang=ja, with no content-error banner); the note exists
+//     NOWHERE (page, TOC, home); the body carries no lang override
+//     (the document IS in the reader's language now); and ALL FOUR
+//     documents render their own PINNED Japanese sentence.
 //
-// The pinned sentence is a LITERAL here (I18n.iManualFallbackNote Ja),
-// never derived from the page under test, so a note that renders empty,
-// unlocalized, or in the wrong language is red.
+// The pinned sentences are LITERALS here, copied from the wave-2
+// transcriptions, never read off the page under test -- so a ja bundle
+// that fell back to English (or a document that quietly did) turns
+// MF4/MF5 red rather than agreeing with itself. That is exactly what
+// makes this stage's red test possible without editing translations/:
+// see check-site's own comment, and the W3 report, for the one-off
+// EN-fallback build the flip was demonstrated against.
 //
-// WHAT THIS CANNOT DO BEFORE WAVE 2, AND WHY: it cannot serve a ja
-// bundle in which one document is REAL Japanese, because the app
-// (correctly) refuses any bundle whose whole-body FNV-1a/32 is not the
-// one THIS wasm was built with -- the same reason --check-ja-toggle had
-// to stop injecting fixture variants and pin the shipped corpus's own
-// strings. The emitter half of wave 2's mechanism -- adding
-// <slug>.ja.md flips exactly that document's !SXC1-DOC record to `ja`,
-// leaves the others `en`, and moves the ja fingerprint -- is therefore
-// asserted structurally by check-site's M7-i instead, and W1's report
-// records a one-off full rebuild against a synthetic Japanese document
-// that showed the note disappearing for exactly that document.
-const MANUAL_FALLBACK_ROUTE = '#/m/guide-book/p/15';
+// THE MECHANISM ITSELF IS NOT RETIRED, only its current expectation:
+// View.Pages still renders the note for any document whose !SXC1-DOC
+// record names a language other than the reader's, check-site's M7-i
+// still proves the emitter flips that record when a .ja.md appears or
+// disappears, and this stage's PRECONDITION in check-site.sh now
+// requires every record in the served manuals.ja.txt to say 'ja' -- so
+// a future untranslated document turns the precondition red (loudly,
+// with the reason) instead of silently asserting an absence that no
+// longer holds.
 const MANUAL_FALLBACK_TOC_ROUTE = '#/m/guide-book';
 // I18n.iManualFallbackNote Ja -- この文書の日本語テキストはまだ用意されていません。
+// Kept as a literal even though the note must now be ABSENT: MF3 reads
+// it back if one ever appears, so a failure names WHAT appeared.
 const MANUAL_FALLBACK_JA_TEXT =
   'この文書の日本語テキストはまだ用意されていません。';
+
+// One real reading route per document, each with a distinctive sentence
+// from wave 2's transcription of THAT page's image. Every document is
+// listed on purpose: "all four are Japanese now" is the claim, so one
+// document falling back must fail here.
+const MANUAL_FALLBACK_DOCS = [
+  {
+    slug: 'guide-book',
+    route: '#/m/guide-book/p/2',
+    // 本書の説明・表示例やイラストなどは、実際の製品と異なる場合があります。
+    jaText: '本書の説明・表示例やイラストなどは、実際の製品と異なる場合があります。',
+  },
+  {
+    slug: 'startup-guide',
+    route: '#/m/startup-guide/p/1',
+    // ご使用の前に取扱説明書の「安全上のご注意」をよくお読みの上、正しくお使いください。
+    jaText: 'ご使用の前に取扱説明書の「安全上のご注意」をよくお読みの上、正しくお使いください。',
+  },
+  {
+    slug: 'midi',
+    route: '#/m/midi/p/1',
+    // 本書は本機に搭載された MIDI 機能及びそのインプリメンテーションに関して記載しています。
+    jaText: '本書は本機に搭載された MIDI 機能及びそのインプリメンテーションに関して記載しています。',
+  },
+  {
+    slug: 'oss',
+    route: '#/m/oss/p/1',
+    // 本書に記載のソフトウェアについて、各ライセンス条件に基づく必要な表示および条文を掲載しています。
+    jaText: '本書に記載のソフトウェアについて、各ライセンス条件に基づく必要な表示および条文を掲載しています。',
+  },
+];
 
 async function runManualFallbackCheck(opts) {
   const deadline = Date.now() + opts.timeout;
@@ -7107,12 +7329,16 @@ async function runManualFallbackCheck(opts) {
 
   const baseNoHash = opts.url.replace(/#.*$/, '').replace(/\/$/, '');
 
+  // Stable IDs, the JAC1..JAC5 precedent (M6 W4, finding M6-R1-3):
+  // check-site.sh requires this exact SET by id, so an assertion that is
+  // renamed, unplugged or swapped for a different "manual fallback:"
+  // assertion cannot hide behind the 5/5 count.
   const NAMES = {
-    enAbsent: 'manual fallback: under EN every document IS in the reader\'s language, so #sxc1-manual-fallback exists NOWHERE (page, TOC or home) while the page body renders normally with no lang override',
-    jaLoaded: 'manual fallback: the app\'s own #btn-ui-lang switch reloads into a real JA boot -- #sxc1-progress reports uiLang=ja AND contentLang=ja with no #sxc1-content-error banner (the ja manual bundle was accepted)',
-    jaNote: 'manual fallback: on a JA boot the VISIBLE role=note #sxc1-manual-fallback carries the pinned Japanese sentence (a literal here, never read off the page)',
-    jaBody: 'manual fallback: the fallback page still renders its English text (never a blank page) and the body is marked lang="en" for screen readers',
-    jaOther: 'manual fallback: the manual TOC route and the home manual card carry the same .manual-fallback-note',
+    enAbsent: 'manual fallback: [MF1] under EN every document IS in the reader\'s language, so #sxc1-manual-fallback exists NOWHERE (page, TOC or home) while the page body renders normally with no lang override',
+    jaLoaded: 'manual fallback: [MF2] the app\'s own #btn-ui-lang switch reloads into a real JA boot -- #sxc1-progress reports uiLang=ja AND contentLang=ja with no #sxc1-content-error banner (the ja manual bundle was accepted)',
+    jaNoNote: 'manual fallback: [MF3] wave 2 landed every document in Japanese, so under JA #sxc1-manual-fallback exists NOWHERE either -- not on any of the four reading routes, not in the manual TOC, not on a home card',
+    jaBody: 'manual fallback: [MF4] the JA page body renders the pinned Japanese sentence (a literal here, never read off the page) and carries NO lang override, because the document IS in the reader\'s language now',
+    jaAllDocs: 'manual fallback: [MF5] ALL FOUR documents render their own pinned Japanese sentence under JA -- a single document still falling back to English fails here by name',
   };
 
   const t = await newTarget(`${baseNoHash}/`, 30000);
@@ -7123,7 +7349,11 @@ async function runManualFallbackCheck(opts) {
     return;
   }
 
+  // One probe visits every document's reading route (going HOME between
+  // routes, so the wait for '#sxc1-page .page-body' cannot be satisfied
+  // by the page being left), then the TOC and home.
   const probe = async (evaluate) => evaluate(`(async () => {
+    const DOCS = ${JSON.stringify(MANUAL_FALLBACK_DOCS)};
     const wait = async (sel) => {
       const start = Date.now();
       while (Date.now() - start < 8000) {
@@ -7132,38 +7362,60 @@ async function runManualFallbackCheck(opts) {
       }
       return false;
     };
-    window.location.hash = ${JSON.stringify(MANUAL_FALLBACK_ROUTE)};
-    await wait('#sxc1-page .page-body');
-    const body = document.querySelector('#sxc1-page .page-body');
-    const note = document.querySelector('#sxc1-manual-fallback');
+    const docs = [];
+    for (const d of DOCS) {
+      window.location.hash = '#/';
+      await wait('#sxc1-home');
+      window.location.hash = d.route;
+      await wait('#sxc1-page .page-body');
+      const body = document.querySelector('#sxc1-page .page-body');
+      const note = document.querySelector('#sxc1-manual-fallback');
+      const bodyText = body && body.textContent ? body.textContent : '';
+      docs.push({
+        slug: d.slug,
+        route: d.route,
+        noteExists: note !== null,
+        noteVisible: note !== null && !note.hidden && note.offsetParent !== null,
+        noteRole: note ? note.getAttribute('role') : null,
+        noteText: note ? (note.textContent || '').trim() : '',
+        bodyChars: bodyText.trim().length,
+        bodyLang: body ? body.getAttribute('lang') : null,
+        jaTextPresent: bodyText.indexOf(d.jaText) !== -1,
+      });
+    }
     let prog = null;
     try { prog = JSON.parse(document.querySelector('#sxc1-progress').textContent); } catch (e) { prog = null; }
-    const page = {
-      noteExists: note !== null,
-      noteVisible: note !== null && !note.hidden && note.offsetParent !== null,
-      noteRole: note ? note.getAttribute('role') : null,
-      noteText: note ? (note.textContent || '').trim() : '',
-      bodyChars: body && body.textContent ? body.textContent.trim().length : 0,
-      bodyLang: body ? body.getAttribute('lang') : null,
-      banner: document.querySelector('#sxc1-content-error') !== null,
-      uiLang: prog ? prog.uiLang : null,
-      contentLang: prog ? prog.contentLang : null,
-    };
     window.location.hash = ${JSON.stringify(MANUAL_FALLBACK_TOC_ROUTE)};
     await wait('#sxc1-toc');
     const tocNotes = document.querySelectorAll('#sxc1-toc .manual-fallback-note').length;
     window.location.hash = '#/';
     await wait('#sxc1-home');
     const homeNotes = document.querySelectorAll('#sxc1-home .manual-fallback-note').length;
-    return Object.assign(page, { tocNotes, homeNotes });
+    return {
+      docs,
+      tocNotes,
+      homeNotes,
+      docLang: document.documentElement.lang,
+      banner: document.querySelector('#sxc1-content-error') !== null,
+      uiLang: prog ? prog.uiLang : null,
+      contentLang: prog ? prog.contentLang : null,
+    };
   })()`);
+
+  const firstDoc = (r) => (r && Array.isArray(r.docs) && r.docs.length ? r.docs[0] : null);
+  const noteFreeEverywhere = (r) => Boolean(
+    r && Array.isArray(r.docs) && r.docs.length === MANUAL_FALLBACK_DOCS.length
+      && r.docs.every((d) => d.noteExists === false)
+      && r.tocNotes === 0 && r.homeNotes === 0,
+  );
 
   let en = null;
   try { en = await probe(t.evaluate); } catch (err) { en = { error: String(err && err.message ? err.message : err) }; }
+  const enFirst = firstDoc(en);
   report(
     NAMES.enAbsent,
-    Boolean(en && en.noteExists === false && en.tocNotes === 0 && en.homeNotes === 0
-      && en.bodyChars > 100 && en.bodyLang === null && en.uiLang === 'en'),
+    Boolean(noteFreeEverywhere(en) && enFirst && enFirst.bodyChars > 100
+      && enFirst.bodyLang === null && en.uiLang === 'en'),
     en,
   );
 
@@ -7211,26 +7463,30 @@ async function runManualFallbackCheck(opts) {
     ja = { error: `switch failed: ${switched && switched.why ? switched.why : 'unknown'}` };
   }
 
+  const jaFirst = firstDoc(ja);
   report(
     NAMES.jaLoaded,
     Boolean(ja && ja.uiLang === 'ja' && ja.contentLang === 'ja' && ja.banner === false),
     ja,
   );
   report(
-    NAMES.jaNote,
-    Boolean(ja && ja.noteExists && ja.noteVisible && ja.noteRole === 'note'
-      && ja.noteText.includes(MANUAL_FALLBACK_JA_TEXT)),
-    ja,
+    NAMES.jaNoNote,
+    noteFreeEverywhere(ja),
+    // The pinned note text is reported alongside so a REGRESSION (the
+    // note reappearing) is named for what it is, not just "!== 0".
+    { ja, wouldSay: MANUAL_FALLBACK_JA_TEXT },
   );
   report(
     NAMES.jaBody,
-    Boolean(ja && ja.bodyChars > 100 && ja.bodyLang === 'en'),
-    ja,
+    Boolean(jaFirst && jaFirst.bodyChars > 100 && jaFirst.bodyLang === null
+      && jaFirst.jaTextPresent === true && ja.docLang === 'ja'),
+    { jaFirst, docLang: ja && ja.docLang, want: MANUAL_FALLBACK_DOCS[0].jaText },
   );
   report(
-    NAMES.jaOther,
-    Boolean(ja && ja.tocNotes === 1 && ja.homeNotes >= 1),
-    ja,
+    NAMES.jaAllDocs,
+    Boolean(ja && Array.isArray(ja.docs) && ja.docs.length === MANUAL_FALLBACK_DOCS.length
+      && ja.docs.every((d) => d.jaTextPresent === true && d.bodyLang === null && d.bodyChars > 40)),
+    { docs: ja && ja.docs, want: MANUAL_FALLBACK_DOCS.map((d) => ({ slug: d.slug, jaText: d.jaText })) },
   );
 
   await t.close();
@@ -9109,9 +9365,12 @@ async function main() {
           coldLoadFn,
           // M6 W4: jaCorpus turns on the five JA COURSE assertions --
           // real corpus Japanese, from the bundle this server is
-          // actually serving (see JA_COURSE_PINS). The self-test
-          // fixture caller passes none: it has no corpus to render.
-          { checkBundleFetch: true, jaCorpus: JA_COURSE_PINS },
+          // actually serving (see JA_COURSE_PINS). M7 W3: jaManuals
+          // turns on the four JA MANUAL assertions, the same discipline
+          // for the manual text (see JA_MANUAL_PINS). The self-test
+          // fixture caller passes neither: it has no corpus and no
+          // manual bundle to render.
+          { checkBundleFetch: true, jaCorpus: JA_COURSE_PINS, jaManuals: JA_MANUAL_PINS },
         );
       }
 

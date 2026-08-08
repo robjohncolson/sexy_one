@@ -18,14 +18,19 @@ Edge — connect an SXC-1 over USB, click **Enable device verification** on a dr
 and watch steps confirm themselves as you perform them on the real hardware.
 
 **日本語でも使えます — the whole thing runs in Japanese too.** Click **日本語** in the
-site header and the interface, all **435 exercises across 52 decks**, and the device
-messages switch to Japanese (**English** in the same place switches back). The
-manuals' original Japanese pages were always there; what M6 adds is the *course* in
-Japanese. Your choice is remembered in this browser, and **progress is shared between
-the languages** — the same exercise has the same id in both, so a prompt you answered
-in English is the same prompt when it comes up for review in Japanese. Switching to
-Japanese also suggests the reader's "Japanese first" mode the first time (a
-suggestion, not a lock — both preferences stay independently settable).
+site header and the interface, all **435 exercises across 52 decks**, the device
+messages **and the manuals themselves** switch to Japanese (**English** in the same
+place switches back). M6 made the *course* Japanese; **M7 makes the manual pages
+Japanese TEXT** — all **108 pages of all four documents**, transcribed from Casio's
+own page images, so a Japanese reader gets words they can select, search, copy and
+reflow on a phone instead of a picture of words. The original scan is still there and
+still one click away (**Show original page**), exactly as before: what changed is that
+it is no longer the *only* Japanese on the page. Your choice is remembered in this
+browser, and **progress is shared between the languages** — the same exercise has the
+same id in both, so a prompt you answered in English is the same prompt when it comes
+up for review in Japanese. Switching to Japanese also suggests the reader's "Japanese
+first" mode the first time (a suggestion, not a lock — both preferences stay
+independently settable).
 
 ## For SXC-1 owners
 
@@ -50,11 +55,13 @@ endorsed by, or sponsored by Casio**, and original manual content remains
 ## For developers
 
 The app is written in Haskell with [Miso](https://haskell-miso.org/) and compiled to
-WebAssembly by GHC's wasm backend; the manuals are embedded into the wasm at compile
-time and the exercise decks are fetched at boot as one per-language text bundle
-(`content/content.{en,ja}.txt`, M6 — see [Status](#status)), so the whole deployment
-is still static files — zero servers, working unchanged at any sub-path or served
-locally. The project runs on a
+WebAssembly by GHC's wasm backend; both corpora — the exercise decks (M6) and the
+manual text (M7) — are fetched at boot as per-language text bundles
+(`content/content.{en,ja}.txt` and `content/manuals.{en,ja}.txt`, accepted
+all-or-nothing against an expectation compiled into the wasm — see
+[Status](#status) and [How the manuals get into the app](#how-the-manuals-get-into-the-app)),
+so the whole deployment is still static files — zero servers, working unchanged at any
+sub-path or served locally. The project runs on a
 check-suite culture: nearly every claim in this README is enforced by a named check
 in `./scripts/check-site.sh`, which computes the content statistics three
 independent ways and drives the built site in headless Chrome before anything ships.
@@ -63,6 +70,47 @@ Start with [Prerequisites](#prerequisites) and [Build](#build) to build it yours
 [Measured figures](#measured-figures) for current sizes, counts and timings.
 
 ## Status
+
+**M7 (Japanese manual text).** The manuals are now first-class in both languages.
+Before this milestone, `uiLang=ja` gave a Japanese *interface* around an English
+manual body, with Casio's original page as an **image** beside it — a picture a
+Japanese reader cannot select, search, copy or reflow. All **108 pages** of all four
+documents (`guide-book` 71, `startup-guide` 15, `midi` 6, `oss` 16) now exist as
+Japanese **text** in `translations/<slug>.ja.md`, and the reader renders them with the
+same block renderer, the same outline and the same routes as the English. Three
+decisions carry it:
+
+* **The manual text left the wasm too.** Adding ~396 KB of Japanese to the
+  TH-embedded translations would have blown the frozen 1,000,000-byte gzip ceiling,
+  so the manuals became fetched per-language bundles
+  (`site/public/content/manuals.{en,ja}.txt`) under the *same* discipline M6's gate
+  forced on the course: one bundle grammar, an expectation compiled into `app.wasm`
+  (slugs in order, per-document page counts, a whole-bundle FNV-1a/32 fingerprint per
+  language), header-language match, every document must parse, **all-or-nothing**
+  acceptance, and a visible degraded state on any failure. The wasm *shed* 48,984
+  gzipped bytes doing it, so the Japanese text cost the binary nothing — it lands in
+  the `ja` bundle.
+* **Transcribed, not translated.** Ground truth is the page **image**; the OCR was a
+  draft to be corrected against it. The Japanese is what Casio printed — including
+  on-device labels in Latin caps (`BANK`, `MIDI IN Ch.`) and the documented on-screen
+  misspelling `LOW STRAGE SPACE` — never a back-translation of the English.
+* **Structural parity is a check, not a hope.** Each `.ja.md` is page-for-page with
+  its English sibling *and* block-for-block: `exercise-check --manual-structural-diff`
+  parses both bundles with the reader's own parser and requires identical page
+  markers, block-type sequences, heading levels, list/table shapes and
+  figure-callout positions — **109/109** (one document/order check plus one per page),
+  with three negative controls. A missing `ja` page is a hard failure by name.
+
+Ruling 4's per-document English fallback — a visible, localized note rather than
+English silently passed off as Japanese — is still in the app and still enforced, but
+**no document uses it any more**, so the gate asserts its *absence*: the
+manual-language-of-record stage requires every `!SXC1-DOC` record in the served
+`manuals.ja.txt` to say `ja` and the note to exist nowhere, and four ID-pinned
+`ja manual:` assertions in **both** full browser stages read real Japanese sentences
+off real reading routes with the original page image still reachable on `/ja`.
+
+The gate is now **129 checks** with **242 assertions per browser stage**. The figures
+below are the M7 ship state; the milestone entries that follow are historical.
 
 **M6 (Japanese).** The course itself is now bilingual. The interface, every
 learner-visible string in all **435 exercises across 52 decks**, the device
@@ -96,9 +144,8 @@ structural decisions carry it:
   cite.
 
 The gate grew to **109 checks** with **238 assertions per browser stage**, both
-stages now completing a real Japanese quiz out of the shipped `ja` bundle. The
-figures below are the M6 ship state; the milestone entries that follow are
-historical.
+stages now completing a real Japanese quiz out of the shipped `ja` bundle — the
+numbers as they stood at M6's close; M7 raised both (see above).
 
 **M5 (ship).** The closing milestone: the SEXY ONE rename, a full content audit
 (94% topic coverage, twelve citation defects found and fixed, hooks recalibrated
@@ -281,25 +328,59 @@ printed `check-site: result=complete`; and `serve-site.sh` served
 
 ## How the manuals get into the app
 
-`translations/*.md` are embedded into the wasm **at compile time** by Template Haskell
-(`SXC1.Content.Embed.embedUtf8File`, spliced once per document in `SXC1.Content.Corpus`)
-and then parsed **lazily, at runtime**, by the miso-free `sxc1-content` library
-(`site/src/SXC1/`) — no fetch, no JSON, works offline and at any GitHub Pages sub-path.
-`site/sxc1-trainer.cabal` declares:
+<a id="how-the-manuals-get-into-the-app"></a>
+
+`translations/<slug>.md` (English) and `translations/<slug>.ja.md` (Japanese, M7) are
+emitted by `scripts/emit-content-bundles.py` into **two per-language text bundles**,
+`site/public/content/manuals.{en,ja}.txt`, which the static shell fetches **before**
+the wasm reactor starts and hands to the app through the same JS-side-guarded
+`window.__sxc1Content` bridge the exercise bundles use. Each bundle is one
+`!SXC1-BUNDLE v1 <lang> <count>` header plus one `!SXC1-DOC <slug> <lang> <pages>`
+record per document, and the text inside a record is the `.md` file **byte for byte**.
+It is then parsed **lazily, at runtime**, by the miso-free `sxc1-content` library
+(`site/src/SXC1/`) — the same parser, the same `Doc`/`Page`/`Block` model and the same
+laziness contract the compile-time embedding had.
+
+Acceptance is **all-or-nothing** and is checked against `site/app/Bundle/Manifest.hs`
+— a *generated* module compiled **into `app.wasm`** that records the document slugs in
+order, each document's page count and one FNV-1a/32 fingerprint per language over the
+whole bundle. The requested language must match the header's, the record list must
+equal the manifest's exactly, the declared count must match both, the fingerprint must
+match this build's, and every document must *parse* to exactly the page count the
+manifest promises. Anything else renders the visible degraded state (`#sxc1-content-error`
+plus `#sxc1-manual-degraded` with a retry) instead of a quietly smaller manual. The
+expectation deliberately does **not** travel with the bundle: a bundle attesting to
+itself proves only internal consistency, so a complete *older* build would satisfy it.
+
+Per document, the `!SXC1-DOC` line names the language **that document's own text** is
+in. A `ja` bundle may legally carry `en` for a document with no `.ja.md` yet, and the
+reader then renders ruling 4's visible localized note above an `lang="en"`-marked body
+— never a blank page, never English passed off as Japanese. As of M7 **no document
+takes that path**: all four records read `ja`.
+
+`site/sxc1-trainer.cabal` still declares:
 
 ```
 extra-source-files: ../translations/*.md
 ```
 
-This line is load-bearing, not decorative: `addDependentFile` alone makes GHC recompile
+This line is load-bearing, not decorative — now for `exe:content-check`, which is the
+one component that still TH-embeds the translations (`site/test/EmbeddedTranslations.hs`;
+its `--dump-source` is check-site's stale-*build* detector, and that only works if the
+bytes are fixed at compile time). `addDependentFile` alone makes GHC recompile
 when a translation changes, but only if cabal decides to *invoke* GHC in the first
 place, and cabal's own staleness check has no idea a Haskell module depends on a file
 three directories away unless `extra-source-files` tells it so. Without this line,
 editing a translation and re-running `wasm32-wasi-cabal build` does nothing — cabal
 reports the package up to date and never calls GHC. With it, cabal notices the mtime
 change and GHC reports `[../translations/guide-book.md changed]` before recompiling.
-So the whole content-editing workflow is: edit a file under `translations/`, re-run
-`./scripts/build-site.sh`.
+The glob covers `*.ja.md` too, so a Japanese page edit is just as visible. On the
+*shipped* path the equivalent guarantee is stronger and needs no recompilation at all:
+`check-site.sh` requires `manuals.{en,ja}.txt` to be byte-identical to a fresh emission
+from `translations/`, and requires `site/app/Bundle/Manifest.hs` to be byte-identical
+to a fresh regeneration — so a translation edited without rebuilding is red either way.
+The whole content-editing workflow is unchanged: edit a file under `translations/`,
+re-run `./scripts/build-site.sh`.
 
 That line does produce one expected, harmless cabal warning, printed once per component
 configured (the library, `exe:app` and `exe:content-check` — three times per build):
@@ -338,10 +419,14 @@ never renumbered, only retired-with-a-tombstone — because M3 keys a learner's 
 progress to them; an id that moved out from under a learner's history would silently
 orphan it.
 
-Exercise decks are embedded into the wasm **at compile time**, the same way the manuals
-are, so — exactly as with a translation — the whole content-editing workflow is: edit a
-`.ex.md` file (or `INDEX`), re-run `./scripts/build-site.sh`. As of M3 this is a single
-compile-time splice, not one hand-written literal per deck: `SXC1.Content.Embed`'s
+Neither corpus is compiled into the wasm any more — the decks left in M6 and the
+manual text in M7, both into fetched per-language bundles (see
+[How the manuals get into the app](#how-the-manuals-get-into-the-app)) — but the
+content-editing workflow is unchanged either way: edit a `.ex.md` file (or `INDEX`),
+re-run `./scripts/build-site.sh`, which re-emits the bundles *and* the wasm-embedded
+expectation they are checked against. The compile-time design they replaced is
+recorded here because its lesson still binds the emitter: as of M3 embedding was a
+single compile-time splice, not one hand-written literal per deck: `SXC1.Content.Embed`'s
 `embedIndexedDir` reads `INDEX` at compile time and `addDependentFile`s every file it
 names, and `site/app/Exercises/Embed.hs` is just
 `deckSources = $(embedIndexedDir "../content/exercises/INDEX" "../content/exercises")`.
@@ -491,9 +576,11 @@ heading/table/figure counts, section and subsection counts, PART titles, …) **
 independent ways** and fails if any two disagree:
 
 1. **The real Haskell parser** — `exe:content-check`, a wasm32-wasi *command* module
-   (not the reactor-model `exe:app`) run on the host by `wasm-run.mjs`, over the
-   TH-embedded manual corpus (the *manuals* are still embedded; the exercise decks
-   moved out in M6 and have their own bundle-freshness check).
+   (not the reactor-model `exe:app`) run on the host by `wasm-run.mjs`, over its own
+   TH-embedded copy of the manual corpus. Both corpora are *fetched* by the app now
+   (decks since M6, manual text since M7) and each has its own bundle-freshness check;
+   the checker keeps a compile-time copy on purpose, because that is what makes its
+   `--dump-source` byte comparison a stale-**build** detector.
 2. **An independent regex sweep** — an embedded `python3` snippet that recomputes the
    same numbers straight from `translations/*.md` by regex, without going anywhere near
    the Haskell parser.
@@ -528,8 +615,8 @@ flow in a target with *no* fake injected at all, and requires it to land in "den
 and never confirm — because real headless Chrome denies the permission, a positive
 result anywhere else in the suite can only have come from the fake's scripted
 messages, never from the real API by accident. All of this sits inside
-`check-site.sh`'s ordinary gate (**109 checks** as of M6): the browser driver asserts
-**238 assertions per served stage** (**198** in `node scripts/browser-check.mjs
+`check-site.sh`'s ordinary gate (**129 checks** as of M7): the browser driver asserts
+**242 assertions per served stage** (**198** in `node scripts/browser-check.mjs
 --self-test`), and a named check-site check independently counts the 27 distinct
 `ok - D<n>` lines in the root stage's captured output — so silently unplugging the
 device suite from the driver turns check-site red even while the browser stages
@@ -570,6 +657,55 @@ the same as the Japanese course working, so the gate checks the course, not the 
   emission relabelled `ja` failed exactly those five assertions and nothing else — and
   a named check-site check counts them *by name* in each stage's capture, so removing
   them cannot hide under the per-stage assertion floor.
+
+**How the Japanese MANUALS are proven (M7).** Shipping 108 pages of Japanese is not
+the same as a Japanese reader getting them, and "the file is bigger" is not evidence.
+Three checks carry the claim, and each was demonstrated red before it was trusted:
+
+* **Structural parity, by the reader's own parser.** `exercise-check
+  --manual-structural-diff <en-bundle> <ja-bundle>` parses **both** freshly emitted
+  manual bundles with `SXC1.Content.Markdown.mkDoc` — the exact function
+  `View.Pages.mkManuals` calls on every fetched document, so the checker and the reader
+  cannot drift — and requires, per document per page: the same page markers in the same
+  order, the same block-type sequence, the same heading levels, the same list and table
+  shapes, and the same figure-callout positions. Only *text* may differ. A `ja` page
+  **missing** while its English page exists is a hard failure naming the document and
+  the page. The reported total is 1 + one per page (**109/109**), so a document quietly
+  dropped from either bundle cannot hide behind a smaller all-green run. Its three
+  negative controls run in the same check, each on a copy of the fresh `ja` emission
+  and each grep-confirmed in first: a whole-line `*[Figure: …]*` callout stripped to
+  prose (`en=figure callout` vs `ja=paragraph`), a `###` heading dropped to `##`
+  (`heading level 3` vs `heading level 2`), and one whole `<!-- page N -->` section
+  deleted (`page 3: MISSING from the ja document`). All three exit non-zero and name
+  exactly the document, page and position.
+* **Real Japanese on real routes, in both full stages.** Four ID-pinned `ja manual:`
+  assertions (JAM1–JAM4) run inside the `uiLang=ja` flow of *both* served stages:
+  guide-book p.2 renders its pinned Japanese heading and sentence with
+  `document.documentElement.lang="ja"`, no fallback note and no `lang` override on the
+  body; `midi` p.1 renders its own pinned sentence **and still carries `MIDI IN Ch.` in
+  Latin caps** (ruling 3); on the `/ja` route the original page image is still there
+  beside the Japanese text and the scan URL really fetches (a same-origin `fetch` of
+  `#ja-image`'s own `src`, 200 + non-trivial bytes); and the manual TOC renders the
+  Japanese outline. Every expectation is a literal copied out of
+  `translations/<slug>.ja.md`, never read off the page under test — so an English
+  fallback `ja` bundle turns them red instead of agreeing with itself. It was
+  demonstrated red exactly that way: rebuilding against a scratch `translations/` with
+  the `.ja.md` files removed (and the matching manifest regenerated, so the app still
+  *accepts* the bundle) failed all four, while removing only `guide-book.ja.md` failed
+  JAM1/JAM3/JAM4 and left JAM2 green. A named check-site check counts them **by ID** in
+  each stage's capture.
+* **The fallback note, now proven by its absence.** The per-document English fallback
+  of ruling 4 is unchanged in the app, but no document uses it, so the
+  manual-language-of-record stage (`browser-check --check-manual-fallback`, **5/5**,
+  IDs MF1–MF5) asserts that under `ja` `#sxc1-manual-fallback` exists **nowhere** — no
+  reading route, no TOC, no home card — while all four documents render their own
+  pinned Japanese sentence. The mechanism is kept honest rather than retired: the stage
+  first requires every `!SXC1-DOC` record in the served `manuals.ja.txt` to say `ja`,
+  so a future untranslated document turns the stage red *by name* instead of asserting
+  an absence that no longer holds; the emitter half (adding or removing a `.ja.md`
+  flips exactly that document's record) has its own check; and the note-**present**
+  direction was re-demonstrated on real served bytes against the scratch build above,
+  where the note appeared for `guide-book` only and for none of the other three.
 
 ## Progress, spaced repetition and the id registry
 
@@ -859,8 +995,8 @@ there is no server-side router:
 |---|---|
 | `#/` | Home — a card per manual |
 | `#/m/<slug>` | That manual's table of contents (grouped by front matter / PART / appendix) |
-| `#/m/<slug>/p/<n>` | Page `n` of that manual |
-| `#/m/<slug>/p/<n>/ja` | Page `n`, with the original-Japanese-page panel already open |
+| `#/m/<slug>/p/<n>` | Page `n` of that manual, in the reader's language (English, or Japanese since M7) |
+| `#/m/<slug>/p/<n>/ja` | The same page, with the original-Japanese-page **scan** panel already open |
 
 `<slug>` is one of `guide-book`, `startup-guide`, `midi`, `oss`. Hash routing was chosen
 because GitHub Pages serves static files with no server-side rewrites — a path-based
@@ -998,7 +1134,10 @@ casio-sxc1/
 │   │                             (committed JA page images)
 │   └── public/                  build output (gitignored, never committed)
 ├── manuals/                     original Japanese Casio PDFs (source material)
-├── translations/                English translations of the manuals (embedded at build time)
+├── translations/                <slug>.md  -- the English translation of each manual
+│                                 <slug>.ja.md -- the Japanese TEXT of the same pages
+│                                 (M7, transcribed from the page images); both are
+│                                 emitted into content/manuals.{en,ja}.txt at build
 ├── content/
 │   ├── EXERCISE-FORMAT.md       the .ex.md authoring guide -- the only doc a content
 │   │                             author needs
@@ -1006,7 +1145,8 @@ casio-sxc1/
 │   ├── id-registry.tsv          the 440-row PromptId-stability registry (promptCount +
 │   │                             the tombstone process; see exe:registry-check)
 │   ├── terminology-rules.tsv    house style rules exercise-check enforces
-│   ├── exercises/                52 .ex.md decks + INDEX (embedded at compile time)
+│   ├── exercises/                52 .ex.md decks + INDEX (emitted into the fetched
+│   │                             content/content.{en,ja}.txt bundles at build time)
 │   └── fixtures/                 the validator's falsifiability corpus (files/, dirs/)
 └── .github/workflows/           CI: build (with --optimize), check, and (once enabled)
                                   deploy to Pages
@@ -1104,9 +1244,9 @@ above. The same built `site/public/` bundle is also deployed to Vercel (project
 
 <a id="measured-figures"></a>
 
-Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), at M6's close,
-against the full 52-deck/435-exercise course in **both languages** (rows measured at
-an earlier milestone's close say so):
+Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), at M7's close,
+against the full 52-deck/435-exercise course **and all 108 manual pages** in **both
+languages** (rows measured at an earlier milestone's close say so):
 
 | Metric | Value |
 |---|---|
@@ -1114,20 +1254,27 @@ an earlier milestone's close say so):
 | Warm build, unoptimized (nothing changed) | <1s |
 | Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time; `-Oz --converge` iterates to a fixed point, so it costs more than M3's `-O2` ~5s: the `wasm-opt` pass alone measures ≈11s on this machine) | ~15s |
 | `app.wasm`, unoptimized default build (`build-site.sh`, no flags; measured at M3's close — M4 ships only the optimized flavour, and grew, so this is still *over* the ceiling) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
-| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M6 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `879161`) | 2,439,911 bytes raw / **879,161 bytes gzipped** |
+| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M7 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `838748`) | 2,299,098 bytes raw / **838,748 bytes gzipped** |
+| `app.wasm` at M6's close, for comparison (the pre-manual-externalization baseline `briefs/M7-budget.json` records as `m6_final`) | 2,439,911 bytes raw / 887,732 bytes gzipped |
+| M7 gzip delta over the M6 close: the manual text left the wasm (`SXC1.Content.Corpus` retired, 193,460 raw bytes of embedded translations) | **−48,984 bytes** — against a pinned `M7_SHRINK_MIN` of 30,000; waves 2/3 added 108 pages of Japanese and **zero** wasm bytes |
 | `app.wasm` at M5's close, for comparison (the pre-externalization baseline `briefs/M6-budget.json` records as `m5_final`) | 2,662,016 bytes raw / 933,305 bytes gzipped |
 | M6 gzip delta over the M5 close: corpus externalization **−73,560**, then the JA UI string table **+19,416** | **−54,144 bytes** net — no new wasm ceiling was granted or needed |
 | `content/content.en.txt` (the EN exercise bundle the app fetches at boot) | 284,108 bytes raw / **76,602 bytes gzipped** |
 | `content/content.ja.txt` (the JA bundle — real Japanese for all 52 decks, not an EN fallback) | 358,497 bytes raw / **91,130 bytes gzipped** |
-| Combined bundle gzip against `M6_BUNDLE_CEILING` (pinned in `check-site.sh`, recorded in `briefs/M6-budget.json`, logged to `state/bundle-ledger.tsv` every run) | **167,732 / 300,000 bytes** — 132,268 of headroom |
+| Combined exercise-bundle gzip against `M6_BUNDLE_CEILING` (pinned in `check-site.sh`, recorded in `briefs/M6-budget.json`, logged to `state/bundle-ledger.tsv` every run) | **167,732 / 300,000 bytes** — 132,268 of headroom |
+| `content/manuals.en.txt` (the EN manual bundle — all four documents, 108 pages) | 193,578 bytes raw / **57,818 bytes gzipped** |
+| `content/manuals.ja.txt` (the JA manual bundle — real Japanese for all 108 pages, all four `!SXC1-DOC` records `ja`, not an EN fallback) | 217,070 bytes raw / **60,215 bytes gzipped** |
+| Combined manual-bundle gzip against `M7_MANUAL_BUNDLE_CEILING` (pinned in `check-site.sh`, recorded in `briefs/M7-budget.json`, logged to `state/manual-bundle-ledger.tsv` every run) | **118,033 / 250,000 bytes** — 131,967 of headroom |
+| **Everything the app fetches at boot**, against `M7_BUNDLE_TOTAL_CEILING` (= 300,000 + 250,000, asserted with its arithmetic in `check-site.sh`) | **285,765 / 550,000 bytes** — 264,235 of headroom |
 | M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json`; M4 closed at 927,008) | **+36,295 bytes** — inside M4's 42,000-byte budget |
 | M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
-| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 120,839 bytes of headroom remain |
+| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 161,252 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,664,413 bytes (≈12.7 MB) |
-| `check-site.sh`, full run (**109** checks, both browser sweeps of 108 routes, **238** browser assertions per served stage incl. the D1–D27 device suite and the JA course) | ≈78s |
-| Per-stage browser floor / JA course floor (pinned in `check-site.sh`; floors, never equalities) | **238** assertions per stage / **5** named `ja course:` assertions per stage |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,938,967 bytes (≈12.9 MB) |
+| `check-site.sh`, full run (**129** checks, both browser sweeps of 108 routes, **242** browser assertions per served stage incl. the D1–D27 device suite, the JA course and the JA manuals) | ≈109s |
+| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **242** assertions per stage / **5** named `ja course:` (JAC1–JAC5) / **4** named `ja manual:` (JAM1–JAM4) per stage |
+| `exe:exercise-check --bundle-structural-diff` (EN/JA exercise corpus) / `--manual-structural-diff` (EN/JA manual documents, the reader's own parser) | **53/53** checks (1 + one per deck) / **109/109** checks (1 + one per page), each with its own negative controls |
 | `node scripts/browser-check.mjs --self-test` / `--self-test-negative` | **198/198** assertions / **42/42** sabotage passes, each catching exactly its own mapped assertion(s) |
 | `exe:content-check --self-test` | **412/412** checks |
 | `exe:progress-check --self-test` | **91/91** checks |
@@ -1155,9 +1302,12 @@ gzipped baseline mainly for two reasons: the course grew from 4 decks/16 exercis
 (`site/app/Device/Midi.hs`, `SXC1.Midi.Spec`, the device panel) added the **+36,295**
 gzipped bytes recorded above. **M6 reversed the first of those two causes**: the course
 is no longer inside `app.wasm` at all (it is fetched as the two bundles in the table),
-which is what paid for a second full language without touching the frozen ceiling. See
-[Status](#status) for the full size story and why CI now builds the `--optimize`d
-flavour. `site/public/` stays well inside GitHub Pages' 1 GB artifact limit either way.
+which is what paid for a second full language without touching the frozen ceiling.
+**M7 did the same to the manual text**, shedding another 48,984 gzipped bytes, so
+`app.wasm` now embeds neither corpus — only the generated `Bundle.Manifest`
+expectation (names, counts and hashes, never text) it checks both fetched bundles
+against. See [Status](#status) for the full size story and why CI now builds the
+`--optimize`d flavour. `site/public/` stays well inside GitHub Pages' 1 GB artifact limit either way.
 
 `--optimize` (`wasm-opt --detect-features -Oz --converge` + `wasm-tools strip`) remains **off by default** in
 `build-site.sh` itself — `wasm-opt` is the one step in this pipeline that could in

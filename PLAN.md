@@ -114,6 +114,33 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   `content-check` 412/412, `progress-check` 91/91, `registry-check` 8/8 + 16/16.
   Remaining: Codex adversarial review, tag `m6`, deploy both hosts, live-verify
   EN+JA flows.
+- **M7 — Japanese manual text.** Owner report, 2026-08-08: on `#/m/guide-book/p/2/ja`
+  the chrome was Japanese but the page body was English — `/ja` showed Casio's
+  original page as an IMAGE beside the English translation TEXT, so a Japanese reader
+  got a picture they could not select, search, copy or reflow. *Done when: a learner
+  reading in Japanese gets Japanese TEXT on every manual page, with the original scan
+  still one click away.* **IMPLEMENTATION COMPLETE 2026-08-09** (waves 1-3; gate
+  pending): the manual text moved out of `app.wasm` into fetched per-language bundles
+  under M6's manifest/fingerprint discipline (plan ruling 1 — the wasm *shed* 48,984
+  gzip bytes, 838,748 at ship with 161,252 of headroom under the frozen ceiling, and
+  the four manual bundles cost 118,033 of a new 250,000 ceiling; all four fetched
+  bundles 285,765 of 550,000); all **108 pages** of all four documents were
+  TRANSCRIBED from the page images into `translations/<slug>.ja.md` (ruling 3 — never
+  a back-translation, on-device labels left in Latin caps) and QA-accepted page by
+  page; EN/JA structural parity is enforced by `exercise-check
+  --manual-structural-diff`, which parses both bundles with the reader's own
+  `mkDoc` and compares page markers, block sequences, heading levels, list/table
+  shapes and figure-callout positions (**109/109**, three negative controls); and the
+  per-document EN-fallback note of ruling 4 — unchanged in the app, and still red-
+  tested against a rebuilt EN-fallback bundle — is now asserted by its ABSENCE, with
+  four ID-pinned `ja manual:` assertions (JAM1-JAM4) reading real Japanese off real
+  routes in both browser stages, the original page image still reachable on `/ja`.
+  Gate: `check-site` **129/129 result=complete**, **242** assertions per browser
+  stage, `exercise-check` **454/454** self-test / **56/56** fixtures / 0 issues /
+  **53/53** + **109/109** structural diffs, `browser-check` **198/198** self-test and
+  **42/42** sabotage passes, `content-check` 412/412, `progress-check` 91/91,
+  `registry-check` 8/8 + 16/16. Remaining: Codex adversarial review, tag `m7`, deploy
+  both hosts, live-verify the Japanese manual text.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 

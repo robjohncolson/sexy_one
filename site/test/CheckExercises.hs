@@ -9,6 +9,8 @@
 --   exercise-check [--content-dir DIR] [--translations-dir DIR]
 --                  [--json] [--self-test] [--fixtures DIR]
 --                  [--list-codes] [--browser-fixture]
+--                  [--bundle-structural-diff EN JA]
+--                  [--manual-structural-diff EN JA]
 --
 -- See briefs\/M2-manifest.json, task \"exercise-core\", item (9) for the
 -- full contract. Exit codes: 0 all good; 1 validation\/assertion
@@ -21,7 +23,7 @@ import           Control.Monad          (forM, forM_, unless, when)
 import qualified Data.ByteString        as BS
 import qualified Data.IntMap.Strict     as IntMap
 import qualified Data.IntSet            as IntSet
-import           Data.List              (isPrefixOf, isSuffixOf, sortOn)
+import           Data.List              (intercalate, isPrefixOf, isSuffixOf, sortOn)
 import qualified Data.Map.Strict        as Map
 import           Data.Map.Strict        (Map)
 import           Data.Maybe             (mapMaybe)
@@ -35,8 +37,13 @@ import           System.Exit            (ExitCode (ExitFailure), exitFailure, ex
 import           System.FilePath        ((</>))
 import           System.IO              (hPutStrLn, hSetEncoding, stderr, stdout, utf8)
 
-import           SXC1.Content.Markdown  (LineShape (..), classifyLine, parseBlocksEngineWith)
-import           SXC1.Content.Types     (Block (..))
+-- 'mkDoc' is imported for --manual-structural-diff (M7 W3, ruling 5):
+-- the checker parses both manual bundles with the READER'S OWN parser,
+-- the exact function View.Pages.mkManuals calls, so the two cannot
+-- drift.
+import           SXC1.Content.Markdown  (LineShape (..), classifyLine, mkDoc, parseBlocksEngineWith)
+import           SXC1.Content.Types     (Block (..), Doc (docPages), ListItem (liChildren),
+                                          Page (pageBlocks, pageHeader, pageNumber))
 import           SXC1.Exercise.Engine
 import           SXC1.Exercise.Lint
 import           SXC1.Exercise.Parse
@@ -65,6 +72,10 @@ data Opts = Opts
     -- @--bundle-structural-diff EN JA@ -- the two emitted content
     -- bundles to compare for STRUCTURAL identity.
   , optBundleDiff       :: Maybe (FilePath, FilePath)
+    -- | M7 W3 (briefs\/M7-plan.md, ruling 5):
+    -- @--manual-structural-diff EN JA@ -- the two emitted MANUAL
+    -- bundles to compare for STRUCTURAL identity, page by page.
+  , optManualDiff       :: Maybe (FilePath, FilePath)
   }
 
 defaultOpts :: FilePath -> Opts
@@ -73,6 +84,7 @@ defaultOpts root = Opts
   , optJson = False, optSelfTest = False, optFixtures = Nothing
   , optListCodes = False, optBrowserFixture = False
   , optBundleDiff = Nothing
+  , optManualDiff = Nothing
   }
 
 -- | @content\/fixtures@'s default location under the resolved repo root
@@ -101,6 +113,9 @@ parseArgs root = go (defaultOpts root)
     go o ("--bundle-structural-diff" : en : ja : rest)
       | not ("--" `isPrefixOf` en), not ("--" `isPrefixOf` ja)
       = go o { optBundleDiff = Just (en, ja) } rest
+    go o ("--manual-structural-diff" : en : ja : rest)
+      | not ("--" `isPrefixOf` en), not ("--" `isPrefixOf` ja)
+      = go o { optManualDiff = Just (en, ja) } rest
     go _ (bad : _)                         = Left ("unknown or incomplete argument: " ++ bad)
 
 --------------------------------------------------------------------------
@@ -892,6 +907,206 @@ runBundleStructuralDiff enPath jaPath = do
       putStrLn ("exercise-check --bundle-structural-diff: " ++ show passed ++ "/" ++ show total ++ " checks passed")
       if null problems then exitSuccess else exitFailure
 
+--------------------------------------------------------------------------
+-- --manual-structural-diff: EN vs JA STRUCTURAL IDENTITY OF THE MANUAL
+-- DOCUMENTS (M7 W3, briefs/M7-plan.md ruling 5).
+--
+-- Ruling 2 says translations/<slug>.ja.md is PAGE-FOR-PAGE with its EN
+-- sibling and carries the same block structure, so the one Blocks
+-- renderer renders either language with no per-language branch. The
+-- emitter only counts page markers; nothing checked that the two
+-- documents PARSE to the same shape. A JA page that turned a
+-- *[Figure: ...]* callout into prose, dropped a heading level, split a
+-- table, or lost a page section entirely would render as a quietly
+-- different document for a Japanese reader, with every other check
+-- green -- exactly the class of drift E-JA-MISSING and
+-- --bundle-structural-diff closed on the exercise corpus.
+--
+-- WHY THIS MODE LIVES IN exe:exercise-check AND NOT IN
+-- exe:content-check (the manual axis's own checker):
+--
+--   * It must run the READER'S OWN PARSER, not a re-implementation:
+--     'mkDoc' is the exact function View.Pages.mkManuals calls on every
+--     fetched document, so the checker and the reader cannot drift.
+--     Every checker in this package links it -- that alone does not
+--     pick a binary.
+--   * exe:exercise-check is the ONLY checker that takes its inputs as
+--     PATHS at run time (its module Haddock: "the only module in the
+--     project that touches the filesystem"). exe:content-check is
+--     TH-embedded BY CONTRACT -- that is precisely what makes
+--     `--dump-source` check-site's stale-BUILD detector -- so giving it
+--     run-time file inputs would weaken the contract it exists to hold,
+--     and every negative control below would need a checker RECOMPILE
+--     instead of a scratch file.
+--   * exe:exercise-check already owns "EN/JA structural identity over
+--     an emitted bundle" ('runBundleStructuralDiff'), including
+--     'firstDiff' and the framing splitter idiom. The manual half is
+--     the same claim over the other corpus: one binary, one flag
+--     idiom, one diff engine, one place a diffing bug can live.
+--
+-- Like its exercise sibling, the bundle splitter here is a small
+-- INDEPENDENT re-implementation of the framing (this binary cannot
+-- import exe:app's Bundle module), so a bug in the app-side splitter
+-- cannot hide here. The PARSER, by contrast, is deliberately shared --
+-- that is the whole point.
+--
+-- What is compared, per document, per page: the page marker (its
+-- number) and the running header's presence, then the block sequence --
+-- block type by position, heading LEVEL, figure-callout KIND (hence its
+-- position in the sequence), bullet/numbered list item counts and start
+-- numbers, blockquote nesting, and table header/row/column shape --
+-- recursively into list children and quotes. Only TEXT may differ. A JA
+-- page missing while its EN page exists is a hard failure naming the
+-- document and the page.
+--------------------------------------------------------------------------
+
+-- | Split a manual bundle body into @(slug, declared language, declared
+-- page count, text)@ in bundle order -- the framing only; nothing here
+-- knows the app's manifest.
+splitBundleDocs :: Text -> Either String [(Text, Text, Int, Text)]
+splitBundleDocs raw = case T.lines raw of
+  [] -> Left "bundle is empty"
+  (hdr : rest)
+    | not ("!SXC1-BUNDLE v1 " `T.isPrefixOf` hdr) ->
+        Left ("bundle does not start with a '!SXC1-BUNDLE v1 <lang> <count>' header: " ++ T.unpack (T.take 60 hdr))
+    | otherwise -> go rest
+  where
+    delim = "!SXC1-DOC "
+    go [] = Right []
+    go (l : ls) = case T.stripPrefix delim l of
+      Nothing -> Left ("expected a '" ++ T.unpack delim ++ "<slug> <lang> <pages>' delimiter, got: "
+                         ++ T.unpack (T.take 60 l))
+      Just fieldsTxt ->
+        let (body, more) = break (T.isPrefixOf delim) ls
+        in case T.words fieldsTxt of
+             [slug, dl, pagesTxt] | Just p <- readDigits pagesTxt ->
+               ((slug, dl, p, T.unlines body) :) <$> go more
+             _ -> Left ("malformed '" ++ T.unpack delim ++ "<slug> <lang> <pages>' delimiter: "
+                          ++ T.unpack (T.take 60 fieldsTxt))
+    readDigits t
+      | not (T.null t), T.all (\c -> c >= '0' && c <= '9') t = Just (read (T.unpack t) :: Int)
+      | otherwise = Nothing
+
+-- | The comparable SHAPE of one block, as one line per block plus one
+-- per nested block, each carrying its POSITION so a divergence names
+-- where it is. Never any reader-visible text -- only the structure the
+-- Blocks renderer branches on.
+manualBlockSig :: String -> Block -> [String]
+manualBlockSig pos b = case b of
+  Heading lvl _ _   -> [pos ++ ": heading level " ++ show lvl]
+  Para _            -> [pos ++ ": paragraph"]
+  -- POSITION, not wording: 'Figure''s kind and caption are both
+  -- reader-visible TEXT (View.Blocks renders them as one figcaption),
+  -- and ruling 3 has the JA callouts DESCRIBING the figure in Japanese
+  -- -- guide-book's transcription writes *[写真：...]* where the EN
+  -- writes *[Photo: ...]*, which the placeholder grammar (an ASCII ':'
+  -- kind separator) reads as an all-kind, no-caption callout. Both are
+  -- a Figure block in the same slot, which is exactly what ruling 5
+  -- asks this check to hold; comparing the kind string would be
+  -- comparing a translation.
+  Figure _ _        -> [pos ++ ": figure callout"]
+  Bullets items     -> (pos ++ ": bullet list, " ++ show (length items) ++ " item(s)")
+                         : itemSigs pos items
+  Numbered start is -> (pos ++ ": numbered list from " ++ show start ++ ", " ++ show (length is) ++ " item(s)")
+                         : itemSigs pos is
+  Quote bs          -> (pos ++ ": blockquote, " ++ show (length bs) ++ " block(s)")
+                         : manualBlockSigs (pos ++ ".") bs
+  Table mhdr rows   -> [pos ++ ": table, header " ++ maybe "absent" (\h -> show (length h) ++ " cell(s)") mhdr
+                          ++ ", " ++ show (length rows) ++ " body row(s), widths "
+                          ++ show (map length rows)]
+  -- Never legal in either language: the parser's fallback shape is
+  -- itself a corpus defect (E-BLOCK-UNPARSED's seam class), and a page
+  -- that produced one in BOTH languages would otherwise compare equal.
+  Unparsed _        -> [pos ++ ": UNPARSED BLOCK (the parser's fallback -- must never occur)"]
+  where
+    itemSigs p items = concat
+      [ manualBlockSigs (p ++ ".item" ++ show (j :: Int) ++ ".") (liChildren it)
+      | (j, it) <- zip [1 ..] items ]
+
+manualBlockSigs :: String -> [Block] -> [String]
+manualBlockSigs prefix bs = concat
+  [ manualBlockSig (prefix ++ "block " ++ show (i :: Int)) b | (i, b) <- zip [1 ..] bs ]
+
+-- | The whole structural signature of one page.
+manualPageSig :: Page -> [String]
+manualPageSig pg =
+  ("page marker " ++ show (pageNumber pg)
+     ++ ", running header " ++ maybe "absent" (const "present") (pageHeader pg))
+  : manualBlockSigs "" (pageBlocks pg)
+
+runManualStructuralDiff :: FilePath -> FilePath -> IO ()
+runManualStructuralDiff enPath jaPath = do
+  enRaw <- readUtf8FileOrHarnessError enPath
+  jaRaw <- readUtf8FileOrHarnessError jaPath
+  case (splitBundleDocs enRaw, splitBundleDocs jaRaw) of
+    (Left e, _) -> harnessError (enPath ++ ": " ++ e)
+    (_, Left e) -> harnessError (jaPath ++ ": " ++ e)
+    (Right enDocs, Right jaDocs) -> do
+      let ident (slug, _, pages, _) = (slug, pages)
+          headerName = "en/ja manual document slugs, order and declared page counts are identical ("
+                         ++ show (length enDocs) ++ " document(s): "
+                         ++ intercalate ", " [ T.unpack s ++ " " ++ show p | (s, p) <- map ident enDocs ]
+                         ++ ")"
+          headerOk = map ident enDocs == map ident jaDocs
+          headerProblems
+            | headerOk  = []
+            | otherwise = ["manual document slugs/order/page counts differ: en="
+                             ++ show (map ident enDocs) ++ " ja=" ++ show (map ident jaDocs)]
+          -- Both documents go through the READER'S parser. Pairing is
+          -- positional and only meaningful once the header check holds,
+          -- which is why a header failure suppresses the page report.
+          paired = zip enDocs jaDocs
+          docReport ((slug, _, declared, enText), (_, _, _, jaText)) =
+            let enPages = docPages (mkDoc slug enText)
+                jaPages = docPages (mkDoc slug jaText)
+                jaByNum = [ (pageNumber p, p) | p <- jaPages ]
+                extraJa = [ pageNumber p | p <- jaPages
+                          , pageNumber p `notElem` map pageNumber enPages ]
+                -- The reader indexes pages POSITIONALLY, so a declared
+                -- count the text does not yield is the same defect
+                -- View.Pages.mkManuals rejects at boot; naming it here
+                -- keeps a truncated record from reading as "pages
+                -- missing from JA" further down.
+                countProblems =
+                  [ "document '" ++ T.unpack slug ++ "': the en record declares " ++ show declared
+                      ++ " page(s) but its text parses to " ++ show (length enPages)
+                  | length enPages /= declared ]
+                  ++
+                  [ "document '" ++ T.unpack slug ++ "': the ja record declares " ++ show declared
+                      ++ " page(s) but its text parses to " ++ show (length jaPages)
+                  | length jaPages /= declared ]
+                  ++
+                  [ "document '" ++ T.unpack slug ++ "': ja carries page " ++ show n
+                      ++ ", which has no en counterpart"
+                  | n <- extraJa ]
+                pageResult enPg = case lookup (pageNumber enPg) jaByNum of
+                  Nothing ->
+                    Left ("document '" ++ T.unpack slug ++ "' page " ++ show (pageNumber enPg)
+                            ++ ": MISSING from the ja document (its en page exists)")
+                  Just jaPg -> case firstDiff (manualPageSig enPg) (manualPageSig jaPg) of
+                    [] -> Right ("ok - " ++ T.unpack slug ++ " page " ++ show (pageNumber enPg)
+                                   ++ ": en/ja structurally identical (page marker, block sequence, "
+                                   ++ "heading levels, list/table shapes, figure-callout positions)")
+                    ((i, a, b) : _) ->
+                      Left ("document '" ++ T.unpack slug ++ "' page " ++ show (pageNumber enPg)
+                              ++ ": structural difference at position " ++ show i
+                              ++ ": en=" ++ show a ++ " ja=" ++ show b)
+                results = map pageResult enPages
+            in (length enPages, countProblems ++ [ e | Left e <- results ], [ s | Right s <- results ])
+          perDoc = map docReport paired
+          pageTotal = sum [ n | (n, _, _) <- perDoc ]
+          pageProblems = concat [ ps | (_, ps, _) <- perDoc ]
+          okLines = concat [ ls | (_, _, ls) <- perDoc ]
+          problems = headerProblems ++ (if headerOk then pageProblems else [])
+      when headerOk $ putStrLn ("ok - " ++ headerName)
+      forM_ problems (\p -> putStrLn ("FAIL - " ++ p))
+      when (null problems) (mapM_ putStrLn okLines)
+      let passed = (if headerOk then 1 else 0) + (if null problems then pageTotal else 0)
+          total  = 1 + (if headerOk then pageTotal else 0)
+      putStrLn ("exercise-check --manual-structural-diff: " ++ show passed ++ "/" ++ show total
+                  ++ " checks passed")
+      if null problems then exitSuccess else exitFailure
+
 -- | The first index at which two signature lists differ (as a
 -- singleton list, or empty when identical) -- a differing LENGTH counts
 -- as a difference at the first missing position.
@@ -1111,6 +1326,7 @@ main = do
     Right opts
       | optSelfTest opts       -> runSelfTest
       | Just (en, ja) <- optBundleDiff opts -> runBundleStructuralDiff en ja
+      | Just (en, ja) <- optManualDiff opts -> runManualStructuralDiff en ja
       | optListCodes opts      -> runListCodes opts
       | Just fdir <- optFixtures opts -> runFixtures opts fdir
       | optBrowserFixture opts -> runBrowserFixture opts

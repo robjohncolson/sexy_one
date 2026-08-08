@@ -67,6 +67,19 @@ manuals' Japanese TEXT so the reader is first-class in both languages.
    arithmetic in `briefs/M7-budget.json`, pinned constants, and the file
    required to MATCH the pins (the M5-R1-2 / M6 pattern).
 
+## Status (2026-08-09)
+
+**W1 COMPLETE** (commit 078d294) — **W2 COMPLETE** (commit 05c2061, all 108 pages
+transcribed and QA-accepted) — **W3 COMPLETE**: enforcement, browser assertions,
+ledgers and docs landed; gate pending. Measured at W3's close: `check-site`
+**129/129 result=complete**, zero skips; **242/242** assertions in each full browser
+stage; `exercise-check --manual-structural-diff` **109/109** with three negative
+controls; the manual-language-of-record stage **5/5** (MF1-MF5) now asserting the
+EN-fallback note's ABSENCE; four ID-pinned `ja manual:` assertions (JAM1-JAM4) in both
+stages; `app.wasm` 838,748 gzip of 1,000,000; manual bundles 118,033 of 250,000 and
+all four fetched bundles 285,765 of 550,000. Remaining: gate → tag `m7` → deploy →
+live-verify.
+
 ## Waves
 
 - **W1 — externalize manual text** (code): manuals move to fetched per-language

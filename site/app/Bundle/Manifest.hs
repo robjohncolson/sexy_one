@@ -146,5 +146,5 @@ manifestManualDocCount = 4
 -- exactly like 'manifestFingerprint'.
 manifestManualFingerprint :: Text -> Maybe Word32
 manifestManualFingerprint "en" = Just 1189317258
-manifestManualFingerprint "ja" = Just 253264256
+manifestManualFingerprint "ja" = Just 3461888404
 manifestManualFingerprint _    = Nothing

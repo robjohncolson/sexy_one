@@ -460,20 +460,57 @@ Checks performed, in order:
      the two bundles fail independently, which is the claim), while the
      control shows no banner, a readable manual page and the whole
      course. Skipped via skip() under --skip-browser.
-  29. M7 W1 MANUAL EN-FALLBACK NOTE (browser axis, ruling 4): on a
-     served copy of the SHIPPED bundles, browser-check
-     --check-manual-fallback must report exactly 5/5 across one EN boot
-     and the app's own JA switch (#btn-ui-lang, persist-then-reload):
-     under EN no #sxc1-manual-fallback exists anywhere; after the
-     switch the ja bundle really loaded (uiLang=ja, contentLang=ja, no
-     content-error banner), the VISIBLE role=note #sxc1-manual-fallback
-     carries the pinned Japanese sentence, the page body still renders
-     the English text (never a blank page) and is marked lang="en", and
-     the manual TOC and home card carry the same note. Both DIRECTIONS
-     of the mechanism are exercised on real served bytes -- absent when
-     a document IS in the reader's language, present when it is not --
-     which is what wave 2 flips, one document at a time. Skipped via
-     skip() under --skip-browser.
+  29. M7 MANUAL LANGUAGE-OF-RECORD (browser axis, ruling 4; FLIPPED BY
+     W3): on a served copy of the SHIPPED bundles, browser-check
+     --check-manual-fallback must report exactly 5/5 with the exact id
+     set MF1..MF5, across one EN boot and the app's own JA switch
+     (#btn-ui-lang, persist-then-reload): under EN no
+     #sxc1-manual-fallback exists anywhere; after the switch the ja
+     bundle really loaded (uiLang=ja, contentLang=ja, no content-error
+     banner), the note exists NOWHERE under ja either (none of the four
+     reading routes, no manual TOC, no home card), the page body carries
+     no lang override, and ALL FOUR documents render their own pinned
+     Japanese sentence. W1 asserted the OPPOSITE (the note PRESENT)
+     because the ja bundle then carried English for every document; W2
+     landed all 108 pages in Japanese, so the note is now correct only
+     by its absence. The MECHANISM is not retired: View.Pages still
+     renders the note for any document whose !SXC1-DOC record names
+     another language, M7-i still proves the emitter flips that record
+     with the .ja.md file, and this stage's PRECONDITION now requires
+     every record in the served manuals.ja.txt to say 'ja' -- so an
+     untranslated document turns the stage red by name instead of
+     asserting an absence that no longer holds. Skipped via skip()
+     under --skip-browser.
+  30. M7 W3 EN/JA MANUAL STRUCTURAL DIFF (content axis, ruling 5):
+     exercise-check --manual-structural-diff parses BOTH freshly emitted
+     manual bundles with SXC1.Content.Markdown.mkDoc -- the READER'S OWN
+     parser, the exact function View.Pages.mkManuals calls, so checker
+     and reader cannot drift -- and requires, per document per page: the
+     same page markers in the same order, the same block-type sequence,
+     the same heading levels, the same list/table shapes and the same
+     figure-callout positions, with a ja page missing while its en page
+     exists a hard failure naming document and page. Only TEXT may
+     differ. The reported total is 1 + one per page (>= 109), so a
+     document quietly dropped cannot hide behind a smaller all-green
+     run. Three NEGATIVE CONTROLS run in the same check, each on a COPY
+     of the fresh ja emission and each grep-confirmed in: a whole-line
+     *[...]* figure callout stripped to prose, a '### ' heading dropped
+     to '## ', and one whole page section deleted. Runs on the content
+     axis (skipped, conspicuously, under --skip-content).
+  31. M7 W3 JA MANUAL FLOOR (browser axis): the four "ja manual:"
+     assertions runUiLangJaAssertions runs inside BOTH full stages
+     (checks 7/8, within the UI-language JA flow) must each be reported
+     ok, counted BY STABLE ID (JAM1..JAM4, allowlisted in this script)
+     -- the JAC1..JAC5 discipline of check 23, for the manuals. What
+     they prove is M7's own claim: the ja manual bundle the site SHIPS
+     renders REAL JAPANESE MANUAL TEXT on real reading routes (pinned
+     sentences from the wave-2 transcriptions, literals in
+     browser-check.mjs, never read off the page), with the document's
+     lang=ja and no fallback note; the ORIGINAL page image is still
+     reachable on the /ja route beside that Japanese text; and the
+     manual TOC renders the Japanese outline. Skipped via skip() under
+     --skip-browser (the stages never ran) and under --skip-content
+     (without --exercise-fixture the JA flow does not run at all).
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -691,8 +728,20 @@ info() {
 # full stages -- the manual reader's own assertions there already cover
 # the fetched text, because they are the SAME assertions that covered
 # the embedded text and they never knew the difference.
-M5_CHECK_TOTAL=127
-M5_BROWSER_ASSERT_FLOOR=238
+# M7 W3 pin raise (the SAME documented procedure -- ADDING A CHECK
+# REQUIRES A VISIBLE EDIT TO THIS PIN; RAISING THE FLOOR IS PART OF
+# ADDING ASSERTIONS): 127 -> 129 (+1 EN/JA MANUAL structural identity
+# with its three negative controls, check 30; +1 the JA MANUAL floor
+# across both full stages, check 31) and 238 -> 242 (+4: the JA manual
+# assertions inside runUiLangJaAssertions -- real Japanese manual text on
+# a real reading route, a second document, the original page image still
+# reachable on /ja beside that text, and the Japanese manual TOC --
+# measured 242/242 on both full stages at this raise). Check 29 keeps its
+# own 5/5 cardinality: W3 FLIPPED what those five assert (the EN-fallback
+# note is now correct only by its absence) without changing how many
+# there are.
+M5_CHECK_TOTAL=129
+M5_BROWSER_ASSERT_FLOOR=242
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -3090,6 +3139,7 @@ if [ "$SKIP_CONTENT" -eq 1 ]; then
   skip "exercise-stats/inventory-binding-scope-fired (totals.inventoryChecked equals totals.decks)"
   skip "exercise-check --self-test passes from the repo root as well as site/ (cwd-robust content-root resolution, M5 debt item 6)"
   skip "EN/JA bundle structural identity (exercise-check --bundle-structural-diff over both FRESH emissions: deck/exercise ids and order, kinds, prompt ids, body shapes, option ids and correctness -- only text may differ), with its own negative control (one flipped option correctness in the ja bundle must turn it red)"
+  skip "EN/JA MANUAL structural identity (exercise-check --manual-structural-diff over both FRESH manual emissions, parsed with the reader's OWN SXC1.Content.Markdown.mkDoc: page markers and their order, per-page block-type sequence, heading levels, list/table shapes, figure-callout positions -- only text may differ, and a ja page missing while its en page exists is a hard failure naming document and page), with three negative controls (a figure callout turned into prose, a heading level dropped, one page section deleted -- each must turn it red)"
   skip "exercise-stats/fnv1a-vectors (FNV-1a/32 pinned against published test vectors)"
   skip "exercise-stats/index-directory-agreement (content/exercises/INDEX vs directory, both directions)"
   skip "exercise-stats/totals-agreement (python re-derivation vs exercise-check --json totals)"
@@ -3584,6 +3634,181 @@ open(p, "w", encoding="utf-8").write("\n".join(lines))
     unregister_temp_dir "$JADIFF_TMP"
   else
     fail "$JADIFF_LABEL (observed: toolchain env, exercise-check binary, or python3 unavailable -- see checks above)"
+  fi
+
+  # -------------------------------------------------------------------------
+  # M7 W3 (briefs/M7-plan.md, ruling 5), CHECKER HALF: EN/JA STRUCTURAL
+  # IDENTITY OF THE MANUAL DOCUMENTS -- the manual sibling of the check
+  # immediately above, and the enforcement half of ruling 2.
+  #
+  # Ruling 2 requires translations/<slug>.ja.md to be page-for-page with
+  # its EN sibling AND to carry the same block structure, so ONE Blocks
+  # renderer renders either language with no per-language branch. The
+  # emitter only counts page markers; until now nothing compared what the
+  # two documents PARSE TO. A JA page that turned a *[Figure: ...]*
+  # callout into prose, dropped a heading level, resplit a table or lost
+  # a page section entirely would render as a quietly different document
+  # for a Japanese reader with every other check green.
+  #
+  # exercise-check --manual-structural-diff parses BOTH freshly emitted
+  # manual bundles with SXC1.Content.Markdown.mkDoc -- the READER'S OWN
+  # parser, the exact function View.Pages.mkManuals calls on every
+  # fetched document, so the checker and the reader cannot drift (that is
+  # why this lives in a wasm checker binary and not in a re-implementation
+  # here or in the emitter) -- and requires, per document per page: the
+  # same page markers in the same order, the same block-type sequence,
+  # the same heading levels, the same list/table shapes and the same
+  # figure-callout positions. A ja page MISSING while its en page exists
+  # is a hard failure naming document and page. Only TEXT may differ.
+  #
+  # THREE NEGATIVE CONTROLS run in the same check, each on a COPY of the
+  # fresh ja emission (the real translations/ are never touched), each
+  # grep-confirmed IN before the differ runs: a whole-line *[...]*
+  # callout stripped to prose, a '### ' heading dropped to '## ', and one
+  # whole '<!-- page N -->' section deleted. Each must exit non-zero.
+  # Without them a differ that compared nothing would pass.
+  # -------------------------------------------------------------------------
+  MANDIFF_LABEL="EN/JA MANUAL structural identity (exercise-check --manual-structural-diff over both FRESH manual emissions, parsed with the reader's OWN SXC1.Content.Markdown.mkDoc: page markers and their order, per-page block-type sequence, heading levels, list/table shapes, figure-callout positions -- only text may differ, and a ja page missing while its en page exists is a hard failure naming document and page), with three negative controls (a figure callout turned into prose, a heading level dropped, one page section deleted -- each must turn it red)"
+  if [ -n "$EXERCISE_CHECK_BIN" ] && command -v wasm-run.mjs >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    MANDIFF_TMP="$(mktemp -d -t sxc1-check-site-mandiff.XXXXXX)"
+    register_temp_dir "$MANDIFF_TMP"
+    MANDIFF_PROBLEMS=""
+    MANDIFF_NEG_SUMMARY=""
+    if ! python3 "$REPO_ROOT/scripts/emit-content-bundles.py" \
+         --exercises-dir "$REPO_ROOT/content/exercises" --translations-dir "$REPO_ROOT/translations" \
+         --out-dir "$MANDIFF_TMP" >/dev/null 2>&1; then
+      MANDIFF_PROBLEMS="a fresh emission from translations/ failed"
+    else
+      set +e
+      MANDIFF_OUT="$(cd "$REPO_ROOT/site" && wasm-run.mjs "$EXERCISE_CHECK_BIN" \
+        --manual-structural-diff "$MANDIFF_TMP/manuals.en.txt" "$MANDIFF_TMP/manuals.ja.txt" 2>&1)"
+      MANDIFF_RC=$?
+      set -e
+      MANDIFF_LAST="$(printf '%s\n' "$MANDIFF_OUT" | tail -n 1)"
+      MANDIFF_N="$(printf '%s' "$MANDIFF_LAST" | sed -nE 's|^exercise-check --manual-structural-diff: ([0-9]+)/([0-9]+) checks passed$|\1 \2|p')"
+      if [ "$MANDIFF_RC" -ne 0 ] || [ -z "$MANDIFF_N" ]; then
+        MANDIFF_PROBLEMS="the positive run exited $MANDIFF_RC (last line: ${MANDIFF_LAST:-<empty>})"
+      else
+        MANDIFF_PASSED="$(printf '%s' "$MANDIFF_N" | cut -d' ' -f1)"
+        MANDIFF_TOTAL="$(printf '%s' "$MANDIFF_N" | cut -d' ' -f2)"
+        # The total is 1 (slug/order/page-count agreement) + one per
+        # PAGE, so it also pins that all 108 pages were really compared
+        # -- a document quietly dropped from either bundle cannot hide
+        # behind a smaller all-green run.
+        if [ "$MANDIFF_PASSED" != "$MANDIFF_TOTAL" ] || [ "$MANDIFF_TOTAL" -lt 109 ]; then
+          MANDIFF_PROBLEMS="the positive run reported $MANDIFF_PASSED/$MANDIFF_TOTAL (expected N/N with N >= 109: one slug/order/page-count check plus one per page)"
+        fi
+      fi
+      if [ -z "$MANDIFF_PROBLEMS" ]; then
+        cp "$MANDIFF_TMP/manuals.ja.txt" "$MANDIFF_TMP/ja-pristine.txt"
+        for MANDIFF_MODE in figure heading page; do
+          MANDIFF_MUT="$MANDIFF_TMP/manuals.ja.$MANDIFF_MODE.txt"
+          cp "$MANDIFF_TMP/manuals.ja.txt" "$MANDIFF_MUT"
+          set +e
+          MANDIFF_MUT_LINES="$(python3 -c '
+import sys
+
+PATH, MODE = sys.argv[1], sys.argv[2]
+lines = open(PATH, encoding="utf-8").read().split("\n")
+
+# Never mutate a framing line: the differ must fail on STRUCTURE, not on
+# a bundle it cannot even split.
+def is_frame(l):
+    return l.startswith("!SXC1-")
+
+old = new = None
+if MODE == "figure":
+    # A whole-line *[...]* placeholder is what the parser PROMOTES to a
+    # Figure block; stripping the wrapper leaves the same words as prose.
+    for i, l in enumerate(lines):
+        s = l.strip()
+        if not is_frame(l) and s.startswith("*[") and s.endswith("]*") and len(s) > 6:
+            old, new = l, s[2:-2]
+            lines[i] = new
+            break
+elif MODE == "heading":
+    for i, l in enumerate(lines):
+        if not is_frame(l) and l.startswith("### ") and not l.startswith("#### "):
+            old, new = l, l[1:]
+            lines[i] = new
+            break
+elif MODE == "page":
+    # One whole page section deleted: its marker up to (not including)
+    # the next marker or delimiter. new is empty -- nothing replaces it.
+    start = None
+    for i, l in enumerate(lines):
+        if l.strip() == "<!-- page 3 -->":
+            start = i
+            break
+    if start is not None:
+        end = None
+        for j in range(start + 1, len(lines)):
+            if lines[j].strip().startswith("<!-- page ") or is_frame(lines[j]):
+                end = j
+                break
+        if end is not None:
+            old, new = lines[start], ""
+            del lines[start:end]
+else:
+    raise SystemExit("unknown mode " + MODE)
+
+if old is None:
+    raise SystemExit(1)
+open(PATH, "w", encoding="utf-8").write("\n".join(lines))
+sys.stdout.write(old + "\n" + new + "\n")
+' "$MANDIFF_MUT" "$MANDIFF_MODE" 2>/dev/null)"
+          MANDIFF_MUT_RC=$?
+          set -e
+          if [ "$MANDIFF_MUT_RC" -ne 0 ]; then
+            MANDIFF_PROBLEMS="$MANDIFF_PROBLEMS; could not build the '$MANDIFF_MODE' negative control from the fresh ja manual bundle"
+            continue
+          fi
+          MANDIFF_OLD_LINE="$(printf '%s\n' "$MANDIFF_MUT_LINES" | sed -n '1p')"
+          MANDIFF_NEW_LINE="$(printf '%s\n' "$MANDIFF_MUT_LINES" | sed -n '2p')"
+          # grep-confirm the mutation IN (and, for a replacement, that the
+          # replaced line really left): counted whole-line matches, since
+          # the same marker text legitimately occurs in other documents.
+          MANDIFF_OLD_BEFORE="$(grep -cxF -- "$MANDIFF_OLD_LINE" "$MANDIFF_TMP/manuals.ja.txt" || true)"
+          MANDIFF_OLD_AFTER="$(grep -cxF -- "$MANDIFF_OLD_LINE" "$MANDIFF_MUT" || true)"
+          if [ "$MANDIFF_OLD_AFTER" -ne "$((MANDIFF_OLD_BEFORE - 1))" ]; then
+            MANDIFF_PROBLEMS="$MANDIFF_PROBLEMS; grep-confirm IN failed for the '$MANDIFF_MODE' control (whole-line matches of the mutated line went $MANDIFF_OLD_BEFORE -> $MANDIFF_OLD_AFTER, expected one fewer)"
+            continue
+          fi
+          if [ -n "$MANDIFF_NEW_LINE" ]; then
+            MANDIFF_NEW_BEFORE="$(grep -cxF -- "$MANDIFF_NEW_LINE" "$MANDIFF_TMP/manuals.ja.txt" || true)"
+            MANDIFF_NEW_AFTER="$(grep -cxF -- "$MANDIFF_NEW_LINE" "$MANDIFF_MUT" || true)"
+            if [ "$MANDIFF_NEW_AFTER" -ne "$((MANDIFF_NEW_BEFORE + 1))" ]; then
+              MANDIFF_PROBLEMS="$MANDIFF_PROBLEMS; grep-confirm IN failed for the '$MANDIFF_MODE' control (whole-line matches of the replacement went $MANDIFF_NEW_BEFORE -> $MANDIFF_NEW_AFTER, expected one more)"
+              continue
+            fi
+          fi
+          set +e
+          (cd "$REPO_ROOT/site" && wasm-run.mjs "$EXERCISE_CHECK_BIN" \
+            --manual-structural-diff "$MANDIFF_TMP/manuals.en.txt" "$MANDIFF_MUT" >/dev/null 2>&1)
+          MANDIFF_NEG_RC=$?
+          set -e
+          if [ "$MANDIFF_NEG_RC" -eq 0 ]; then
+            MANDIFF_PROBLEMS="$MANDIFF_PROBLEMS; the '$MANDIFF_MODE' NEGATIVE CONTROL passed: the differ accepted a ja bundle whose structure really did diverge"
+          fi
+          MANDIFF_NEG_SUMMARY="$MANDIFF_NEG_SUMMARY $MANDIFF_MODE=$MANDIFF_NEG_RC"
+          rm -f "$MANDIFF_MUT"
+        done
+        # EXACT-REVERSE: the controls only ever wrote to copies, so the
+        # emission the positive run judged must still be byte-identical.
+        if ! cmp -s "$MANDIFF_TMP/ja-pristine.txt" "$MANDIFF_TMP/manuals.ja.txt"; then
+          MANDIFF_PROBLEMS="$MANDIFF_PROBLEMS; the fresh ja manual bundle was modified by the negative controls (it must only ever be COPIED)"
+        fi
+      fi
+    fi
+    if [ -z "$MANDIFF_PROBLEMS" ]; then
+      ok "$MANDIFF_LABEL (observed: $MANDIFF_PASSED/$MANDIFF_TOTAL structural checks passed; negative controls exited:${MANDIFF_NEG_SUMMARY})"
+    else
+      fail "$MANDIFF_LABEL (observed: ${MANDIFF_PROBLEMS#; })"
+    fi
+    rm -rf "$MANDIFF_TMP"
+    unregister_temp_dir "$MANDIFF_TMP"
+  else
+    fail "$MANDIFF_LABEL (observed: toolchain env, exercise-check binary, or python3 unavailable -- see checks above)"
   fi
 
   # -------------------------------------------------------------------------
@@ -4563,7 +4788,7 @@ JA_TOGGLE_LABEL="ui-language toggle roundtrip: served copy of the SHIPPED bundle
 # M7 W1 (briefs/M7-plan.md, rulings 1/4) -- see usage() checks 28 and 29
 # and each stage's own comment.
 BAD_MANUAL_LABEL="bad-manual-bundle rejection: six broken manual bundles (wrong language, altered text, delimiter-complete truncation, zero documents, one document missing, file absent) each produce the VISIBLE #sxc1-content-error alert AND the named #sxc1-manual-degraded body with #btn-content-retry on a real manual route, while the EXERCISE course stays whole in every one of them and an unsabotaged control served beside them renders a readable manual page (browser-check --check-bad-manual-bundle, 14/14)"
-MANUAL_FALLBACK_LABEL="manual EN-fallback note (ruling 4): under EN no #sxc1-manual-fallback exists anywhere; after the app's own #btn-ui-lang switch the ja manual bundle loads and the VISIBLE role=note #sxc1-manual-fallback carries the pinned Japanese sentence while the page body still renders its English text marked lang=\"en\" (browser-check --check-manual-fallback, 5/5)"
+MANUAL_FALLBACK_LABEL="manual language-of-record (ruling 4, FLIPPED in W3 now that every document is Japanese): under EN no #sxc1-manual-fallback exists anywhere; after the app's own #btn-ui-lang switch the ja manual bundle loads and the note exists NOWHERE under ja either (no reading route, no TOC, no home card) while all four documents render their own pinned Japanese sentence with no lang override (browser-check --check-manual-fallback, 5/5, ids MF1..MF5; the served copy is checked FIRST to carry every document as 'ja', so an untranslated document turns this red by name instead of asserting an absence that no longer holds)"
 ROOT_CARDINALITY_LABEL="M5 cardinality contract: root browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 # M6 W4 (check 23): THE JA COURSE FLOOR -- V6's naming discipline
@@ -4634,6 +4859,56 @@ ja_course_ok_count() {
   if [ -z "$ids" ]; then echo 0; else echo "$ids" | wc -w; fi
 }
 
+# ---------------------------------------------------------------------------
+# M7 W3 (check 31): THE JA MANUAL FLOOR -- check 23's discipline, applied
+# to the milestone M7 actually is. M6 proved the shipped ja bundle
+# renders a real Japanese COURSE; M7's claim is that with uiLang=ja the
+# MANUAL BODY is real Japanese TEXT (not a picture of Japanese beside
+# English), with the original page scan still reachable on /ja. Through
+# waves 1-2 the ja manual bundle carried ENGLISH for every document and
+# every assertion in both full stages stayed green, because none of them
+# looked at the manual body's language -- exactly the hole these four
+# close.
+#
+# Their expectations are LITERAL sentences from wave 2's transcriptions,
+# inside scripts/browser-check.mjs (JA_MANUAL_PINS), never read off the
+# page under test, so an EN-fallback ja manual bundle turns them red
+# rather than agreeing with itself. Counted BY STABLE ID for finding
+# M6-R1-3's reason: a cardinality alone cannot tell a missing assertion
+# from a substituted one.
+JA_MANUAL_ASSERT_COUNT=4
+JA_MANUAL_IDS="JAM1 JAM2 JAM3 JAM4"
+JA_MANUAL_LABEL="M7 W3 JA manual floor: BOTH full browser stages reported all $JA_MANUAL_ASSERT_COUNT 'ja manual:' assertions ok (the SHIPPED ja manual bundle renders REAL JAPANESE manual text on real reading routes -- pinned sentences from two documents, document lang=ja, no fallback note, the on-device label still in Latin caps -- the ORIGINAL page image still reachable on the /ja route beside that text, and the Japanese outline in the manual TOC) -- counted BY STABLE ID (JAM1..JAM4, allowlisted in this script), so unplugging, renaming or substituting one cannot hide under the N/N floor"
+
+ja_manual_ok_ids() {
+  local log="$1"
+  if [ -n "$log" ] && [ -s "$log" ]; then
+    grep -oE '^ok - ja manual: \[JAM[0-9]+\]' "$log" \
+      | grep -oE 'JAM[0-9]+' | sort -u | tr '\n' ' ' | sed 's/ $//'
+  else
+    echo ""
+  fi
+}
+
+ja_manual_missing_ids() {
+  local got=" $(ja_manual_ok_ids "$1") "
+  local missing=""
+  local id
+  for id in $JA_MANUAL_IDS; do
+    case "$got" in
+      *" $id "*) ;;
+      *) missing="$missing $id" ;;
+    esac
+  done
+  echo "${missing# }"
+}
+
+ja_manual_ok_count() {
+  local ids
+  ids="$(ja_manual_ok_ids "$1")"
+  if [ -z "$ids" ]; then echo 0; else echo "$ids" | wc -w; fi
+}
+
 browser_stage_assertion_floor() {
   local log="$1" label="$2"
   local line="" bs_passed="" bs_total=""
@@ -4671,6 +4946,7 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$ROOT_CARDINALITY_LABEL"
   skip "$SUBPATH_CARDINALITY_LABEL"
   skip "$JA_COURSE_LABEL"
+  skip "$JA_MANUAL_LABEL"
 else
   if ! BROWSER_PATH="$(resolve_browser)"; then
     fail "$ROOT_HEALTH_LABEL (observed: no browser found -- set SXC1_BROWSER, install Chrome/Chromium, or pass --skip-browser)"
@@ -4689,6 +4965,7 @@ else
     fail "$ROOT_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
     fail "$SUBPATH_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
     fail "$JA_COURSE_LABEL (observed: no browser found, the stages never ran)"
+    fail "$JA_MANUAL_LABEL (observed: no browser found, the stages never ran)"
   else
     # Check 7: ordinary root-served smoke test.
     run_browser_stage "$DIR" "$DIR/index.html" "/" "$ROOT_HEALTH_LABEL" "$ROOT_BROWSER_LABEL" "$BROWSER_PATH"
@@ -5202,18 +5479,29 @@ PYEOF
       unregister_temp_dir "$BAD_MANUAL_TMP"
     fi
 
-    # M7 W1 ruling 4: the MANUAL EN-FALLBACK NOTE stage. The bundle is
-    # served AS SHIPPED (a re-emitted manual bundle is not accepted by
-    # the app at all -- the wasm-embedded manifest fingerprint rejects
-    # it -- so this stage pins the app's OWN localized note string
-    # instead of an injected fixture, exactly as the ja-toggle stage
-    # had to). Before the browser runs, the served copy is checked to
-    # BE the W1 fallback state it is about to be judged on: every
-    # !SXC1-DOC record in manuals.ja.txt must say 'en', and every one in
-    # manuals.en.txt must say 'en' too -- so a tree in which wave 2 has
-    # already landed turns this stage's precondition red (loudly, with
-    # the reason) instead of quietly asserting a note that should by
-    # then be gone.
+    # M7 ruling 4: the MANUAL LANGUAGE-OF-RECORD stage, FLIPPED BY W3.
+    # The bundle is served AS SHIPPED (a re-emitted manual bundle is not
+    # accepted by the app at all -- the wasm-embedded manifest
+    # fingerprint rejects it -- so this stage pins the corpus's OWN
+    # Japanese sentences instead of an injected fixture, exactly as the
+    # ja-toggle stage had to).
+    #
+    # W1 asserted the EN-fallback note was PRESENT under ja, because the
+    # ja bundle then carried English for every document. W2 landed all
+    # 108 pages in Japanese, so the note is now correct only by its
+    # ABSENCE, and the browser mode asserts exactly that plus real
+    # Japanese in all four documents.
+    #
+    # THE PRECONDITION IS FLIPPED WITH IT, and it is what keeps the
+    # MECHANISM honest rather than retired: every !SXC1-DOC record in the
+    # served manuals.ja.txt must now say 'ja' (and every one in
+    # manuals.en.txt must still say 'en', or the EN-boot half would be
+    # vacuous). A future document that lands untranslated therefore turns
+    # this stage red HERE, loudly, naming the document -- with the fix
+    # spelled out: the note assertion has to come back for that document.
+    # The note-PRESENT direction itself is still proven on real served
+    # bytes, off the gate path, by rebuilding against a scratch
+    # translations/ with one .ja.md removed (see the W3 report).
     MANUAL_FALLBACK_PORT=$((PORT + 25))
     if port_in_use "$MANUAL_FALLBACK_PORT"; then
       fail "$MANUAL_FALLBACK_LABEL (observed: port $MANUAL_FALLBACK_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
@@ -5223,12 +5511,13 @@ PYEOF
       cp -al "$DIR"/. "$MANUAL_FALLBACK_TMP"/ 2>/dev/null || cp -R "$DIR"/. "$MANUAL_FALLBACK_TMP"/
       MANUAL_FALLBACK_PREP_ERR=""
       MF_JA_DOCS="$(grep -c '^!SXC1-DOC ' "$MANUAL_FALLBACK_TMP/content/manuals.ja.txt" 2>/dev/null || echo 0)"
-      MF_JA_EN_DOCS="$(grep -cE '^!SXC1-DOC [a-z0-9-]+ en [0-9]+$' "$MANUAL_FALLBACK_TMP/content/manuals.ja.txt" 2>/dev/null || echo 0)"
+      MF_JA_JA_DOCS="$(grep -cE '^!SXC1-DOC [a-z0-9-]+ ja [0-9]+$' "$MANUAL_FALLBACK_TMP/content/manuals.ja.txt" 2>/dev/null || echo 0)"
+      MF_JA_FALLBACKS="$(grep -E '^!SXC1-DOC [a-z0-9-]+ en [0-9]+$' "$MANUAL_FALLBACK_TMP/content/manuals.ja.txt" 2>/dev/null | awk '{print $2}' | tr '\n' ' ' || true)"
       MF_EN_EN_DOCS="$(grep -cE '^!SXC1-DOC [a-z0-9-]+ en [0-9]+$' "$MANUAL_FALLBACK_TMP/content/manuals.en.txt" 2>/dev/null || echo 0)"
       if [ "$MF_JA_DOCS" -lt 1 ]; then
         MANUAL_FALLBACK_PREP_ERR="the served copy's manuals.ja.txt carries no !SXC1-DOC records"
-      elif [ "$MF_JA_EN_DOCS" -ne "$MF_JA_DOCS" ]; then
-        MANUAL_FALLBACK_PREP_ERR="the served copy's manuals.ja.txt carries $MF_JA_EN_DOCS/$MF_JA_DOCS documents in the 'en' fallback -- wave 2 has landed for at least one document, so this stage's W1 precondition no longer holds: flip it to assert the note is ABSENT for the translated document(s) and present only for the rest"
+      elif [ "$MF_JA_JA_DOCS" -ne "$MF_JA_DOCS" ]; then
+        MANUAL_FALLBACK_PREP_ERR="the served copy's manuals.ja.txt carries only $MF_JA_JA_DOCS/$MF_JA_DOCS documents as 'ja' -- document(s) [${MF_JA_FALLBACKS% }] are on the EN fallback, so this stage's W3 precondition (every document is Japanese) no longer holds: restore the note assertion for exactly those documents, and keep the absence assertion for the rest"
       elif [ "$MF_EN_EN_DOCS" -ne "$MF_JA_DOCS" ]; then
         MANUAL_FALLBACK_PREP_ERR="the served copy's manuals.en.txt does not carry all $MF_JA_DOCS documents as 'en' (got $MF_EN_EN_DOCS) -- the EN-boot half of the assertion would be vacuous"
       fi
@@ -5254,10 +5543,20 @@ PYEOF
           MANUAL_FALLBACK_RC=$?
           set -e
           MANUAL_FALLBACK_SUMMARY="$(grep -E '^browser-check --check-manual-fallback: [0-9]+/[0-9]+ assertions passed$' "$MANUAL_FALLBACK_LOG" | tail -n1)"
-          if [ "$MANUAL_FALLBACK_RC" -eq 0 ] && [ "$MANUAL_FALLBACK_SUMMARY" = "browser-check --check-manual-fallback: 5/5 assertions passed" ]; then
-            ok "$MANUAL_FALLBACK_LABEL (observed: $MF_JA_EN_DOCS/$MF_JA_DOCS documents still on the documented W1 EN fallback)"
+          # The 5/5 count alone only catches assertions being REMOVED,
+          # not replaced (M6 W4's finding M6-R1-3). The five carry stable
+          # ids, and the exact SET is required here.
+          MANUAL_FALLBACK_MISSING=""
+          for MF_ID in MF1 MF2 MF3 MF4 MF5; do
+            grep -qE "^ok - manual fallback: \[$MF_ID\]" "$MANUAL_FALLBACK_LOG" \
+              || MANUAL_FALLBACK_MISSING="$MANUAL_FALLBACK_MISSING $MF_ID"
+          done
+          if [ "$MANUAL_FALLBACK_RC" -eq 0 ] \
+             && [ "$MANUAL_FALLBACK_SUMMARY" = "browser-check --check-manual-fallback: 5/5 assertions passed" ] \
+             && [ -z "$MANUAL_FALLBACK_MISSING" ]; then
+            ok "$MANUAL_FALLBACK_LABEL (observed: $MF_JA_JA_DOCS/$MF_JA_DOCS documents carry their own Japanese text; MF1..MF5 all reported ok)"
           else
-            fail "$MANUAL_FALLBACK_LABEL (browser-check --check-manual-fallback exit $MANUAL_FALLBACK_RC, summary: ${MANUAL_FALLBACK_SUMMARY:-<none>}; expected 5/5)"
+            fail "$MANUAL_FALLBACK_LABEL (browser-check --check-manual-fallback exit $MANUAL_FALLBACK_RC, summary: ${MANUAL_FALLBACK_SUMMARY:-<none>}; expected 5/5 with ids MF1..MF5; missing ids:${MANUAL_FALLBACK_MISSING:- none})"
             sed 's/^/    /' "$MANUAL_FALLBACK_LOG" >&2
           fi
           rm -f "$MANUAL_FALLBACK_LOG"
@@ -5529,6 +5828,24 @@ PYEOF
         ok "$JA_COURSE_LABEL (observed: root $JA_COURSE_ROOT_OK/$JA_COURSE_ASSERT_COUNT, sub-path $JA_COURSE_SUB_OK/$JA_COURSE_ASSERT_COUNT distinct ja course assertions reported ok)"
       else
         fail "$JA_COURSE_LABEL (observed: root reported [$(ja_course_ok_ids "${ROOT_BROWSER_STAGE_LOG:-}")] missing[${JA_COURSE_ROOT_MISSING:-none}], sub-path reported [$(ja_course_ok_ids "${SUBPATH_BROWSER_STAGE_LOG:-}")] missing[${JA_COURSE_SUB_MISSING:-none}] -- a required JA course assertion failed, was renamed, or was swapped for a different 'ja course:' assertion)"
+      fi
+    fi
+
+    # Check 31 (M7 W3): the JA MANUAL floor -- see JA_MANUAL_LABEL's
+    # comment above. Scoped exactly like check 23, and for the same
+    # reason: the UI-language JA flow these four ride in only runs when
+    # the stages got --exercise-fixture.
+    if [ "$SKIP_CONTENT" -eq 1 ]; then
+      skip "$JA_MANUAL_LABEL (only enforced on full fixture inputs -- the UI-language JA flow runs only with --exercise-fixture)"
+    else
+      JA_MANUAL_ROOT_OK="$(ja_manual_ok_count "${ROOT_BROWSER_STAGE_LOG:-}")"
+      JA_MANUAL_SUB_OK="$(ja_manual_ok_count "${SUBPATH_BROWSER_STAGE_LOG:-}")"
+      JA_MANUAL_ROOT_MISSING="$(ja_manual_missing_ids "${ROOT_BROWSER_STAGE_LOG:-}")"
+      JA_MANUAL_SUB_MISSING="$(ja_manual_missing_ids "${SUBPATH_BROWSER_STAGE_LOG:-}")"
+      if [ -z "$JA_MANUAL_ROOT_MISSING" ] && [ -z "$JA_MANUAL_SUB_MISSING" ]; then
+        ok "$JA_MANUAL_LABEL (observed: root $JA_MANUAL_ROOT_OK/$JA_MANUAL_ASSERT_COUNT, sub-path $JA_MANUAL_SUB_OK/$JA_MANUAL_ASSERT_COUNT distinct ja manual assertions reported ok)"
+      else
+        fail "$JA_MANUAL_LABEL (observed: root reported [$(ja_manual_ok_ids "${ROOT_BROWSER_STAGE_LOG:-}")] missing[${JA_MANUAL_ROOT_MISSING:-none}], sub-path reported [$(ja_manual_ok_ids "${SUBPATH_BROWSER_STAGE_LOG:-}")] missing[${JA_MANUAL_SUB_MISSING:-none}] -- a required JA manual assertion failed, was renamed, or was swapped for a different 'ja manual:' assertion)"
       fi
     fi
   fi
