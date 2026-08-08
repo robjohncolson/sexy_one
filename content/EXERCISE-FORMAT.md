@@ -344,6 +344,7 @@ and adding the one-line fix a content author actually needs. `--list-codes` prin
 | `E-ID-RETIRED` | dir | the id is tagged `(retired)` in the inventory | pick a different, non-retired id |
 | `E-ID-TYPE-MISMATCH` | dir | the id's leading letter (`q`/`d`/`l`) doesn't match `type:` | use an id whose letter matches, or fix `type:` |
 | `E-ID-CHAPTER-MISMATCH` | dir | the id's chapter digit doesn't match this deck's `chapter:` | use an id from the right chapter, or fix `chapter:` |
+| `E-JA-MISSING` | dir | a learner-visible piece of a **live** deck has no `ja:` variant (section 12) | add a `ja:` replacement line directly below the line(s) the message names |
 | `E-BLOCK-UNPARSED` | seam | unreachable from real content (see above) | not applicable to authors |
 | `E-TERM.<rule_id>` | file | learner-facing text violates a `content/terminology-rules.tsv` rule | see section 6 — use the rule's `replacement`, or fix the spelling/case |
 
@@ -596,14 +597,28 @@ A sound is assigned to each pad. What happens to it when you tap the pad?
 The assigned sound plays. The pads section is used to play, record, and edit sounds.
 ```
 
-## 12. Japanese variants: `ja:` lines (M6)
+## 12. Japanese variants: `ja:` lines (M6) — **required**
 
 The course is bilingual (briefs/M6-plan.md): every learner-visible piece of an
-exercise can carry a Japanese variant **in the same file**, on a line that starts
+exercise carries a Japanese variant **in the same file**, on a line that starts
 with `ja:` at column 0, placed **directly under** the English line(s) it
 translates. One file, one id, one registry — prompt ids and counts are identical
 across languages by construction, so a learner's saved progress applies
 regardless of UI language.
+
+> **These variants are REQUIRED, not optional.** Wave 3 of M6 translated all 52
+> decks and wave 4 turned the check hard (plan ruling 2: "JA-completeness
+> enforcement flips from report-only to hard"). Every learner-visible piece of
+> every deck named by `content/exercises/INDEX` must carry one; a piece that
+> does not is an **`E-JA-MISSING`** issue, `exercise-check` exits non-zero, and
+> `check-site` goes red. Writing a new deck therefore means writing it in both
+> languages. The rule the checker applies is one sentence: *the line directly
+> below a learner-visible unit's last line must be a `ja:` line* — which is the
+> emitter's own substitution rule read backwards, so "the checker is happy"
+> and "the JA bundle really contains Japanese here" are the same statement.
+> (`E-JA-MISSING` is a **dir**-class code: it is a property of the live corpus,
+> so it is not applied to loose `content/fixtures/files/` decks. The `dirs/`
+> fixture `E-JA-MISSING--untranslated-option` is the falsifying example.)
 
 The variant's payload is everything after `ja:` (with at most one leading space
 dropped, like any field value), and it is a **full replacement line** — it repeats
@@ -623,7 +638,12 @@ Which single button do you press to start selecting BANK 1?
 ja: BANK 1 の選択を始めるには、どのボタンを押しますか。
 ```
 
-**What may carry a `ja:` variant — the complete learner-visible list:**
+**What must carry a `ja:` variant — the complete learner-visible list.** This
+table is also exactly the list `exercise-check` enforces: one `E-JA-MISSING`
+per row that is missing one, naming the row's kind ("deck title", "exercise
+title", "summary: field", "choice option", "deck intro prose", "exercise body
+prose", "### Why prose", "drill step prose", "check: field") and the line the
+`ja:` line has to go under.
 
 | Learner-visible piece | Where the `ja:` line goes | Payload shape |
 |---|---|---|
@@ -638,9 +658,13 @@ ja: BANK 1 の選択を始めるには、どのボタンを押しますか。
 | step `check:` | directly under the `check:` line | one `check: ...` field line |
 
 **What may NOT carry a variant** (language-invariant by ruling — the build
-refuses them loudly): `cite:`, `find:`, `verify:`, `type:`, `id:`, `deck:`,
-`chapter:`, `tier:`, `tags:`, `requires:`, `limit:`, and the role headings
-themselves (`### Why` etc. — the UI localizes those labels, not the content).
+refuses them loudly, and `exercise-check` never demands one for them): `cite:`,
+`find:`, `verify:`, `type:`, `id:`, `deck:`, `chapter:`, `tier:`, `tags:`,
+`requires:`, `limit:`, and the role headings themselves (`### Why` etc. — the
+UI localizes those labels, not the content). These two lists are exhaustive and
+structural: there is no per-file or per-line opt-out from the completeness
+check, and the emitter's allowed-field set (`summary`, `check`) and the
+checker's are the same set for exactly that reason.
 On-device labels (`BANK`, `EDIT`, `SELECT BANK 1`, …) stay in Latin caps inside
 the Japanese text, exactly as the hardware prints them.
 

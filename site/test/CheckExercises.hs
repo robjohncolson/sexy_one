@@ -223,14 +223,67 @@ inventoryScopedCodes = map codeText
   , E_DECK_REQUIRES_UNKNOWN, E_DECK_REQUIRES_CYCLE
   ]
 
+-- | M6 W4 (briefs\/M6-plan.md ruling 2): the SECOND structural scope,
+-- built the same way 'inventoryScopedCodes' is and for the same reason.
+-- JA completeness (E-JA-MISSING, see 'jaCompletenessIssues') is a
+-- LIVE-CORPUS contract: the decks @content\/exercises\/INDEX@ ships are
+-- the decks @scripts\/emit-content-bundles.py@ translates into
+-- @content.ja.txt@, so those -- and only those -- must carry a @ja:@
+-- variant for every learner-visible piece. A loose @content\/fixtures@
+-- deck is not a shipping deck (none of them carries a single @ja:@
+-- line, and demanding one would say nothing true about the course), so
+-- the check is scoped exactly like the six inventory-scoped codes:
+--
+--   * the real-corpus modes (default, @--json@, @--browser-fixture@)
+--     ALWAYS bind it;
+--   * a @--fixtures@ dirs\/ fixture binds it iff the code its own name
+--     declares is one of the codes below -- it opts in by what it
+--     claims to falsify, never by how its path is spelled;
+--   * loose files\/ fixtures never bind it.
+--
+-- Kept as its OWN list (rather than folded into
+-- 'inventoryScopedCodes') precisely so the two scopes stay
+-- independent: every existing dirs\/ fixture opts into the inventory
+-- binding WITHOUT thereby acquiring a JA-completeness demand it was
+-- never written to satisfy.
+jaScopedCodes :: [Text]
+jaScopedCodes = map codeText [ E_JA_MISSING ]
+
+-- | Which corpus-wide check families apply to ONE 'collectFromDirs'
+-- run. Decided STRUCTURALLY, per run, by the caller (never by
+-- inspecting a path) -- see 'inventoryScopedCodes' and 'jaScopedCodes'.
+data BindScope = BindScope
+  { bsInventory :: !Bool  -- ^ the four E-ID-* inventory bindings + the two requires: checks
+  , bsJa        :: !Bool  -- ^ E-JA-MISSING (M6 W4)
+  }
+
+-- | The real corpus governed by 'fixedInventoryPath': every corpus-wide
+-- family binds, wherever that tree sits on disk.
+realCorpusScope :: BindScope
+realCorpusScope = BindScope { bsInventory = True, bsJa = True }
+
+-- | A loose @files\/@ fixture: a single deck file is no corpus, so no
+-- corpus-wide family binds.
+looseFileScope :: BindScope
+looseFileScope = BindScope { bsInventory = False, bsJa = False }
+
+-- | A @dirs\/@ fixture opts into each family by the code its own
+-- directory name declares.
+fixtureDirScope :: Text -> BindScope
+fixtureDirScope declared = BindScope
+  { bsInventory = declared `elem` inventoryScopedCodes
+  , bsJa        = declared `elem` jaScopedCodes
+  }
+
 -- | Resolve every issue for ONE already-read deck file: grammar
 -- ("SXC1.Exercise.Parse"), citation and verify-hook resolution
 -- ("SXC1.Exercise.Verify"), terminology ("SXC1.Exercise.Lint"), chapter
--- title, and -- iff @bindInventory@ (decided structurally by the
--- caller, see 'inventoryScopedCodes') -- the inventory binding.
-resolveDeckIssues :: SharedCtx -> Bool -> FilePath -> Text -> ([Issue], Maybe Deck)
-resolveDeckIssues ctx bindInventory fp raw =
-  (parseIssues ++ citeIssues ++ verifyIssues ++ termIssues ++ chapterIssues ++ idIssues, mDeck)
+-- title, and -- each iff its own family binds for this run (decided
+-- structurally by the caller, see 'BindScope') -- the inventory binding
+-- and the M6 JA-completeness check.
+resolveDeckIssues :: SharedCtx -> BindScope -> FilePath -> Text -> ([Issue], Maybe Deck)
+resolveDeckIssues ctx scope fp raw =
+  (parseIssues ++ citeIssues ++ verifyIssues ++ termIssues ++ chapterIssues ++ idIssues ++ jaIssues, mDeck)
   where
     (parseIssues, mDeck, cites, verifies, mChapterField, idRows, lintTargets) = parseDeckDetailed fp raw
     citeIssues    = concat [ resolveCitation (scManualIdx ctx) loc c | (loc, c) <- cites ]
@@ -240,10 +293,226 @@ resolveDeckIssues ctx bindInventory fp raw =
       Just (loc, txt) -> resolveChapter (scChapterVocab ctx) loc txt
       Nothing         -> []
     idIssues
-      | bindInventory =
+      | bsInventory scope =
           concat [ resolveInventoryId (scInventoryRaw ctx) (scChapterVocab ctx) loc eid kind chText
                  | (loc, eid, kind, chText) <- idRows ]
       | otherwise = []
+    jaIssues
+      | bsJa scope = jaCompletenessIssues fp raw
+      | otherwise  = []
+
+--------------------------------------------------------------------------
+-- M6 W4: JA COMPLETENESS (E-JA-MISSING)
+--
+-- briefs/M6-plan.md ruling 2: "exercise-check gains JA-completeness
+-- enforcement (a live exercise missing any ja: variant is an issue, not
+-- a warning, once wave 3 lands)". Wave 3 landed (all 52 decks
+-- translated and QA-ACCEPTED), so this is now HARD: a live deck with an
+-- untranslated learner-visible piece makes exercise-check exit 1, which
+-- makes check-site's exercise-validator gate red.
+--
+-- THE RULE, in one sentence: every learner-visible UNIT of a deck file
+-- must be immediately followed by a column-0 @ja:@ line.
+--
+-- That is exactly the emitter's own substitution rule read backwards.
+-- scripts/emit-content-bundles.py attaches each maximal @ja:@ run to
+-- the segment of English lines ENDING AT THE LINE DIRECTLY ABOVE IT
+-- (heading -> that heading; option -> that option; field -> that field
+-- plus its continuation lines; otherwise -> the whole contiguous prose
+-- block). So a unit ends up in content.ja.txt in Japanese iff the line
+-- after the unit's LAST line is a variant line, and "is this piece
+-- translated?" needs no re-implementation of the substitution itself --
+-- only the same classification of lines, done here independently in
+-- Haskell (house standard: a check that counts must count
+-- independently; if the two classifications ever disagree the emitter
+-- fails the build loudly rather than shipping something this check
+-- blessed).
+--
+-- THE LEARNER-VISIBLE UNITS are content/EXERCISE-FORMAT.md sec. 12's
+-- table, one for one:
+--   * the deck title (a level-1 heading)          -> 'JuHeading'
+--   * every exercise title (a level-2 heading)    -> 'JuHeading'
+--   * the deck's summary: and every step's check: -> 'JuField'
+--   * every choice-list option line               -> 'JuOption'
+--   * every prose block (deck intro, exercise body, ### Why/Hint/Answer
+--     block, drill step body)                     -> 'JuProse'
+--
+-- THE EXCLUSIONS are structural and exhaustive -- there is no per-file,
+-- per-deck or per-line opt-out anywhere in this checker:
+--   1. LEVEL-3 ROLE HEADINGS (### Step/Why/Hint/Answer). The UI
+--      localizes those labels (I18n.hs), the content does not -- sec.
+--      12's "What may NOT carry a variant" list says so, and the
+--      emitter would accept a variant here, so excluding them is a
+--      deliberate contract, not an oversight.
+--   2. EVERY FIELD KEY EXCEPT summary:/check:. cite:/find:/verify:/
+--      type:/id:/deck:/chapter:/tier:/tags:/requires:/limit: are
+--      language-invariant by ruling 2, and the emitter REFUSES a
+--      variant on them (its ALLOWED_FIELD_KEYS); this checker's
+--      'jaTranslatableFieldKeys' is the same set, so the two ends of
+--      the contract cannot drift apart silently.
+--   3. Blank lines and the @ja:@ lines themselves.
+--------------------------------------------------------------------------
+
+-- | The ONLY field keys whose VALUE is learner-visible, and therefore
+-- the only ones that may (and must) carry a @ja:@ variant. Mirrors
+-- @scripts/emit-content-bundles.py@'s @ALLOWED_FIELD_KEYS@ exactly --
+-- see exclusion 2 above.
+jaTranslatableFieldKeys :: [Text]
+jaTranslatableFieldKeys = ["summary", "check"]
+
+-- | One learner-visible piece of a deck source file.
+data JaUnit = JaUnit
+  { juKind  :: !Text  -- ^ what it is, in the words of EXERCISE-FORMAT.md sec. 12
+  , juHead  :: !Text  -- ^ its first line (quoted back in the issue detail)
+  , juStart :: !Int   -- ^ 1-based line the unit starts on
+  , juEnd   :: !Int   -- ^ 1-based line it ends on -- the @ja:@ run must sit directly below THIS
+  }
+
+-- | @#@\/@##@\/@###@ at column 0, followed by a space and a non-space --
+-- the same structural-heading shape the emitter's @HEADING_RE@ uses.
+jaHeadingLevelOf :: Text -> Maybe Int
+jaHeadingLevelOf l =
+  let (hashes, rest) = T.span (== '#') l
+      n = T.length hashes
+  in if n >= 1 && n <= 3
+       then case T.uncons rest of
+              Just (' ', more) | not (T.null (T.stripStart more)) -> Just n
+              _ -> Nothing
+       else Nothing
+
+-- | A column-0 GFM task-list option line (the emitter's @OPTION_RE@).
+jaIsOptionLine :: Text -> Bool
+jaIsOptionLine l =
+  any (`T.isPrefixOf` l) ["- [ ] ", "- [x] ", "- [X] "]
+    && not (T.null (T.stripStart (T.drop 6 l)))
+
+-- | A column-0 @key:@ field line, returning its key (the emitter's
+-- @FIELD_RE@ / "SXC1.Exercise.Reader".@fieldKeyValueOf@'s key shape).
+jaFieldKeyOf :: Text -> Maybe Text
+jaFieldKeyOf l =
+  let (key, rest) = T.span (\c -> (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') l
+  in if not (T.null key) && ":" `T.isPrefixOf` rest
+       && (let c = T.head key in c >= 'a' && c <= 'z')
+       then Just key
+       else Nothing
+
+jaIsBlankLine :: Text -> Bool
+jaIsBlankLine = T.null . T.strip
+
+-- | A field-block CONTINUATION line: non-blank, indented by >= 2 spaces.
+jaIsContinuationLine :: Text -> Bool
+jaIsContinuationLine l =
+  not (jaIsBlankLine l) && T.length (T.takeWhile (== ' ') l) >= 2
+
+-- | For each 0-based line index inside a FIELD BLOCK, the index of the
+-- field line that owns it (itself for a field line). Mirrors
+-- "SXC1.Exercise.Reader".@scanFieldBlock@ -- and
+-- @emit-content-bundles.py@'s @field_block_map@ -- exactly: a block
+-- starts after a structural heading, blank lines are allowed BEFORE it
+-- but end it, and @ja:@ lines inside it are transparent (they are
+-- field-shaped but own nothing, because the Reader strips them from the
+-- stream before its own scan ever runs).
+jaFieldOwners :: IntMap.IntMap Text -> Int -> IntMap.IntMap Int
+jaFieldOwners lineMap n = IntMap.fromList (outer 0)
+  where
+    at i = IntMap.findWithDefault "" i lineMap
+    outer i
+      | i >= n = []
+      | Just _ <- jaHeadingLevelOf (at i) =
+          let start = skipLead (i + 1)
+              (pairs, next) = inner start Nothing
+          in pairs ++ outer next
+      | otherwise = outer (i + 1)
+    skipLead j
+      | j < n && (jaIsBlankLine (at j) || isJaLine (at j)) = skipLead (j + 1)
+      | otherwise = j
+    inner j cur
+      | j >= n = ([], j)
+      | jaIsBlankLine l = ([], j)
+      | isJaLine l = inner (j + 1) cur
+      | Just _ <- jaFieldKeyOf l = let (ps, e) = inner (j + 1) (Just j) in ((j, j) : ps, e)
+      | jaIsContinuationLine l, Just owner <- cur = let (ps, e) = inner (j + 1) cur in ((j, owner) : ps, e)
+      | otherwise = ([], j)
+      where l = at j
+
+-- | Every learner-visible unit of one deck source, in source order.
+-- @ctx@ carries the most recent structural heading so a prose block can
+-- name itself the way EXERCISE-FORMAT.md sec. 12 names it (deck intro /
+-- exercise body / @### Why@ block / drill step body).
+jaUnitsOf :: [Text] -> [JaUnit]
+jaUnitsOf ls = go 0 "deck intro prose"
+  where
+    n = length ls
+    lineMap = IntMap.fromList (zip [0 ..] ls)
+    owners = jaFieldOwners lineMap n
+    at i = IntMap.findWithDefault "" i lineMap
+    go i ctx
+      | i >= n = []
+      | isJaLine l || jaIsBlankLine l = go (i + 1) ctx
+      | Just lvl <- jaHeadingLevelOf l =
+          let ctx' = case lvl of
+                1 -> "deck intro prose"
+                2 -> "exercise body prose"
+                _ -> roleProseKind (T.strip (T.drop 4 l))
+          in if lvl <= 2
+               then JaUnit (if lvl == 1 then "deck title" else "exercise title") l (i + 1) (i + 1)
+                      : go (i + 1) ctx'
+               -- exclusion 1: the role heading itself is UI-localized.
+               else go (i + 1) ctx'
+      | jaIsOptionLine l = JaUnit "choice option" l (i + 1) (i + 1) : go (i + 1) ctx
+      | Just owner <- IntMap.lookup i owners =
+          if owner /= i
+            then go (i + 1) ctx  -- a continuation; its field line already emitted the unit
+            else
+              let lastLine = fieldEnd i i
+                  key = maybe "" id (jaFieldKeyOf l)
+              in if key `elem` jaTranslatableFieldKeys
+                   then JaUnit (key <> ": field") l (i + 1) (lastLine + 1) : go (lastLine + 1) ctx
+                   -- exclusion 2: language-invariant field.
+                   else go (lastLine + 1) ctx
+      | otherwise =
+          let end = proseEnd i
+          in JaUnit ctx l (i + 1) (end + 1) : go (end + 1) ctx
+      where l = at i
+    roleProseKind role
+      | role == "Step" = "drill step prose"
+      | otherwise      = "### " <> role <> " prose"
+    -- the last line owned by field line @f@ (itself, or its final
+    -- continuation -- the emitter requires the variant to follow THAT).
+    fieldEnd f j
+      | j + 1 < n, IntMap.lookup (j + 1) owners == Just f = fieldEnd f (j + 1)
+      | otherwise = j
+    -- one Markdown block: contiguous non-blank, non-variant,
+    -- non-heading, non-option lines outside any field block.
+    proseEnd j
+      | j + 1 < n
+      , let k = j + 1
+      , not (jaIsBlankLine (at k)), not (isJaLine (at k))
+      , jaHeadingLevelOf (at k) == Nothing, not (jaIsOptionLine (at k))
+      , IntMap.notMember k owners = proseEnd k
+      | otherwise = j
+
+-- | E-JA-MISSING for every learner-visible unit of this deck with no
+-- @ja:@ variant directly below it. Reads the RAW source (never the
+-- parsed 'Deck'): the variants are deliberately invisible to every
+-- structural pass, and the raw text is the only place the contract can
+-- be seen.
+jaCompletenessIssues :: FilePath -> Text -> [Issue]
+jaCompletenessIssues fp raw =
+  [ mkIssue E_JA_MISSING (Loc (T.pack fp) (juStart u))
+      (juKind u <> " has no ja: variant -- add a \"ja: \" replacement line directly below line "
+         <> T.pack (show (juEnd u)) <> " (" <> excerpt (juHead u) <> ")")
+  | u <- jaUnitsOf ls
+  , not (translated (juEnd u))
+  ]
+  where
+    ls = T.lines raw
+    n = length ls
+    lineMap = IntMap.fromList (zip [0 ..] ls)
+    -- juEnd is 1-based, so the line BELOW it is index juEnd.
+    translated e = e < n && isJaLine (IntMap.findWithDefault "" e lineMap)
+    excerpt t = let s = T.strip t
+                in if T.length s > 60 then T.take 57 s <> "..." else s
 
 --------------------------------------------------------------------------
 -- INDEX
@@ -266,19 +535,20 @@ data Loaded = Loaded
   -- | briefs/M2-signoff-fixes.json, task "quiz-selection-semantics",
   -- FIX 3: the number of successfully-parsed decks for which the four
   -- id-inventory-binding checks in 'resolveDeckIssues' actually fired
-  -- (i.e. the run's structural @bindInventory@ held -- M5 item 7). This
+  -- (i.e. the run's structural 'bsInventory' scope held -- M5 item 7). This
   -- makes the scope OBSERVABLE -- see 'runJsonMode' and
   -- @scripts/check-site.sh@'s "inventory-binding-scope-fired" check,
   -- which asserts this equals 'ldDecks'' length on the real corpus.
   , ldInventoryChecked :: !Int
   }
 
--- | Load and validate one whole content root. @bindInventory@ is the
--- structural id-binding scope for every deck in this run -- see
--- 'inventoryScopedCodes' (M5 debt item 7): True for the real-corpus
--- modes, per-fixture for dirs\/ fixtures, never for loose files.
-collectFromDirs :: Bool -> FilePath -> FilePath -> IO Loaded
-collectFromDirs bindInventory contentDir translationsDir = do
+-- | Load and validate one whole content root. @scope@ is the structural
+-- corpus-wide check scope for every deck in this run -- see 'BindScope',
+-- 'inventoryScopedCodes' (M5 debt item 7) and 'jaScopedCodes' (M6 W4):
+-- everything binds for the real-corpus modes, per-fixture for dirs\/
+-- fixtures, nothing binds for loose files.
+collectFromDirs :: BindScope -> FilePath -> FilePath -> IO Loaded
+collectFromDirs scope contentDir translationsDir = do
   contentDirExists <- doesDirectoryExist contentDir
   unless contentDirExists $
     () <$ harnessError ("content directory does not exist: " ++ contentDir)
@@ -320,7 +590,7 @@ collectFromDirs bindInventory contentDir translationsDir = do
       perDeck <- forM existingEntries $ \(_, nm) -> do
         let fp = exercisesDir </> T.unpack nm
         raw <- readUtf8FileOrHarnessError fp
-        let (issues, mDeck) = resolveDeckIssues ctx bindInventory fp raw
+        let (issues, mDeck) = resolveDeckIssues ctx scope fp raw
             -- M6 W2 seam repair: sourceChars reports the EN EMISSION's
             -- length (column-0 ja: variant lines deleted -- the same
             -- rule scripts/emit-content-bundles.py applies), because
@@ -330,7 +600,7 @@ collectFromDirs bindInventory contentDir translationsDir = do
             -- round-trips byte-identically here because every source
             -- file ends with a newline (the emitter enforces it).
             enChars = T.length (T.unlines (filter (not . isJaLine) (T.lines raw)))
-        pure (nm, issues, mDeck, enChars, bindInventory)
+        pure (nm, issues, mDeck, enChars, bsInventory scope)
 
       let allIssues  = ctxIssues ++ orphanIssues ++ danglingIssues ++ concat [ i | (_, i, _, _, _) <- perDeck ]
           decks      = mapMaybe (\(_, _, d, _, _) -> d) perDeck
@@ -339,18 +609,18 @@ collectFromDirs bindInventory contentDir translationsDir = do
           -- FIX 3: count only successfully-parsed decks (mDeck == Just)
           -- for which 'resolveDeckIssues' actually applied the four
           -- E-ID-* id-inventory-binding checks (M5 debt item 7: the
-          -- per-deck flag is this run's structural @bindInventory@, not
+          -- per-deck flag is this run's structural 'bsInventory' scope, not
           -- a path-substring probe), not merely attempted them.
           inventoryChecked = length [ () | (_, _, Just _, _, real) <- perDeck, real ]
           -- M3 (briefs/M3-manifest.json, task "size-split-and-format"):
           -- requires: resolution is DIR-class (it needs the whole
           -- corpus) and, like the four id-inventory-binding checks above,
           -- must NEVER apply to plain --fixtures runs -- scoped by the
-          -- SAME structural @bindInventory@ signal (every deck loaded in
+          -- SAME structural 'bsInventory' signal (every deck loaded in
           -- one 'collectFromDirs' call shares the same content root, so
           -- one per-run flag covers both check families -- exactly the
           -- coupling the old per-path probe emulated).
-          requiresIssues = if bindInventory then globalRequiresIssues decks else []
+          requiresIssues = if bsInventory scope then globalRequiresIssues decks else []
       pure Loaded
         { ldIssues = allIssues ++ dupIdIssues ++ requiresIssues, ldDecks = decks, ldSourceChars = sourceChars
         , ldInventoryChecked = inventoryChecked
@@ -449,7 +719,7 @@ unDeckId (DeckId t) = t
 
 runDefaultMode :: Opts -> IO ()
 runDefaultMode opts = do
-  loaded <- collectFromDirs True (optContentDir opts) (optTranslationsDir opts)
+  loaded <- collectFromDirs realCorpusScope (optContentDir opts) (optTranslationsDir opts)
   forM_ (sortOn (\i -> (isFile i, isLine i)) (ldIssues loaded)) $ \i ->
     putStrLn (T.unpack (renderIssue i))
   putStrLn ("exercise-check: " ++ show (length (ldIssues loaded)) ++ " issue(s)")
@@ -457,7 +727,7 @@ runDefaultMode opts = do
 
 runJsonMode :: Opts -> IO ()
 runJsonMode opts = do
-  loaded <- collectFromDirs True (optContentDir opts) (optTranslationsDir opts)
+  loaded <- collectFromDirs realCorpusScope (optContentDir opts) (optTranslationsDir opts)
   let report = renderReport (null (ldIssues loaded)) (ldDecks loaded) (ldSourceChars loaded) (ldIssues loaded)
   putStrLn (T.unpack (injectInventoryChecked (ldInventoryChecked loaded) report))
 
@@ -496,7 +766,7 @@ runListCodes opts = do
 
 runBrowserFixture :: Opts -> IO ()
 runBrowserFixture opts = do
-  loaded <- collectFromDirs True (optContentDir opts) (optTranslationsDir opts)
+  loaded <- collectFromDirs realCorpusScope (optContentDir opts) (optTranslationsDir opts)
   case (findQuiz loaded, findDrill loaded, findLookup loaded) of
     (Just qz, Just dr, Just lk) -> putStrLn (T.unpack (browserFixtureJson qz dr lk))
     _ -> do
@@ -605,7 +875,7 @@ runFixtures opts fixturesDir = do
   fileResults <- forM (filter (".ex.md" `isSuffixOf`) fileNames) $ \fn -> do
     raw <- readUtf8FileOrHarnessError (filesDir </> fn)
     let fp = filesDir </> fn
-        (issues, _) = resolveDeckIssues ctx False fp raw
+        (issues, _) = resolveDeckIssues ctx looseFileScope fp raw
         nm = T.pack fn
         expected = expectedCodeOf nm
         -- A files/ fixture's own on-disk name is <CODE>--<slug>.ex.md
@@ -646,9 +916,14 @@ runFixtures opts fixturesDir = do
       -- (structural scope -- see 'inventoryScopedCodes'); every other
       -- dirs/ fixture runs with the binding off, exactly as before.
       -- (Until M5 the same opt-in rode on the "--fixture-content" name
-      -- suffix satisfying a path-substring probe.)
-      let bindInv = expectedCodeOf (T.pack dn) `elem` inventoryScopedCodes
-      loaded <- collectFromDirs bindInv (dirsDir </> dn) (optTranslationsDir opts)
+      -- suffix satisfying a path-substring probe.) M6 W4 adds the
+      -- SECOND, INDEPENDENT family on the same opt-in rule
+      -- ('jaScopedCodes' -- E-JA-MISSING), which is why 'fixtureDirScope'
+      -- decides the two separately: the eleven pre-M6 dirs/ fixtures
+      -- carry no ja: lines and must keep reporting exactly the one code
+      -- their own name declares.
+      let dirScope = fixtureDirScope (expectedCodeOf (T.pack dn))
+      loaded <- collectFromDirs dirScope (dirsDir </> dn) (optTranslationsDir opts)
       let got = Set.toList (Set.fromList (map isCode (ldIssues loaded)))
           nm = T.pack dn
           expected = expectedCodeOf nm
@@ -752,10 +1027,11 @@ stLabel 18 = "18. M3: INDEX-driven embedding -- embeddable deck count == non-com
 stLabel 19 = "19. M3: StaticCode totality sweep (codeText/issueClassOf WHNF non-empty for every allIssueCodes member)"
 stLabel 20 = "20. M4: SXC1.Midi.Spec vs translations/midi.md -- decode/match/pads/ports/describe + the six live verify: hooks"
 stLabel 21 = "21. M6: `ja:` variant lines -- skipped for EN (byte-identical Deck), invisible to the validator, line numbers preserved"
+stLabel 22 = "22. M6 W4: JA completeness (E-JA-MISSING) -- per-unit-kind negative controls, the documented exclusions, and a sweep over the REAL corpus"
 stLabel n  = show n ++ ". ?"
 
 stMaxGroup :: Int
-stMaxGroup = 21
+stMaxGroup = 22
 
 stGroupsAllOk :: Int -> [STCheck] -> Bool
 stGroupsAllOk maxG cs = all oneGroupOk [1 .. maxG]
@@ -768,6 +1044,7 @@ runSelfTest = do
   agreementChecks  <- readerAgreementChecks root
   indexCountChecks <- indexDrivenEmbeddingChecks root
   midiSpecCks      <- midiSpecChecks root
+  jaCompleteCks    <- jaCompletenessCorpusChecks root
   let allChecks = concat
         [ grammarChecks, new12GuardSelfChecks, choiceChecks, recallChecks, confirmChecks
         , findPageChecks, retryChecks, hintChecks, progressEventChecks, promptIdChecks
@@ -776,6 +1053,7 @@ runSelfTest = do
         , agreementChecks, indexCountChecks, staticCodeTotalityChecks
         , midiSpecCks
         , jaVariantChecks
+        , jaCompletenessChecks, jaCompleteCks
         ]
   forM_ [1 .. stMaxGroup] $ \g -> do
     let inGroup = filter ((== g) . stGroup) allChecks
@@ -1268,6 +1546,160 @@ jaVariantChecks =
          ("no FieldLine with key \"ja\" may reach the validator's field blocks; got "
             ++ show (length jaKeyed))
   ]
+
+--------------------------------------------------------------------------
+-- Group 22 (M6 W4): JA COMPLETENESS -- 'jaCompletenessIssues' itself.
+-- briefs/M6-plan.md ruling 2's enforcement flipped from report-only to
+-- HARD at wave 3's completion, so this group has to prove three
+-- separate things, none of which the real corpus being green can show
+-- on its own:
+--
+--   (a) a fully-annotated deck reports NOTHING (no false positives --
+--       otherwise the hard check would be unshippable);
+--   (b) removing the ja: variant of EACH learner-visible unit KIND in
+--       turn fires EXACTLY ONE E-JA-MISSING, on the right line, naming
+--       the right kind. These nine are the permanent, in-memory half of
+--       this deliverable's red-first demonstration (the by-hand half --
+--       one ja: line deleted from a scratch COPY of a real deck, run
+--       through --content-dir -- is in the M6 W4 report);
+--   (c) the DOCUMENTED EXCLUSIONS really are exclusions: the same
+--       fully-annotated deck carries no variant for cite:/type:/id:/
+--       verify: or any ### role heading and STILL reports nothing, so
+--       the exclusion list is a property of this checker rather than a
+--       lucky absence of those constructs.
+--
+-- Plus the sweep over the REAL corpus (one check per INDEX-named deck),
+-- which is the milestone claim itself: all 52 shipping decks are
+-- completely translated. It reads disk for exactly the reason groups
+-- 17/18/20 do (see the runSelfTest Haddock) and never degrades to a
+-- vacuous pass: a missing INDEX or a missing deck file is a FAIL that
+-- names the path.
+--------------------------------------------------------------------------
+
+-- | Drop the FIRST line equal to @target@ (the negative controls'
+-- mutation: one ja: line removed, nothing else touched).
+jaDropLine :: Text -> [Text] -> [Text]
+jaDropLine target ls = case break (== target) ls of
+  (before, _ : after) -> before ++ after
+  (before, [])        -> before
+
+-- | 1-based line number of the first line equal to @target@ (0 when
+-- absent, which makes the expectation unsatisfiable rather than
+-- vacuously true).
+jaLineNumberOf :: Text -> [Text] -> Int
+jaLineNumberOf target ls = case [ i | (i, l) <- zip [1 :: Int ..] ls, l == target ] of
+  (i : _) -> i
+  []      -> 0
+
+-- | One negative control: delete @jaLine@ from the fully-annotated
+-- fixture and require exactly one E-JA-MISSING, anchored on
+-- @anchorLine@'s own line number, whose detail starts with @wantKind@.
+jaNegativeCase :: String -> Text -> Text -> Text -> STCheck
+jaNegativeCase name jaLine anchorLine wantKind =
+  let mutated = jaDropLine jaLine jaAnnotatedLines
+      issues  = jaCompletenessIssues validFp (joinL mutated)
+      wantLn  = jaLineNumberOf anchorLine mutated
+      got     = [ (T.unpack (isCode i), isLine i, T.unpack (isDetail i)) | i <- issues ]
+      ok = length mutated == length jaAnnotatedLines - 1
+             && wantLn > 0
+             && case issues of
+                  [i] -> isCode i == codeText E_JA_MISSING
+                           && isLine i == wantLn
+                           && (wantKind <> " has no ja: variant") `T.isPrefixOf` isDetail i
+                  _   -> False
+  in mkST 22 name ok
+       ("want exactly one " ++ T.unpack (codeText E_JA_MISSING) ++ " (" ++ T.unpack wantKind
+          ++ ") at line " ++ show wantLn ++ ", got " ++ show got)
+
+jaCompletenessChecks :: [STCheck]
+jaCompletenessChecks =
+  [ -- (a) no false positives on a completely translated deck.
+    let issues = jaCompletenessIssues validFp (joinL jaAnnotatedLines)
+    in mkST 22 "ja-complete/fully-annotated-deck-is-silent"
+         (null issues)
+         ("a deck with a ja: variant on every learner-visible piece must report nothing; got "
+            ++ showIssues issues)
+
+    -- (c) the exclusions are structural, not accidental: this same
+    -- silent deck deliberately carries NO variant for the
+    -- language-invariant fields or the role headings.
+  , let noVariantFor p = not (any (T.isPrefixOf p) jaAnnotatedLines)
+        excluded = map noVariantFor ["ja: cite:", "ja: type:", "ja: id:", "ja: verify:", "ja: ###"]
+    in mkST 22 "ja-complete/documented-exclusions-carry-no-variant"
+         (and excluded && null (jaCompletenessIssues validFp (joinL jaAnnotatedLines)))
+         ("cite:/type:/id:/verify: and the ### role headings are language-invariant (ruling 2, "
+            ++ "EXERCISE-FORMAT.md sec. 12) -- the silent fixture must translate none of them; got "
+            ++ show excluded)
+
+    -- The counting mechanism can detect absence at all: an EN-only deck
+    -- (every ja: line deleted -- exactly the EN bundle emission) fires
+    -- one issue per learner-visible unit, i.e. exactly as many issues as
+    -- the annotated deck has variant lines.
+  , let issues = jaCompletenessIssues validFp (joinL jaStrippedLines)
+        wanted = length (filter isJaVariantLine jaAnnotatedLines)
+    in mkST 22 "ja-complete/en-only-deck-fires-once-per-unit"
+         (length issues == wanted && wanted > 0
+            && all ((== codeText E_JA_MISSING) . isCode) issues)
+         ("an untranslated deck must fire one E-JA-MISSING per learner-visible unit: want "
+            ++ show wanted ++ ", got " ++ show (length issues))
+  ]
+  -- (b) one negative control per learner-visible unit KIND -- the
+  -- complete list from content/EXERCISE-FORMAT.md sec. 12's table.
+  ++ [ jaNegativeCase "ja-complete/missing-deck-title"
+         "ja: # バンクの選択" "# Choosing a bank" "deck title"
+     , jaNegativeCase "ja-complete/missing-deck-summary"
+         "ja: summary: パフォーマンスモードで BANK 1 を選び、バンク表示を読み取る。"
+         "summary: Choose BANK 1 in Performance mode and read the bank indicator." "summary: field"
+     , jaNegativeCase "ja-complete/missing-deck-intro-prose"
+         "ja: 始める前に、本体の電源を入れてください。"
+         "Before you start, turn the unit on." "deck intro prose"
+     , jaNegativeCase "ja-complete/missing-exercise-title"
+         "ja: ## どのボタンで BANK 1 に戻りますか"
+         "## Which button returns you to BANK 1" "exercise title"
+     , jaNegativeCase "ja-complete/missing-body-prose"
+         "ja: BANK 1 の選択を始めるには、どのボタンを押しますか。"
+         "Which single button do you press to start selecting BANK 1?" "exercise body prose"
+     , jaNegativeCase "ja-complete/missing-choice-option"
+         "ja: - [ ] `B`" "- [ ] `B`" "choice option"
+     , jaNegativeCase "ja-complete/missing-why-prose"
+         "ja: `A` を押すと `SELECT BANK 1` と表示されます。"
+         "Pressing `A` shows `SELECT BANK 1` on the display." "### Why prose"
+     , jaNegativeCase "ja-complete/missing-step-check"
+         "ja: check: 音が鳴っている間、パッドが白く光ります。"
+         "check: The pad lights white while the sound plays." "check: field"
+     , jaNegativeCase "ja-complete/missing-step-prose"
+         "ja: パッド `1` を叩きます。" "Tap pad `1`." "drill step prose"
+     ]
+
+-- | The milestone claim, swept over the REAL corpus: every deck
+-- @content\/exercises\/INDEX@ ships is completely translated. One check
+-- per deck so a failure names the file (group 17's pattern).
+jaCompletenessCorpusChecks :: FilePath -> IO [STCheck]
+jaCompletenessCorpusChecks root = do
+  let exercisesDir = root </> "content" </> "exercises"
+      indexPath    = exercisesDir </> "INDEX"
+  indexExists <- doesFileExist indexPath
+  if not indexExists
+    then pure [ mkST 22 "ja-complete/corpus-not-found" False
+                  (indexPath ++ " does not exist -- the JA-completeness sweep had nothing to check") ]
+    else do
+      raw <- readUtf8File indexPath
+      let names = map snd (parseIndexEntries raw)
+      if null names
+        then pure [ mkST 22 "ja-complete/corpus-not-found" False
+                      (indexPath ++ " names no deck files -- the JA-completeness sweep had nothing to check") ]
+        else forM names $ \nm -> do
+          let fp = exercisesDir </> T.unpack nm
+          fileExists <- doesFileExist fp
+          if not fileExists
+            then pure (mkST 22 ("ja-complete/" ++ fp) False
+                         (fp ++ " is named by INDEX but does not exist on disk"))
+            else do
+              deckRaw <- readUtf8File fp
+              let issues = jaCompletenessIssues fp deckRaw
+              pure (mkST 22 ("ja-complete/" ++ fp) (null issues)
+                      (show (length issues) ++ " learner-visible piece(s) with no ja: variant; first: "
+                         ++ (case issues of { (i : _) -> T.unpack (renderIssue i); [] -> "<none>" })))
 
 --------------------------------------------------------------------------
 -- Group 2: NEW12-safe runner demonstration (mirrors CheckContent.hs's

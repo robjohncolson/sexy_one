@@ -310,9 +310,16 @@ Checks performed, in order:
      byte-match a fresh scripts/emit-content-bundles.py emission from
      content/exercises/ (the stale-bundle detector, check 12's
      exact-bytes discipline); and briefs/M6-budget.json must match the
-     pinned M6 re-baseline (m5_final==933305, frozen ceiling, m6_entry
-     shrunk by >= M6_SHRINK_MIN, fresh artifact in [m6_entry-3000,
-     1000000)).
+     pinned M6 re-baseline (m5_final==933305, frozen ceiling,
+     bundle_ceiling==M6_BUNDLE_CEILING, m6_entry shrunk by >=
+     M6_SHRINK_MIN, fresh artifact in [m6_entry-3000, 1000000)) AND
+     (M6 W4) its recorded M6-FINAL figures must describe THIS tree:
+     m6_final_gzip_bytes within 3000 of the freshly measured artifact,
+     and the recorded en/ja/combined bundle gzips self-consistent,
+     under the bundle ceiling, and within 3000 of the live measurement
+     (a 3000-byte window rather than an equality because gzip's exact
+     output is a property of the local gzip build, not of this tree --
+     the same window the artifact figure already uses).
   21. M6 FETCH-FAILURE DEGRADATION (browser axis): a COPY of the bundle
      is served WITHOUT its content/ directory and browser-check
      --check-content-missing must report 4/4: the app still boots (the
@@ -338,6 +345,27 @@ Checks performed, in order:
      back restores EN. The injection is grep-confirmed both into the
      served copy's ja bundle AND absent from its en bundle before the
      browser ever runs. Skipped via skip() under --skip-browser.
+  23. M6 W4 JA COURSE FLOOR (browser axis): the five "ja course:"
+     assertions scripts/browser-check.mjs runs inside BOTH full stages
+     (checks 7/8, within the UI-language JA flow) must each be reported
+     ok, counted BY NAME in each stage's own capture -- the D-suite's
+     V6 discipline, because the N/N cardinality floor (check 19a) only
+     catches assertions being REMOVED, not replaced. What those five
+     prove is the milestone claim itself: the ja bundle the site SHIPS
+     renders the real Japanese course -- #sxc1-exercise-stats reports
+     52 decks / 435 exercises and the pinned deck's JAPANESE title; the
+     deck index card, deck page title and deck summary: are the
+     corpus's Japanese; a real corpus quiz renders its JA title,
+     question and both option labels and, clicked BY ITS JAPANESE
+     LABEL, grades to the JA "Correct" feedback with the JA rationale;
+     and a real corpus drill step shows its JA check: sentence. Every
+     expectation is a LITERAL pinned in browser-check.mjs
+     (JA_COURSE_PINS), never derived from the bundle under test, so an
+     EN-fallback ja bundle (the emitter's documented degenerate case,
+     and what content.ja.txt actually was through waves 1-2) turns all
+     five red. Skipped via skip() under --skip-browser (the stages
+     never ran) and under --skip-content (without --exercise-fixture
+     the JA flow does not run at all).
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -522,8 +550,15 @@ info() {
 # assertions plus the ENTIRE runExerciseAssertions/a11y set re-run
 # under lang='ja' with every learner-visible text pin pinning the JA
 # string -- measured 233/233 on both full stages at this raise).
-M5_CHECK_TOTAL=108
-M5_BROWSER_ASSERT_FLOOR=233
+# M6 W4 pin raise (same documented procedure): 108 -> 109 (+1: the JA
+# COURSE floor, check 23 -- the named counterpart of the D-suite's V6)
+# and 233 -> 238 (+5: the JA course assertions inside
+# runUiLangJaAssertions -- shipped-bundle totals + JA deck title, the
+# deck card/page/summary in Japanese, a real corpus quiz COMPLETED in
+# Japanese, and a real corpus drill step's JA check: sentence --
+# measured 238/238 on both full stages at this raise).
+M5_CHECK_TOTAL=109
+M5_BROWSER_ASSERT_FLOOR=238
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -1450,7 +1485,7 @@ unregister_temp_dir "$BUNDLE_FRESH_TMP"
 # 6: no new task-local wasm ceiling was granted for M6 -- later M6
 # waves' JA UI strings lawfully grow the artifact above m6_entry, under
 # the frozen 1,000,000).
-M6E_LABEL="briefs/M6-budget.json MATCHES the pinned M6 re-baseline (m5_final==933305, ceiling==1000000; m6_entry <= m5_final - M6_SHRINK_MIN=$M6_SHRINK_MIN -- the externalization really shrank the wasm) and the fresh artifact gzip sits in [m6_entry-3000, 1000000)"
+M6E_LABEL="briefs/M6-budget.json MATCHES the pinned M6 re-baseline (m5_final==933305, ceiling==1000000, bundle_ceiling==$M6_BUNDLE_CEILING; m6_entry <= m5_final - M6_SHRINK_MIN=$M6_SHRINK_MIN -- the externalization really shrank the wasm) and its recorded M6-FINAL figures describe THIS tree (artifact gzip in [m6_entry-3000, 1000000) and within 3000 of m6_final; recorded en+ja bundle gzips self-consistent, under the bundle ceiling and within 3000 of the live measurement)"
 if [ -f "$M6_BUDGET_JSON" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
   M6E_OUT="$(python3 -c '
 import json, sys
@@ -1461,29 +1496,52 @@ except Exception as e:
     raise SystemExit
 observed = int(sys.argv[2])
 pin_m5_final, pin_shrink, pin_ceiling = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+pin_bundle_ceiling = int(sys.argv[6])
+# live bundle gzips, or -1/-1 when the bundles were missing (M6-b
+# already failed loudly in that case; this check then skips only the
+# bundle COMPARISON, never the pin checks).
+live_en, live_ja = int(sys.argv[7]), int(sys.argv[8])
 problems = []
 try:
     m5_final = int(m6["m5_final_gzip_bytes"])
     m6_entry = int(m6["m6_entry_gzip_bytes"])
+    m6_final = int(m6["m6_final_gzip_bytes"])
     ceiling = int(m6["ceiling_bytes"])
+    bundle_ceiling = int(m6["bundle_ceiling_bytes"])
+    b_en = int(m6["bundle_en_gzip_bytes"])
+    b_ja = int(m6["bundle_ja_gzip_bytes"])
+    b_combined = int(m6["bundle_combined_gzip_bytes"])
     if m5_final != pin_m5_final:
         problems.append("m5_final_gzip_bytes=%d does not match the pinned M6_M5_FINAL=%d -- the record was doctored" % (m5_final, pin_m5_final))
     if ceiling != pin_ceiling:
         problems.append("ceiling_bytes=%d, not the frozen %d" % (ceiling, pin_ceiling))
+    if bundle_ceiling != pin_bundle_ceiling:
+        problems.append("bundle_ceiling_bytes=%d does not match the pinned M6_BUNDLE_CEILING=%d -- raising a ceiling is a visible check-site.sh edit, never a budget-file edit" % (bundle_ceiling, pin_bundle_ceiling))
     if m6_entry > m5_final - pin_shrink:
         problems.append("m6_entry_gzip_bytes=%d did not shrink by at least M6_SHRINK_MIN=%d from m5_final=%d (the externalization is not doing its job)" % (m6_entry, pin_shrink, m5_final))
     if observed < m6_entry - 3000:
         problems.append("fresh artifact gzip=%d is %d bytes BELOW the recorded m6_entry=%d (beyond the 3000-byte window) -- the recorded re-baseline never described this pipeline/tree" % (observed, m6_entry - observed, m6_entry))
     if observed >= pin_ceiling:
         problems.append("fresh artifact gzip=%d is at/over the frozen ceiling %d" % (observed, pin_ceiling))
+    if abs(observed - m6_final) > 3000:
+        problems.append("fresh artifact gzip=%d is %d bytes from the recorded m6_final_gzip_bytes=%d (beyond the 3000-byte window) -- re-measure and update briefs/M6-budget.json" % (observed, observed - m6_final, m6_final))
+    if b_en + b_ja != b_combined:
+        problems.append("bundle_combined_gzip_bytes=%d is not bundle_en_gzip_bytes=%d + bundle_ja_gzip_bytes=%d" % (b_combined, b_en, b_ja))
+    if b_combined >= bundle_ceiling:
+        problems.append("recorded bundle_combined_gzip_bytes=%d is at/over the bundle ceiling %d" % (b_combined, bundle_ceiling))
+    if live_en >= 0 and live_ja >= 0:
+        live_combined = live_en + live_ja
+        if abs(live_combined - b_combined) > 3000:
+            problems.append("live combined bundle gzip=%d (en=%d + ja=%d) is %d bytes from the recorded %d (beyond the 3000-byte window) -- re-measure and update briefs/M6-budget.json" % (live_combined, live_en, live_ja, live_combined - b_combined, b_combined))
 except KeyError as e:
     problems.append("briefs/M6-budget.json is missing field %s" % e)
 if problems:
     print("FAIL " + "; ".join(problems))
 else:
-    print("OK m5_final=%d, m6_entry=%d (shrink %d >= %d), fresh gzip %d in [%d, %d); restored ceiling headroom %d bytes"
-          % (m5_final, m6_entry, m5_final - m6_entry, pin_shrink, observed, m6_entry - 3000, pin_ceiling, pin_ceiling - m6_entry))
-' "$M6_BUDGET_JSON" "$WASM_GZIP_BYTES" "$M6_M5_FINAL" "$M6_SHRINK_MIN" "$WASM_GZIP_CEILING_BYTES" 2>&1)" || true
+    print("OK m5_final=%d, m6_entry=%d (shrink %d >= %d), m6_final=%d, fresh gzip %d in [%d, %d); bundles en=%d + ja=%d = %d of %d; ceiling headroom %d bytes"
+          % (m5_final, m6_entry, m5_final - m6_entry, pin_shrink, m6_final, observed, m6_entry - 3000, pin_ceiling, b_en, b_ja, b_combined, bundle_ceiling, pin_ceiling - observed))
+' "$M6_BUDGET_JSON" "$WASM_GZIP_BYTES" "$M6_M5_FINAL" "$M6_SHRINK_MIN" "$WASM_GZIP_CEILING_BYTES" \
+  "$M6_BUNDLE_CEILING" "${BUNDLE_EN_GZIP:--1}" "${BUNDLE_JA_GZIP:--1}" 2>&1)" || true
   case "$M6E_OUT" in
     "OK "*) ok "$M6E_LABEL (${M6E_OUT#OK })" ;;
     *)      fail "$M6E_LABEL (observed: ${M6E_OUT#FAIL })" ;;
@@ -3563,11 +3621,39 @@ CONTENT_MISSING_LABEL="fetch-failure degradation: served WITHOUT content/ bundle
 JA_TOGGLE_LABEL="ui-language toggle roundtrip: served copy with one injected ja: fixture variant -- EN boot, JA switch via reload-as-refetch, header/pref/ruling-4 suggestion, JA content title, JA device flow, back to EN (browser-check --check-ja-toggle, 9/9)"
 ROOT_CARDINALITY_LABEL="M5 cardinality contract: root browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
+# M6 W4 (check 23): THE JA COURSE FLOOR -- V6's naming discipline
+# applied to the five "ja course:" assertions runUiLangJaAssertions runs
+# inside BOTH full stages. The N/N cardinality floor above is a FLOOR:
+# it catches five assertions being deleted, but not five being deleted
+# while five others are added. These five are the entire proof that the
+# JAPANESE COURSE (not merely the JA UI, and not merely a bundle file on
+# disk) renders end to end from the bundle the site ships, so -- exactly
+# like D1..D27 -- they are counted BY NAME, in each stage's own capture.
+# Their expectations are LITERAL corpus strings inside
+# scripts/browser-check.mjs (JA_COURSE_PINS), which is what makes an
+# EN-fallback ja bundle red rather than self-consistent; the red-first
+# demonstration served a copy whose content.ja.txt was the EN emission
+# relabelled "ja" and all five failed (M6 W4 report).
+JA_COURSE_ASSERT_COUNT=5
+JA_COURSE_LABEL="M6 W4 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course: 52 decks/435 exercises + a JA deck title from #sxc1-exercise-stats, the deck card/page/summary, a JA quiz COMPLETED, a JA drill check: sentence) -- counted BY NAME, so unplugging them cannot hide under the N/N floor"
 
 # Parse one stage's captured output for its final "browser-check: N/M
 # assertions passed" summary line and enforce the contract: the line must
 # exist, every assertion must have passed (N == M), and the total must be
 # at or above the pinned floor.
+# M6 W4 (check 23): how many DISTINCT "ja course:" assertions one stage
+# capture reported ok. A failed assertion prints "FAIL - ja course: ..."
+# instead, so it is missing from this count -- the check goes red both
+# when the suite is unplugged and when any member fails.
+ja_course_ok_count() {
+  local log="$1"
+  if [ -n "$log" ] && [ -s "$log" ]; then
+    grep -oE '^ok - ja course: [^(]*' "$log" | sort -u | grep -c '^ok - ja course: ' || true
+  else
+    echo 0
+  fi
+}
+
 browser_stage_assertion_floor() {
   local log="$1" label="$2"
   local line="" bs_passed="" bs_total=""
@@ -3599,6 +3685,7 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$DEVICE_SUITE_LABEL"
   skip "$ROOT_CARDINALITY_LABEL"
   skip "$SUBPATH_CARDINALITY_LABEL"
+  skip "$JA_COURSE_LABEL"
 else
   if ! BROWSER_PATH="$(resolve_browser)"; then
     fail "$ROOT_HEALTH_LABEL (observed: no browser found -- set SXC1_BROWSER, install Chrome/Chromium, or pass --skip-browser)"
@@ -3611,6 +3698,7 @@ else
     fail "$DEVICE_SUITE_LABEL (observed: no browser found, the suite never ran)"
     fail "$ROOT_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
     fail "$SUBPATH_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
+    fail "$JA_COURSE_LABEL (observed: no browser found, the stages never ran)"
   else
     # Check 7: ordinary root-served smoke test.
     run_browser_stage "$DIR" "$DIR/index.html" "/" "$ROOT_HEALTH_LABEL" "$ROOT_BROWSER_LABEL" "$BROWSER_PATH"
@@ -3866,6 +3954,23 @@ PYEOF2
     else
       browser_stage_assertion_floor "${ROOT_BROWSER_STAGE_LOG:-}" "$ROOT_CARDINALITY_LABEL"
       browser_stage_assertion_floor "${SUBPATH_BROWSER_STAGE_LOG:-}" "$SUBPATH_CARDINALITY_LABEL"
+    fi
+
+    # Check 23 (M6 W4): the JA course floor -- see JA_COURSE_LABEL's
+    # comment above. Scoped exactly like the cardinality floors: the
+    # UI-language JA flow (and therefore these five assertions) only
+    # runs when the stages got --exercise-fixture, so --skip-content
+    # skips it conspicuously via skip() with TOTAL unchanged.
+    if [ "$SKIP_CONTENT" -eq 1 ]; then
+      skip "$JA_COURSE_LABEL (only enforced on full fixture inputs -- the UI-language JA flow runs only with --exercise-fixture)"
+    else
+      JA_COURSE_ROOT_OK="$(ja_course_ok_count "${ROOT_BROWSER_STAGE_LOG:-}")"
+      JA_COURSE_SUB_OK="$(ja_course_ok_count "${SUBPATH_BROWSER_STAGE_LOG:-}")"
+      if [ "$JA_COURSE_ROOT_OK" -eq "$JA_COURSE_ASSERT_COUNT" ] && [ "$JA_COURSE_SUB_OK" -eq "$JA_COURSE_ASSERT_COUNT" ]; then
+        ok "$JA_COURSE_LABEL (observed: root $JA_COURSE_ROOT_OK/$JA_COURSE_ASSERT_COUNT, sub-path $JA_COURSE_SUB_OK/$JA_COURSE_ASSERT_COUNT distinct ja course assertions reported ok)"
+      else
+        fail "$JA_COURSE_LABEL (observed: root $JA_COURSE_ROOT_OK/$JA_COURSE_ASSERT_COUNT, sub-path $JA_COURSE_SUB_OK/$JA_COURSE_ASSERT_COUNT -- a JA course assertion failed, or the JA course block was unplugged and never ran)"
+      fi
     fi
   fi
 fi

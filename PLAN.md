@@ -94,6 +94,26 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   implementation doc. Chromium-only; must degrade gracefully elsewhere.
 - **M5 — Ship.** Mobile/a11y polish, content completeness audit against the manuals,
   whole-project Codex review, GitHub Pages publish, shareable link.
+- **M6 — Japanese.** Owner directive: "It's important that the course is available
+  in Japanese too." UI strings and all 435 exercises in Japanese, selectable at
+  runtime, with progress shared across languages. *Done when: a learner can take
+  the whole course in Japanese and their history follows them between languages.*
+  **IMPLEMENTATION COMPLETE 2026-08-08** (waves 1-4; gate pending): the corpus
+  moved out of `app.wasm` into fetched per-language bundles (plan ruling 1, which
+  is what made a second language fit under the frozen 1,000,000-byte ceiling —
+  879,161 gzip at ship, 120,839 of headroom; bundles 167,732 of their own 300,000
+  ceiling); inline `ja:` variants in the same `.ex.md` files keep one id and one
+  registry per exercise, so progress is shared by construction; a `Lang`-indexed
+  UI string table plus a `uiLang` pref (prefs schema v2) and a header toggle; all
+  52 decks translated against the original Japanese manual pages and
+  QA-verified deck by deck. JA completeness is enforced hard (`E-JA-MISSING`),
+  and both full browser stages complete a real Japanese quiz out of the shipped
+  `ja` bundle. Gate: `check-site` **109/109 result=complete**, **238** assertions
+  per browser stage, `exercise-check` **454/454** self-test / **56/56** fixtures /
+  0 issues, `browser-check` **198/198** self-test and **42/42** sabotage passes,
+  `content-check` 412/412, `progress-check` 91/91, `registry-check` 8/8 + 16/16.
+  Remaining: Codex adversarial review, tag `m6`, deploy both hosts, live-verify
+  EN+JA flows.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 

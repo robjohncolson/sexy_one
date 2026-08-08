@@ -461,7 +461,16 @@ their '/ja' form and awaits a real image decode for every one -- this is
 the authoritative decoder for the project's page images (see NEW6). A
 separate assertion also opens a genuinely fresh browser target whose
 initial URL already carries a JA deep-link hash, to catch a cold-load
-regression that a warm hashchange-only check cannot see (see NEW5).`);
+regression that a warm hashchange-only check cannot see (see NEW5).
+
+A full run given --exercise-fixture also runs the M6 UI-language flow:
+the whole exercise/a11y assertion set a second time under uiLang=ja,
+plus (M6 W4) the five JA COURSE assertions -- the shipped ja bundle's
+own deck/exercise totals, a real corpus deck title and summary:, a real
+corpus quiz completed in Japanese (title, question, both option labels,
+graded feedback and rationale) and a real corpus drill step's Japanese
+check: sentence, every expectation a LITERAL pinned from
+content/exercises/ so an EN-fallback ja bundle turns them red.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -2686,6 +2695,74 @@ const UILANG_VERIFY_JA_ASSERTION_NAME =
 const UILANG_ROUNDTRIP_ASSERTION_NAME =
   'UI language toggle roundtrip: switching back restores EN (uiLang "en" after another reboot, #btn-ui-lang shows the switch-to-ja label again)';
 
+// ---------------------------------------------------------------------------
+// M6 W4: THE JA COURSE ITSELF -- the five assertions that make "the site
+// is available in Japanese" a checked claim rather than a shipped file.
+//
+// Everything above pins the UI STRINGS (I18n.hs) under ja; these pin the
+// COURSE: the Japanese the 52 decks were translated into in wave 3,
+// fetched from the bundle the site actually ships, rendered by the real
+// wasm, all the way through completing a quiz in Japanese.
+//
+// WHY THESE ARE LITERALS AND NOT DERIVED FROM THE BUNDLE: a check that
+// reads its expectations out of the artifact it is checking cannot fail.
+// An EN-fallback ja bundle (the emitter's own documented degenerate
+// case: "anything without a variant falls back to English", which is
+// exactly what content.ja.txt WAS through waves 1-2) would sail through
+// a self-derived comparison, because every string would agree with
+// itself. Pinned as literals -- copied from content/exercises/
+// 030-pad-04.ex.md's ja: lines, the DEVICE_REAL_CFG precedent of the
+// harness pinning real corpus identities -- an EN-fallback bundle turns
+// all five of these red at once. RED-FIRST: demonstrated by serving a
+// COPY of the bundle whose content.ja.txt is the EN emission relabelled
+// "ja" (see the M6 W4 report).
+//
+// The pinned deck (pad-04) is deliberately NOT one of the decks the
+// device suite (DEVICE_REAL_CFG: pad-01, pad-03) or --exercise-fixture
+// (ch0-01, prep-02) already drive, so completing its quiz here cannot
+// perturb what those assertions observe.
+// ---------------------------------------------------------------------------
+const JA_COURSE_PINS = {
+  totals: { decks: 52, exercises: 435 },
+  deck: {
+    slug: 'pad-04',
+    route: '#/x/pad-04',
+    // ループにあわせてフィンガードラム
+    titleJa: 'ループにあわせてフィンガードラム',
+    // 波形表示を読み取り、... (the deck's summary: field variant)
+    summaryJa: '波形表示を読み取り、リズムにドラムやベースを重ねる本章の中心となる練習に取り組み、すべてのループを一度に止める。',
+  },
+  quiz: {
+    route: '#/x/pad-04/q-2-27',
+    // パッドを叩くと表示されるもの
+    titleJa: 'パッドを叩くと表示されるもの',
+    // パッドを叩くと、その音の「波形」が表示されます。
+    stemJa: 'パッドを叩くと、その音の「波形」が表示されます。',
+    // 左から右へ移動するタテの線 (the [x] option)
+    correctOptJa: '左から右へ移動するタテの線',
+    // カウントダウンする MASTER BPM の値 (a [ ] option -- device labels stay Latin)
+    wrongOptJa: 'カウントダウンする MASTER BPM の値',
+    // 移動するタテの線は再生位置を示しています。 (### Why)
+    noteJa: '移動するタテの線は再生位置を示しています。',
+  },
+  drill: {
+    route: '#/x/pad-04/d-2-03',
+    // ドラム＋パーカッションのループが安定して鳴り続けます。これが参考にするリズムです。
+    step1CheckJa: 'ドラム＋パーカッションのループが安定して鳴り続けます。これが参考にするリズムです。',
+  },
+};
+
+const JA_COURSE_BUNDLE_ASSERTION_NAME =
+  'ja course: the SHIPPED ja bundle carries the whole course -- #sxc1-exercise-stats reports 52 decks / 435 exercises and the pinned deck\'s title is its JAPANESE title (an EN-fallback ja bundle fails here)';
+const JA_COURSE_INDEX_ASSERTION_NAME =
+  'ja course: the deck index card, the deck page title and the deck summary: all render the corpus Japanese for the pinned deck';
+const JA_COURSE_QUIZ_RENDER_ASSERTION_NAME =
+  'ja course: a real corpus quiz renders in Japanese -- #ex-title, the #ex-stem question and BOTH pinned option labels are the corpus JA text';
+const JA_COURSE_QUIZ_COMPLETE_ASSERTION_NAME =
+  'ja course: completing that quiz in Japanese -- clicking the JA correct option grades Correct (JA feedback) and #ex-note renders the JA rationale';
+const JA_COURSE_DRILL_ASSERTION_NAME =
+  'ja course: a real corpus drill step shows its Japanese check: sentence in #ex-step-1-check';
+
 // Trusted keyboard input for a session: returns pressKey(key) driving the
 // full keyDown/keyUp pair through CDP's Input domain. 'Tab'/'Enter' are
 // the navigation/activation pair the keyboard flows live on; single
@@ -3524,6 +3601,137 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
   // fields -- the stats identity is the EN pass's claim.
   const jaResults = await runExerciseAssertions(h, fixture, null, coldLoadFn, 'ja');
   results.push(...jaResults);
+
+  // -- 6b (M6 W4). THE JA COURSE: real corpus text, from the bundle the
+  // site ships, all the way through completing a quiz in Japanese. Real
+  // run only -- the file:// self-test fixture has no corpus and no
+  // bundle at all, so its caller passes no `jaCorpus` (documented here,
+  // never a silent skip: without pins there is nothing to compare, and
+  // the assertions would be vacuous rather than absent). See
+  // JA_COURSE_PINS for why every expectation is a literal.
+  if (cfg && cfg.jaCorpus) {
+    const P = cfg.jaCorpus;
+
+    // (a) The bundle really is the JA course: totals + a JA deck title
+    // read straight out of #sxc1-exercise-stats, which the app computes
+    // from the bundle it FETCHED at boot.
+    await h.goto('#/x', '#sxc1-exercise-index');
+    const statsJa = await h.evaluate(`(() => {
+      const e = document.querySelector('#sxc1-exercise-stats');
+      try { return JSON.parse(e ? e.textContent : 'null'); } catch (err) { return null; }
+    })()`);
+    const pinnedDeckStats = statsJa && Array.isArray(statsJa.decks)
+      ? statsJa.decks.find((d) => d && d.deck === P.deck.slug) || null
+      : null;
+    report(
+      JA_COURSE_BUNDLE_ASSERTION_NAME,
+      Boolean(statsJa && statsJa.totals)
+        && statsJa.totals.decks === P.totals.decks
+        && statsJa.totals.exercises === P.totals.exercises
+        && Boolean(pinnedDeckStats)
+        && pinnedDeckStats.title === P.deck.titleJa,
+      { totals: statsJa && statsJa.totals, pinnedDeckStats, want: { totals: P.totals, title: P.deck.titleJa } },
+    );
+
+    // (b) The learner's way in: the deck card on #/x, then the deck page.
+    const deckCard = await h.evaluate(`(() => {
+      const a = Array.from(document.querySelectorAll('a.ex-deck-card'))
+        .find((el) => (el.getAttribute('href') || '').indexOf(${JSON.stringify(P.deck.route)}) !== -1);
+      return a ? a.textContent : null;
+    })()`);
+    await h.goto(P.deck.route, '#sxc1-deck');
+    const deckPageJa = await h.evaluate(`(() => ({
+      title: (document.querySelector('#ex-deck-title') || {}).textContent || null,
+      summary: (document.querySelector('#ex-deck-summary') || {}).textContent || null,
+    }))()`);
+    report(
+      JA_COURSE_INDEX_ASSERTION_NAME,
+      typeof deckCard === 'string' && deckCard.indexOf(P.deck.titleJa) !== -1
+        && Boolean(deckPageJa)
+        && deckPageJa.title === P.deck.titleJa
+        && typeof deckPageJa.summary === 'string' && deckPageJa.summary.indexOf(P.deck.summaryJa) !== -1,
+      { deckCard, deckPageJa, want: { title: P.deck.titleJa, summary: P.deck.summaryJa } },
+    );
+
+    // (c) The quiz screen itself: title, question, and BOTH pinned
+    // option labels (an EN-fallback bundle renders English here).
+    // NOTE the ready selectors: '#ex-title' / '#ex-step-1-check', NOT
+    // '.kind-quiz' / '.kind-drill'. A DECK page already carries a
+    // .kind-<kind> span per exercise link (View.Exercise.renderExLink),
+    // so navigating deck-page -> runner with a .kind-* ready selector
+    // returns true against the page we are LEAVING and reads the next
+    // element before the runner has rendered. Measured: that raced
+    // green on the root stage and red on the (slower) sub-path stage.
+    await h.goto(P.quiz.route, '#ex-title');
+    const quizJa = await h.evaluate(`(() => ({
+      title: (document.querySelector('#ex-title') || {}).textContent || null,
+      stem: (document.querySelector('#ex-stem') || {}).textContent || null,
+      options: Array.from(document.querySelectorAll('.ex-option')).map((b) => b.textContent.trim()),
+    }))()`);
+    const optionsJa = quizJa && Array.isArray(quizJa.options) ? quizJa.options : [];
+    report(
+      JA_COURSE_QUIZ_RENDER_ASSERTION_NAME,
+      Boolean(quizJa)
+        && quizJa.title === P.quiz.titleJa
+        && typeof quizJa.stem === 'string' && quizJa.stem.indexOf(P.quiz.stemJa) !== -1
+        && optionsJa.indexOf(P.quiz.correctOptJa) !== -1
+        && optionsJa.indexOf(P.quiz.wrongOptJa) !== -1,
+      { quizJa, want: { title: P.quiz.titleJa, stem: P.quiz.stemJa, correct: P.quiz.correctOptJa, wrong: P.quiz.wrongOptJa } },
+    );
+
+    // (d) COMPLETE it in Japanese: the option is located BY ITS JAPANESE
+    // LABEL (so a fallback bundle cannot even find something to click),
+    // graded by the real engine, and both the feedback and the rationale
+    // must come back Japanese.
+    const clickedJaOption = await h.evaluate(`(() => {
+      const b = Array.from(document.querySelectorAll('.ex-option'))
+        .find((el) => el.textContent.trim() === ${JSON.stringify(P.quiz.correctOptJa)});
+      if (!b) return false;
+      b.click();
+      return true;
+    })()`);
+    const submittedJa = clickedJaOption
+      ? await h.evaluate("(() => { const e = document.querySelector('#btn-ex-submit'); if (!e) return false; e.click(); return true; })()")
+      : false;
+    const gradedJa = submittedJa
+      ? await h.evaluate(`(async () => {
+          const start = Date.now();
+          while (Date.now() - start < 5000) {
+            const fb = document.querySelector('#ex-feedback');
+            if (fb && fb.textContent.indexOf(${JSON.stringify(UI_TEXT.ja.correctPrefix)}) === 0) break;
+            await new Promise((r) => setTimeout(r, 20));
+          }
+          const fb = document.querySelector('#ex-feedback');
+          const note = document.querySelector('#ex-note');
+          return {
+            feedback: fb ? fb.textContent : null,
+            feedbackClass: fb ? fb.className : null,
+            note: note ? note.textContent : null,
+          };
+        })()`)
+      : null;
+    report(
+      JA_COURSE_QUIZ_COMPLETE_ASSERTION_NAME,
+      clickedJaOption === true && submittedJa === true && Boolean(gradedJa)
+        && typeof gradedJa.feedback === 'string'
+        && gradedJa.feedback.indexOf(UI_TEXT.ja.correctPrefix) === 0
+        && gradedJa.feedbackClass === 'correct'
+        && typeof gradedJa.note === 'string'
+        && gradedJa.note.indexOf(P.quiz.noteJa) !== -1,
+      { clickedJaOption, submittedJa, gradedJa, wantFeedbackPrefix: UI_TEXT.ja.correctPrefix, wantNote: P.quiz.noteJa },
+    );
+
+    // (e) A drill step's check: sentence -- the field kind the ja:
+    // grammar treats as a FIELD variant rather than prose, so it is a
+    // genuinely different path through the emitter than (c)/(d).
+    await h.goto(P.drill.route, '#ex-step-1-check');
+    const drillCheckJa = await h.evaluate("(() => { const e = document.querySelector('#ex-step-1-check'); return e ? e.textContent : null; })()");
+    report(
+      JA_COURSE_DRILL_ASSERTION_NAME,
+      typeof drillCheckJa === 'string' && drillCheckJa.indexOf(P.drill.step1CheckJa) !== -1,
+      { drillCheckJa, want: P.drill.step1CheckJa },
+    );
+  }
 
   // -- 7. The verify line's learner-visible device sentence, in JA, in
   // its aria-live region (a11y parity for the no-fake idle state; the
@@ -7958,7 +8166,11 @@ async function main() {
           { evaluate, report, goto, click, clickAssert, assertElement, typeText, setMobileViewport, clearViewport, consoleHygiene, pressKey, reload, waitBooted },
           exerciseFixture,
           coldLoadFn,
-          { checkBundleFetch: true },
+          // M6 W4: jaCorpus turns on the five JA COURSE assertions --
+          // real corpus Japanese, from the bundle this server is
+          // actually serving (see JA_COURSE_PINS). The self-test
+          // fixture caller passes none: it has no corpus to render.
+          { checkBundleFetch: true, jaCorpus: JA_COURSE_PINS },
         );
       }
 

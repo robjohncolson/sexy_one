@@ -72,6 +72,7 @@ module SXC1.Exercise.Report
       , E_ID_NOT_IN_INVENTORY, E_ID_RETIRED, E_ID_TYPE_MISMATCH, E_ID_CHAPTER_MISMATCH
       , E_BLOCK_UNPARSED
       , E_DECK_TIER_UNKNOWN, E_DECK_REQUIRES_UNKNOWN, E_DECK_REQUIRES_CYCLE
+      , E_JA_MISSING
       )
   , StaticCode
   , IssueClass (..)
@@ -180,6 +181,12 @@ data StaticCode
   | E_ID_NOT_IN_INVENTORY_ | E_ID_RETIRED_ | E_ID_TYPE_MISMATCH_ | E_ID_CHAPTER_MISMATCH_
   | E_BLOCK_UNPARSED_
   | E_DECK_TIER_UNKNOWN_ | E_DECK_REQUIRES_UNKNOWN_ | E_DECK_REQUIRES_CYCLE_
+  -- M6 W4 (briefs/M6-plan.md ruling 2, "JA-completeness enforcement
+  -- flips from report-only to hard" at W3's completion): a LIVE deck
+  -- carries a learner-visible piece with no ja: variant. DIR-class,
+  -- like every other whole-corpus contract -- see
+  -- 'staticIssueClassOf' and @exercise-check@'s own 'jaScopedCodes'.
+  | E_JA_MISSING_
   deriving (Eq, Show, Enum, Bounded)
 
 data IssueCode
@@ -246,6 +253,8 @@ pattern E_DECK_TIER_UNKNOWN, E_DECK_REQUIRES_UNKNOWN, E_DECK_REQUIRES_CYCLE :: I
 pattern E_DECK_TIER_UNKNOWN     = Static E_DECK_TIER_UNKNOWN_
 pattern E_DECK_REQUIRES_UNKNOWN = Static E_DECK_REQUIRES_UNKNOWN_
 pattern E_DECK_REQUIRES_CYCLE   = Static E_DECK_REQUIRES_CYCLE_
+pattern E_JA_MISSING :: IssueCode
+pattern E_JA_MISSING = Static E_JA_MISSING_
 
 -- NOTE: deliberately NO {-# COMPLETE ... #-} pragma here (M3 gate fix --
 -- see the module Haddock above). 'codeText' and 'issueClassOf' match
@@ -323,6 +332,7 @@ staticCodeText c = case c of
   E_DECK_TIER_UNKNOWN_     -> "E-DECK-TIER-UNKNOWN"
   E_DECK_REQUIRES_UNKNOWN_ -> "E-DECK-REQUIRES-UNKNOWN"
   E_DECK_REQUIRES_CYCLE_   -> "E-DECK-REQUIRES-CYCLE"
+  E_JA_MISSING_            -> "E-JA-MISSING"
 
 issueClassOf :: IssueCode -> IssueClass
 issueClassOf (E_TERM _)  = FileClass
@@ -341,6 +351,13 @@ staticIssueClassOf c = case c of
   E_ID_CHAPTER_MISMATCH_   -> DirClass
   E_DECK_REQUIRES_UNKNOWN_ -> DirClass
   E_DECK_REQUIRES_CYCLE_   -> DirClass
+  -- M6 W4: DIR-class because the JA-completeness contract is scoped to
+  -- the LIVE corpus (the decks INDEX ships, which is what the bundle
+  -- emitter translates), never to a loose fixture file -- exactly the
+  -- scoping the four id-inventory checks and the two requires: checks
+  -- already have. A single .ex.md carrying no ja: line at all is not a
+  -- defect; a SHIPPING deck carrying none is.
+  E_JA_MISSING_            -> DirClass
   E_BLOCK_UNPARSED_        -> SeamClass
   _                        -> FileClass
 

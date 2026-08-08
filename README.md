@@ -1,8 +1,8 @@
 # SEXY ONE — a Casio SXC-1 trainer
 
-**SEXY ONE** is an unofficial English trainer and complete fan translation of the
-manuals for the [Casio SXC-1](https://www.casio.com/), a portable standalone sampler
-Casio sells only in Japan. Everything runs in your browser — the site is static files
+**SEXY ONE** is an unofficial bilingual (English / 日本語) trainer and complete fan
+translation of the manuals for the [Casio SXC-1](https://www.casio.com/), a portable
+standalone sampler Casio sells only in Japan. Everything runs in your browser — the site is static files
 with no server, no account and no analytics, and nothing you do in it ever leaves
 your machine.
 
@@ -17,12 +17,25 @@ and lookups (every one cites the manual page it teaches), or — in desktop Chro
 Edge — connect an SXC-1 over USB, click **Enable device verification** on a drill,
 and watch steps confirm themselves as you perform them on the real hardware.
 
+**日本語でも使えます — the whole thing runs in Japanese too.** Click **日本語** in the
+site header and the interface, all **435 exercises across 52 decks**, and the device
+messages switch to Japanese (**English** in the same place switches back). The
+manuals' original Japanese pages were always there; what M6 adds is the *course* in
+Japanese. Your choice is remembered in this browser, and **progress is shared between
+the languages** — the same exercise has the same id in both, so a prompt you answered
+in English is the same prompt when it comes up for review in Japanese. Switching to
+Japanese also suggests the reader's "Japanese first" mode the first time (a
+suggestion, not a lock — both preferences stay independently settable).
+
 ## For SXC-1 owners
 
 The manual reader keeps the original Japanese page one click away at all times, and
 a "Japanese first" reading preference makes the reader open the original page before
 the English translation — useful if you read Japanese and want the translation as
-the aid rather than the text. Your course progress lives only in your own browser;
+the aid rather than the text. If you would rather work entirely in Japanese, the
+**日本語** button in the header switches the interface *and the whole course*; every
+on-device label (`BANK`, `EDIT`, `SELECT BANK 1`, …) stays in Latin caps inside the
+Japanese text, exactly as the hardware prints it. Your course progress lives only in your own browser;
 **Export/Import** on the progress panel produces a small text blob you can copy by
 hand to move your history to another device, and that blob is the *only* way
 progress ever travels anywhere. Device verification — the trainer confirming drill
@@ -37,9 +50,11 @@ endorsed by, or sponsored by Casio**, and original manual content remains
 ## For developers
 
 The app is written in Haskell with [Miso](https://haskell-miso.org/) and compiled to
-WebAssembly by GHC's wasm backend; the manuals and exercise decks are embedded into
-the wasm at compile time, so the whole deployment is static files — zero servers,
-working unchanged at any sub-path or served locally. The project runs on a
+WebAssembly by GHC's wasm backend; the manuals are embedded into the wasm at compile
+time and the exercise decks are fetched at boot as one per-language text bundle
+(`content/content.{en,ja}.txt`, M6 — see [Status](#status)), so the whole deployment
+is still static files — zero servers, working unchanged at any sub-path or served
+locally. The project runs on a
 check-suite culture: nearly every claim in this README is enforced by a named check
 in `./scripts/check-site.sh`, which computes the content statistics three
 independent ways and drives the built site in headless Chrome before anything ships.
@@ -49,14 +64,50 @@ Start with [Prerequisites](#prerequisites) and [Build](#build) to build it yours
 
 ## Status
 
+**M6 (Japanese).** The course itself is now bilingual. The interface, every
+learner-visible string in all **435 exercises across 52 decks**, the device
+messages and the ARIA/live-region text all exist in Japanese, selectable at
+runtime from the header's **日本語** / **English** button and remembered in
+`sxc1.prefs` (`uiLang`, schema v2) plus a small `sxc1.uilang` boot hint. Three
+structural decisions carry it:
+
+* **The corpus left the wasm.** Doubling the embedded course would have broken
+  the frozen 1,000,000-byte gzip ceiling, so `content/exercises/` is now built
+  into two fetched text bundles (`site/public/content/content.{en,ja}.txt`) that
+  the app loads at boot behind the same JS-side guard the storage bridge uses —
+  a failed fetch degrades visibly (banner + retry) instead of killing boot. This
+  supersedes M3's "decks are embedded into the wasm at compile time" below, and
+  gave back ~74 KB gzipped before the Japanese UI strings added ~19 KB of it
+  back; see [Measured figures](#measured-figures).
+* **One file, one id, one registry.** The Japanese lives in the *same*
+  `.ex.md` files, on `ja:`-prefixed lines directly under the English they
+  replace (`content/EXERCISE-FORMAT.md` section 12), so prompt ids and counts
+  are identical across languages **by construction** — which is why progress is
+  shared between them and the id registry never had to change. `cite:`,
+  `verify:`, `find:` and the other structural fields are language-invariant and
+  the build refuses a variant on them.
+* **Completeness is enforced, not audited.** A learner-visible piece of a live
+  deck with no `ja:` variant is a hard `E-JA-MISSING` issue: `exercise-check`
+  exits non-zero and the gate goes red (see
+  [Validating exercise content](#validating-exercise-content) and
+  [Verification](#verification)). All 52 decks were translated with the original
+  Japanese manual pages and `translations/glossary.md` as ground truth for
+  terminology, then QA-verified deck by deck against the pages their exercises
+  cite.
+
+The gate grew to **109 checks** with **238 assertions per browser stage**, both
+stages now completing a real Japanese quiz out of the shipped `ja` bundle. The
+figures below are the M6 ship state; the milestone entries that follow are
+historical.
+
 **M5 (ship).** The closing milestone: the SEXY ONE rename, a full content audit
 (94% topic coverage, twelve citation defects found and fixed, hooks recalibrated
 to measured hardware behavior), the M1-era reader debts paid (Index linkified,
 list fragmentation fixed, breadcrumbs corrected), keyboard-only completion and
 screen-reader labels with focus management on advance, a mobile sweep that
 caught a clipped control, and the gate hardened to **99 checks** with pinned
-cardinality floors (175 assertions per browser stage, D1–D27). The figures
-below are the M5 ship state; the milestone entries that follow are historical.
+cardinality floors (175 assertions per browser stage, D1–D27) — the numbers as
+they stood at M5's close; M6 raised both (see above).
 
 **M4 (live-device verification).** The trainer can now confirm a drill step by
 watching the learner perform it on the real hardware: with a Casio SXC-1 connected
@@ -94,11 +145,12 @@ shipping — up from M2's 4-deck/16-exercise seed. Decks are grouped into **six 
 book's own progression — Preparation, Pad play, Sampling, Sequencer, Leveling up) and
 tagged `tier: intro | core | stretch` (14 / 32 / 6 decks respectively) for course-map
 navigation; 36 decks also carry an optional `requires:` list of deck-slug prerequisites.
-Decks are still embedded into the wasm at compile time, but no longer via one
-hand-written Template Haskell splice per file — `SXC1.Content.Embed.embedIndexedDir`
-reads `content/exercises/INDEX` at compile time and splices every listed file in one
-shot, so an author adding deck 53 only has to add it to `INDEX`, not to
-`site/app/Exercises/Embed.hs` by hand.
+Decks were embedded into the wasm at compile time through M5 — `INDEX`-driven, one
+Template Haskell splice for the whole directory rather than one per file — so an author
+adding deck 53 only had to add it to `INDEX`. **M6 moved them out of the wasm
+entirely** (see the M6 entry above): `INDEX` is still the single list an author edits,
+but it is now read at *build* time by `scripts/emit-content-bundles.py`, which writes
+the two fetched bundles.
 
 **Progress and spaced repetition.** Every graded prompt now feeds an integer SM-2
 scheduler (see [Progress, spaced repetition and the id registry](#progress-spaced-repetition-and-the-id-registry)
@@ -337,11 +389,13 @@ wasm-run.mjs "$BIN" --list-codes       # every issue code the validator can rais
 
 Every one of those has been run, in this order, from this repository's root, on this
 machine, against the full 52-deck/435-exercise course: the real-content run reports `0
-issue(s)`, `--self-test` passes `272/272` checks, `--fixtures` reports `55/55 fixtures
-passed`, and `--list-codes` prints 52 codes (up from M2's 48 — M3 added
+issue(s)`, `--self-test` passes `454/454` checks, `--fixtures` reports `56/56 fixtures
+passed`, and `--list-codes` prints 53 codes (up from M2's 48 — M3 added
 `E-DECK-TIER-UNKNOWN`, `E-DECK-REQUIRES-UNKNOWN`, `E-DECK-REQUIRES-CYCLE` and one more
-for id-registry/inventory cross-checking; run `--list-codes` yourself for the exact,
-current list rather than trusting this count to stay still).
+for id-registry/inventory cross-checking, and M6 added `E-JA-MISSING`; run
+`--list-codes` yourself for the exact, current list rather than trusting this count to
+stay still). Both directory flags default correctly from either the repository root or
+`site/`, so the same commands work from both.
 `./scripts/check-site.sh` runs the same validator (plus everything below) as part of its
 own gate — this is the escape hatch for checking content alone, without a full build and
 browser sweep, while iterating on a deck.
@@ -364,9 +418,29 @@ gap:
 3. **Three-way agreement**, mirroring the manual reader's own check above: the real
    Haskell validator (`exe:exercise-check --json`), an independent `python3`
    re-derivation of the same deck/exercise/citation counts straight from
-   `content/exercises/*.ex.md` (never from the Haskell side), and the running app's
-   embedded copy read out of `#sxc1-exercise-stats` in the live DOM must all agree, or
-   `check-site.sh` fails red instead of silently shipping a stale or miscounted build.
+   `content/exercises/*.ex.md` (never from the Haskell side), and the numbers the
+   running app computes from the bundle it *fetched at boot*, read out of
+   `#sxc1-exercise-stats` in the live DOM, must all agree, or `check-site.sh` fails red
+   instead of silently shipping a stale or miscounted build. (Since M6 the same
+   comparison also catches a stale **bundle**: `check-site.sh` re-emits both bundles
+   from `content/exercises/` and requires the shipped files to match byte for byte.)
+
+**Japanese completeness is part of this gate (M6).** Every learner-visible piece of
+every live deck — deck title, `summary:`, deck intro prose, exercise titles, body
+prose, *every* choice option, `### Why`/`### Hint`/`### Answer` prose, drill step prose
+and every step `check:` — must carry a `ja:` variant, or `exercise-check` reports
+**`E-JA-MISSING`** and exits non-zero. The rule is the bundle emitter's own
+substitution rule read backwards (the line directly below a learner-visible unit must
+be a `ja:` line), implemented independently in the checker, so "the check is green" and
+"that text is really Japanese in `content.ja.txt`" are the same statement. The
+exclusions are structural and exhaustive — the `### Why`-style role headings (the UI
+localizes those labels) and the language-invariant fields (`cite:`, `find:`, `verify:`,
+`type:`, `id:`, `deck:`, `chapter:`, `tier:`, `tags:`, `requires:`, `limit:`) — with no
+per-file opt-out anywhere. `--self-test` group 22 both sweeps all 52 live decks and
+carries one negative control per learner-visible kind (delete that kind's `ja:` line and
+exactly one `E-JA-MISSING` must fire, on the right line, naming the right kind), and
+`content/fixtures/dirs/E-JA-MISSING--untranslated-option/` is the standing falsifying
+example: a deck translated except for one option.
 
 ## Device verification
 
@@ -418,7 +492,8 @@ independent ways** and fails if any two disagree:
 
 1. **The real Haskell parser** — `exe:content-check`, a wasm32-wasi *command* module
    (not the reactor-model `exe:app`) run on the host by `wasm-run.mjs`, over the
-   TH-embedded corpus.
+   TH-embedded manual corpus (the *manuals* are still embedded; the exercise decks
+   moved out in M6 and have their own bundle-freshness check).
 2. **An independent regex sweep** — an embedded `python3` snippet that recomputes the
    same numbers straight from `translations/*.md` by regex, without going anywhere near
    the Haskell parser.
@@ -453,17 +528,48 @@ flow in a target with *no* fake injected at all, and requires it to land in "den
 and never confirm — because real headless Chrome denies the permission, a positive
 result anywhere else in the suite can only have come from the fake's scripted
 messages, never from the real API by accident. All of this sits inside
-`check-site.sh`'s ordinary gate (**99 checks** as of M5): the browser driver asserts
-**175 assertions per served stage** (**141** in `node scripts/browser-check.mjs
+`check-site.sh`'s ordinary gate (**109 checks** as of M6): the browser driver asserts
+**238 assertions per served stage** (**198** in `node scripts/browser-check.mjs
 --self-test`), and a named check-site check independently counts the 27 distinct
 `ok - D<n>` lines in the root stage's captured output — so silently unplugging the
 device suite from the driver turns check-site red even while the browser stages
-themselves stay green. `check-site.sh` also carries M4-specific structural checks: the
+themselves stay green. The device sentences are asserted in **both languages**: the
+Japanese status, waiting and confirmed lines (including the JA renderer for a
+`verify:` spec) are pinned by their own stage. `check-site.sh` also carries M4-specific structural checks: the
 fake exists and names its whole driver surface, the fake is **never** shipped (no
 `fake-midi.js` under `site/public/` or `site/static/`), `requestMIDIAccess` has exactly
 one call site (in `site/app/Device/Midi.hs`) carrying `sysex: False`, no network-egress
 primitive appears anywhere in `site/app/`, and the frozen size ceiling and M4 budget
 file are intact and authorised.
+
+**How both languages are proven (M6).** Being able to *serve* a Japanese bundle is not
+the same as the Japanese course working, so the gate checks the course, not the file:
+
+* **The UI, twice.** The entire exercise/a11y assertion set runs a second time with
+  `uiLang=ja` — the same assertion code parameterised by language, never a duplicated
+  copy — so every learner-visible string it pins (grading feedback, the device
+  sentences, ARIA names, the keyboard-only flows) is pinned in Japanese too.
+* **The switch itself.** A dedicated stage drives a *fresh profile* through the real
+  header button: boot English fetching `content.en.txt`, click **日本語**, and the app
+  persists the preference and reloads — the reload *is* the refetch, proven by the new
+  document's own resource entries naming `content.ja.txt` and not `content.en.txt` —
+  then Japanese header, the one-time "Japanese first" suggestion, a Japanese device
+  flow, and back to English.
+* **The course, from the shipped bundle.** Five assertions in both full stages open the
+  Japanese course the site actually ships: `#sxc1-exercise-stats` must report 52 decks
+  and 435 exercises *and* the pinned deck's **Japanese** title; the deck index card,
+  deck page title and deck `summary:` must be the corpus Japanese; a real corpus quiz
+  must render its Japanese title, question and both pinned option labels, and — clicked
+  **by its Japanese label** — grade to the Japanese "correct" feedback with the Japanese
+  rationale; and a real corpus drill step must show its Japanese `check:` sentence.
+  Every expectation is a literal copied out of `content/exercises/`, never derived from
+  the bundle under test: that is what makes a silently English-fallback `ja` bundle
+  (the emitter's documented degenerate case, and exactly what `content.ja.txt` was
+  before the decks were translated) turn red instead of agreeing with itself. It was
+  demonstrated red that way — a served copy whose `content.ja.txt` was the English
+  emission relabelled `ja` failed exactly those five assertions and nothing else — and
+  a named check-site check counts them *by name* in each stage's capture, so removing
+  them cannot hide under the per-stage assertion floor.
 
 ## Progress, spaced repetition and the id registry
 
@@ -998,9 +1104,9 @@ above. The same built `site/public/` bundle is also deployed to Vercel (project
 
 <a id="measured-figures"></a>
 
-Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), at M5's close,
-against the full 52-deck/435-exercise course (rows measured at an earlier
-milestone's close say so):
+Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), at M6's close,
+against the full 52-deck/435-exercise course in **both languages** (rows measured at
+an earlier milestone's close say so):
 
 | Metric | Value |
 |---|---|
@@ -1008,18 +1114,25 @@ milestone's close say so):
 | Warm build, unoptimized (nothing changed) | <1s |
 | Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time; `-Oz --converge` iterates to a fixed point, so it costs more than M3's `-O2` ~5s: the `wasm-opt` pass alone measures ≈11s on this machine) | ~15s |
 | `app.wasm`, unoptimized default build (`build-site.sh`, no flags; measured at M3's close — M4 ships only the optimized flavour, and grew, so this is still *over* the ceiling) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
-| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M5 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `933305`) | 2,662,016 bytes raw / **933,305 bytes gzipped** |
+| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M6 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `879161`) | 2,439,911 bytes raw / **879,161 bytes gzipped** |
+| `app.wasm` at M5's close, for comparison (the pre-externalization baseline `briefs/M6-budget.json` records as `m5_final`) | 2,662,016 bytes raw / 933,305 bytes gzipped |
+| M6 gzip delta over the M5 close: corpus externalization **−73,560**, then the JA UI string table **+19,416** | **−54,144 bytes** net — no new wasm ceiling was granted or needed |
+| `content/content.en.txt` (the EN exercise bundle the app fetches at boot) | 284,108 bytes raw / **76,602 bytes gzipped** |
+| `content/content.ja.txt` (the JA bundle — real Japanese for all 52 decks, not an EN fallback) | 358,497 bytes raw / **91,130 bytes gzipped** |
+| Combined bundle gzip against `M6_BUNDLE_CEILING` (pinned in `check-site.sh`, recorded in `briefs/M6-budget.json`, logged to `state/bundle-ledger.tsv` every run) | **167,732 / 300,000 bytes** — 132,268 of headroom |
 | M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json`; M4 closed at 927,008) | **+36,295 bytes** — inside M4's 42,000-byte budget |
 | M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
-| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 66,695 bytes of headroom remain |
+| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 120,839 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,234,536 bytes (≈12.2 MB) |
-| `check-site.sh`, full run (**99** checks, both browser sweeps of 108 routes, **175** browser assertions per served stage incl. the D1–D27 device suite) | ≈65s |
-| `node scripts/browser-check.mjs --self-test` | **141/141** assertions |
-| `exe:progress-check --self-test` | **84/84** checks |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,664,413 bytes (≈12.7 MB) |
+| `check-site.sh`, full run (**109** checks, both browser sweeps of 108 routes, **238** browser assertions per served stage incl. the D1–D27 device suite and the JA course) | ≈78s |
+| Per-stage browser floor / JA course floor (pinned in `check-site.sh`; floors, never equalities) | **238** assertions per stage / **5** named `ja course:` assertions per stage |
+| `node scripts/browser-check.mjs --self-test` / `--self-test-negative` | **198/198** assertions / **42/42** sabotage passes, each catching exactly its own mapped assertion(s) |
+| `exe:content-check --self-test` | **412/412** checks |
+| `exe:progress-check --self-test` | **91/91** checks |
 | `exe:registry-check` (real tree) / `--self-test` | **8/8** (435 corpus / 440 registry) / **16/16** |
-| `exe:exercise-check` real-content / `--self-test` / `--fixtures` / `--list-codes` | 0 issues / **382/382** (incl. the **110**-assertion M4 group grounding `SXC1.Midi.Spec` against `translations/midi.md`) / **55/55** fixtures / 52 codes |
+| `exe:exercise-check` real-content / `--self-test` / `--fixtures` / `--list-codes` | 0 issues / **454/454** (incl. the **110**-assertion M4 group grounding `SXC1.Midi.Spec` against `translations/midi.md` and the **64**-check M6 JA-completeness group) / **56/56** fixtures / 53 codes |
 
 The *unoptimized* `app.wasm` gzip figure above is a range, not a single number,
 deliberately: this project observed a few hundred bytes of run-to-run jitter across
@@ -1040,7 +1153,9 @@ gzipped baseline mainly for two reasons: the course grew from 4 decks/16 exercis
 `.ex.md`), and the M3 progress engine (`SXC1.Progress.*`, `Progress/Store.hs`,
 `View/Progress.hs`) added roughly another 34 KB gzipped; M4's device layer
 (`site/app/Device/Midi.hs`, `SXC1.Midi.Spec`, the device panel) added the **+36,295**
-gzipped bytes recorded above. See
+gzipped bytes recorded above. **M6 reversed the first of those two causes**: the course
+is no longer inside `app.wasm` at all (it is fetched as the two bundles in the table),
+which is what paid for a second full language without touching the frozen ceiling. See
 [Status](#status) for the full size story and why CI now builds the `--optimize`d
 flavour. `site/public/` stays well inside GitHub Pages' 1 GB artifact limit either way.
 

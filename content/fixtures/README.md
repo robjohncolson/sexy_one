@@ -42,6 +42,28 @@ trick that hides anything: it is a real, on-disk content root, validated by the 
 documented contract for what counts as a "real" content path. Verified empirically
 (each of the four passes with exactly its intended code and no other).
 
+## `E-JA-MISSING--untranslated-option` (M6 W4)
+
+`E-JA-MISSING` is a `dirs/` fixture for the same reason the four above are: JA
+completeness (`content/EXERCISE-FORMAT.md` section 12) is a property of the
+**live corpus** — the decks `INDEX` ships are the decks the bundle emitter
+translates — not of a single file. `site/test/CheckExercises.hs` scopes it
+structurally, per run (`jaScopedCodes`/`BindScope`), which is what keeps the
+other fifty-odd fixtures (none of which carries a single `ja:` line) reporting
+exactly the one code their own filename declares.
+
+This fixture's deck is fully translated **except one `- [ ] \`B\`` option**, so
+it reports exactly one `E-JA-MISSING` and nothing else — and it is also a
+standing demonstration that the check can fail at all. (The per-unit-kind
+demonstrations — one for each of the nine learner-visible kinds — live in
+`exercise-check --self-test` group 22.)
+
+Note also that the `isRealContentPath` mechanism the section above describes was
+replaced in M5 by a structural, per-run scope (`inventoryScopedCodes`): a
+`dirs/` fixture now opts into the inventory-binding checks by the code its own
+name declares, not by how its path is spelled. The four fixtures keep their
+`...-content` names for continuity; the naming is no longer load-bearing.
+
 ## Historical: the `E-FILE-BAD-NAME` contamination defect (fixed)
 
 Between the `format-guide` task and the M2 gate-fix round, `exercise-check --fixtures
