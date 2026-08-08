@@ -10,6 +10,7 @@
 -- copy, button labels) -- never manual content.
 module View.Pages
   ( viewRoute
+  , contentDegradedView
   ) where
 
 import           Data.List              (find)
@@ -51,19 +52,58 @@ viewRoute
   -> T.Text                     -- ^ #sxc1-prompt-baseline JSON (M2 re-gate: see Main.promptBaselineJson)
   -> T.Text                     -- ^ #sxc1-progress JSON (M3: see Main.progressJson)
   -> T.Text                     -- ^ #sxc1-device-state JSON (M4: see Main.deviceStateJson)
+  -> Maybe T.Text               -- ^ M6: 'Just' the content-bundle load-failure reason -- renders the
+                                --   visible \#sxc1-content-error banner on EVERY route (never rendered,
+                                --   not merely hidden, on a healthy boot)
   -> Maybe (View model action)  -- ^ the exercise body, when the route calls for one
   -> Route
   -> View model action
-viewRoute toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mExerciseBody route = H.main_ [ P.id_ "app" ]
-  [ headerView ph pd route
-  , statsView
-  , exerciseStatsView exStatsJson
-  , eventLogView eventLogJson
-  , promptBaselineView baselineJson
-  , progressPayloadView progressJson
-  , deviceStateView deviceJson
-  , routeBody toggleAction ph pd mExerciseBody route
-  , footerView
+viewRoute toggleAction ph pd exStatsJson eventLogJson baselineJson progressJson deviceJson mContentErr mExerciseBody route = H.main_ [ P.id_ "app" ]
+  ( headerView ph pd route
+  : contentErrorBanner mContentErr
+  ++ [ statsView
+     , exerciseStatsView exStatsJson
+     , eventLogView eventLogJson
+     , promptBaselineView baselineJson
+     , progressPayloadView progressJson
+     , deviceStateView deviceJson
+     , routeBody toggleAction ph pd mExerciseBody route
+     , footerView
+     ]
+  )
+
+--------------------------------------------------------------------------
+-- M6 W1 (briefs/M6-plan.md, ruling 1): the DEGRADED content state. The
+-- exercise corpus is loaded at boot (site/static/index.js +
+-- Exercises.Bundle); when that load fails the app must still boot, name
+-- the failure visibly, keep the manuals fully working, and offer a
+-- retry. Two pieces:
+--   * 'contentErrorBanner' -- a VISIBLE role="alert" banner under the
+--     header, on every route, naming the failure. Absent entirely (not
+--     hidden) on a healthy boot -- the harness asserts both directions.
+--   * 'contentDegradedView' -- what Main.exerciseBodyView renders on
+--     the three exercise routes instead of an empty index/deck/runner.
+--     #btn-content-retry is handled JS-side (site/static/index.js
+--     click delegation -> location.reload()), like the wipe-confirm
+--     toggle: a reload re-runs the guarded boot-time load, which is
+--     the retry.
+--------------------------------------------------------------------------
+
+contentErrorBanner :: Maybe T.Text -> [View model action]
+contentErrorBanner Nothing    = []
+contentErrorBanner (Just err) =
+  [ H.div_ [ P.id_ "sxc1-content-error", textProp "role" "alert" ]
+      [ text (ms ("Exercise content failed to load: " <> err
+                    <> " — the manuals are unaffected; training exercises are temporarily unavailable.")) ]
+  ]
+
+contentDegradedView :: T.Text -> View model action
+contentDegradedView err = H.section_ [ P.id_ "sxc1-exercise-degraded" ]
+  [ H.h1_ [] [ "Training is unavailable" ]
+  , H.p_ [] [ text (ms ("The exercise content bundle could not be loaded: " <> err)) ]
+  , H.p_ [] [ "The manuals are unaffected and remain fully readable." ]
+  , H.button_ [ P.id_ "btn-content-retry" ] [ "Reload and try again" ]
+  , H.p_ [] [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RHome)) ] [ "Back to the manuals" ] ]
   ]
 
 routeBody :: action -> ProgHandlers action -> ProgData -> Maybe (View model action) -> Route -> View model action

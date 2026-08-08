@@ -40,7 +40,8 @@ import           SXC1.Content.Types     (Block (..))
 import           SXC1.Exercise.Engine
 import           SXC1.Exercise.Lint
 import           SXC1.Exercise.Parse
-import           SXC1.Exercise.Reader   (readDeck)
+import           SXC1.Exercise.Reader   (DeckSyn (..), ExSyn (..), FieldLine (..), StepSyn (..),
+                                          readDeck, readDeckSyn)
 import           SXC1.Exercise.Report
 import           SXC1.Exercise.Types
 import           SXC1.Exercise.Verify
@@ -741,10 +742,11 @@ stLabel 17 = "17. M3: SXC1.Exercise.Reader.readDeck agrees with parseDeck over t
 stLabel 18 = "18. M3: INDEX-driven embedding -- embeddable deck count == non-comment INDEX lines"
 stLabel 19 = "19. M3: StaticCode totality sweep (codeText/issueClassOf WHNF non-empty for every allIssueCodes member)"
 stLabel 20 = "20. M4: SXC1.Midi.Spec vs translations/midi.md -- decode/match/pads/ports/describe + the six live verify: hooks"
+stLabel 21 = "21. M6: `ja:` variant lines -- skipped for EN (byte-identical Deck), invisible to the validator, line numbers preserved"
 stLabel n  = show n ++ ". ?"
 
 stMaxGroup :: Int
-stMaxGroup = 20
+stMaxGroup = 21
 
 stGroupsAllOk :: Int -> [STCheck] -> Bool
 stGroupsAllOk maxG cs = all oneGroupOk [1 .. maxG]
@@ -764,6 +766,7 @@ runSelfTest = do
         , clockChecks, routeStrictnessChecks
         , agreementChecks, indexCountChecks, staticCodeTotalityChecks
         , midiSpecCks
+        , jaVariantChecks
         ]
   forM_ [1 .. stMaxGroup] $ \g -> do
     let inGroup = filter ((== g) . stGroup) allChecks
@@ -1074,6 +1077,188 @@ grammarChecks =
 
 insertAfter :: Text -> Text -> [Text] -> [Text]
 insertAfter anchor new = concatMap (\l -> if l == anchor then [l, new] else [l])
+
+--------------------------------------------------------------------------
+-- Group 21 (M6 W1): the bilingual `ja:` variant-line contract
+-- (briefs/M6-plan.md, ruling 2 + wave W1). A column-0 line beginning
+-- "ja:" is a JAPANESE VARIANT of the learner-visible line(s) directly
+-- above it. The STRUCTURAL Reader must skip such lines entirely, so:
+--   * the Deck built from a ja:-annotated file is EQUAL to the Deck
+--     built from the same file with every ja: line deleted (the EN
+--     emission -- byte-identical EN behavior);
+--   * the frozen validator (SXC1.Exercise.Parse, which consumes the
+--     Reader's DeckSyn and never re-scans raw text) reports ZERO issues
+--     for a well-formed ja:-annotated deck -- no E-FIELD-UNKNOWN for a
+--     "ja" field key, no E-CHOICE-COUNT from a ja: line splitting a
+--     task-list run;
+--   * issue LINE NUMBERS still point at the ORIGINAL file's lines (the
+--     Reader filters ja: lines out of the numbered stream, it never
+--     renumbers what remains);
+--   * the raw ja: lines are carried on DeckSyn ('synJaLines', original
+--     line number + payload) for wave-3's completeness/terminology
+--     validation to consume without re-scanning.
+-- Checks 1-4 were demonstrated RED against the pre-M6 Reader (which
+-- collected "ja" as a field key and let ja: lines split choice runs)
+-- before the Reader change landed -- see the M6 W1 report.
+--------------------------------------------------------------------------
+
+-- | Mirrors the Reader's own variant-line rule (column-0 @ja:@ prefix).
+isJaVariantLine :: Text -> Bool
+isJaVariantLine l = "ja:" `T.isPrefixOf` l
+
+-- | A well-formed two-exercise deck (choice quiz + two-step drill) with
+-- a @ja:@ variant attached to EVERY learner-visible line kind the format
+-- has: deck title, deck summary, deck intro prose, exercise titles,
+-- prompt prose, option lines, a Why block, step check: fields and step
+-- body prose. cite:/verify:/type:/id:/deck:/chapter:/tier: carry NO
+-- variants -- they are language-invariant by ruling 2.
+jaAnnotatedLines :: [Text]
+jaAnnotatedLines =
+  [ "# Choosing a bank"
+  , "ja: # バンクの選択"
+  , ""
+  , "deck: st-ja-variants"
+  , "chapter: Part: Pad play"
+  , "tier: core"
+  , "summary: Choose BANK 1 in Performance mode and read the bank indicator."
+  , "ja: summary: パフォーマンスモードで BANK 1 を選び、バンク表示を読み取る。"
+  , "cite: guide-book 15 \"First, select BANK 1\""
+  , ""
+  , "Before you start, turn the unit on."
+  , "ja: 始める前に、本体の電源を入れてください。"
+  , ""
+  , "## Which button returns you to BANK 1"
+  , "ja: ## どのボタンで BANK 1 に戻りますか"
+  , ""
+  , "type: quiz"
+  , "id: st-ja-quiz"
+  , "cite: guide-book 15 \"press the `A` button\""
+  , ""
+  , "Which single button do you press to start selecting BANK 1?"
+  , "ja: BANK 1 の選択を始めるには、どのボタンを押しますか。"
+  , ""
+  , "- [x] `A`"
+  , "ja: - [x] `A`"
+  , "- [ ] `B`"
+  , "ja: - [ ] `B`"
+  , ""
+  , "### Why"
+  , ""
+  , "Pressing `A` shows `SELECT BANK 1` on the display."
+  , "ja: `A` を押すと `SELECT BANK 1` と表示されます。"
+  , ""
+  , "## Tap the pads and listen"
+  , "ja: ## パッドを叩いて聞く"
+  , ""
+  , "type: drill"
+  , "id: st-ja-drill"
+  , "cite: guide-book 17 \"Tap the pads to make sounds\""
+  , ""
+  , "Tap pads in BANK 1."
+  , "ja: BANK 1 のパッドを叩きます。"
+  , ""
+  , "### Step"
+  , ""
+  , "cite: guide-book 17 \"Tap the pads to make sounds\""
+  , "check: The pad lights white while the sound plays."
+  , "ja: check: 音が鳴っている間、パッドが白く光ります。"
+  , ""
+  , "Tap pad `1`."
+  , "ja: パッド `1` を叩きます。"
+  , ""
+  , "### Step"
+  , ""
+  , "cite: guide-book 17 \"Tap the pads to make sounds\""
+  , "check: The loop repeats until you tap the pad again."
+  , "ja: check: もう一度パッドを叩くまでループします。"
+  , ""
+  , "Tap pad `13`."
+  , "ja: パッド `13` を叩きます。"
+  ]
+
+-- | The EN emission of 'jaAnnotatedLines': every ja: line deleted,
+-- nothing else touched -- exactly what build-site's bundle emitter
+-- produces for the EN bundle.
+jaStrippedLines :: [Text]
+jaStrippedLines = filter (not . isJaVariantLine) jaAnnotatedLines
+
+-- | Line-number preservation fixture: the ONE real issue (a misspelled
+-- @summry:@ field) sits on ORIGINAL line 9, below two ja: lines (lines
+-- 2 and 8). The validator must report exactly one E-FIELD-UNKNOWN at
+-- line 9 -- not a second one for a "ja" field key, and not a shifted
+-- line number from a renumbered stream.
+jaUnknownFieldLines :: [Text]
+jaUnknownFieldLines =
+  [ "# Title"                                        -- line 1
+  , "ja: # タイトル"                                  -- line 2
+  , ""                                               -- line 3
+  , "deck: st-ja-lines"                              -- line 4
+  , "chapter: Part: Pad play"                        -- line 5
+  , "tier: core"                                     -- line 6
+  , "summary: A line-number preservation fixture."   -- line 7
+  , "ja: summary: 行番号の検査。"                      -- line 8
+  , "summry: a misspelled field"                     -- line 9  <- the one real issue
+  , "cite: guide-book 15 \"First, select BANK 1\""   -- line 10
+  , ""
+  , "## One quiz"
+  , ""
+  , "type: quiz"
+  , "id: st-ja-lines-quiz"
+  , "cite: guide-book 15 \"press the `A` button\""
+  , ""
+  , "Which button?"
+  , ""
+  , "- [x] `A`"
+  , "- [ ] `B`"
+  ]
+
+jaVariantChecks :: [STCheck]
+jaVariantChecks =
+  [ let ann = readDeck validFp (joinL jaAnnotatedLines)
+        en  = readDeck validFp (joinL jaStrippedLines)
+    in mkST 21 "ja/readDeck-equal-to-stripped"
+         (ann == en && ann /= Nothing)
+         ("annotated parse " ++ (case ann of { Just _ -> "Just"; Nothing -> "Nothing" })
+            ++ (if ann == en then " == " else " /= ") ++ "stripped parse")
+
+  , let (issues, _) = parseDeck validFp (joinL jaAnnotatedLines)
+    in mkST 21 "ja/parseDeck-zero-issues"
+         (null issues)
+         ("codes=" ++ show (map (T.unpack . isCode) issues))
+
+  , let optCount = do
+          d  <- readDeck validFp (joinL jaAnnotatedLines)
+          e0 <- case dkExercises d of { (e : _) -> Just e; [] -> Nothing }
+          p0 <- case exPrompts e0 of { (p : _) -> Just p; [] -> Nothing }
+          case prBody p0 of { Choice opts -> Just (length opts); _ -> Nothing }
+    in mkST 21 "ja/choice-options-preserved"
+         (optCount == Just 2)
+         ("interleaved ja: lines must not split the task-list run; option count = " ++ show optCount)
+
+  , let (issues, _) = parseDeck validFp (joinL jaUnknownFieldLines)
+        got = [ (T.unpack (isCode i), isLine i) | i <- issues ]
+    in mkST 21 "ja/issue-lines-point-at-original"
+         (got == [("E-FIELD-UNKNOWN", 9)])
+         ("want exactly [(\"E-FIELD-UNKNOWN\",9)] (original numbering), got " ++ show got)
+
+  , let syn  = readDeckSyn validFp (joinL jaAnnotatedLines)
+        want = [ (i, jaPayload l)
+               | (i, l) <- zip [1 :: Int ..] jaAnnotatedLines, isJaVariantLine l ]
+        jaPayload l = let rest = T.drop 3 l in maybe rest id (T.stripPrefix " " rest)
+    in mkST 21 "ja/synJaLines-captured"
+         (synJaLines syn == want)
+         ("synJaLines must carry every ja: line as (original line number, payload); got "
+            ++ show (length (synJaLines syn)) ++ " of " ++ show (length want))
+
+  , let syn = readDeckSyn validFp (joinL jaAnnotatedLines)
+        allFieldLines = synDeckFields syn
+          ++ concat [ synExFields e ++ concatMap synStFields (synExSteps e) | e <- synExercises syn ]
+        jaKeyed = [ flKey f | f <- allFieldLines, flKey f == "ja" ]
+    in mkST 21 "ja/no-ja-fieldline-leaks-to-validator"
+         (null jaKeyed)
+         ("no FieldLine with key \"ja\" may reach the validator's field blocks; got "
+            ++ show (length jaKeyed))
+  ]
 
 --------------------------------------------------------------------------
 -- Group 2: NEW12-safe runner demonstration (mirrors CheckContent.hs's

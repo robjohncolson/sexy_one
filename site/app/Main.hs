@@ -30,11 +30,12 @@ import           Progress.Store         (loadPrefs, loadProgress, loadRaw, saveP
 import           Device.Midi            (DeviceStatus (..), DeviceVerifier (..), Hub,
                                          HubSnapshot (..), hubDisable, hubEnable, hubSetChannel,
                                          hubSnapshot, newHub, statusText, webMidiVerifier)
-import           Exercises.Corpus       (exerciseCorpus, exerciseStatsJson, jArr, jBool, jInt, jInteger, jKV, jObj,
+import           Exercises.Bundle       (loadDeckSources)
+import           Exercises.Corpus       (exerciseCorpusOf, exerciseStatsJsonOf, jArr, jBool, jInt, jInteger, jKV, jObj,
                                           jStr)
 import           View.Exercise          (DevView (..), ExHandlers (..))
 import qualified View.Exercise          as Exercise
-import           View.Pages             (viewRoute)
+import           View.Pages             (contentDegradedView, viewRoute)
 import           View.Progress          (ProgData (..), ProgHandlers (..))
 
 -- | Read window.location.hash via Miso's own DSL.
@@ -311,6 +312,21 @@ main :: IO ()
 main = do
   h    <- currentHash
   sink <- mkProgressSink
+  -- M6 W1 (briefs/M6-plan.md, ruling 1): the exercise corpus arrives
+  -- through the static shell's JS-side-guarded loader ("Exercises.
+  -- Bundle") instead of a TH splice. Read ONCE, here, before the app
+  -- starts; a failure yields an EMPTY corpus plus the failure reason,
+  -- and the app boots into a visible degraded state (banner + per-route
+  -- notice with a retry affordance) -- the manuals, which stay
+  -- embedded, are unaffected. Retry is a plain page reload, delegated
+  -- JS-side in site/static/index.js (#btn-content-retry), so the
+  -- re-load takes exactly this same boot path again.
+  bootContent <- loadDeckSources
+  let (deckSrcs, mContentErr) = case bootContent of
+        Right srcs -> (srcs, Nothing)
+        Left err   -> ([], Just err)
+      corpus     = exerciseCorpusOf deckSrcs
+      exStatsTxt = exerciseStatsJsonOf deckSrcs
   -- M4: the device hub. 'newHub' and 'dvAvailable' are feature detection
   -- ONLY (they read navigator.requestMIDIAccess and test undefined/null;
   -- they never call it), so both stay safe at boot -- the permission
@@ -337,7 +353,7 @@ main = do
   prefs   <- loadPrefs
   (_, WallMs wall0) <- readClocks
   let st0 = case loadRes of { DecodeOk s -> s; _ -> emptyProgress }
-  startApp defaultEvents (readerApp sink dev supported snap0 avail loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
+  startApp defaultEvents (readerApp corpus exStatsTxt mContentErr sink dev supported snap0 avail loadRes rawBlob st0 prefs (dayOf wall0) (parseRoute h))
 
 -- | H6: a cold @RExercise@ route (a deep link, or the very first paint --
 -- Miso's own \"hashchange\" DOM event never fires for the page's INITIAL
@@ -353,10 +369,11 @@ main = do
 -- runtime age as prompt age only because the browser's monotonic origin
 -- is page load -- see this task's final report).
 readerApp
-  :: ProgressSink -> DevCtx -> Bool -> HubSnapshot -> Bool -> DecodeResult -> Maybe Text -> ProgressState -> Prefs -> DayNum -> Route
+  :: [Deck] -> Text -> Maybe Text
+  -> ProgressSink -> DevCtx -> Bool -> HubSnapshot -> Bool -> DecodeResult -> Maybe Text -> ProgressState -> Prefs -> DayNum -> Route
   -> App Model Action
-readerApp sink dev supported snap0 avail loadRes rawBlob st0 prefs today0 r0 =
-  (component model0 (updateModel sink dev) viewModel)
+readerApp corpus exStatsTxt mContentErr sink dev supported snap0 avail loadRes rawBlob st0 prefs today0 r0 =
+  (component model0 (updateModel corpus sink dev) (viewModel corpus exStatsTxt mContentErr))
     { subs  = [ windowSub "hashchange" emptyDecoder (const HashChanged) ]
     , mount = Just (SetRoute r0)
     }
@@ -378,8 +395,8 @@ safeIndexL xs i
   | i < 0     = Nothing
   | otherwise = case drop i xs of { (x : _) -> Just x; [] -> Nothing }
 
-updateModel :: ProgressSink -> DevCtx -> Action -> Effect parent props Model Action
-updateModel sink dev = \case
+updateModel :: [Deck] -> ProgressSink -> DevCtx -> Action -> Effect parent props Model Action
+updateModel corpus sink dev = \case
   HashChanged ->
     io (SetRoute . parseRoute <$> currentHash)
 
@@ -407,7 +424,7 @@ updateModel sink dev = \case
         modify (\m -> m { mRoute = r', mBooted = True })
         io_ (setHash (renderRoute r'))
       _ -> modify (\m -> m { mRoute = r, mBooted = True })
-    beginIfNeeded r
+    beginIfNeeded corpus r
     io_ (scrollIntoView "app")
     -- NEW13: mToday was captured once at startup and previously only
     -- advanced from later events' own peAt -- an open tab crossing UTC
@@ -416,11 +433,11 @@ updateModel sink dev = \case
     io (do { (_, WallMs w) <- readClocks; pure (Prog (PSetToday (dayOf w))) })
     -- M4: a route move can change which prompt (if any) should be
     -- watched -- see 'reconcileEff'.
-    reconcileEff dev
+    reconcileEff corpus dev
 
   Prog op -> handleProg op
 
-  Dev op -> handleDev sink dev op
+  Dev op -> handleDev corpus sink dev op
 
   ToggleJA -> do
     r <- gets mRoute
@@ -432,10 +449,10 @@ updateModel sink dev = \case
       _ -> pure ()
 
   ExBatch exid acts -> do
-    applyExActions sink exid acts
+    applyExActions corpus sink exid acts
     -- M4: a batch can move the cursor (ConfirmStep/Advance/Restart/
     -- Begin), which changes which prompt should be watched.
-    reconcileEff dev
+    reconcileEff corpus dev
 
   ExClocked exid mk -> io $ do
     (mono, wall) <- readClocks
@@ -500,8 +517,8 @@ handleProg op = case op of
 -- hidden #sxc1-device-state payload.
 --------------------------------------------------------------------------
 
-handleDev :: ProgressSink -> DevCtx -> DeviceOp -> Effect parent props Model Action
-handleDev sink dev op = case op of
+handleDev :: [Deck] -> ProgressSink -> DevCtx -> DeviceOp -> Effect parent props Model Action
+handleDev corpus sink dev op = case op of
   -- #btn-device-enable. When already granted the same button disables
   -- (its label tracks the status): run the active watch's remover (a
   -- no-op if none), clear the bookkeeping, and tear the JS side down --
@@ -530,7 +547,7 @@ handleDev sink dev op = case op of
           -- hub event (grant, deny, hot-plug rebind, message) re-syncs
           -- the model's mirror through the component's own sink.
           hubEnable (dcHub dev) (syncDevice dev snk)
-      reconcileWatch dev m snk
+      reconcileWatch corpus dev m snk
       syncDevice dev snk
 
   DSetChannel c -> withSink $ \snk -> do
@@ -592,8 +609,8 @@ handleDev sink dev op = case op of
     case guardedConfirmIx m exid pidText gen of
       Nothing -> pure ()
       Just i  -> do
-        applyExActions sink exid [ConfirmStep i src mono wall, Advance mono wall]
-        reconcileEff dev
+        applyExActions corpus sink exid [ConfirmStep i src mono wall, Advance mono wall]
+        reconcileEff corpus dev
 
 -- | The FULL stale-confirm guard (briefs/M4-codex-gate1.json, HIGH
 -- finding), shared verbatim by both hops of the confirm path: 'Just'
@@ -643,17 +660,17 @@ syncDevice dev snk = do
 -- watched. Registering a watch touches no JS and is legal before
 -- enabling ("watching before enabling is legal and simply never
 -- fires"), so this runs unconditionally.
-reconcileEff :: DevCtx -> Effect parent props Model Action
-reconcileEff dev = do
+reconcileEff :: [Deck] -> DevCtx -> Effect parent props Model Action
+reconcileEff corpus dev = do
   m <- get
   withSink $ \snk -> do
-    reconcileWatch dev m snk
+    reconcileWatch corpus dev m snk
     syncDevice dev snk
 
-reconcileWatch :: DevCtx -> Model -> Sink Action -> IO ()
-reconcileWatch dev m snk = do
+reconcileWatch :: [Deck] -> DevCtx -> Model -> Sink Action -> IO ()
+reconcileWatch corpus dev m snk = do
   active <- readIORef (dcWatch dev)
-  let desired = desiredWatch m
+  let desired = desiredWatch corpus m
       gen     = mAttemptGen m
   case (desired, active) of
     (Nothing, Nothing) -> pure ()
@@ -680,11 +697,11 @@ reconcileWatch dev m snk = do
 
 -- | The watch the current model calls for: an exercise route whose
 -- cursor prompt is a Confirm with a @verify:@ hook, not yet answered.
-desiredWatch :: Model -> Maybe (ExId, Text, VerifySpec)
-desiredWatch m = case mRoute m of
+desiredWatch :: [Deck] -> Model -> Maybe (ExId, Text, VerifySpec)
+desiredWatch corpus m = case mRoute m of
   RExercise _ exSlug -> do
     let exid = ExId exSlug
-    ex <- findExerciseById exerciseCorpus exid
+    ex <- findExerciseById corpus exid
     let st = Map.findWithDefault (initialState exid (MonoMs 0)) exSlug (mExStates m)
         i  = esCursor st
     prompt <- safeIndexL (exPrompts ex) i
@@ -752,18 +769,18 @@ deviceStateJson m = jObj
 -- a citation into the manual reader and coming back preserve the
 -- learner's prompt and selections (the model keys state by 'ExId', not
 -- by "the current exercise", exactly per the acceptance criteria).
-beginIfNeeded :: Route -> Effect parent props Model Action
-beginIfNeeded (RExercise _ exSlug) = do
+beginIfNeeded :: [Deck] -> Route -> Effect parent props Model Action
+beginIfNeeded corpus (RExercise _ exSlug) = do
   let exid = ExId exSlug
   states <- gets mExStates
   if Map.member (unExId exid) states
     then pure ()
-    else case findExerciseById exerciseCorpus exid of
+    else case findExerciseById corpus exid of
       Nothing -> pure ()
       Just _  -> io $ do
         (mono, wall) <- readClocks
         pure (ExBatch exid [Begin mono wall])
-beginIfNeeded _ = pure ()
+beginIfNeeded _ _ = pure ()
 
 -- | Apply a list of pure engine steps IN ORDER against one pre-batch
 -- state, fold the combined state change into the model, record each
@@ -813,8 +830,8 @@ advanceFocusTarget ex st
   | exKind ex == KDrill = "ex-step-" <> T.pack (show (esCursor st + 1))
   | otherwise           = "ex-title"
 
-applyExActions :: ProgressSink -> ExId -> [ExerciseAction] -> Effect parent props Model Action
-applyExActions sink exid acts = case findExerciseById exerciseCorpus exid of
+applyExActions :: [Deck] -> ProgressSink -> ExId -> [ExerciseAction] -> Effect parent props Model Action
+applyExActions corpus sink exid acts = case findExerciseById corpus exid of
   Nothing -> pure ()
   Just ex -> do
     states <- gets mExStates
@@ -933,21 +950,28 @@ devViewFor m = DevView
 -- | The current prompt's last graded result, if any -- looked up by
 -- 'PromptId' text so the runner never re-derives correctness itself
 -- (see "View.Exercise"'s Haddock).
-currentResult :: Model -> ExId -> ExerciseState -> Maybe (Outcome, Int)
-currentResult m exid st = do
-  ex     <- findExerciseById exerciseCorpus exid
+currentResult :: [Deck] -> Model -> ExId -> ExerciseState -> Maybe (Outcome, Int)
+currentResult corpus m exid st = do
+  ex     <- findExerciseById corpus exid
   prompt <- safeIndexL (exPrompts ex) (esCursor st)
   Map.lookup (unPromptId (prId prompt)) (mExResults m)
 
-exerciseBodyView :: Model -> Route -> Maybe (View Model Action)
-exerciseBodyView m route = case route of
-  RExercises -> Just (Exercise.viewExerciseIndex (mProgress m) exerciseCorpus)
-  RDeck slug -> Just (Exercise.viewDeck (mProgress m) exerciseCorpus slug)
+-- | M6 W1: when the content bundle failed to load, EVERY exercise route
+-- renders the degraded notice (naming the failure, with the
+-- #btn-content-retry affordance) instead of an empty index/deck/runner
+-- built from the empty corpus -- the manuals routes are untouched.
+exerciseBodyView :: [Deck] -> Maybe Text -> Model -> Route -> Maybe (View Model Action)
+exerciseBodyView corpus mContentErr m route = case route of
+  RExercises   | Just err <- mContentErr -> Just (contentDegradedView err)
+  RDeck _      | Just err <- mContentErr -> Just (contentDegradedView err)
+  RExercise _ _ | Just err <- mContentErr -> Just (contentDegradedView err)
+  RExercises -> Just (Exercise.viewExerciseIndex (mProgress m) corpus)
+  RDeck slug -> Just (Exercise.viewDeck (mProgress m) corpus slug)
   RExercise deckSlug exSlug ->
     let exid   = ExId exSlug
         st     = Map.findWithDefault (initialState exid (MonoMs 0)) (unExId exid) (mExStates m)
-        result = currentResult m exid st
-    in Just (Exercise.viewExerciseRunner (exHandlersFor exid) (devViewFor m) exerciseCorpus deckSlug exSlug st result)
+        result = currentResult corpus m exid st
+    in Just (Exercise.viewExerciseRunner (exHandlersFor exid) (devViewFor m) corpus deckSlug exSlug st result)
   _ -> Nothing
 
 eventLogJson :: [ProgressEvent] -> Text
@@ -996,16 +1020,16 @@ promptBaselineJson m = case mRoute m of
 -- no longer exists). Retired records are kept in 'psRecs' (dropping
 -- them would let a content edit silently destroy history), excluded
 -- from the review queue, and counted separately here.
-allCorpusPromptIds :: Map Text ()
-allCorpusPromptIds = Map.fromList
+allCorpusPromptIds :: [Deck] -> Map Text ()
+allCorpusPromptIds corpus = Map.fromList
   [ (unPromptId (promptIdFor (exId e) i), ())
-  | d <- exerciseCorpus, e <- dkExercises d, i <- [1 .. length (exPrompts e)] ]
+  | d <- corpus, e <- dkExercises d, i <- [1 .. length (exPrompts e)] ]
 
 -- | The #sxc1-progress machine-readable payload (M3 DOM contract).
 -- Every number derives from the real model state -- the harness asserts
 -- on VALUES here.
-progressJson :: Model -> Text
-progressJson m = jObj
+progressJson :: [Deck] -> Model -> Text
+progressJson corpus m = jObj
   [ jKV "available" (jBool (mStorageOk m))
   , jKV "state" (jStr (case mLoad m of
       DecodeOk _      -> "ok"
@@ -1024,7 +1048,7 @@ progressJson m = jObj
     st    = mProgress m
     today = mToday m
     (liveRecs, retiredRecs) =
-      Map.partitionWithKey (\k _ -> Map.member k allCorpusPromptIds) (psRecs st)
+      Map.partitionWithKey (\k _ -> Map.member k (allCorpusPromptIds corpus)) (psRecs st)
     liveState = st { psRecs = liveRecs }
 
 -- | M3 (task "progress-ui"): the "View.Exercise"\/"View.Pages" call
@@ -1043,9 +1067,9 @@ progHandlersFor m = ProgHandlers
 
 -- | M3: everything "View.Progress" renders from, assembled fresh each
 -- frame straight from the Model -- never stored, never diffed.
-progDataFor :: Model -> ProgData
-progDataFor m = ProgData
-  { pdDecks      = exerciseCorpus
+progDataFor :: [Deck] -> Model -> ProgData
+progDataFor corpus m = ProgData
+  { pdDecks      = corpus
   , pdProgress   = mProgress m
   , pdToday      = mToday m
   , pdLoad       = mLoad m
@@ -1056,5 +1080,5 @@ progDataFor m = ProgData
   , pdStorageOk  = mStorageOk m
   }
 
-viewModel :: props -> Model -> View Model Action
-viewModel _ m = viewRoute ToggleJA (progHandlersFor m) (progDataFor m) exerciseStatsJson (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson m) (deviceStateJson m) (exerciseBodyView m (mRoute m)) (mRoute m)
+viewModel :: [Deck] -> Text -> Maybe Text -> props -> Model -> View Model Action
+viewModel corpus exStatsTxt mContentErr _ m = viewRoute ToggleJA (progHandlersFor m) (progDataFor corpus m) exStatsTxt (eventLogJson (mEventLog m)) (promptBaselineJson m) (progressJson corpus m) (deviceStateJson m) mContentErr (exerciseBodyView corpus mContentErr m (mRoute m)) (mRoute m)

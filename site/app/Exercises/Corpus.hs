@@ -1,9 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | The parsed, lazy exercise corpus, plus the DOM contract's
--- @#sxc1-exercise-stats@ JSON -- the stale-build detector. Reads never
--- touch disk (see "Exercises.Embed"); everything here is a pure
--- projection of the compile-time-embedded deck sources.
+-- @#sxc1-exercise-stats@ JSON -- the stale-build detector. M6 W1
+-- (briefs\/M6-plan.md, ruling 1): the corpus is no longer a
+-- compile-time-embedded constant ("Exercises.Embed" is retired) --
+-- every projection here is now a pure FUNCTION of the deck sources the
+-- boot path loaded through "Exercises.Bundle", applied exactly once in
+-- Main.main and shared from there. Reads still never touch disk.
 --
 -- M3 gate (briefs\/M3-manifest.json, task \"size-split-and-format\"):
 -- reads via 'SXC1.Exercise.Reader.readDeck' -- the STRUCTURAL reader --
@@ -11,8 +14,8 @@
 -- module (and everything reachable from @exe:app@) must never import.
 -- See "SXC1.Exercise.Reader"'s Haddock for the size history.
 module Exercises.Corpus
-  ( exerciseCorpus
-  , exerciseStatsJson
+  ( exerciseCorpusOf
+  , exerciseStatsJsonOf
   , fnv1a32
     -- * Tiny JSON combinators, reused verbatim by Main.hs's event-log
     -- encoder rather than duplicated (see this module's Haddock).
@@ -35,8 +38,6 @@ import           SXC1.Content.Stats   (jsonEscape)
 import           SXC1.Exercise.Reader (readDeck)
 import           SXC1.Exercise.Types
 
-import           Exercises.Embed     (deckSources)
-
 --------------------------------------------------------------------------
 -- The parsed corpus. LAZY exactly as M1's manual corpus is (see
 -- SXC1.Content.Corpus.docs): matching 'Just d' only forces 'parseDeck'
@@ -47,19 +48,19 @@ import           Exercises.Embed     (deckSources)
 -- the app; SXC1.Exercise.Parse owns all validation, not this module.
 --------------------------------------------------------------------------
 
--- | (file name, raw embedded text, parsed 'Deck' if any), in INDEX
+-- | (file name, raw bundle text, parsed 'Deck' if any), in INDEX
 -- order -- the one place that keeps a deck's raw source paired with its
--- parse, for 'exerciseStatsJson' below.
-parsedDecks :: [(FilePath, Text, Maybe Deck)]
-parsedDecks = [ (fp, raw, readDeck fp raw) | (fp, raw) <- deckSources ]
+-- parse, for 'exerciseStatsJsonOf' below.
+parsedDecksOf :: [(FilePath, Text)] -> [(FilePath, Text, Maybe Deck)]
+parsedDecksOf srcs = [ (fp, raw, readDeck fp raw) | (fp, raw) <- srcs ]
 
-exerciseCorpus :: [Deck]
-exerciseCorpus = [ d | (_, _, Just d) <- parsedDecks ]
+exerciseCorpusOf :: [(FilePath, Text)] -> [Deck]
+exerciseCorpusOf srcs = [ d | (_, _, Just d) <- parsedDecksOf srcs ]
 
 --------------------------------------------------------------------------
 -- FNV-1a/32 over the UTF-8 BYTES of a 'Text' -- hand-rolled because
 -- neither 'Data.ByteString' nor 'Data.Text.Encoding' is reachable from
--- exe:app (see "Exercises.Embed"'s Haddock): this walks 'Text' directly
+-- exe:app (build-depends discipline): this walks 'Text' directly
 -- with 'Data.Text.foldl'' and encodes each 'Char' to its UTF-8 byte
 -- sequence by hand (both 'Data.Bits' and 'Data.Char' are re-exported by
 -- @base@, already a dependency). Pinned against the test vectors in
@@ -169,9 +170,13 @@ totalsJson decks = jObj
     prompts = concatMap exPrompts exs
 
 -- | Per-deck: identity, size (from the parse, when it succeeded), and
--- the three EMBEDDED-source integrity numbers (from the raw text
+-- the three LOADED-source integrity numbers (from the raw bundle text
 -- regardless of parse success, so a genuinely broken deck still shows
--- up here rather than vanishing silently).
+-- up here rather than vanishing silently). Because the EN bundle's
+-- per-deck text is byte-identical to the deck's on-disk EN emission,
+-- chars/lines/fnv1a keep matching the harness's disk-derived numbers
+-- -- the stale-BUNDLE detector, exactly as they were the stale-BUILD
+-- detector when the corpus was embedded.
 deckStatsJson :: (FilePath, Text, Maybe Deck) -> Text
 deckStatsJson (fp, raw, mDeck) = jObj
   [ jKV "file"      (jStr (T.pack fp))
@@ -185,8 +190,8 @@ deckStatsJson (fp, raw, mDeck) = jObj
   , jKV "fnv1a"     (jWord32 (fnv1a32 raw))
   ]
 
-exerciseStatsJson :: Text
-exerciseStatsJson = jObj
-  [ jKV "totals" (totalsJson exerciseCorpus)
-  , jKV "decks"  (jArr (map deckStatsJson parsedDecks))
+exerciseStatsJsonOf :: [(FilePath, Text)] -> Text
+exerciseStatsJsonOf srcs = jObj
+  [ jKV "totals" (totalsJson (exerciseCorpusOf srcs))
+  , jKV "decks"  (jArr (map deckStatsJson (parsedDecksOf srcs)))
   ]

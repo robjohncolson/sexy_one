@@ -172,7 +172,7 @@ function validateExpectJson(parsed, filePath) {
 // "exercise-ui"): every expected deck present, none unexpected, none
 // duplicated, and every field compared -- an expectation satisfiable by a
 // subset is not an expectation. The schema below matches exactly what
-// Exercises.Corpus.exerciseStatsJson (site/app/Exercises/Corpus.hs)
+// Exercises.Corpus.exerciseStatsJsonOf (site/app/Exercises/Corpus.hs)
 // emits.
 // ---------------------------------------------------------------------------
 
@@ -278,6 +278,7 @@ function parseArgs(argv) {
     exerciseFixture: null,
     expectExerciseJson: null,
     checkStorageRefused: false,
+    checkContentMissing: false,
     deviceOnly: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -318,6 +319,9 @@ function parseArgs(argv) {
         break;
       case '--check-storage-refused':
         opts.checkStorageRefused = true;
+        break;
+      case '--check-content-missing':
+        opts.checkContentMissing = true;
         break;
       case '--device-only':
         opts.deviceOnly = true;
@@ -414,6 +418,20 @@ Options:
                        happened. See this task's final report for why
                        this is a separate opt-in mode rather than a
                        gating assertion.
+  --check-content-missing
+                       M6 W1 fetch-failure degradation check, invoked by
+                       check-site.sh against a served COPY of the bundle
+                       whose content/ directory (the exercise content
+                       bundles) has been removed: the app must still
+                       boot (the JS-side content guard in index.js must
+                       swallow the failed load), render the VISIBLE
+                       #sxc1-content-error banner naming the failure,
+                       keep a manual page fully readable, and offer
+                       #btn-content-retry on the exercise routes. Exits
+                       0 only when all four hold -- red-first
+                       demonstrated by breaking the index.js guard
+                       (rethrowing from the load path kills boot, which
+                       this mode reports as its own FAIL).
   --help               Show this help and exit
 
 By default (no --quick) the page-route sweep visits all 108 routes in
@@ -748,7 +766,7 @@ const SELF_TEST_FIXTURE = {
 };
 
 // The #sxc1-exercise-stats payload the fixture below emits verbatim --
-// matches the schema Exercises.Corpus.exerciseStatsJson produces
+// matches the schema Exercises.Corpus.exerciseStatsJsonOf produces
 // (totals + one entry per deck with file/deck/chapter/title/exercises/
 // prompts/chars/lines/fnv1a). --self-test's own --expect-exercise-json
 // negative control compares against exactly this.
@@ -836,6 +854,25 @@ window.__SXC1_BOOTED = true;
   var FIXTURE = ${fixtureJson};
   var PROGRESS_DECK_TIER = ${JSON.stringify(PROGRESS_SELF_TEST_TIER)};
   var MANUAL_TOTAL_PAGES = 2;
+
+  // M6 W1 SABOTAGE 'contentDegraded' (-> CONTENT_ABSENT_ASSERTION_NAME):
+  // render the degraded-content surface on a HEALTHY boot -- the exact
+  // defect the absent-scenario parity assertion exists to catch (a
+  // degraded banner that leaks into ordinary runs). The healthy fixture
+  // deliberately has NEITHER element, mirroring the real app, where
+  // View.Pages renders them only when the bundle load failed.
+  if (sel('contentDegraded')) {
+    var degraded = document.createElement('div');
+    degraded.id = 'sxc1-content-error';
+    degraded.setAttribute('role', 'alert');
+    degraded.textContent = 'Exercise content failed to load: SXC1 SELF-TEST sabotage';
+    var retryBtn = document.createElement('button');
+    retryBtn.id = 'btn-content-retry';
+    retryBtn.textContent = 'Reload and try again';
+    var appRoot = document.getElementById('app');
+    appRoot.insertBefore(degraded, appRoot.firstChild);
+    appRoot.insertBefore(retryBtn, appRoot.firstChild.nextSibling);
+  }
 
   // -----------------------------------------------------------------------
   // M5 a11y mirror -- the fixture-side halves of the app's a11y pass, so
@@ -2468,6 +2505,20 @@ const FOCUS_DRILL_ASSERTION_NAME =
 const SR_LABELS_ASSERTION_NAME =
   'SR labels: #sxc1-export-blob carries an aria-label accessible name; a verify-hooked drill\'s .ex-verify is aria-live=polite';
 
+// M6 W1 (briefs/M6-plan.md, W1 "D2-class absent-scenario parity"): the
+// degraded-content surface exists ONLY when the exercise content bundle
+// failed to load at boot -- on a healthy boot neither the visible
+// #sxc1-content-error banner nor the #btn-content-retry affordance may
+// be in the DOM at all (absent, not merely hidden). The positive half
+// (bundle really missing -> banner present, names the failure, manuals
+// still reachable, retry affordance rendered) is --check-content-missing,
+// driven by check-site.sh's fetch-failure stage against a served copy of
+// the bundle with content/ removed. Fixed name so the negative sweep's
+// M6_SELECTOR_ASSERTIONS map ('contentDegraded' sabotages the fixture
+// into rendering the banner on a healthy boot) can reference it.
+const CONTENT_ABSENT_ASSERTION_NAME =
+  'degraded-content surface absent on a healthy boot: no #sxc1-content-error banner, no #btn-content-retry anywhere in the DOM';
+
 // Trusted keyboard input for a session: returns pressKey(key) driving the
 // full keyDown/keyUp pair through CDP's Input domain. 'Tab'/'Enter' are
 // the navigation/activation pair the keyboard flows live on; single
@@ -3155,6 +3206,20 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     'exercise runner has no horizontal overflow at 390x844',
     Boolean(overflow) && overflow.scrollWidth <= overflow.innerWidth + 1,
     overflow,
+  );
+
+  // 8c (M6 W1): absent-scenario parity, negative half -- see
+  // CONTENT_ABSENT_ASSERTION_NAME's own comment. Queried document-wide
+  // (any route) because the banner renders on EVERY route when the
+  // bundle load failed.
+  const degradedSurface = await h.evaluate(`(() => ({
+    banner: document.querySelector('#sxc1-content-error') !== null,
+    retry: document.querySelector('#btn-content-retry') !== null,
+  }))()`);
+  report(
+    CONTENT_ABSENT_ASSERTION_NAME,
+    Boolean(degradedSurface) && degradedSurface.banner === false && degradedSurface.retry === false,
+    degradedSurface,
   );
 
   // 9. Console hygiene.
@@ -4027,6 +4092,20 @@ const M5_SELECTOR_ASSERTIONS = {
   a11ySrLabels: {
     expectedToFail: [SR_LABELS_ASSERTION_NAME, DEVICE_ASSERTION_NAMES.d27],
     includeDevice: true,
+  },
+};
+
+// M6 W1: one sabotage point for the degraded-content surface -- the
+// fixture renders the #sxc1-content-error banner + #btn-content-retry on
+// a HEALTHY boot (see selfTestFixtureHtml's 'contentDegraded' block), so
+// exactly the absent-scenario parity assertion must fail and nothing
+// else. Same {expectedToFail, includeDevice} shape as
+// M5_SELECTOR_ASSERTIONS; wired into runSelfTestNegative's passesInOrder
+// (sweep 37 -> 38 passes).
+const M6_SELECTOR_ASSERTIONS = {
+  contentDegraded: {
+    expectedToFail: [CONTENT_ABSENT_ASSERTION_NAME],
+    includeDevice: false,
   },
 };
 
@@ -5175,6 +5254,215 @@ async function runStorageRefusedCheck(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// M6 W1: --check-content-missing. Driven by check-site.sh's fetch-failure
+// degradation stage against a served COPY of the bundle whose content/
+// directory has been removed (so ./content/content.en.txt 404s). Four
+// named assertions, all required:
+//   1. the app still BOOTS -- the JS-side content guard in
+//      site/static/index.js must swallow the failed load (a rethrow
+//      kills boot exactly like the pre-bridge storage defect, and this
+//      mode reports it as its own FAIL -- the red-first demonstration);
+//   2. the VISIBLE #sxc1-content-error banner is rendered and names the
+//      failure (non-empty, mentions 'content');
+//   3. the manuals still work: a real manual page route renders its
+//      translated body (the manuals stay embedded in app.wasm);
+//   4. the exercise routes render the degraded notice with the
+//      #btn-content-retry affordance instead of an empty index.
+// Same launch idiom as --check-storage-refused; no script injection --
+// the served bundle itself is the broken input.
+// ---------------------------------------------------------------------------
+async function runContentMissingCheck(opts) {
+  const deadline = Date.now() + opts.timeout;
+  const cleanupFns = [];
+  const runCleanup = async () => {
+    for (const fn of cleanupFns.splice(0).reverse()) {
+      try { await fn(); } catch { /* best-effort cleanup */ }
+    }
+  };
+  const die = async (code, message) => {
+    if (message) console.log(message);
+    await runCleanup();
+    process.exit(code);
+  };
+
+  const browserPath = resolveBrowser(opts.browser);
+  if (!browserPath) {
+    await die(2, 'error: no browser found for --check-content-missing. Install Google Chrome/Chromium, or set ' +
+      'SXC1_BROWSER to a browser executable path, or pass --browser <path>.');
+    return;
+  }
+
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sxc1-contentmissing-profile-'));
+  cleanupFns.push(() => removeDirWithRetry(userDataDir));
+  const debugPort = await findFreePort();
+  const browserProc = spawn(browserPath, [
+    '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
+    '--disable-dev-shm-usage', `--user-data-dir=${userDataDir}`, `--remote-debugging-port=${debugPort}`, 'about:blank',
+  ], { stdio: 'ignore', detached: true });
+  let cdp = null;
+  let browserFailure = null;
+  const noteBrowserFailure = (message) => {
+    if (!browserFailure) browserFailure = new Error(message);
+    if (cdp) cdp.failFatally(browserFailure);
+  };
+  browserProc.on('exit', (code, signal) => {
+    noteBrowserFailure(`browser process exited unexpectedly (code=${code === null ? 'null' : code}, signal=${signal || 'none'})`);
+  });
+  browserProc.on('error', (err) => {
+    noteBrowserFailure(`browser process error: ${err && err.message ? err.message : err}`);
+  });
+  cleanupFns.push(() => new Promise((resolve) => {
+    const killGroup = (signal) => { try { process.kill(-browserProc.pid, signal); } catch { /* group already gone */ } };
+    if (browserProc.exitCode !== null || browserProc.signalCode !== null) { killGroup('SIGKILL'); resolve(); return; }
+    const forceKillTimer = setTimeout(() => killGroup('SIGKILL'), 3000);
+    browserProc.once('exit', () => { clearTimeout(forceKillTimer); killGroup('SIGKILL'); resolve(); });
+    killGroup('SIGTERM');
+  }));
+
+  let versionInfo = null;
+  while (Date.now() < deadline) {
+    if (browserFailure) {
+      await die(2, `error: ${browserFailure.message} (before DevTools became reachable at ${browserPath})`);
+      return;
+    }
+    try {
+      const info = await withDeadline(
+        httpGetJson(`http://127.0.0.1:${debugPort}/json/version`),
+        deadline,
+        'DevTools /json/version request',
+      );
+      if (info && info.webSocketDebuggerUrl) { versionInfo = info; break; }
+    } catch { /* not up yet, or this attempt ran past the deadline */ }
+    await sleep(200);
+  }
+  if (!versionInfo) {
+    await die(2, 'error: timed out waiting for DevTools (--check-content-missing)');
+    return;
+  }
+
+  const ws = await withDeadline(connectWebSocket(versionInfo.webSocketDebuggerUrl), deadline, 'WebSocket connect');
+  cleanupFns.push(() => { try { ws.close(); } catch { /* ignore */ } });
+  cdp = new CDPClient(ws, { getRemaining: () => remaining(deadline) });
+  ws.addEventListener('close', () => cdp.failFatally(new Error('CDP WebSocket closed unexpectedly')));
+  ws.addEventListener('error', (ev) => cdp.failFatally(new Error(`CDP WebSocket error: ${formatWsErrorEvent(ev)}`)));
+
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+  await cdp.send('Page.enable', {}, sessionId);
+  await cdp.send('Runtime.enable', {}, sessionId);
+
+  const evaluate = async (expression) => {
+    const res = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+    if (res.exceptionDetails) {
+      const d = res.exceptionDetails;
+      throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
+    }
+    return res.result ? res.result.value : undefined;
+  };
+
+  await cdp.send('Page.navigate', { url: opts.url }, sessionId);
+
+  let bootOutcome = null;
+  while (Date.now() < deadline) {
+    let state;
+    try {
+      state = await evaluate(`(() => {
+        if (typeof window.__SXC1_BOOT_ERROR === 'string') return { error: window.__SXC1_BOOT_ERROR };
+        if (window.__SXC1_BOOTED === true) return { booted: true };
+        return { pending: true };
+      })()`);
+    } catch (err) {
+      state = { error: `evaluate failed: ${err && err.message ? err.message : err}` };
+    }
+    if (state.error) { bootOutcome = { ok: false, error: state.error }; break; }
+    if (state.booted) { bootOutcome = { ok: true }; break; }
+    await sleep(100);
+  }
+
+  let passed = 0;
+  let total = 0;
+  const report = (name, ok, observed) => {
+    total += 1;
+    if (ok) { passed += 1; console.log(`ok - ${name}`); }
+    else { console.log(`FAIL - ${name} (observed: ${JSON.stringify(observed)})`); }
+  };
+  const NAMES = {
+    boots: 'content missing: the app still boots (the JS-side content guard never lets a failed bundle load kill boot)',
+    banner: 'content missing: the VISIBLE #sxc1-content-error banner is rendered and names the failure',
+    manual: 'content missing: a manual page route still renders its translated body (manuals stay embedded)',
+    retry: 'content missing: the exercise route renders the degraded notice with #btn-content-retry',
+  };
+
+  if (!bootOutcome || !bootOutcome.ok) {
+    report(NAMES.boots, false,
+      bootOutcome && bootOutcome.error
+        ? { bootError: bootOutcome.error }
+        : { timeout: true });
+    for (const name of [NAMES.banner, NAMES.manual, NAMES.retry]) {
+      report(name, false, 'skipped: app did not boot');
+    }
+    console.log(`browser-check --check-content-missing: ${passed}/${total} assertions passed`);
+    await die(1, null);
+    return;
+  }
+  report(NAMES.boots, true, null);
+
+  const banner = await evaluate(`(() => {
+    const e = document.querySelector('#sxc1-content-error');
+    if (!e) return { exists: false };
+    return {
+      exists: true,
+      visible: !e.hidden && e.offsetParent !== null,
+      role: e.getAttribute('role'),
+      text: (e.textContent || '').trim(),
+    };
+  })()`);
+  report(
+    NAMES.banner,
+    Boolean(banner && banner.exists && banner.visible && banner.role === 'alert'
+      && banner.text.length > 0 && /content/i.test(banner.text)),
+    banner,
+  );
+
+  const manualOk = await evaluate(`(async () => {
+    window.location.hash = '#/m/guide-book/p/15';
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+      const body = document.querySelector('#sxc1-page .page-body');
+      if (body && body.textContent && body.textContent.trim().length > 100) {
+        return { ok: true, chars: body.textContent.trim().length };
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const body = document.querySelector('#sxc1-page .page-body');
+    return { ok: false, chars: body && body.textContent ? body.textContent.trim().length : null };
+  })()`);
+  report(NAMES.manual, Boolean(manualOk && manualOk.ok), manualOk);
+
+  const retryOk = await evaluate(`(async () => {
+    window.location.hash = '#/x';
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+      const deg = document.querySelector('#sxc1-exercise-degraded');
+      const btn = document.querySelector('#btn-content-retry');
+      if (deg && btn) {
+        return { ok: true, text: (deg.textContent || '').slice(0, 160) };
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return {
+      ok: false,
+      degraded: document.querySelector('#sxc1-exercise-degraded') !== null,
+      retry: document.querySelector('#btn-content-retry') !== null,
+    };
+  })()`);
+  report(NAMES.retry, Boolean(retryOk && retryOk.ok), retryOk);
+
+  console.log(`browser-check --check-content-missing: ${passed}/${total} assertions passed`);
+  await die(passed === total ? 0 : 1, null);
+}
+
+// ---------------------------------------------------------------------------
 // M4: --device-only. Launches its own throwaway browser and runs ONLY
 // runDeviceAssertions against --url -- the fast dev loop the sabotage
 // sweep uses (each app mutation needs a rebuild + one targeted run, not
@@ -5754,6 +6042,14 @@ async function runSelfTestNegative(opts) {
       expectedToFail: M5_SELECTOR_ASSERTIONS[key].expectedToFail,
       includeDevice: M5_SELECTOR_ASSERTIONS[key].includeDevice,
     })),
+    // M6 W1 pass -- the degraded-content surface leaking into a healthy
+    // boot (sweep 37 -> 38).
+    ...Object.keys(M6_SELECTOR_ASSERTIONS).map((key) => ({
+      key,
+      selector: key,
+      expectedToFail: M6_SELECTOR_ASSERTIONS[key].expectedToFail,
+      includeDevice: M6_SELECTOR_ASSERTIONS[key].includeDevice,
+    })),
   ];
 
   const onlyKey = opts.selfTestNegativeOnly;
@@ -5870,6 +6166,10 @@ async function main() {
   // --check-storage-refused: also a full short-circuit (its own
   // throwaway browser, own target, own deadline) -- see its own --help
   // text and runStorageRefusedCheck's comment.
+  if (opts.checkContentMissing) {
+    await runContentMissingCheck(opts);
+    return;
+  }
   if (opts.checkStorageRefused) {
     await runStorageRefusedCheck(opts);
     return;

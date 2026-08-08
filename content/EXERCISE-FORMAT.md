@@ -595,3 +595,71 @@ A sound is assigned to each pad. What happens to it when you tap the pad?
 
 The assigned sound plays. The pads section is used to play, record, and edit sounds.
 ```
+
+## 12. Japanese variants: `ja:` lines (M6)
+
+The course is bilingual (briefs/M6-plan.md): every learner-visible piece of an
+exercise can carry a Japanese variant **in the same file**, on a line that starts
+with `ja:` at column 0, placed **directly under** the English line(s) it
+translates. One file, one id, one registry — prompt ids and counts are identical
+across languages by construction, so a learner's saved progress applies
+regardless of UI language.
+
+The variant's payload is everything after `ja:` (with at most one leading space
+dropped, like any field value), and it is a **full replacement line** — it repeats
+the marker of the line it replaces (`# `/`## `, `- [x] `, `summary: `, `check: `):
+
+```text
+## Which button returns you to BANK 1
+ja: ## どのボタンで BANK 1 に戻りますか
+
+summary: Choose BANK 1 in Performance mode.
+ja: summary: パフォーマンスモードで BANK 1 を選ぶ。
+
+- [x] `A`
+ja: - [x] `A`
+
+Which single button do you press to start selecting BANK 1?
+ja: BANK 1 の選択を始めるには、どのボタンを押しますか。
+```
+
+**What may carry a `ja:` variant — the complete learner-visible list:**
+
+| Learner-visible piece | Where the `ja:` line goes | Payload shape |
+|---|---|---|
+| deck title (`# ...`) | directly under the `#` line | one `# ...` heading, same level |
+| deck `summary:` | directly under the `summary:` line | one `summary: ...` field line |
+| deck intro prose | directly under the paragraph's last line | one or more prose lines (they replace the whole contiguous block) |
+| exercise title (`## ...`) | directly under the `##` line | one `## ...` heading, same level |
+| exercise body prose — the quiz question, the drill's mission goal, the lookup question | directly under each paragraph/table/list block | one or more prose lines |
+| choice-list option (`- [x] ...` / `- [ ] ...`) | directly under **each** option line | one option line with the **same** checked state |
+| `### Why` / `### Hint` / `### Answer` block prose | directly under each block | one or more prose lines |
+| drill step body prose | directly under each block | one or more prose lines |
+| step `check:` | directly under the `check:` line | one `check: ...` field line |
+
+**What may NOT carry a variant** (language-invariant by ruling — the build
+refuses them loudly): `cite:`, `find:`, `verify:`, `type:`, `id:`, `deck:`,
+`chapter:`, `tier:`, `tags:`, `requires:`, `limit:`, and the role headings
+themselves (`### Why` etc. — the UI localizes those labels, not the content).
+On-device labels (`BANK`, `EDIT`, `SELECT BANK 1`, …) stay in Latin caps inside
+the Japanese text, exactly as the hardware prints them.
+
+**How it is processed.** The validator and the app's reader simply *skip* `ja:`
+lines — a file with them parses to the exact same deck as the file with them
+deleted, issue line numbers keep pointing at the original lines, and a `ja:`
+line between two options does not split the choice list. At build time,
+`scripts/build-site.sh` (via `scripts/emit-content-bundles.py`) emits two
+content bundles the app loads at boot:
+
+* `content.en.txt` — the deck text with every `ja:` line deleted;
+* `content.ja.txt` — the same with each `ja:` run **substituted for** the
+  line(s) directly above it; anything without a variant falls back to English.
+
+Rules the emitter enforces (each violation is a named build failure): a `ja:`
+run must sit directly under the text it translates (never after a blank line,
+never first in the file); headings/options/fields take exactly one variant line
+of the same shape (same heading level, same checked state, same field key);
+prose payloads are non-blank and never structural headings; nothing may start
+with the reserved bundle prefix `!SXC1-`; and only column-0 `ja:` counts — an
+indented `ja:` is ordinary text, and a variant line is one physical line (field
+continuation indentation does not extend it).

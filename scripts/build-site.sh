@@ -43,7 +43,9 @@ Environment:
 
 Output:
   site/public/  containing index.html, index.js, app.wasm,
-                ghc_wasm_jsffi.js, .nojekyll and vendor/browser_wasi_shim/
+                ghc_wasm_jsffi.js, .nojekyll, vendor/browser_wasi_shim/
+                and content/content.{en,ja}.txt (the M6 exercise
+                content bundles, emitted from content/exercises/)
 EOF
 }
 
@@ -124,6 +126,26 @@ cp -R "$REPO_ROOT/site/static/." "$REPO_ROOT/site/public/"
 cp "$WASM" "$REPO_ROOT/site/public/app.wasm"
 
 # ---------------------------------------------------------------------------
+# 7b. M6 W1 (briefs/M6-plan.md, ruling 1): emit the per-language exercise
+#     content bundles the app now loads at boot instead of embedding
+#     (site/app/Exercises/Bundle.hs consumes them; the format and the ja:
+#     substitution grammar are documented in scripts/emit-content-bundles.py
+#     and content/EXERCISE-FORMAT.md sec. 12).
+#
+#     Served as PLAIN .txt, deliberately not pre-compressed .txt.gz:
+#     GitHub Pages compresses text responses on the wire via ordinary
+#     Content-Encoding negotiation but does NOT transparently serve a .gz
+#     sidecar as gzip-encoded content -- a fetched .txt.gz would arrive as
+#     opaque bytes needing a manual DecompressionStream pass in the boot
+#     loader. Plain text + CDN wire compression is the simplest robust
+#     choice; check-site.sh's bundle ledger holds the gzip cost under the
+#     M6_BUNDLE_CEILING pin.
+# ---------------------------------------------------------------------------
+python3 "$SCRIPT_DIR/emit-content-bundles.py" \
+  --exercises-dir "$REPO_ROOT/content/exercises" \
+  --out-dir "$REPO_ROOT/site/public/content"
+
+# ---------------------------------------------------------------------------
 # 8. Optional optimisation pass (opt-in only).
 # ---------------------------------------------------------------------------
 if [ "$OPTIMIZE" -eq 1 ]; then
@@ -164,4 +186,6 @@ wasm_size() {
 echo "build-site: done in ${DURATION}s (GHC ${GHC_VERSION})"
 echo "build-site: app.wasm            -> $(wasm_size "$REPO_ROOT/site/public/app.wasm")"
 echo "build-site: ghc_wasm_jsffi.js    -> $(wasm_size "$REPO_ROOT/site/public/ghc_wasm_jsffi.js")"
+echo "build-site: content.en.txt       -> $(wasm_size "$REPO_ROOT/site/public/content/content.en.txt")"
+echo "build-site: content.ja.txt       -> $(wasm_size "$REPO_ROOT/site/public/content/content.ja.txt")"
 echo "build-site: exe:content-check    -> $CONTENT_CHECK_BIN"

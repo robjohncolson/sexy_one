@@ -27,6 +27,29 @@
 -- (a field's own line and raw value, a role chunk's raw lines, a choice
 -- list's raw items, ...) is carried on 'DeckSyn'\/'ExSyn'\/'StepSyn' so
 -- the validator never has to re-scan raw text to get at it.
+--
+-- M6 W1 (briefs\/M6-plan.md, ruling 2): the bilingual @ja:@ variant
+-- grammar. A column-0 line beginning @ja:@ ('isJaLine') carries the
+-- JAPANESE variant of the learner-visible line(s) directly above it --
+-- the build-time bundle emitter (@scripts\/emit-content-bundles.py@)
+-- substitutes those variants into the JA bundle and deletes them from
+-- the EN bundle; the browser only ever parses pre-substituted text.
+-- THIS reader (the one the validator also consumes) simply SKIPS ja:
+-- lines: 'readDeckSyn' filters them out of the numbered line stream
+-- before any structural pass runs, so a ja:-annotated file parses to a
+-- 'Deck' EQUAL to its EN emission's parse (byte-identical EN behavior),
+-- a ja: line inside a field block never surfaces as a @\"ja\"@
+-- 'FieldLine' (which the frozen validator would reject as
+-- @E-FIELD-UNKNOWN@ -- its unknown-field strictness for every OTHER
+-- key is deliberately unchanged), and a ja: line between two task-list
+-- options never splits the choice run. Line numbers on the surviving
+-- lines are the ORIGINAL file's, never renumbered, so validator issues
+-- keep pointing at real lines. The filtered-out lines are carried on
+-- 'synJaLines' (original line number + payload) for wave-3's
+-- JA-completeness\/terminology validation to consume without
+-- re-scanning. Indented @ja:@ text is NOT a variant line (column-0
+-- only, exactly like structural headings); a variant line is one
+-- physical line -- field-continuation indentation does not extend it.
 module SXC1.Exercise.Reader
   ( -- * Field-line scanning (the syntactic primitive shared with the
     -- validator -- see "SXC1.Exercise.Parse".checkFieldBlock, which reads
@@ -34,6 +57,9 @@ module SXC1.Exercise.Reader
     -- rather than re-scanning)
     FieldLine (..)
   , scanFieldBlock
+    -- * The @ja:@ variant-line rule (M6)
+  , isJaLine
+  , jaPayloadOf
   , fieldValuesOf
     -- * Filenames \/ slug shape
   , validFileName
@@ -135,6 +161,24 @@ fieldKeyValueOf l = case T.uncons l of
 
 isContinuationLine :: Text -> Bool
 isContinuationLine l = T.length (T.takeWhile (== ' ') l) >= 2 && not (isBlankL l)
+
+--------------------------------------------------------------------------
+-- The M6 ja: variant-line rule -- see the module Haddock.
+--------------------------------------------------------------------------
+
+-- | A column-0 line beginning @ja:@ -- a Japanese variant line. Checked
+-- against the RAW line (before any stripping), so indented text that
+-- happens to start with @ja:@ is ordinary content, exactly as an
+-- indented @#@ is not a heading.
+isJaLine :: Text -> Bool
+isJaLine = T.isPrefixOf "ja:"
+
+-- | A variant line's payload: everything after @ja:@ with AT MOST ONE
+-- leading space dropped -- the same one-space rule 'fieldKeyValueOf'
+-- applies to field values, so authors write @ja: <replacement line>@
+-- and the payload is the replacement line verbatim.
+jaPayloadOf :: Text -> Text
+jaPayloadOf l = let rest = T.drop 3 l in maybe rest id (T.stripPrefix " " rest)
 
 -- | The maximal run of field lines (plus their indented continuations)
 -- immediately following a structural heading -- blank lines are allowed
@@ -345,6 +389,11 @@ data DeckSyn = DeckSyn
   , synTierField      :: Maybe FieldLine
   , synExercises      :: [ExSyn]
   , synDeck           :: Maybe Deck
+    -- | M6: every @ja:@ variant line of the file, as (ORIGINAL line
+    -- number, payload via 'jaPayloadOf'), in source order -- filtered
+    -- out of every structural pass above, carried here for the wave-3
+    -- JA validation to consume without re-scanning the raw text.
+  , synJaLines        :: [(Int, Text)]
   }
 
 -- | One @##@ exercise chunk, structurally.
@@ -417,9 +466,16 @@ readDeckSyn fp raw = DeckSyn
   , synTierField       = mTierField
   , synExercises       = exSyns
   , synDeck            = mDeck
+  , synJaLines         = jaLines
   }
   where
-    numbered = zip [1 :: Int ..] (T.lines raw)
+    -- M6: ja: variant lines are filtered out of the numbered stream
+    -- BEFORE any structural pass (title, field blocks, heading splits,
+    -- choice-list lifting, block parsing) -- see the module Haddock.
+    -- The surviving lines keep their ORIGINAL numbers.
+    numberedAll = zip [1 :: Int ..] (T.lines raw)
+    jaLines  = [ (i, jaPayloadOf l) | (i, l) <- numberedAll, isJaLine l ]
+    numbered = [ p | p@(_, l) <- numberedAll, not (isJaLine l) ]
     nonBlank = dropWhile (isBlankL . snd) numbered
 
     (titleResult, afterTitle) = case nonBlank of

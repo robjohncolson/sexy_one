@@ -239,18 +239,18 @@ Checks performed, in order:
      stats from check 16 are handed to checks 7/8's
      scripts/browser-check.mjs as --expect-exercise-json, and
      exe:exercise-check --browser-fixture's output as --exercise-fixture
-     -- comparing what is ACTUALLY EMBEDDED in the running app.wasm
-     (#sxc1-exercise-stats) against what is on disk right now. This is
-     M2's equivalent of check 12's `content-check --dump-source`
-     exact-bytes comparison, but that trick cannot be reused here:
-     --dump-source reads bytes the Haskell compiler already embedded,
-     whereas exe:exercise-check only ever reads content/exercises/ off
-     DISK (it has no view into what site/app/Exercises/Embed.hs's
-     hand-written, per-file TH splices actually shipped) -- so a
-     forgotten rebuild, OR a new deck added on disk but never given its
-     own named splice in Embed.hs, shows up as a RED check instead of a
-     silently stale site. The per-deck FNV-1a is what makes this
-     byte-sensitive, not merely length-sensitive. Unless --skip-content.
+     -- comparing what the running app ACTUALLY LOADED
+     (#sxc1-exercise-stats -- since M6 W1 computed from the content
+     bundle the app fetched at boot, before that from the TH-embedded
+     corpus) against what is on disk right now. This is M2's equivalent
+     of check 12's `content-check --dump-source` exact-bytes comparison,
+     but that trick cannot be reused here: --dump-source reads bytes the
+     Haskell compiler already embedded, whereas exe:exercise-check only
+     ever reads content/exercises/ off DISK -- so a forgotten rebuild
+     (now: a stale content bundle -- see check 20's freshness half)
+     shows up as a RED check instead of a silently stale site. The
+     per-deck FNV-1a is what makes this byte-sensitive, not merely
+     length-sensitive. Unless --skip-content.
   18. M4 DEVICE-VERIFICATION GATE (task "verification"): checks V1-V8
      from briefs/M4-manifest.json, on the EXISTING axes only -- no new
      skip flag. V1, V2, V8 (size/budget: the frozen ceiling constant
@@ -300,6 +300,26 @@ Checks performed, in order:
      skip runs too, and a deleted check turns the gate red instead of
      silently shrinking the total. ADDING OR REMOVING ANY CHECK
      REQUIRES A VISIBLE EDIT TO THE PIN.
+  20. M6 CONTENT-BUNDLE CHECKS (unconditional): the corpus-externalization
+     re-baseline (briefs/M6-plan.md rulings 1/6). content/content.en.txt
+     and content.ja.txt are required files (check 1); the
+     M6_BUNDLE_CEILING=300000 combined-gzip ceiling constant is asserted
+     in this script's own source (the V1 pattern); both bundle gzips are
+     measured, recorded to state/bundle-ledger.tsv, and the combined
+     number is HARD-gated under the ceiling; both shipped bundles must
+     byte-match a fresh scripts/emit-content-bundles.py emission from
+     content/exercises/ (the stale-bundle detector, check 12's
+     exact-bytes discipline); and briefs/M6-budget.json must match the
+     pinned M6 re-baseline (m5_final==933305, frozen ceiling, m6_entry
+     shrunk by >= M6_SHRINK_MIN, fresh artifact in [m6_entry-3000,
+     1000000)).
+  21. M6 FETCH-FAILURE DEGRADATION (browser axis): a COPY of the bundle
+     is served WITHOUT its content/ directory and browser-check
+     --check-content-missing must report 4/4: the app still boots (the
+     JS-side content guard), the visible #sxc1-content-error banner
+     names the failure, a real manual page stays readable, and the
+     exercise routes offer #btn-content-retry. Skipped via skip() under
+     --skip-browser, like every other browser-axis stage.
 
 Exit status is non-zero if any check (other than the informational size
 report) failed.
@@ -470,8 +490,16 @@ info() {
 #                          assertions are exactly as unpluggable as
 #                          D26/D27 were before this fix).
 # ---------------------------------------------------------------------------
-M5_CHECK_TOTAL=99
-M5_BROWSER_ASSERT_FLOOR=175
+# M6 W1 pin raise (the documented procedure: ADDING A CHECK REQUIRES A
+# VISIBLE EDIT TO THE PIN; RAISING THE FLOOR IS PART OF ADDING
+# ASSERTIONS): 99 -> 107 (+2 required content bundles in check 1, +1
+# M6_BUNDLE_CEILING literal, +1 bundle ledger/ceiling, +2 bundle
+# freshness en/ja, +1 M6 budget re-baseline, +1 fetch-failure
+# degradation stage) and 175 -> 176 (+1: the degraded-content
+# absent-scenario parity assertion in runExerciseAssertions, present in
+# both full stages).
+M5_CHECK_TOTAL=107
+M5_BROWSER_ASSERT_FLOOR=176
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -656,6 +684,13 @@ REQUIRED_FILES=(
   "ghc_wasm_jsffi.js"
   ".nojekyll"
   "vendor/browser_wasi_shim/index.js"
+  # M6 W1 (briefs/M6-plan.md, ruling 1): the per-language exercise
+  # content bundles the app now loads at boot (build-site.sh step 7b,
+  # scripts/emit-content-bundles.py). A bundle-less build ships a
+  # permanently degraded app, so their absence is a missing-required-file
+  # failure exactly like a missing app.wasm.
+  "content/content.en.txt"
+  "content/content.ja.txt"
 )
 for rel in "${REQUIRED_FILES[@]}"; do
   if [ -f "$DIR/$rel" ]; then
@@ -1134,6 +1169,16 @@ fi
 # briefs/M5-budget.json remains the human-readable RECORD of the ruling;
 # V8 below asserts that record MATCHES these pins exactly, so a doctored
 # file fails even when it is internally consistent.
+# M6 W1 NOTE (briefs/M6-plan.md, ruling 6 + W1): these three remain the
+# M5 HISTORICAL-RECORD pins -- V8 still asserts briefs/M5-budget.json
+# matches them exactly, and V2 keeps the M5 task ceiling as a (now loose)
+# outer bound under the frozen 1,000,000. The corpus-externalization
+# re-baseline moved the CURRENT fresh-artifact honesty window to the M6
+# pins below (M6_M5_FINAL/M6_SHRINK_MIN + briefs/M6-budget.json): after
+# W1 the shipping artifact sits ~73K gzip BELOW the recorded M5 close ON
+# PURPOSE, so V8's old fresh-in-[m4_final-3000, m5_ceiling] clause was
+# retired (it described the M5 window, which closed at 933,305) and its
+# job is done by the M6 budget check.
 M5_M4_FINAL=927008
 M5_RESERVE=60000
 M5_TASK_CEILING=987008
@@ -1185,7 +1230,7 @@ fi
 #       clause (d), retired by the re-scope ruling: the M5 tree sat 626
 #       bytes under the M4-scoped ceiling and would have false-blocked
 #       the a11y pass).
-V8_LABEL="briefs/M5-budget.json MATCHES the pinned coordinator-ruling constants (m4_final==927008, m5_reserve==60000, task_local_ceiling==987008 -- M5-R1-2: a doctored file fails even when internally consistent) and coheres (task_local_ceiling_bytes == m4_final + m5_reserve; ceiling_bytes==1000000; fresh optimized-artifact gzip within [m4_final-3000, task_local_ceiling_bytes]) and briefs/M4-budget.json still stands as the M4 historical record (authorised:true; task_local == min(940000, m3_final+m4_budget); ceiling_bytes==1000000; |m3_final - second_build| <= 3000)"
+V8_LABEL="briefs/M5-budget.json MATCHES the pinned coordinator-ruling constants (m4_final==927008, m5_reserve==60000, task_local_ceiling==987008 -- M5-R1-2: a doctored file fails even when internally consistent) and coheres (task_local_ceiling_bytes == m4_final + m5_reserve; ceiling_bytes==1000000) and briefs/M4-budget.json still stands as the M4 historical record (authorised:true; task_local == min(940000, m3_final+m4_budget); ceiling_bytes==1000000; |m3_final - second_build| <= 3000) -- the FRESH artifact's own window moved to the M6 budget check (corpus-externalization re-baseline)"
 if [ -f "$M5_BUDGET_JSON" ] && [ -f "$M4_BUDGET_JSON" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
   V8_OUT="$(python3 -c '
 import json, sys
@@ -1214,10 +1259,12 @@ try:
         problems.append("M5 task_local_ceiling_bytes=%d is not m4_final+m5_reserve=%d" % (m5_task, want))
     if m5_ceil != 1000000:
         problems.append("M5 ceiling_bytes=%d, not the frozen 1000000" % m5_ceil)
-    if observed < m5_final - 3000:
-        problems.append("fresh artifact gzip=%d is %d bytes BELOW m4_final=%d (beyond the 3000-byte window) -- the recorded baseline never described this pipeline/tree" % (observed, m5_final - observed, m5_final))
-    if observed > m5_task:
-        problems.append("fresh artifact gzip=%d is OVER task_local_ceiling_bytes=%d by %d bytes" % (observed, m5_task, observed - m5_task))
+    # M6 W1: the fresh-artifact-in-M5-window clauses (observed >=
+    # m4_final-3000, observed <= m5_task) are RETIRED -- the M5 window is
+    # a closed historical record now, and the externalized corpus puts
+    # the current artifact deliberately far below it. The fresh-artifact
+    # honesty window is asserted by the M6 budget check
+    # (briefs/M6-budget.json vs the M6_* pins), never silently unchecked.
 except KeyError as e:
     problems.append("M5-budget.json is missing field %s" % e)
 try:
@@ -1240,8 +1287,8 @@ except KeyError as e:
 if problems:
     print("FAIL " + "; ".join(problems))
 else:
-    print("OK M5 record matches the pinned ruling (m4_final=%d, reserve=%d, task ceiling=%d), formula holds (task ceiling %d = %d+%d, ceiling_bytes=1000000), fresh gzip %d in [%d, %d]; M4 record intact (task ceiling %d = min(940000, %d+%d), authorised, variance |%d-%d|<=3000)"
-          % (pin_final, pin_res, pin_task, m5_task, m5_final, m5_res, observed, m5_final - 3000, m5_task,
+    print("OK M5 record matches the pinned ruling (m4_final=%d, reserve=%d, task ceiling=%d), formula holds (task ceiling %d = %d+%d, ceiling_bytes=1000000); fresh gzip %d is judged by the M6 budget check; M4 record intact (task ceiling %d = min(940000, %d+%d), authorised, variance |%d-%d|<=3000)"
+          % (pin_final, pin_res, pin_task, m5_task, m5_final, m5_res, observed,
              m4_task, m4_m3, m4_b, m4_m3, m4_second))
 ' "$M5_BUDGET_JSON" "$M4_BUDGET_JSON" "$WASM_GZIP_BYTES" "$M5_M4_FINAL" "$M5_RESERVE" "$M5_TASK_CEILING" 2>&1)" || true
   case "$V8_OUT" in
@@ -1250,6 +1297,175 @@ else:
   esac
 else
   fail "$V8_LABEL (observed: briefs/M5-budget.json or briefs/M4-budget.json missing, python3 missing, or app.wasm missing)"
+fi
+
+# ===========================================================================
+# M6 W1 (briefs/M6-plan.md, rulings 1/6 + wave W1): CORPUS-EXTERNALIZATION
+# RE-BASELINE + CONTENT-BUNDLE LEDGER. The exercise corpus moved OUT of
+# app.wasm into per-language bundles (site/public/content/content.{en,ja}
+# .txt, emitted by build-site.sh step 7b via scripts/emit-content-
+# bundles.py and loaded at boot by site/static/index.js +
+# site/app/Exercises/Bundle.hs). Everything here is unconditional (pure
+# artifact/file/python work, no toolchain, no browser); the behavioral
+# half -- the fetch-failure degradation stage -- lives on the browser
+# axis below.
+#
+# COORDINATOR-RULING CONSTANTS (2026-08-08 M6 plan, ruling 6; pinned here
+# per the M5-R1-2 pattern -- the mutable briefs/M6-budget.json may not
+# authorize its own numbers, this script's literals are what it must
+# MATCH):
+#   M6_BUNDLE_CEILING  the hard ceiling on gzip(content.en.txt) +
+#                      gzip(content.ja.txt) COMBINED: 300,000 bytes
+#                      ("Content bundles get their OWN ledger line and
+#                      ceiling: 300,000 gzip bytes combined (en+ja),
+#                      asserted by check-site" -- ruling 6). W1 measures
+#                      ~153K combined (the ja bundle is the EN fallback
+#                      until wave 3 fills the ja: fields; wave 3's real
+#                      Japanese text compresses independently, hence the
+#                      2x headroom).
+#   M6_M5_FINAL        gzip of the M5-final shipping artifact -- 933,305
+#                      bytes, the pre-externalization baseline the
+#                      re-baseline is measured against (briefs/
+#                      M6-plan.md ruling 1: "933,305 today").
+#   M6_SHRINK_MIN      the externalization must have RESTORED at least
+#                      this much wasm-ceiling headroom: m6_entry <=
+#                      m5_final - 50,000 (ruling 1 expected "roughly
+#                      -100K gzip"; measured -73,560 on this tree -- the
+#                      pin is a deliberate floor under the measurement,
+#                      not a target).
+# Moving ANY of these is a coordinator decision, never a task's.
+# ===========================================================================
+M6_BUNDLE_CEILING=300000
+M6_M5_FINAL=933305
+M6_SHRINK_MIN=50000
+M6_BUDGET_JSON="$REPO_ROOT/briefs/M6-budget.json"
+
+# --- M6-a: the bundle-ceiling CONSTANT itself (the V1 pattern) ------------
+M6A_LABEL="M6_BUNDLE_CEILING is literally 300000 (the combined en+ja bundle-gzip ceiling, coordinator-ruling constant asserted in this script's own source; the artifact half is the bundle ledger check below)"
+M6_CEILING_ASSIGN_COUNT="$(grep -c '^M6_BUNDLE_CEILING=' "${BASH_SOURCE[0]}" || true)"
+if [ "$M6_BUNDLE_CEILING" -eq 300000 ] \
+   && [ "$M6_CEILING_ASSIGN_COUNT" -eq 1 ] \
+   && grep -qx 'M6_BUNDLE_CEILING=300000' "${BASH_SOURCE[0]}"; then
+  ok "$M6A_LABEL"
+else
+  fail "$M6A_LABEL (observed: live value=$M6_BUNDLE_CEILING, assignment lines matching ^M6_BUNDLE_CEILING==$M6_CEILING_ASSIGN_COUNT -- the bundle ceiling was moved; that is a coordinator decision, never a task's)"
+fi
+
+# --- M6-b: THE BUNDLE LEDGER + the combined-gzip ceiling ------------------
+# The wasm size ledger's sibling: both bundle gzips are measured and
+# RECORDED on every run (state/bundle-ledger.tsv), and -- unlike the wasm
+# ledger's advisory projection -- the combined number is a HARD gate
+# against M6_BUNDLE_CEILING (ruling 6 says "asserted by check-site").
+BUNDLE_EN_FILE="$DIR/content/content.en.txt"
+BUNDLE_JA_FILE="$DIR/content/content.ja.txt"
+BUNDLE_LEDGER_FILE="$REPO_ROOT/state/bundle-ledger.tsv"
+M6B_LABEL="content bundles: combined gzip(content.en.txt)+gzip(content.ja.txt) is under the M6_BUNDLE_CEILING=$M6_BUNDLE_CEILING byte ceiling, recorded to state/bundle-ledger.tsv"
+if [ -f "$BUNDLE_EN_FILE" ] && [ -f "$BUNDLE_JA_FILE" ]; then
+  BUNDLE_EN_GZIP="$(gzip -c "$BUNDLE_EN_FILE" | wc -c | tr -d ' ')"
+  BUNDLE_JA_GZIP="$(gzip -c "$BUNDLE_JA_FILE" | wc -c | tr -d ' ')"
+  BUNDLE_COMBINED_GZIP=$((BUNDLE_EN_GZIP + BUNDLE_JA_GZIP))
+  BUNDLE_HEADROOM=$((M6_BUNDLE_CEILING - BUNDLE_COMBINED_GZIP))
+  mkdir -p "$REPO_ROOT/state"
+  if [ ! -f "$BUNDLE_LEDGER_FILE" ]; then
+    printf 'timestamp\ten_gzip_bytes\tja_gzip_bytes\tcombined_gzip_bytes\tceiling_bytes\theadroom_bytes\n' > "$BUNDLE_LEDGER_FILE"
+  fi
+  printf '%s\t%d\t%d\t%d\t%d\t%d\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BUNDLE_EN_GZIP" "$BUNDLE_JA_GZIP" \
+    "$BUNDLE_COMBINED_GZIP" "$M6_BUNDLE_CEILING" "$BUNDLE_HEADROOM" >> "$BUNDLE_LEDGER_FILE"
+  info "bundle ledger: content.en.txt gzip=$BUNDLE_EN_GZIP, content.ja.txt gzip=$BUNDLE_JA_GZIP, combined=$BUNDLE_COMBINED_GZIP; ceiling=$M6_BUNDLE_CEILING; headroom=$BUNDLE_HEADROOM"
+  if [ "$BUNDLE_COMBINED_GZIP" -lt "$M6_BUNDLE_CEILING" ]; then
+    ok "$M6B_LABEL (observed: en=$BUNDLE_EN_GZIP + ja=$BUNDLE_JA_GZIP = $BUNDLE_COMBINED_GZIP bytes, headroom $BUNDLE_HEADROOM)"
+  else
+    fail "$M6B_LABEL (observed: en=$BUNDLE_EN_GZIP + ja=$BUNDLE_JA_GZIP = $BUNDLE_COMBINED_GZIP bytes, OVER by $((BUNDLE_COMBINED_GZIP - M6_BUNDLE_CEILING)) bytes)"
+  fi
+else
+  fail "$M6B_LABEL (observed: $DIR/content/content.en.txt or content.ja.txt missing -- run ./scripts/build-site.sh first)"
+fi
+
+# --- M6-c/M6-d: BUNDLE FRESHNESS (the exact-bytes discipline) -------------
+# A fresh emission from content/exercises/ (the same
+# scripts/emit-content-bundles.py build-site runs) must byte-match what
+# is actually shipping at --dir -- this is the bundle counterpart of
+# check 12's --dump-source exact-bytes comparison: a deck edited (or a
+# ja: variant added) without re-running build-site turns this red
+# instead of silently shipping a stale bundle. Emitter CORRECTNESS is
+# separately cross-checked by the browser stages (#sxc1-exercise-stats,
+# computed by the app from the FETCHED bundle, must match the harness's
+# independent disk-derived numbers -- checks 16/17).
+BUNDLE_FRESH_TMP="$(mktemp -d -t sxc1-check-site-bundles.XXXXXX)"
+register_temp_dir "$BUNDLE_FRESH_TMP"
+BUNDLE_EMIT_OUT="$(python3 "$REPO_ROOT/scripts/emit-content-bundles.py" \
+  --exercises-dir "$REPO_ROOT/content/exercises" --out-dir "$BUNDLE_FRESH_TMP" 2>&1)" || BUNDLE_EMIT_OUT="EMIT-FAILED: $BUNDLE_EMIT_OUT"
+for lang in en ja; do
+  M6F_LABEL="bundle freshness/content.$lang.txt ($DIR/content/content.$lang.txt is byte-identical to a fresh scripts/emit-content-bundles.py emission from content/exercises/)"
+  case "$BUNDLE_EMIT_OUT" in
+    EMIT-FAILED:*)
+      fail "$M6F_LABEL (observed: fresh emission failed -- ${BUNDLE_EMIT_OUT#EMIT-FAILED: })"
+      ;;
+    *)
+      if [ -f "$DIR/content/content.$lang.txt" ] && cmp -s "$BUNDLE_FRESH_TMP/content.$lang.txt" "$DIR/content/content.$lang.txt"; then
+        ok "$M6F_LABEL"
+      else
+        fail "$M6F_LABEL (observed: shipped bundle diverges from a fresh emission -- stale bundle, or content/exercises edited without rebuilding)"
+      fi
+      ;;
+  esac
+done
+rm -rf "$BUNDLE_FRESH_TMP"
+unregister_temp_dir "$BUNDLE_FRESH_TMP"
+
+# --- M6-e: THE WASM-SHRINK RE-BASELINE (briefs/M6-budget.json) ------------
+# The M5-R1-2 pattern applied to the M6 record: the file must MATCH the
+# pins (a doctored file fails even when internally consistent), the
+# recorded m6_entry must show the externalization actually restored the
+# ceiling headroom (m6_entry <= m5_final - M6_SHRINK_MIN), and the FRESH
+# artifact must sit inside the M6 window [m6_entry - 3000,
+# WASM_GZIP_CEILING): the lower bound is baseline honesty (an artifact
+# far below the recorded entry means the record never described this
+# pipeline/tree), the upper bound stays the one frozen ceiling (ruling
+# 6: no new task-local wasm ceiling was granted for M6 -- later M6
+# waves' JA UI strings lawfully grow the artifact above m6_entry, under
+# the frozen 1,000,000).
+M6E_LABEL="briefs/M6-budget.json MATCHES the pinned M6 re-baseline (m5_final==933305, ceiling==1000000; m6_entry <= m5_final - M6_SHRINK_MIN=$M6_SHRINK_MIN -- the externalization really shrank the wasm) and the fresh artifact gzip sits in [m6_entry-3000, 1000000)"
+if [ -f "$M6_BUDGET_JSON" ] && [ -f "$WASM_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  M6E_OUT="$(python3 -c '
+import json, sys
+try:
+    m6 = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception as e:
+    print("FAIL could not parse briefs/M6-budget.json: %s" % e)
+    raise SystemExit
+observed = int(sys.argv[2])
+pin_m5_final, pin_shrink, pin_ceiling = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+problems = []
+try:
+    m5_final = int(m6["m5_final_gzip_bytes"])
+    m6_entry = int(m6["m6_entry_gzip_bytes"])
+    ceiling = int(m6["ceiling_bytes"])
+    if m5_final != pin_m5_final:
+        problems.append("m5_final_gzip_bytes=%d does not match the pinned M6_M5_FINAL=%d -- the record was doctored" % (m5_final, pin_m5_final))
+    if ceiling != pin_ceiling:
+        problems.append("ceiling_bytes=%d, not the frozen %d" % (ceiling, pin_ceiling))
+    if m6_entry > m5_final - pin_shrink:
+        problems.append("m6_entry_gzip_bytes=%d did not shrink by at least M6_SHRINK_MIN=%d from m5_final=%d (the externalization is not doing its job)" % (m6_entry, pin_shrink, m5_final))
+    if observed < m6_entry - 3000:
+        problems.append("fresh artifact gzip=%d is %d bytes BELOW the recorded m6_entry=%d (beyond the 3000-byte window) -- the recorded re-baseline never described this pipeline/tree" % (observed, m6_entry - observed, m6_entry))
+    if observed >= pin_ceiling:
+        problems.append("fresh artifact gzip=%d is at/over the frozen ceiling %d" % (observed, pin_ceiling))
+except KeyError as e:
+    problems.append("briefs/M6-budget.json is missing field %s" % e)
+if problems:
+    print("FAIL " + "; ".join(problems))
+else:
+    print("OK m5_final=%d, m6_entry=%d (shrink %d >= %d), fresh gzip %d in [%d, %d); restored ceiling headroom %d bytes"
+          % (m5_final, m6_entry, m5_final - m6_entry, pin_shrink, observed, m6_entry - 3000, pin_ceiling, pin_ceiling - m6_entry))
+' "$M6_BUDGET_JSON" "$WASM_GZIP_BYTES" "$M6_M5_FINAL" "$M6_SHRINK_MIN" "$WASM_GZIP_CEILING_BYTES" 2>&1)" || true
+  case "$M6E_OUT" in
+    "OK "*) ok "$M6E_LABEL (${M6E_OUT#OK })" ;;
+    *)      fail "$M6E_LABEL (observed: ${M6E_OUT#FAIL })" ;;
+  esac
+else
+  fail "$M6E_LABEL (observed: briefs/M6-budget.json missing, app.wasm missing, or python3 missing)"
 fi
 
 # --- V3: the harness fake exists and carries its whole driver surface -----
@@ -3294,6 +3510,20 @@ DEVICE_SUITE_LABEL="device assertions D1..D27 ran and passed inside check 7's ro
 # under --skip-browser (the stages never ran) AND under --skip-content
 # (without the content/exercise fixtures the stages lawfully run fewer
 # assertions -- see check 17's fallback note in usage()).
+# M6 W1: the fetch-failure degradation stage -- the behavioral half of
+# the corpus externalization (the structural half is the M6 bundle
+# section above). A COPY of the bundle at --dir is served WITHOUT its
+# content/ directory, so the boot-time bundle load 404s, and
+# browser-check --check-content-missing asserts the app still boots,
+# renders the visible #sxc1-content-error banner naming the failure,
+# keeps a real manual page readable, and offers #btn-content-retry on
+# the exercise routes. RED-FIRST: demonstrated by sabotaging the served
+# copy's index.js content guard to rethrow (the pre-guard behavior) --
+# boot dies with __SXC1_BOOT_ERROR and the mode reports 0/4 (see the M6
+# W1 report). Same owned-server discipline as the storage-refused stage
+# (M5-R1-3): reject a pre-occupied port, verify the child serves OUR
+# copy's index.html byte-for-byte, kill only our own child.
+CONTENT_MISSING_LABEL="fetch-failure degradation: served WITHOUT content/ bundles the app still boots, names the failure, keeps manuals readable, and offers a retry (browser-check --check-content-missing, 4/4)"
 ROOT_CARDINALITY_LABEL="M5 cardinality contract: root browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 
@@ -3327,6 +3557,7 @@ if [ "$SKIP_BROWSER" -eq 1 ]; then
   skip "$SUBPATH_HEALTH_LABEL"
   skip "$SUBPATH_BROWSER_LABEL"
   skip "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation)"
+  skip "$CONTENT_MISSING_LABEL"
   skip "$DEVICE_SUITE_LABEL"
   skip "$ROOT_CARDINALITY_LABEL"
   skip "$SUBPATH_CARDINALITY_LABEL"
@@ -3337,6 +3568,7 @@ else
     fail "$SUBPATH_HEALTH_LABEL (observed: no browser found -- set SXC1_BROWSER, install Chrome/Chromium, or pass --skip-browser)"
     fail "$SUBPATH_BROWSER_LABEL"
     fail "storage refused: app boots and reports available=false when localStorage throws (private-mode simulation) (observed: no browser found, the stage never ran)"
+    fail "$CONTENT_MISSING_LABEL (observed: no browser found, the stage never ran)"
     fail "$DEVICE_SUITE_LABEL (observed: no browser found, the suite never ran)"
     fail "$ROOT_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
     fail "$SUBPATH_CARDINALITY_LABEL (observed: no browser found, the stage never ran)"
@@ -3426,6 +3658,44 @@ else
       fi
       kill "$STORAGE_SRV_PID" >/dev/null 2>&1 || true
       wait "$STORAGE_SRV_PID" 2>/dev/null || true
+    fi
+
+    # M6 W1: the fetch-failure degradation stage -- see
+    # CONTENT_MISSING_LABEL's comment above.
+    CONTENT_MISSING_PORT=$((PORT + 9))
+    if port_in_use "$CONTENT_MISSING_PORT"; then
+      fail "$CONTENT_MISSING_LABEL (observed: port $CONTENT_MISSING_PORT is already in use BEFORE this stage started its own server -- refusing to probe a server this run does not own (M5-R1-3); free the port or pass a different --port)"
+    else
+      CONTENT_MISSING_TMP="$(mktemp -d -t sxc1-check-site-nocontent.XXXXXX)"
+      register_temp_dir "$CONTENT_MISSING_TMP"
+      cp -R "$DIR"/. "$CONTENT_MISSING_TMP"/
+      rm -rf "$CONTENT_MISSING_TMP/content"
+      python3 -m http.server "$CONTENT_MISSING_PORT" --bind 127.0.0.1 --directory "$CONTENT_MISSING_TMP" >/dev/null 2>&1 &
+      CONTENT_MISSING_SRV_PID=$!
+      SERVER_PIDS+=("$CONTENT_MISSING_SRV_PID")
+      CONTENT_MISSING_VERIFIED=0
+      if ! wait_for_port "$CONTENT_MISSING_PORT" 15; then
+        fail "$CONTENT_MISSING_LABEL (observed: this stage's own python http.server (pid $CONTENT_MISSING_SRV_PID) never came up on port $CONTENT_MISSING_PORT within 15s)"
+      elif ! verify_server_healthy "$CONTENT_MISSING_SRV_PID" "$CONTENT_MISSING_PORT" "/index.html" "$CONTENT_MISSING_TMP/index.html"; then
+        fail "$CONTENT_MISSING_LABEL (observed: the listener on port $CONTENT_MISSING_PORT is not provably this stage's own child serving the pruned copy -- child dead, /index.html unfetchable, or served bytes mismatch; browser check not run)"
+      else
+        CONTENT_MISSING_VERIFIED=1
+      fi
+      if [ "$CONTENT_MISSING_VERIFIED" -eq 1 ]; then
+        set +e
+        "$NODE" "$REPO_ROOT/scripts/browser-check.mjs" --check-content-missing --url "http://127.0.0.1:$CONTENT_MISSING_PORT/" --timeout 120000 >/dev/null 2>&1
+        CONTENT_MISSING_RC=$?
+        set -e
+        if [ "$CONTENT_MISSING_RC" -eq 0 ]; then
+          ok "$CONTENT_MISSING_LABEL"
+        else
+          fail "$CONTENT_MISSING_LABEL (browser-check --check-content-missing exit $CONTENT_MISSING_RC)"
+        fi
+      fi
+      kill "$CONTENT_MISSING_SRV_PID" >/dev/null 2>&1 || true
+      wait "$CONTENT_MISSING_SRV_PID" 2>/dev/null || true
+      rm -rf "$CONTENT_MISSING_TMP"
+      unregister_temp_dir "$CONTENT_MISSING_TMP"
     fi
 
     # V6 (M4, task "verification"; floor widened to D1..D27 by the M5

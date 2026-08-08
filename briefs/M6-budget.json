@@ -1,0 +1,16 @@
+{
+  "measured_at": "2026-08-08",
+  "m5_final_gzip_bytes": 933305,
+  "m6_entry_gzip_bytes": 859745,
+  "ceiling_bytes": 1000000,
+  "shrink_bytes": 73560,
+  "bundle_en_gzip_bytes": 76602,
+  "bundle_ja_gzip_bytes": 76603,
+  "bundle_ceiling_bytes": 300000,
+  "ruling": "Coordinator, 2026-08-08 (briefs/M6-plan.md rulings 1/6): the exercise corpus moved OUT of app.wasm into per-language content bundles (site/public/content/content.{en,ja}.txt, emitted by scripts/emit-content-bundles.py, loaded at boot via the JS-side-guarded window.__sxc1Content bridge). m5_final is the M5-tagged shipping artifact's gzip (933,305 -- the pre-externalization baseline); m6_entry is the post-externalization optimized artifact on this tree (859,745; -73,560 -- ruling 1 expected roughly -100K, the corpus's 284,107 raw bytes compressed better inside the wasm than the linear 0.3456 coefficient predicted). The frozen WASM_GZIP_CEILING_BYTES=1000000 is untouched and remains the only wasm ceiling for M6 (no new task-local wasm ceiling was granted; W2's JA UI strings lawfully grow the artifact above m6_entry under it). Content bundles get their own ledger and a 300,000-byte combined-gzip ceiling, asserted by check-site. check-site pins M6_M5_FINAL=933305, M6_SHRINK_MIN=50000 and M6_BUNDLE_CEILING=300000 as literals (the M5-R1-2 pattern) and asserts this file MATCHES them; briefs/M4-budget.json and briefs/M5-budget.json are preserved unchanged as historical records.",
+  "evidence": [
+    "m5_final: gzip of site/public/app.wasm at the M5 close (933,305, measured 2026-08-08 on the pre-W1 tree -- identical to the M6 plan's '933,305 today').",
+    "m6_entry: gzip of build-site.sh --optimize's app.wasm after Exercises.Embed retired and the boot fetch path landed (this tree).",
+    "bundles: gzip -c | wc -c of the emitted content.en.txt / content.ja.txt (the ja bundle is the EN fallback until wave 3 fills the ja: fields); combined 153,205 of the 300,000 ceiling."
+  ]
+}

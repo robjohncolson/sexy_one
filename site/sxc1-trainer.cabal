@@ -48,7 +48,7 @@ executable app
   hs-source-dirs:   app
   other-modules:    View.Blocks
                     View.Pages
-                    Exercises.Embed
+                    Exercises.Bundle
                     Exercises.Corpus
                     View.Exercise
                     Progress.Store

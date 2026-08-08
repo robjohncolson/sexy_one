@@ -1,0 +1,80 @@
+{
+  "task_type": "review",
+  "review_round": "M5 final review, round 2",
+  "reviewed_commit": "4e3178df0176081210079c9d1d4be6dd5e9b90a2",
+  "overall_verdict": "GATE-BLOCKED",
+  "summary": "Four of the five round-1 findings are fully resolved and the substantive check-site changes inspect cleanly. M5-R1-4 is only partially resolved: the requested M5 figures are present, but the README still labels current M5 verification and measurements as M4 in several places. The edit also introduces a false historical baseline ('96 at M4's close') that conflicts with the same README's '95 as of M4'.",
+  "verification_treatment": "Read-only source and diff inspection only. Per the subagent constraint, no tests, lint checks, builds, browser runs, shell syntax checks, or other verification commands were run. The coordinator-supplied green executions and artifact measurements were accepted as execution evidence.",
+  "per_finding_verdicts": [
+    {
+      "id": "M5-R1-1",
+      "verdict": "PASS — RESOLVED",
+      "blocks_ship": false,
+      "evidence": [
+        "scripts/check-site.sh:473-474 pins M5_CHECK_TOTAL=99 and M5_BROWSER_ASSERT_FLOOR=175.",
+        "scripts/check-site.sh:3304-3320 requires a captured browser-check summary with passed == total and total >= 175; both root and sub-path captures are checked at lines 3467-3468.",
+        "scripts/check-site.sh:3441-3454 matches exactly ^ok - D([1-9]|1[0-9]|2[0-7]): , de-duplicates the names, requires all 27, and enumerates each missing D-name in the failure text.",
+        "scripts/check-site.sh:3323-3342 accounts for eight browser-axis checks on both skip-browser and no-browser paths; skip-content accounts for the two floor checks through skip() at lines 3463-3465.",
+        "scripts/check-site.sh:3485-3490 performs the unconditional last self-counting check against 99, so normal and skip-axis runs cannot silently shrink.",
+        "scripts/browser-check.mjs:3861-3868 now correctly says D26/D27 are inside the D1-D27 V6 floor. The supplied 99/99, 175/175, 57/99 with 42 skipped, and red-demo results are consistent with this control flow."
+      ]
+    },
+    {
+      "id": "M5-R1-2",
+      "verdict": "PASS — RESOLVED",
+      "blocks_ship": false,
+      "evidence": [
+        "scripts/check-site.sh:1137-1139 contains the three coordinator-ruling literals M5_M4_FINAL=927008, M5_RESERVE=60000, and M5_TASK_CEILING=987008.",
+        "V2 compares the freshly measured gzip size only to M5_TASK_CEILING and calculates its delta from M5_M4_FINAL at lines 1143-1152; it does not derive authority from M5-budget.json.",
+        "V8 passes the pinned literals separately into its validator and requires every corresponding M5-budget.json field to equal them at lines 1189-1250, while retaining the internal arithmetic and artifact-window checks. A reserve-only/ceiling co-edit therefore fails V8 without changing V2's ceiling."
+      ]
+    },
+    {
+      "id": "M5-R1-3",
+      "verdict": "PASS — RESOLVED",
+      "blocks_ship": false,
+      "evidence": [
+        "scripts/check-site.sh:3402-3404 fails the storage-refused check immediately when the derived port is occupied and never launches the browser probe on that branch.",
+        "On a free port, lines 3405-3415 start python directly, retain its PID, wait for readiness, require kill -0 on that child through verify_server_healthy, fetch /index.html, and compare SHA-256 with DIR/index.html before setting STORAGE_SRV_VERIFIED=1.",
+        "The browser probe is guarded by STORAGE_SRV_VERIFIED at lines 3416-3426. Direct-child kill plus wait remains at lines 3427-3428, with the PID also registered for trap cleanup."
+      ]
+    },
+    {
+      "id": "M5-R1-4",
+      "verdict": "FAIL — PARTIALLY RESOLVED",
+      "blocks_ship": true,
+      "evidence": [
+        "The requested numeric updates are present: README.md:66-69 and 446-449 advertise 99 checks, a 175-assertion stage floor, D1-D27, and 141 self-test assertions; lines 1000-1008 contain the 2,662,016/933,305 shipping artifact, +6,297 M5 delta, 53,703 task headroom, 66,695 frozen-ceiling headroom, 12,234,536 public total, ~65s run, and 141/141 self-test.",
+        "The sweep is nevertheless incomplete. README.md:50-72 still presents the current 99/175/D1-D27 state under the M4 Status entry and links only the M4 plan/manifest; no M5 current-status entry was added.",
+        "README.md:207-216 says the commands were re-run end to end for M4, then attributes the newly inserted 99-check/D1-D27 result to that M4 run.",
+        "README.md:991-992 still labels the measured-figures table 'M4' and says rows not re-measured for M4 say so, even though the table now calls its shipping artifact the M5 final build and gives current M5 gate figures.",
+        "README.md:859-860 still describes fake-midi.js as pre-loaded for a D1-D25 device suite. The detailed verification text at lines 434-435 also stops its explicit suite enumeration at D1-D25 before later saying that 27 D-lines are counted."
+      ],
+      "recommendation": "Add an M5 status/current-state paragraph (or explicitly label M4 as historical), change the quickstart and measured-figures preambles to M5, and make the repository-layout/device-suite wording consistently describe D1-D27 while preserving any intentionally historical D1-D25 explanation as such."
+    },
+    {
+      "id": "M5-R1-5",
+      "verdict": "PASS — RESOLVED",
+      "blocks_ship": false,
+      "evidence": [
+        "PLAN.md:170-176 preserves the original Actions/ENABLE_PAGES=true intent, states that the current path is legacy gh-pages with ENABLE_PAGES=false, explicitly makes the deploy-path note authoritative, and names M5 debt item 8's ship-time workflow probe."
+      ]
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "M5-R2-1",
+      "severity": "LOW",
+      "blocks_ship_independently": false,
+      "title": "The README edit introduces a false M4 check-count baseline",
+      "locations": [
+        "README.md:66-67",
+        "README.md:140-141"
+      ],
+      "evidence": "Commit 4e3178d changes the Status text to say '96 at M4's close', but the same README retains the historical statement '95 as of M4'. The reviewed parent already had 96 dynamically accumulated checks because M5 had added a check before this final-gate patch; 96 was therefore the pre-round-2 M5 count, not the M4 close count.",
+      "recommendation": "Replace '96 at M4's close' with an accurate transition such as '95 at M4's close; 96 before the M5 final-gate fixes; +3 in this fix to 99', or omit the intermediate count."
+    }
+  ],
+  "new_code_defects": [],
+  "final_line": "GATE-BLOCKED — M5-R1-4 remains incomplete because README still attributes current M5 gate/measurement state to M4; 4e3178d also introduced the contradictory claim that M4 closed at 96 checks."
+}

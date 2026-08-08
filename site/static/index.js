@@ -34,6 +34,52 @@ window.__sxc1Storage = {
 };
 
 
+// M6 W1 (briefs/M6-plan.md, ruling 1): the exercise corpus is no longer
+// embedded in app.wasm -- it ships as a per-language content bundle
+// (site/public/content/content.<lang>.txt, emitted by
+// scripts/emit-content-bundles.py) loaded HERE, on the JS side, with the
+// same guard discipline as the storage bridge above: the network call
+// and every failure live entirely in this file (a JS exception does not
+// unwind into Haskell -- it kills the boot computation), and the wasm
+// side only ever sees total, try/catch-wrapped bridge methods. A load
+// failure must NEVER kill boot: the app starts with an empty corpus plus
+// the failure reason and renders its visible degraded state (the
+// #sxc1-content-error banner; exercises show #btn-content-retry) while
+// the manuals -- still embedded -- keep working.
+//
+// The bundle is served as PLAIN .txt, deliberately not a pre-compressed
+// .txt.gz: GitHub Pages (like the local dev servers) compresses text
+// responses on the wire via ordinary Content-Encoding negotiation, but
+// it does NOT transparently serve a .gz sidecar as gzip-encoded content
+// -- a fetched .txt.gz would arrive as opaque bytes needing a manual
+// DecompressionStream pass. Plain text + on-the-wire compression is the
+// simplest robust choice; check-site.sh's bundle ledger measures the
+// gzip cost against the M6 ceiling.
+//
+// W2 seam: the language will come from the SXC1PREFS blob's uiLang field
+// once it exists; W1 pins 'en' here, in the one place W2 must edit.
+function sxc1ContentLang() {
+  return "en";
+}
+
+// Started BEFORE wasm instantiation so the two loads overlap; awaited
+// just before hs_start. This promise NEVER rejects -- both failure
+// shapes resolve to { ok: false, error }.
+const sxc1ContentPromise = (async () => {
+  const lang = sxc1ContentLang();
+  const rel = `./content/content.${lang}.txt`;
+  try {
+    const resp = await fetch(rel);
+    if (!resp.ok) {
+      return { lang, ok: false, error: `HTTP ${resp.status} fetching ${rel}` };
+    }
+    const text = await resp.text();
+    return { lang, ok: true, text };
+  } catch (err) {
+    return { lang, ok: false, error: `${rel} unreachable: ${err && err.message ? err.message : String(err)}` };
+  }
+})();
+
 const bootStatus = document.getElementById("boot-status");
 
 try {
@@ -52,6 +98,19 @@ try {
     ghc_wasm_jsffi: ghc_wasm_jsffi(instanceExports),
   });
   Object.assign(instanceExports, instance.exports);
+
+  // The content bridge MUST be installed before hs_start: Main.main
+  // reads it synchronously at boot (Exercises.Bundle). Every method is
+  // total -- try/catch, sentinel returns -- mirroring __sxc1Storage, so
+  // no content failure can ever throw across the wasm boundary.
+  // undefined = "load failed" for text(); undefined = "load succeeded"
+  // for error().
+  const sxc1Content = await sxc1ContentPromise;
+  window.__sxc1Content = {
+    lang: () => { try { return sxc1Content.lang; } catch (e) { return "en"; } },
+    text: () => { try { return sxc1Content.ok ? sxc1Content.text : undefined; } catch (e) { return undefined; } },
+    error: () => { try { return sxc1Content.ok ? undefined : String(sxc1Content.error); } catch (e) { return "content bridge failure"; } },
+  };
 
   wasi.initialize(instance);          // runs _initialize, starting the Haskell RTS
   await instance.exports.hs_start();  // mounts the Miso app into <body>
@@ -97,6 +156,12 @@ document.addEventListener("click", (event) => {
     if (confirmBtn) confirmBtn.hidden = false;
   } else if (id === "btn-progress-wipe-confirm") {
     event.target.hidden = true;
+  } else if (id === "btn-content-retry") {
+    // M6 W1: the degraded-content retry affordance. A full reload IS the
+    // retry -- it re-runs this file's guarded bundle load and the app's
+    // boot-time read of it, with no separate re-fetch path to keep in
+    // sync (re-fetch-on-language-switch is W2's seam).
+    window.location.reload();
   }
 });
 
