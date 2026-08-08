@@ -1,0 +1,135 @@
+{
+  "task_type": "review",
+  "scope": {
+    "baseline": "There is no m6 tag. I treated f415633 as the M6 gate-round-2 follow-through, then reviewed M7 plan commit 454dea9 and implementation commits 078d294, 05c2061, and ba1a7a1 through HEAD.",
+    "constraints_observed": "Read-only repository review except for this required result JSON; no build, test, lint, install, browser run, commit, or network operation was performed."
+  },
+  "summary": {
+    "gate": "GATE-BLOCKED",
+    "reason": "The externalization/acceptance architecture is sound, but sampled shipped Japanese guide pages contain visible editorial labels that are absent from Casio's authoritative page images. That contradicts M7 ruling 3 and the documents' own claim that the text is a transcription rather than a back-translation.",
+    "finding_counts": {
+      "BLOCKER": 0,
+      "HIGH": 0,
+      "MEDIUM": 1,
+      "LOW": 2
+    }
+  },
+  "findings": [
+    {
+      "id": "M7-R1-1",
+      "severity": "MEDIUM",
+      "blocks_ship": true,
+      "title": "The Japanese guide transcription exposes editorial `メモ` labels that Casio did not print",
+      "evidence": [
+        "briefs/M7-plan.md:44-50 makes the page image authoritative and requires authors to reproduce what Casio printed, except for the expressly permitted `*[Figure: ...]*` descriptions.",
+        "translations/guide-book.ja.md:3 tells the reader this is text transcribed from the Japanese original and not translated from English.",
+        "translations/guide-book.ja.md:509,523,539 adds visible `メモ：` prefixes on pp.15-16. The authoritative scans site/static/pages/guide-book/page-15.webp and page-16.webp have styled callout text but no printed `メモ` label; manuals/text/guide-book/page-15.txt:35-39 and page-16.txt:25-29,50-53 likewise contain the sentences without that word.",
+        "translations/guide-book.ja.md:1156 adds `メモ：` before the printed `※シーケンスモード...` on p.38. The scan site/static/pages/guide-book/page-38.webp and manuals/text/guide-book/page-38.txt:5-7 begin with the `※` sentence and contain no `メモ` label.",
+        "translations/guide-book.ja.md:1306 adds the same label on p.42, while site/static/pages/guide-book/page-42.webp and manuals/text/guide-book/page-42.txt:22-29 contain only the app sentence.",
+        "The matching English structural template contains `Note:` at translations/guide-book.md:509,523,539,1161,1314. translations/guide-book.qa-notes.md:34-40 also records that the English authoring deliberately supplied textual labels for source icons/unstyled boxes. The Japanese labels therefore track the English editorial template rather than literal Japanese source text."
+      ],
+      "impact": "A Japanese reader receives selectable/searchable words represented as Casio's original even though those words are not in the original. Four of the fourteen image pages sampled showed this same issue, and the Japanese guide contains many additional `メモ`/`ヒント`/`注` lead labels that require an image-by-image audit. The structural checker cannot detect it because text is intentionally excluded from structural signatures.",
+      "recommendation": "Remove visible editorial prefixes wherever the scan does not print them, retaining an unlabeled blockquote when needed to preserve the source's callout styling and EN/JA block shape. Audit every Japanese bold lead label against its page image; represent non-text visual semantics through structure or accessible metadata rather than invented reader-visible transcription text. Re-emit the bundles/manifest and update the derived size record afterward."
+    },
+    {
+      "id": "M7-R1-2",
+      "severity": "LOW",
+      "blocks_ship": false,
+      "title": "The repaired figure-callout delimiter/kind convention is not enforced",
+      "evidence": [
+        "briefs/M7-plan.md:46-49 requires Japanese figure descriptions to use the EN file's `*[Figure: ...]*` convention.",
+        "site/test/CheckExercises.hs:994-1007 reduces every `Figure _ _` to the same `figure callout` signature. Its now-stale explanation at lines 1001-1004 explicitly treats Japanese kinds/full-width colons as structurally acceptable, which means the exact assembly defect repaired before ship would pass this checker.",
+        "site/src/SXC1/Content/Markdown.hs:834-840 recognizes only ASCII `:` as the kind/caption separator. A full-width `：` therefore becomes part of the kind and leaves the caption empty; site/app/View/Blocks.hs:93-99 takes the no-caption rendering branch.",
+        "scripts/check-site.sh:3720-3728 mutates a callout into prose, proving Figure-versus-Para detection, but has no negative control for a Japanese kind or full-width delimiter. scripts/emit-content-bundles.py:581-594 validates encoding/newline/reserved-prefix conditions only and does not pin the callout convention."
+      ],
+      "impact": "A recurrence of the already-observed `写真：`/`イラスト：` assembly form can keep the 109/109 structural check green. The committed files inspected at HEAD are normalized, so this is a regression-enforcement gap, not a current bad rendered page.",
+      "recommendation": "Have the emitter or a checker reject whole-line figure placeholders whose kind/delimiter is outside the agreed ASCII convention, and add a full-width-colon/Japanese-kind negative control."
+    },
+    {
+      "id": "M7-R1-3",
+      "severity": "LOW",
+      "blocks_ship": false,
+      "title": "The human-readable M7 size record is stale and incorrectly describes M6 as tagged",
+      "evidence": [
+        "briefs/M7-budget.json:11-16 has the current machine fields: 57,818 + 60,205 = 118,023 manual gzip bytes, and 167,732 + 118,023 = 285,755 total bytes.",
+        "briefs/M7-budget.json:17 and :21 still say JA=60,215, manual total=118,033, and all bundles=285,765. The same stale totals remain at briefs/M7-plan.md:79-80.",
+        "scripts/check-site.sh:2015 says the wasm shrink was 48,942, while briefs/M7-budget.json:3-5 correctly records 887,732 - 838,748 = 48,984.",
+        "briefs/M7-budget.json:17 calls the 887,732-byte baseline the `M6-tagged shipping artifact`, but the repository has no m6 tag; M6 was deployed pre-tag as stated in this review's scope."
+      ],
+      "impact": "The executable arithmetic and pinned numeric fields remain correct, so ceilings are not bypassed. The narrative audit trail is nevertheless internally contradictory at the M6-to-M7 handoff.",
+      "recommendation": "Synchronize the ruling/evidence prose and M7 plan status with the final 60,205 / 118,023 / 285,755 / 48,984 values, and describe 887,732 as the deployed pre-tag M6 baseline."
+    }
+  ],
+  "m6_gate_round_2_follow_through": [
+    {
+      "id": "M6-R1-1",
+      "verdict": "FIXED",
+      "evidence": "site/app/Bundle.hs:193-242 validates requested header language, exact counts, and a wasm-embedded whole-body fingerprint; lines 251-268 pin the exact ordered deck list. site/app/Exercises/Corpus.hs:73-102 rejects any deck parse failure and aggregate count mismatch. M7 reuses this discipline for manuals at Bundle.hs:302-337."
+    },
+    {
+      "id": "M6-R1-2",
+      "verdict": "FIXED",
+      "evidence": "scripts/emit-content-bundles.py:191-263 and :411-424 classify structural line shapes and prevent Japanese prose from silently becoming exercise structure; the current bundle structural differ supplies the behavioral backstop."
+    },
+    {
+      "id": "M6-R1-3",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:4807-4860 independently allowlists JAC1..JAC5 and extracts the exact successful ID set, so prefix/cardinality substitutions no longer satisfy the gate. M7 applies the same stable-ID pattern to JAM and MF assertions."
+    },
+    {
+      "id": "M6-R1-4",
+      "verdict": "FIXED",
+      "evidence": "site/app/Main.hs:427-446 handles boot hint resync failure, and :642-669 suppresses reload when the hint write fails, corrects documentElement.lang, and degrades storage. site/app/View/Pages.hs:242-249 renders the localized visible role=alert language-split surface."
+    },
+    {
+      "id": "M6-R1-5",
+      "verdict": "FIXED",
+      "evidence": "site/static/index.js:93-175 places headers and body reads for both content bundles under one 15-second AbortController deadline, resolves failures into data rather than aborting wasm boot, and retains the retry/degraded path."
+    },
+    {
+      "id": "M6-R1-6",
+      "verdict": "FIXED",
+      "evidence": "scripts/check-site.sh:1882-1960 preserves M6 as a historical record and verifies its pins plus both live exercise-bundle components; scripts/check-site.sh:2344-2439 explicitly hands current wasm/live-bundle ownership to M7-e."
+    }
+  ],
+  "focus_area_verdicts": {
+    "a_manual_text_integrity_at_seam": {
+      "verdict": "PASS",
+      "analysis": "site/app/Bundle.hs:183-227 rejects malformed/wrong-language framing and record-count disagreement. Manual acceptance at :302-337 requires the exact ordered `(slug,page-count)` manifest, legal per-document language, and the whole raw bundle fingerprint at :308. Because the fingerprint is computed over `raw`, the `!SXC1-DOC ... <lang> ...` line is included; changing `ja` to `en` without regenerating the wasm expectation fails. site/app/Bundle/Manifest.hs:125-150 pins 71/15/6/16 pages and separate EN/JA fingerprints. site/app/View/Pages.hs:91-120 additionally requires every document to have a title and parse to exactly its declared pages. Any failure yields empty manuals plus the visible global alert and named degraded/manual retry views at View/Pages.hs:210-289. FNV-1a/32 is an identity checksum, not an adversarial cryptographic authenticator, but a malicious same-origin deploy could replace wasm/JS as well; no accidental stale/truncated/missing/registry-mismatched path stays healthy."
+    },
+    "b_transcription_honesty": {
+      "verdict": "FAIL",
+      "analysis": "I visually sampled fourteen authoritative images across all four documents: guide-book pp.2,15,16,38,42,52,65,68; startup-guide pp.8,13; midi pp.1,4; oss pp.1,9, cross-checking the OCR drafts and shipped Markdown. Device strings sampled, including `MIDI IN Ch.`, `SAMPLING ERROR！`, and deliberate `LOW STRAGE SPACE`, were preserved. The four sampled guide callouts described in M7-R1-1 contain added visible `メモ` labels, so the zero-error/original-transcription claim does not hold."
+    },
+    "c_structural_enforcement": {
+      "verdict": "PASS-WITH-LOW",
+      "analysis": "The page comparisons are real. Bundle.Manifest.hs:133-142 fixes the current 71+15+6+16=108 pages. site/test/CheckExercises.hs:1037-1108 parses both fresh bundles with the reader's `mkDoc`, compares doc order/counts, and emits one result per EN page plus the header result. `manualBlockSig` at :994-1024 covers block position/type, heading level, bullet/numbered counts and starts, recursive list/quote children, table header/row/width shape, and figure positions; `firstDiff` also catches signature-length divergence. The emitter independently requires each document's markers to be exactly 1..N in order at scripts/emit-content-bundles.py:563-578. scripts/check-site.sh:3682-3700 requires N/N and at least 109, while :3702-3800 captures real exit codes, grep-confirms three mutations, and confirms reversal. No JA page can disappear from the current 108-page corpus while this combined path stays green. M7-R1-2 is the remaining convention-level gap: Figure kind/delimiter is deliberately erased from the signature."
+    },
+    "d_both_language_reader_correctness": {
+      "verdict": "PASS",
+      "analysis": "site/app/View/Pages.hs:578-604 renders the selected language body and, only for `/ja`, the original scan. Lines 583-585 preserve meaningful `jaFirst` ordering. A real fallback alone receives `lang=en` at :578-581 and the localized note at :564-572. Home and TOC notes are wired at :457-497. scripts/browser-check.mjs:2873-2911 uses independent Japanese literals, and :3894 onward navigates via unique page selectors, checks document/body language, a second document/device label, the actual image fetch, and Japanese TOC. EN uses the unchanged EN document sources through the same renderer."
+    },
+    "e_progress_prefs_safety": {
+      "verdict": "PASS",
+      "analysis": "No progress scheduler, codec, or store implementation changed from f415633 through HEAD. M7 adds manual loading before the existing storage/prefs initialization at site/app/Main.hs:375-446 and does not alter progress state serialization. The M6 language-hint repair remains visible and failure-aware at Main.hs:427-446,642-669. Manual fetch failure is independent of the exercise/progress surfaces."
+    },
+    "f_size_budget_and_handoff": {
+      "verdict": "PASS-WITH-LOW",
+      "analysis": "The operative fields and pins are coherent: 887,732 - 838,748 = 48,984; 57,818 + 60,205 = 118,023; 167,732 + 118,023 = 285,755. scripts/check-site.sh:2022-2044 pins 250,000 and 550,000 exactly and binds the latter to 300,000+250,000. M7-e at :2344-2439 checks frozen wasm ceiling, shrink floor, all bundle arithmetic, component live windows, and both bundle ceilings. M6-e explicitly retains historical-record/exercise-bundle responsibility and hands the new live wasm judgment to M7-e. Nothing fell between the enforcement halves; M7-R1-3 is stale prose only."
+    },
+    "g_vacuous_or_masked_checks": {
+      "verdict": "PASS-WITH-LOW",
+      "analysis": "The reviewed new checks capture subprocess statuses before restoring `set -e`, parse exact summaries, require exact JAM/JAC/MF IDs rather than prefix floors, and make null/timeout observations fail Boolean assertions. Structural mutations are confirmed in and their exit codes are tested; bad-manual healthy control uses a full manual corpus. I found no tee-masked status, double-escaped matching, null-as-pass, or zero-work green path. The unpinned callout kind/delimiter in M7-R1-2 is the one recurring-defect class that can evade the current structural signature."
+    }
+  },
+  "known_deferred": {
+    "verdict": "NOT-REFLAGGED",
+    "items": [
+      "The post-ship content backlog in briefs/M5-ship.md.",
+      "The pre-existing intermittent EN keyboard-only drill timeout under load."
+    ]
+  },
+  "low_severity_ship_effect": "M7-R1-2 and M7-R1-3 are explicitly non-blocking LOW findings: the committed callouts are normalized and the executable budget fields/pins are correct. They should be repaired for regression coverage and audit accuracy, but neither LOW independently blocks shipment. M7-R1-1 does block because it violates the milestone's core image-grounded transcription acceptance claim.",
+  "method": "Static review of the relevant commit history/diffs, plans, generated manifest, bundle emitter/parser/reader, browser and shell enforcement, M6 follow-through, and budget records. Fourteen shipped page images were visually compared with Japanese Markdown and OCR drafts. Coordinator-reported test totals were not rerun and are treated as supplied evidence, per the no-verification-command constraint.",
+  "final_line": "GATE-BLOCKED — M7-R1-1: sampled shipped Japanese guide pages include visible editorial `メモ` labels absent from Casio's original page images, contradicting ruling 3 and the documents' transcription claim. LOWs M7-R1-2 and M7-R1-3 do not block ship."
+}

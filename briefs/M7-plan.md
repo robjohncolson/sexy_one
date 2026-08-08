@@ -76,8 +76,8 @@ ledgers and docs landed; gate pending. Measured at W3's close: `check-site`
 stage; `exercise-check --manual-structural-diff` **109/109** with three negative
 controls; the manual-language-of-record stage **5/5** (MF1-MF5) now asserting the
 EN-fallback note's ABSENCE; four ID-pinned `ja manual:` assertions (JAM1-JAM4) in both
-stages; `app.wasm` 838,748 gzip of 1,000,000; manual bundles 118,033 of 250,000 and
-all four fetched bundles 285,765 of 550,000. Remaining: gate → tag `m7` → deploy →
+stages; `app.wasm` 838,748 gzip of 1,000,000; manual bundles 118,023 of 250,000 and
+all four fetched bundles 285,755 of 550,000. Remaining: gate → tag `m7` → deploy →
 live-verify.
 
 ## Waves
@@ -100,3 +100,27 @@ live-verify.
 Enumerate work lists from the filesystem, never by hand. A null agent result is
 UNVERIFIED, never accepted. Every new check red-first. All verification
 foreground with bounded timeouts. Ownership boundaries per wave, disjoint.
+
+## Deferred at the owner's decision (2026-08-09)
+
+The M7 gate (briefs/M7-codex-gate1.json) returned GATE-BLOCKED on ONE finding,
+which the owner reviewed and chose to ship with:
+
+- **M7-R1-1 (MEDIUM) — editorial labels not printed on the source.** The EN
+  translation renders the guide book's styled callout boxes as
+  `> **Note:** ...`; the JA transcription mirrored that as `> **メモ：** ...`.
+  Casio's pages print an unlabeled styled callout, so those labels are
+  editorial, which contradicts ruling 3 and the JA files' own preamble claim.
+  A coordinator audit of every bold lead label against its page OCR found 37
+  such instances across 20 pages (labels: メモ ×14, 禁止, 指示, 必ず実行,
+  ヒント, 注, 注記, 重要, 警告 — some of which ARE printed on safety pages and
+  would be legitimate). The fix is per-page verification against the page
+  images, removing only the labels the scan does not print while keeping the
+  blockquote so callout styling and EN/JA block shape are preserved.
+  NOT a correctness defect in the Japanese sentences themselves: the
+  transcribed text was verified against the images page by page in W2.
+
+Both LOWs the gate raised are also open: M7-R1-2 (the figure-callout ASCII
+`*[Kind: caption]*` convention is repaired but not ENFORCED — a checker or the
+emitter should reject Japanese kind words / full-width delimiters, with a
+negative control), and the M7-R1-3 prose figures (fixed 2026-08-09).

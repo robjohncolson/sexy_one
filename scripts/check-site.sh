@@ -2012,7 +2012,7 @@ fi
 #   M7_SHRINK_MIN the externalization must have RESTORED at least this
 #                 much wasm-ceiling headroom: m7_final <= m6_final -
 #                 30,000. Ruling 1 expected roughly -67K; measured
-#                 -48,942 on this tree (the embedded translations
+#                 -48,984 on this tree (the embedded translations
 #                 compressed better inside the wasm than the linear
 #                 projection assumed -- the same direction M6's own
 #                 estimate missed in). The pin is a deliberate floor
