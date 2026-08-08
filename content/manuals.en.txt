@@ -1,0 +1,3472 @@
+!SXC1-BUNDLE v1 en 4
+!SXC1-DOC guide-book en 71
+# SXC-1 Guide Book (User's Guide)
+
+> This is an English translation of *SXC-1_guide_book_JA.pdf* (Portable Standalone Sampler SXC-1 Guide Book, Japanese original by Casio). Translated on August 6, 2026.
+
+<!-- page 1 -->
+
+# Portable Standalone Sampler SXC-1 Guide Book (User's Guide)
+
+*[Figure: cover page — concert crowd photo in the background; product photo of the SXC-1 held in a hand, its 16 pads lit in various colors]*
+
+Before use, be sure to read the "Safety precautions" carefully and use the product correctly.
+
+## CONTENTS
+
+**PART 0 — First things first: Part: Preparation** — Page 12–
+
+**PART 1 — Hot beats pour from your fingertips! Part: Pad play** — Page 14–
+
+**PART 2 — Your voice and the sounds around you become music! Part: Sampling** — Page 27–
+
+**PART 3 — Grooves emerge like solving a puzzle! Part: Sequencer** — Page 35–
+
+**PART 4 — Remake samples and make the most of the app! Part: Leveling up** — Page 46–
+
+CASIO
+
+JA
+
+<!-- page 2 -->
+
+## Please note the following
+
+- Every effort has been made to ensure the accuracy of the contents of this manual. However, should you notice anything questionable or in error, please contact us.
+- CASIO assumes no responsibility whatsoever for any damages, lost profits, or claims from third parties arising from the use or malfunction of this manual or this unit.
+- CASIO assumes no responsibility whatsoever for any damages, lost profits, or other losses resulting from the loss of memory contents due to malfunction, repair, or any other cause.
+- Reproduction of this manual, in whole or in part, without permission is prohibited. Note that apart from personal use, use of this manual without CASIO's permission is prohibited under copyright law.
+- The contents of this manual are subject to change without notice for the purpose of improvement.
+- Before use, be sure to read the "Safety precautions" carefully and use the product correctly.
+- Using this unit without performing the preparations and settings described in this manual may interfere with proper use of the unit.
+- The explanations, display examples, illustrations, and other content in this manual may differ from the actual product.
+- Keep this manual in a safe place for future reference after reading it.
+
+<!-- page 3 -->
+
+# Safety precautions
+
+Thank you very much for purchasing this unit.
+Before using it, be sure to read these "Safety precautions" carefully and use the product correctly.
+
+| Label | Meaning |
+|---|---|
+| ⚠ **Warning** | Indicates content that could result in death or serious injury. |
+| ⚠ **Caution** | Indicates content that could result in minor injury or property damage. |
+
+### Examples of graphic symbols
+
+*[Figure: a crossed-out circle symbol over an icon of a device exposed to water, labeled "Avoid water"]*
+
+- The 🚫 symbol means "something you must not do" (the example at left means "avoid water"). Items with this symbol are labeled **Prohibited:** in this translation.
+
+*[Figure: a filled blue circle with an exclamation mark]*
+
+- The ● symbol means "something you must do". Items with this symbol are labeled **Required:** in this translation.
+
+## ⚠ Warning
+
+### Batteries
+
+> **Required:** **If fluid leaking from a battery gets on your skin or clothing, rinse it off with clean water.**
+> If it gets into your eyes, there is a risk of blindness or other harm. After rinsing, seek medical attention immediately.
+
+> **Prohibited:** **Keep batteries out of the reach of infants and small children.**
+> If a child swallows a battery, consult a physician immediately.
+
+### USB cable
+
+> **Prohibited:** **To prevent fire and electric shock caused by the USB cable, always observe the following.**
+> - Never use any USB cable other than the specified one
+> - Never use any USB AC adaptor other than the specified one
+> - Do not use the included cable with any device other than this unit
+> - Do not place heavy objects on the cable, and do not use the USB cable while it is bundled
+> - Do not heat, modify, or damage the cable
+> - Do not forcibly bend, twist, or pull the cable
+
+> **Prohibited:** *(do not touch with wet hands)* **Do not touch the plug with wet hands.**
+> - Doing so creates the risk of electric shock.
+
+> **Required:** **If the cable becomes damaged, contact the "Repair inquiries" contact.**
+> Continuing to use it as is creates the risk of fire and electric shock.
+
+> **Caution:** *(beware of electric shock)* **When lightning starts, do not touch any device connected to a power outlet.**
+> - Doing so creates the risk of electric shock.
+
+<!-- page 4 -->
+
+*Safety precautions*
+
+## ⚠ Warning
+
+### Location and place of use
+
+> **Prohibited:** **Do not place or use the unit in locations such as the following.**
+> - Locations with high humidity or large amounts of dust
+> - Near a kitchen or humidifier, or other locations exposed to oil smoke or steam
+> - Near heating equipment, on a heated carpet, in locations exposed to direct sunlight, inside a car parked in the hot sun, or other locations where this unit becomes hot
+> - Locations subject to strong vibration
+> - Other locations of high or low temperature (use this unit in an environment of 0°C to 40°C)
+>
+> Such use creates the risk of fire and electric shock.
+
+> **Prohibited:** **Do not place the unit on a wobbly stand, a high shelf, or any other unstable location.**
+> Falling or tipping over creates the risk of injury.
+
+> **Prohibited:** **Do not place heavy objects on top of this unit.**
+> Falling or tipping over creates the risk of injury.
+
+> **Prohibited:** **Do not use headphones or operate this unit while driving a vehicle.**
+> Doing so creates the risk of traffic accidents.
+
+> **Prohibited:** **Do not use this unit or headphones at railroad crossings, on station platforms, on roads with vehicle traffic, at construction sites, or anywhere else where not being able to hear surrounding sounds would be dangerous.**
+> Doing so creates the risk of accident and injury.
+
+### Abnormalities (smoke, odor, heat, etc.)
+
+> **Required:** **Do not use the unit in an abnormal state such as when it is emitting smoke, an unusual odor, or heat. Do not continue using it while damaged, such as after being dropped.**
+> Doing so creates the risk of fire and electric shock. Immediately take the following steps.
+> 1. Turn the power off
+> 2. Disconnect the USB cable
+> 3. Contact the "Repair inquiries" contact
+
+### Avoid water and foreign objects
+
+> **Required:** **Do not allow water, liquids (sports drinks, seawater, animal or pet urine, etc.), or foreign objects (metal fragments, etc.) to get inside this unit or its USB connector. If any of these gets inside, immediately take the following steps.**
+> Continuing to use the unit as is creates the risk of fire and electric shock.
+> 1. Turn the power off
+> 2. Disconnect the USB cable
+> 3. Contact the "Repair inquiries" contact
+
+> **Prohibited:** *(avoid water)* **Do not place vases or other liquid-filled containers on top of or near this unit.**
+> If one tips over and liquid gets on the unit, it creates the risk of fire and electric shock.
+
+> **Prohibited:** *(do not touch with wet hands)* **Do not operate the unit with wet hands.**
+> Doing so creates the risk of electric shock.
+
+<!-- page 5 -->
+
+*Safety precautions*
+
+## ⚠ Warning
+
+### Display
+
+> **Prohibited:** **Do not press hard on the display or subject it to strong impact.**
+> The glass of the screen could crack, creating the risk of injury.
+
+### Do not disassemble or modify
+
+> **Prohibited:** *(do not disassemble)* **Do not disassemble or modify this unit.**
+> For internal inspection, adjustment, or repair, contact the "Repair inquiries" contact.
+> Disassembly or modification creates the risk of electric shock, burns, and injury.
+
+## ⚠ Caution
+
+### Batteries
+
+> **To prevent fire and injury due to bursting, and contamination of the surroundings due to fluid leakage, always observe the following.**
+> - Do not mix new and old batteries
+> - Do not mix batteries of different types
+> - Do not use any batteries other than those specified for this unit
+> - Insert batteries correctly, paying attention to their polarity (+ and − orientation)
+> - When the unit will not be used for a long time, remove the batteries from it
+> - When batteries run down, replace them promptly
+> - Do not use batteries whose outer covering has peeled off
+
+> **Prohibited:** **Do not continue using the unit with leaking batteries inside.**
+> Doing so can create the risk of fire and electric shock. Immediately stop using this unit and contact the "Repair inquiries" contact.
+
+### USB cable
+
+> **To prevent fire and electric shock caused by the USB cable, always observe the following.**
+> - *(Prohibited)* Do not use detergent to clean the cable
+> - *(Required)* When moving this unit, turn the power off and disconnect the USB cable
+> - Insert the USB plug straight into the connector
+> - *(Prohibited)* Do not use a USB plug that has been bent
+> - *(Caution)* Take care that no liquid or foreign objects get inside the connector
+
+### Care and cleaning
+
+> **Required:** *(unplug)* **Before cleaning, turn the power off and disconnect the USB cable.**
+> Failing to do so can create the risk of electric shock.
+> Also, a damaged cable can create the risk of fire and electric shock.
+
+<!-- page 6 -->
+
+*Safety precautions*
+
+## ⚠ Caution
+
+### Connecting to the connector section
+
+> **Prohibited:** **Do not connect anything other than the specified items to the connector section.**
+> Doing so can create the risk of fire and electric shock.
+
+### Headphones
+
+> **Prohibited:** **Do not let the unit dangle by the headphones while they are plugged in.**
+> The unit could fall, which can create the risk of injury.
+
+### Volume
+
+> **Caution:** **Be careful about the volume when using headphones.**
+> Listening at high volume can create the risk of hearing loss.
+
+> **Prohibited:** **Do not use the unit at high volume for long periods.**
+> Depending on the settings, doing so can create the risk of hearing damage.
+> Be especially careful when using headphones.
+
+### Strap
+
+> **Caution:** **If a commercially available strap is attached to this unit, do not swing the unit around by the strap.**
+> Doing so can create the risk of injury.
+
+### Back up important data
+
+> **Required:** **Regularly back up the contents stored in this unit using the dedicated smartphone app.**
+> Memory contents can be lost due to malfunction, repair, or other causes.
+
+### Health precaution
+
+> **Caution:** **In extremely rare cases, there have been reports of people experiencing symptoms such as temporary muscle convulsions or loss of consciousness when exposed to strong light stimulation or flashing light.**
+> - Anyone prone to such symptoms should be sure to consult a physician before using this unit
+> - Use this unit in a well-lit room
+> - If such symptoms occur during use, stop using the unit immediately and seek medical attention
+
+### Other product handling precautions
+
+> **Prohibited:** **Do not insert your hands or fingers into any gaps in this unit.**
+> Doing so can create the risk of injury, or of malfunction or damage to the unit.
+
+<!-- page 7 -->
+
+# Operating precautions
+
+- This unit is made up of precision electronic components. Failure to observe the following can make it impossible to maintain data correctly and can cause malfunction.
+  - Do not drop the unit, place heavy objects on it, strike it hard, or apply pressure to it. Doing so can cause malfunction. Also take care not to put it in a bag together with hard objects.
+  - Do not operate the buttons or pads with a ballpoint pen or other pointed object.
+  - Do not apply strong force to the display or poke it with a ballpoint pen or other pointed object.
+    The screen is made of glass, so it can be scratched or cracked.
+  - Do not disassemble the unit. Malfunction caused by disassembly will require charged repair even within the warranty period.
+  - Do not use the unit in locations prone to static electricity.
+- Do not connect the unit in any way not described in this manual.
+- When connecting to the DATA port, use the included USB Type-C™ cable.
+- The MAIN VOL of this unit is shared between the headphones and the speaker. Even when the slider is at the same position, the actual volume level differs between them, so before turning the power on or connecting headphones, set the unit's MAIN VOL to minimum. Be especially careful when switching from the speaker to headphones. To protect your hearing, raise the volume gradually.
+- If the power is cut during recording, the data being recorded may be lost.
+  For long recording sessions, use the USB AC adaptor.
+  When running on batteries, check the remaining battery charge before recording.
+- When no sound is playing, faint "hiss" or "buzz" noise may be heard from the speaker and headphones depending on the connection method and environment. This noise is not a product malfunction; it arises from the characteristics of electronic circuits.
+- When turning the power on, a sudden popping or crackling sound may occur. If using headphones, put them on after turning the power on.
+- The built-in microphone is designed for close-range sound pickup, so use it with the sound source close to the mic. For important recordings, we recommend making a test recording beforehand to check the distance to the mic, the surrounding noise, and so on.
+- This unit includes a screen saver function to prevent display burn-in (this is different from the Auto Power Off function).
+  If no operation is performed for about 30 minutes, the display turns off automatically. It can be restored by a button operation or pad operation.
+
+## Operating environment
+
+- Operating temperature range: 0°C to 40°C
+- Do not place the unit in locations such as the following.
+  - Extremely hot or cold locations outside the operating temperature range
+  - Locations exposed to direct sunlight, high humidity or dust, or large amounts of sand
+  - Near air conditioning or heating equipment, or anywhere else with extreme changes in temperature or humidity
+  - Inside a car during the day, or locations subject to strong vibration
+- When using or storing the unit, keep it away from devices that generate strong electromagnetic waves/radiation or magnetic fields.
+- Use the unit out of the reach of small children.
+- The unit is not waterproof. Do not touch it with wet hands or let it get wet.
+- When cleaning, use a dry, soft cloth.
+  When the unit is dirty, wipe it with a dry, soft cloth. Rubbing hard with a cloth may scratch the display. If dirt is heavy, soak a soft cloth in diluted neutral detergent, wring it out firmly, wipe the dirt off lightly, and then finish by wiping lightly with a dry, soft cloth. Do not use thinner, benzine, cosmetics, or other volatile solvents. Doing so could erase the lettering on the buttons and pads or stain the case. When disinfecting, wipe two or three times with a non-alcohol disinfecting sheet, then finish by wiping lightly with a dry, soft cloth.
+- Beware of chemicals.
+  If thinner, gasoline (benzine), kerosene, various solvents, oils or greases, or cleaners, alcohols (including alcohol-type disinfecting sheets), adhesives, paints, chemicals, insect repellent sprays, sunscreens, cosmetics, alkaline detergents, wax, or oily foods (instant ramen, food soups containing pork broth, etc.) and the like adhere to the resin case, they can cause discoloration, deterioration, peeling of the coating, or cracking. Please take care.
+- Keep magnetic cards away.
+  Do not bring credit cards, bank cards, prepaid cards, or other items carrying magnetic strips extremely close to this unit. Because this unit uses magnetized components, magnetic cards may become unusable.
+
+<!-- page 8 -->
+
+*Operating precautions*
+
+## LEDs
+
+Individual variation may occur in the brightness and color tone of the LEDs, but this is not a malfunction. Please be aware of this in advance.
+
+## Strap (commercially available)
+
+After attaching a strap, make sure the strap is securely fastened to this unit.
+
+## Connections
+
+- When connecting external devices, turn off the power of this unit and all external devices.
+- After connecting, turn the volume settings of this unit and the external devices down low, then turn on the power in the order of this unit first, then the external devices.
+- If the sound is distorted when connected to an external device, lower the volume of this unit.
+- For the PHONE jack, use only a 3.5 mm stereo mini plug (3-pole).
+- Even when an external speaker or similar is connected to the LINE OUT jack, sound is still output from this unit's speaker. To silence the sound from this unit's speaker, set the unit's MAIN VOL to minimum.
+
+## Precautions concerning USB power
+
+To power this unit, use the separately available USB AC adaptor (AD-XA06J Type-C) or a commercially available USB AC adaptor.
+When using a commercially available USB AC adaptor, use a product that complies with the USB standard and has an output of DC 5 V, 1 A or more. Also, for the USB cable used with a commercially available USB AC adaptor, use a product that complies with the USB 2.0 standard and is no longer than 1 m.
+
+- When connecting a USB cable to this unit, always connect it with the unit's power turned off.
+- If a USB AC adaptor is connected to the POWER/DATA port while batteries are installed in the unit, USB power takes priority.
+- When not using the unit, unplug the USB cable.
+- When using the separately available USB AC adaptor, carefully read the user documentation included with the USB AC adaptor and use it correctly.
+- If the USB cable comes loose, the power may cut off even when batteries are installed, and data being recorded and settings may be lost. Make sure the cable is securely connected.
+- If a smartphone is connected to the POWER/DATA port, power may be supplied from the smartphone to this unit (in some cases it may not be). If you want to communicate without drawing power from the smartphone, connect the smartphone to the DATA port and the USB AC adaptor to the POWER/DATA port.
+
+<!-- page 9 -->
+
+*Operating precautions*
+
+## About the batteries
+
+- This unit can also be used with commercially available AAA rechargeable nickel-metal hydride eneloop batteries (hereinafter, "eneloop") or AAA alkaline batteries.
+  Do not use any batteries other than those specified with this unit. Due to a mismatch between the battery characteristics and the unit's specifications, the batteries may not achieve their rated battery life, or malfunction may result.
+  - ※ As a guideline, continuous operation on batteries is approximately 2 hours when using eneloop. When using alkaline batteries, or depending on usage conditions, this may drop to 1 hour or less.
+    For extended playing or operation, we recommend supplying power with a USB AC adaptor.
+- If the batteries come loose during use, information such as data being recorded and settings may be lost. Make sure the battery cover is securely attached when using the unit.
+- eneloop batteries, chargers, and alkaline batteries are not included with this product. Purchase eneloop batteries, chargers, and alkaline batteries at a retailer or similar outlet.
+- When using eneloop batteries, note the following.
+  - Always use the dedicated charger to charge eneloop batteries.
+  - eneloop batteries cannot be charged while installed in this unit.
+  - When using eneloop batteries and their dedicated charger, carefully read the user documentation and precautions included with each product, and use them correctly.
+- Depending on how the unit is used, battery life may become significantly shorter. In particular, setting the LED brightness high or playing through the speaker at maximum volume drains the batteries faster, so take care.
+  Also, when the unit is used at low temperatures, battery capacity drops due to the characteristics of batteries, making "REPLACE THE BATTERY" more likely to appear on the display. In that case, we recommend supplying power with a USB AC adaptor.
+- Depending on sound playback/recording activity and usage conditions (remaining battery charge, environment, etc.), the power may shut off without "REPLACE THE BATTERY" being displayed, or the power may shut off immediately after "REPLACE THE BATTERY" appears on the display. Take particular care while recording, because recorded data may be lost.
+
+> **Note:** If Auto Power Off is set to off, the power will no longer shut off automatically, so the unit will continue to consume power.
+
+> **Caution:** **Precautions concerning batteries**
+> - **The following must be avoided, because they create the possibility of explosion, or of leakage of flammable liquid or gas.**
+> - Replacement with batteries not specified for this unit
+> - Disposal in fire or an incinerator, or mechanical crushing or cutting
+> - Excessively high or low temperatures during use, storage, or transport
+> - Excessively low air pressure during use, storage, or transport
+
+## Replacing the batteries
+
+When "REPLACE THE BATTERY" appears on the display, replace the batteries as soon as possible. Even if it does not appear, be sure to replace the batteries once a month.
+In particular, leaving depleted eneloop or alkaline batteries in this unit can degrade the eneloop batteries or cause the alkaline batteries to leak, so remove them immediately.
+
+- Continuing to use this unit with depleted batteries can cause the power to shut off suddenly. This creates the risk of corruption or loss of the data stored on the unit.
+- Always turn the power off before replacing the batteries. Replacing the batteries without turning off the power can cause settings and other information to be lost.
+- When replacing, always replace with four fully charged eneloop batteries or four new alkaline batteries. Using batteries other than those specified, or mixing new and old batteries, can significantly shorten battery life or cause malfunction.
+- After switching to eneloop batteries, set the battery setting (BATTERY Type) to "BAT-e" (for the battery setting, see p. 55).
+  If the power shuts off after "REPLACE THE BATTERY" appears on the display, you can resume use by switching the power switch "OFF→ON" once.
+
+■ **Keep backup copies of important data.**
+Back up any important content stored on this unit. Stored content may be lost due to malfunction, repair, or other causes (for the backup settings, see p. 60).
+
+■ **Auto Power Off**
+This unit is equipped with an "Auto Power Off function" that automatically turns off the power when no operation is performed for a set period of time.
+
+- Set time
+  Default setting: 20 minutes
+- How to restore power
+  If Auto Power Off has activated, you can resume use by switching the power switch "OFF→ON" once.
+- Caution
+  Note that when the Auto Power Off setting is "OFF", the unit continues to consume power (for the Auto Power Off function setting, see p. 55).
+
+<!-- page 10 -->
+
+# Names of parts
+
+*[Figure: five views of the SXC-1 — top edge (connector section), front panel, left side, right side, and rear — with numbered callouts 1–13 corresponding to the table below]*
+
+| No. | Item | Description |
+|---|---|---|
+| 1 | Display (OLED display) | Displays various information such as waveforms and settings. |
+| 2 | Directional buttons | Used to select menus, change values, and so on. |
+| 3 | Sliders | ・INPUT VOL: Adjusts the input level for recording.<br>・MAIN VOL: Adjusts the volume of the built-in speaker and headphones. |
+| 4 | FX1 button / dial<br>FX2 button / dial | Used to apply effects to sounds and to edit waveforms.<br>The buttons switch ON/OFF; the dials select effects and change parameters. |
+| 5 | Function buttons | ・▶/■: Play/stop<br>・REC: Start/stop recording (sampling)<br>・ONE SHOT: Toggle full-sound playback<br>・LOOP: Toggle loop playback<br>・DEL: Delete sounds<br>・EDIT: Switch editing modes (parameters / waveform editing) |
+| 6 | Pads section | Used to play, record, and edit sounds. A sound is assigned to each pad, and pressing a pad plays it. |
+| 7 | Built-in microphone | Used for recording with the unit on its own. |
+| 8 | Bank select buttons (`A`/`B`/`C`/`D`) | Used to switch sound banks and sequences while performing. |
+| 9 | Connector section<br>・PHONE jack<br>・LINE OUT jack<br>・AUDIO IN jack<br>・DATA port<br>・POWER/DATA port | Connects headphones (3.5 mm stereo mini).<br>Connects to a mixer, speakers, etc. to output sound (3.5 mm stereo mini).<br>Connects an external device to input sound (3.5 mm stereo mini).<br>USB port for data communication with a smartphone (MIDI/audio transfer).<br>USB port for power supply and for data communication with a smartphone (MIDI/audio transfer). |
+| 10 | Power switch | Turns the unit's power ON/OFF. |
+| 11 | INPUT SELECT switch | Switches the input source for recording.<br>MIC: built-in microphone / ♪: AUDIO IN jack / USB: USB port |
+| 12 | Built-in speaker | Used for playback with the unit on its own. |
+| 13 | Battery cover | Remove the battery cover to insert batteries. |
+
+<!-- page 11 -->
+
+# Operation overview
+
+The unit's functions are listed below. For a description of each function, see the corresponding page.
+
+*[Figure: mode map of nine screens connected by arrows showing how to move between them]*
+
+- Sequence selection — screen: `SEQUENCE SLCT / BANK = 1 / OK(A) CANCEL(B)`
+- Sequence mode — screen: `BANK A:1  BPM:95` with step grid, `♪:OFF`
+- Sequence settings — screen: `SEQUENCE EDIT / SOUND BANK:1 / BPM :95 / CLEAR :BAR / METRONOME :OFF`
+- Bank selection — screen: `SELECT BANK 1`
+- Performance mode — screen: `MASTER BPM:95 / BANK A:1  PAD:10  BPM:95` with waveform
+- System settings — screen: `SYSTEM SETTING / Beat Sync :ON / LED Bright :3 / Disp Bright :5 / APO Time :20min`
+- REC mode — screen: `SAMPLING MODE: AUTO TRIGGER / L / R` with level meters
+- DEL mode — screen: `DELETE SELECT PAD`
+- EDIT mode — screen: `SOUND EDIT / PITCH :0 / VOLUME :100 / GROUP :0 / COLOR :6`
+- Arrow labels:
+  - Sequence selection ↔ Sequence mode: `A`
+  - Sequence mode ↔ Sequence settings: EDIT
+  - Performance mode → Sequence selection: long-press `A`–`D`
+  - Performance mode ↔ Sequence mode: long-press `A`–`D` (while selected)
+  - Bank selection ↔ Performance mode: `A`–`D` / pad
+  - Performance mode ↔ System settings: long-press EDIT / EDIT
+  - Performance mode → REC mode: REC
+  - Performance mode ↔ DEL mode: DEL
+  - Performance mode → EDIT mode: EDIT
+
+| Function | Description | Reference |
+|---|---|---|
+| Performance mode | The normal mode for performing. | p.15 |
+| Bank selection | After short-pressing one of the `A`–`D` buttons, use the directional buttons to select the bank to assign to each of the `A`–`D` buttons. | p.16 |
+| Sequence selection | After long-pressing one of the `A`–`D` buttons, use the directional buttons to select the sequence to assign to each of the `A`–`D` buttons. | p.36 |
+| Sequence mode | Create patterns of up to 8 measures using the directional buttons, the `A`/`B` buttons, and the pads. Created patterns can be played from Performance mode. | p.36 |
+| Sequence settings | Change settings such as the bank used for a sequence and the BPM. | p.44 |
+| REC mode | Capture sound from outside using the built-in microphone, a USB cable, and so on. | p.29 |
+| DEL mode | Delete sounds assigned to pads. | p.32 |
+| EDIT mode | Change the pitch, playback timing, and other aspects of sounds assigned to pads. | p.44 |
+| Effect function | Apply various changes to the sound being played. | p.24 |
+| System settings | Change settings that affect the sampler as a whole. | p.55 |
+
+<!-- page 12 -->
+
+# PART 0 — Part: Preparation
+
+## Getting ready before making sound
+
+*[Figure: photo of a hand plugging a USB cable into the SXC-1's connector section; inset photo of the included USB Type-C cable]*
+
+- USB Type-C cable (connect to the POWER/DATA port)
+
+### Using the unit plugged into a power outlet
+
+Connect the included USB cable to a commercially available USB AC adaptor, or connect with the separately available USB AC adaptor (AD-XA06J Type-C).
+
+*[Figure: photos of the rear of the unit — a hand slides off the battery cover at the raised tab, and four AAA batteries are inserted]*
+
+- Raised tab on the rear of the unit
+- Battery ×4
+
+### Using the unit on batteries
+
+While pressing the raised tab ("−" shape) on the battery cover on the rear of the unit, slide the cover off, then install four eneloop or AAA alkaline batteries.
+※ Take care that the ⊕ and ⊖ ends face the correct way.
+
+- When using a commercially available USB AC adaptor, use a product that conforms to the USB standard with an output of DC 5 V, 1 A or higher. When doing so, use the included USB cable or a cable no longer than 1 m that conforms to the USB 2.0 standard.
+- As a guideline, continuous operation on batteries is approximately 2 hours when using eneloop. When using alkaline batteries, or depending on usage conditions, this may drop to 1 hour or less. For extended use, we recommend supplying power with a USB AC adaptor.
+- If no operation is performed for a set period of time while the power is on, the power turns off automatically (Auto Power Off). Switch the power switch OFF→ON once to resume use.
+  The time until the power turns off can be set in the system settings (see p. 55).
+
+<!-- page 13 -->
+
+*Getting ready before making sound — PART 0: Part: Preparation*
+
+## How to output sound
+
+*[Figure: photo of the connector section of the unit on a desk, with callouts pointing to the PHONE and LINE OUT jacks]*
+
+- Headphones, etc. (→ PHONE jack)
+- Active speakers / external mixer, etc. (→ LINE OUT jack)
+
+*[Figure: photo of a person wearing headphones connected to the SXC-1, and an image of the rear of the unit with the built-in speaker circled]*
+
+You can also output sound from the speaker on the rear of the unit (no sound is output from the speaker while headphones or another device are connected to the PHONE jack).
+
+<!-- page 14 -->
+
+# PART 1 — Part: Pad play
+
+## Beats pour out of your fingers! Take on finger drumming
+
+- 16 pads whose lighting colors can be customized
+- Preset sounds spanning a wide range of genres
+- Perform using looped sounds and one-shot sounds
+
+*[Figure: photo of two hands playing the SXC-1's pads on a table]*
+
+<!-- page 15 -->
+
+# Finger drumming along with a looped sound
+
+The SXC-1 comes loaded with plenty of sounds so you can enjoy pad performance right away.
+Let's start by choosing sounds recommended for your first finger drumming experience.
+
+## First, select BANK 1
+
+On this unit, a set of sounds assigned to the 16 pads is called a "BANK (bank)".
+This section explains how to select the BANK 1 sounds in Performance mode.
+
+1. *[Figure: two photos of the display area — the "SXC-1" logo on the screen at power-on, then the Performance mode screen]*
+   When you turn the power on, the "SXC-1" logo is displayed.
+   When the logo disappears, "Performance mode" starts.
+
+2. If the number in the circled part of the display is 1, go to "Tap the pads to make sounds" on p. 17.
+   *[Figure: magnified view of the Performance mode screen with the bank indicator "A:1" circled — `MASTER BPM:--- / BANK A:1  PAD:12  BPM:110` with waveform]*
+
+If the number in the circled part of the display is anything other than 1 and one of the `B`–`D` buttons is lit, press the `A` button.
+When "SELECT BANK 1" is displayed, go to "Tap the pads to make sounds" on p. 17.
+
+*[Figure: photo of the display showing "D:4" magnified with the `D` button lit, an arrow down to a photo of the panel with "SELECT BANK 1" on the display and a finger pressing the lit `A` button]*
+
+> **Note:** Which of the `A`–`D` buttons is lit, and which color each pad lights up in, is determined by the state the unit was in when the power was last turned off.
+
+<!-- page 16 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+If "SELECT BANK ◯" shows a number other than 1, change the number with the directional buttons.
+
+*[Figure: two display screens — "SELECT BANK 2" with an arrow down to "SELECT BANK 1" — and a diagram of the directional buttons labeled +1 (up), −1 (down), −10 (left), +10 (right)]*
+
+The ↑/↓ buttons increase or decrease the "SELECT BANK ◯" number by 1, and the ←/→ buttons increase or decrease it by 10.
+
+When "SELECT BANK 1" is displayed, go to the next page.
+
+> **Note:** Using the dedicated app, you can name banks so they are easier to keep track of, and make use of them in other convenient ways. (See PART 4, p. 60)
+
+*[Figure: photo of a smartphone showing the CASIO Sampler App's sound bank management screen]*
+
+## About the SXC-1's "banks"
+
+BANK 1–14 come with a variety of sounds already assigned (preset), so you can tap the pads and start performing right away. BANK 15 and above are the user area, where you assign your own sounds. You can create up to 80 banks.
+
+Running "Initialize" in the system settings (see PART 4, p. 55) returns the unit to its factory default state.
+※ Note that any sounds you have assigned yourself will be erased.
+
+*[Figure: diagram of bank slots — a row of lit pad grids labeled BANK1, BANK2, … BANK14 under the heading "Preset area", and a row of unlit pad grids labeled BANK15 … BANK80 under the heading "User area"]*
+
+- 登録済エリア → Preset area
+- ユーザーエリア → User area
+
+> **Note:** Switch banks with the A–D buttons.
+> By default, BANK 1–4 are assigned.
+> *[Figure: the `A`/`B`/`C`/`D` buttons labeled BANK1, BANK2, BANK3, BANK4]*
+>
+> After pressing one of the `A`–`D` buttons, you can press the directional buttons to change the bank assigned to that `A`–`D` button.
+> *[Figure: directional buttons]*
+
+<!-- page 17 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+## Tap the pads to make sounds
+
+The SXC-1's preset banks each hold in a single bank the sounds needed to perform and produce music — rhythm sounds, bass sounds, chord sounds, and more.
+In BANK1, the following sounds are assigned to the 16 pads.
+
+*[Figure: top panel photo of the 16 pads with callouts pointing to each row of pads]*
+- Drums and percussion rhythm — **looped sound** (pads 13–16, left callout)
+- Rhythm from `13`/`14` without the drums — **looped sound** (right callout)
+- Bass phrases — **looped sound** (pads 9–12, left callout)
+- Piano phrases — **looped sound** (right callout, with piano illustration)
+- Keyboard chord playing — **one-shot sound** (pads 5–8)
+- Bass drum (kick) — **one-shot sound** (pad 1)
+- Sound effects — **one-shot sound** (pad 4)
+- Hi-hat — **one-shot sound** (pad 3)
+- Snare drum — **one-shot sound** (pad 2)
+
+*[Photo: a finger tapping pad 14, which is lit white; drum kit illustration at lower left]*
+- A pad you tap lights up white. When the sound finishes, the pad returns to its original color.
+
+> **Tip (robot character):** **Try tapping the pads and listen to the sounds!**
+> - **One-shot sound**: A single sound plays just once.
+> - **Looped sound**: Tap once and the sound loops (repeats). Tap the same pad again and it stops.
+
+<!-- page 18 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+## About the SXC-1's Beat Sync feature
+
+This feature makes multiple looped sounds play so they sound natural when layered on top of each other. By default it is OFF; turn it ON in the system settings (see PART 4, p. 55) to use it.
+
+### Time stretch
+
+While a sound that has a BPM setting is playing, if you play another sound with a different BPM, it is played back **matched to the tempo of the sound that is already playing**. For a sound that has a pitch, only the tempo changes — the pitch stays the same.
+
+*[Screenshot: display showing `MASTER BPM:130`, `BANK B:2  PAD:13  BPM:130` above a waveform]*
+
+This is the display when you tap a pad that has a BPM setting. The BPM at the upper right is the sound's tempo information, and the same value is also shown in the MASTER BPM area at the top.
+
+*[Screenshot: display showing `MASTER BPM:130`, `BANK A:1  PAD:11  BPM:110` above a waveform]*
+
+If you play another sound while a MASTER BPM is set, it is played at the MASTER BPM tempo, regardless of its original tempo.
+
+*[Screenshot: display showing `MASTER BPM:110`, `BANK A:1  PAD:11  BPM:110` above a waveform]*
+
+Stopping playback resets the MASTER BPM. If you then play the later sound again, the MASTER BPM changes to the BPM shown at the upper right, and the sound plays at that tempo.
+
+### Quantize
+
+When you play one looped sound and then trigger another looped sound, this automatically corrects slight timing errors in when you tap the pad, aligning the start of the looped sounds precisely for playback.
+
+<!-- page 19 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+3. **Listen to the rhythm you will use as a reference**
+
+   *[Photo: a finger tapping pad 13 in the top row of pads (13–16)]*
+
+   Tap pad `13` and listen to the drums + percussion rhythm.
+
+4. **Finger drum along with the percussion loop!**
+
+   *[Photo: a finger tapping pad 15 in the top row of pads (13–16)]*
+
+   Next, tap pad `15` and the rhythm changes to one without the drums.
+
+   *[Photo: two fingers tapping pads 1 and 2]*
+
+   While picturing the rhythm you listened to a moment ago, tap pads `1` and `2` to layer drums on top.
+
+*[Screenshot: display showing `MASTER BPM:---`, `BANK A:1  PAD:8  BPM:---` with a waveform and an arrow indicating a vertical line moving left to right]*
+
+When you tap a pad, that sound's "waveform" is displayed. As the sound plays, a vertical line moves from left to right across the waveform.
+
+> **The "waveform" — making sound visible**
+>
+> What appears when you tap a pad is a "waveform" — a graph that lets you see the sound with your eyes. This waveform display is also used in the systems employed for professional recording.
+>
+> *[Figure: waveform graph with axis labels]*
+> - Vertical axis: loudness of the sound
+> - Horizontal axis: passage of time
+
+> **Tip (robot character):** **Try tapping the pads along with the rhythm!**
+> Your drums don't have to be the same as the phrase you heard on pad 13. Enjoy tapping the pads freely along with the percussion rhythm!
+
+<!-- page 20 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+*[Photo: a finger tapping pad 9 on the unit; callout: "Tap the pad to layer in the bass!"]*
+
+5. **Layer in the bass too, and finger drum!**
+
+   With the percussion loop still playing, time your tap to the start of the rhythm and tap pad `9` — now you have a percussion + bass loop.
+
+   While listening to it, try layering drums on top just like before. When Beat Sync is ON, it corrects your timing even if it is slightly off.
+
+   > With the bass added, it feels even more like playing in a band!
+   > *[Illustration: electric bass guitar]*
+
+6. **"Perform" like a keyboardist**
+
+   While playing the rhythm + bass loop with pad `13` and pad `9`, try tapping pads `5` through `8` in order to layer keyboard sounds on top.
+
+   *[Illustration: keyboard with musical notes]*
+
+   Just by rhythmically tapping different pads to switch the chord sound, you can feel like a keyboardist!
+
+*[Figure: the 16 pads with two callouts]*
+- (1) Play the rhythm + bass loop (pads 13 and 9)
+- (2) Layer keyboard sounds on top (pads 5–8)
+
+> **To stop looped sound playback**
+> Besides pressing a sounding pad again, you can also stop the sound with the `▶/■` button. Use this method to stop multiple loops at once.
+
+<!-- page 21 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+## What the ONE SHOT button and LOOP button do
+
+*[Figure: function button row showing `▶/■`, `REC`, `ONE SHOT`, `LOOP`, `DEL`, `EDIT`, with `ONE SHOT` and `LOOP` highlighted]*
+
+### ONE SHOT button
+
+| State | Behavior |
+|---|---|
+| When ON *(button lit)* | Tap the pad and the sound plays to the end. Tap again before it finishes, and playback starts over from the beginning. |
+| When OFF *(button unlit)* | The sound plays only while you hold the pad down and stops when you release your finger. Tap again and playback starts over from the beginning. |
+
+### LOOP button
+
+| State | Behavior |
+|---|---|
+| When ON *(button lit)* | Tap the pad and the sound plays repeatedly. It stops when you tap the pad again or press the play/stop button. |
+| When OFF *(button unlit)* | Tap the pad and the sound plays to the end, then stops. |
+
+These buttons set whether a sound plays once ("one-shot sound") or plays repeatedly ("looped sound"). The setting is remembered as is for each pad.
+The preset sounds come preconfigured with settings that suit their content.
+
+### With each button state, sounds play as follows.
+
+*[Figure: four rows, each showing the ONE SHOT and LOOP button states, the resulting playback waveforms, and a bar labeled "time the pad is held down"]*
+- Row 1: ONE SHOT lit, LOOP unlit — each tap plays the sound to the end; label: "time the pad is held down"
+- Row 2: ONE SHOT unlit, LOOP unlit — sound plays only while the pad is held; label: "time the pad is held down"
+- Row 3: ONE SHOT lit, LOOP lit — a tap starts repeated playback until stopped; label: "time the pad is held down"
+- Row 4: ONE SHOT unlit, LOOP lit — the sound repeats while the pad is held; label: "time the pad is held down"
+
+Using the ONE SHOT button and LOOP button skillfully lets you play in more advanced ways — for example, cutting off the tail of a long sound partway through for a percussive effect, or looping a short sound.
+
+<!-- page 22 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+## How multiple sounds layer and switch
+
+There are two ways sounds behave when you tap another pad while a sound is playing.
+This is determined by pad grouping. (See PART 4, p. 48.)
+
+**Example: BANK1**
+
+| Grouped pads | Pads in a different group, or not grouped |
+|---|---|
+| **The sound switches to the pad tapped later** | **The sound of the pad tapped later is layered on top** |
+| After tapping rhythm pad `13`, tap rhythm pad `14`, and the sound changes to the `14` rhythm. | After tapping bass pad `9`, tap piano pad `11`, and the bass `9` sound and the piano `11` sound are layered together. |
+
+*[Figure: the 16 pads with callouts]*
+- Rhythm (pads 13–16)
+- Bass (pads 9–10)
+- Piano (pads 11–12)
+
+*[Photo: a person relaxing on a sofa wearing headphones and playing the SXC-1]*
+
+> **Note (balloon):** You can set each pad's group and lighting color individually. (See PART 4, pp. 48–49.) It's a good idea to set colors that are easy to tell apart.
+
+<!-- page 23 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+7. **Try layering sounds from another bank**
+
+   While a BANK2 loop is playing, try layering BANK1 one-shot sounds on top.
+
+   *[Photo: the unit with the directional buttons and bank select buttons `A`–`D` highlighted; two fingers tapping pads 9 and 16]*
+
+   *[Screenshot: display showing `SELECT BANK 2`]*
+
+   Select BANK2 with `B`, then play a synth phrase with pad `16`. (If BANK2 is not selected, press `B` and then select it with the directional buttons.) Then layer another synth phrase on top with pad `9`.
+
+   *[Screenshot: display showing `SELECT BANK 1`]*
+
+   Select BANK1 with `A`, then tap pad `9` to layer a bass phrase on top. Along with it, try playing kick and snare with pads `1` and `2`.
+
+   *[Photo: hands playing the pads on the unit]*
+
+   > **Note:** \* The bass phrase plays at a faster tempo than when you tapped the pad on p. 20. (See "Time stretch," p. 18.)
+
+> **Important:** Switching banks with the directional buttons during playback interrupts the sound.
+> Set the banks you plan to use to the `A`–`D` buttons in advance.
+
+> **Tip (robot character):** **Getting good sounds out of the pads**
+> Everyone taps the pads their own way. Try various approaches — tapping with a pressing-in motion, lifting your finger the instant you tap, and so on — while checking how the feel of your tap changes how the sound plays.
+> *[Photo: hands tapping the pads]*
+
+<!-- page 24 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+## Try changing the sound with effects
+
+*[Photo: the unit with the `FX1` and `FX2` dials/buttons called out; a hand turning a dial; display showing `EFFECT INFO`, `FX1:FILTER`, `FX2:ROLL 1`]*
+
+The SXC-1 is equipped with "effects" that change the sound. Two effect lines are provided, `FX1` and `FX2`, and you can apply one or both at the same time.
+
+**With the `FX1` or `FX2` button unlit,** turning the dial selects the type of effect.
+
+*[Figure: unit with the dials called out and a zoomed screenshot below]*
+
+*[Screenshot: display showing `EFFECT INFO` / `FX1:BIT CRUSHER` (with a selection bar) / `FX2:ROLL 1` (with a selection bar)]*
+
+**Press the `FX1` or `FX2` button so it lights up,** then turning the dial changes how strongly the effect is applied.
+
+*[Figure: unit with the buttons lit and dials called out, and a zoomed screenshot below]*
+
+*[Screenshot: display showing `EFFECT INFO` / `FX1:BIT CRUSHER` (with a level bar) / `FX2:DELAY 3/16` (with a level bar)]*
+
+> **Tip (robot character):** **Use effects effectively!**
+> When you tap multiple pads and their sounds are layered, the effect is applied to the entire sound that is playing. The effect is also applied to the sounds of pads you tap after selecting the effect.
+
+<!-- page 25 -->
+
+*Finger drumming along with a looped sound — PART 1: Part: Pad play*
+
+## Effects explained
+
+The effects provided for `FX1` and `FX2`, and what each dial changes, are as follows.
+
+*[Figure: close-up of the top panel showing the two dials on either side of the INPUT VOL and MAIN VOL sliders, with the left dial circled and labeled FX1 and the right dial circled and labeled FX2]*
+
+### FX1
+
+#### FILTER (filter)
+
+An effect that muffles or lightens the sound. The cutoff frequency, resonance, and filter type change in combination.
+
+#### FLANGER (flanger)
+
+An effect that adds a metallic swirl to the sound. The depth, rate, feedback, and mix change in combination.
+
+#### PHASER (phaser)
+
+This effect also adds a swirl to the sound, but it changes the sound in a different way than the flanger. The number of stages, rate, depth, feedback, and mix change in combination.
+
+#### BIT CRUSHER (bit crusher)
+
+Adds digital noise to the sound and distorts it. The bit depth, sample rate, and dry/wet change in combination.
+
+### FX2
+
+#### ROLL 1 (roll 1)
+
+Produces an effect as if a pad were being tapped in a rapid series of finely spaced hits.
+
+#### ROLL 1/2 (roll 1/2)
+
+Produces an effect as if a pad were being tapped repeatedly at even finer spacing.
+
+#### ROLL 1/4 (roll 1/4)
+
+Produces an effect as if a pad were being tapped repeatedly at still finer spacing.
+
+#### ROLL PATTERN (roll pattern)
+
+Produces an effect as if a pad were being tapped repeatedly in a certain fixed pattern.
+
+#### DELAY 3/4 (delay 3/4)
+
+Adds a delayed copy of the original sound, producing an echo-like effect.
+
+#### DELAY 3/16 (delay 3/16)
+
+Adds a slightly delayed copy of the original sound, producing an echo-like effect.
+
+FX2 varies continuously from dry (effect 0) to wet (effect 100).
+
+<!-- page 26 -->
+
+*PART 1: Part: Pad play*
+
+# CREATIVE NOTE
+
+*[Figure: "CREATIVE NOTE" logo with a robot mascot reading a book, and a photo of hands finger drumming on a pad controller with glowing pads]*
+
+## Outdo even pro drummers with just your fingers!?
+
+The great appeal of the style of playing sounds by tapping pads is that you can enjoy performing music even if you can't play an instrument. Finger drumming in particular is a popular field, with some masters pulling off jaw-dropping plays that surpass what a drummer can do. The gear most often used for it has 16 pads in a 4×4 grid — the same as the SXC-1. If you start finger drumming on this unit, it will serve you well later when you go on to perfect your technique even further.
+
+## The trick is to decide which finger taps each pad
+
+Finger drumming, which involves fine movements of all ten fingers, may feel difficult until you get used to it. First, fix which finger taps what — for example, kick = thumb, snare = index finger, hi-hat = middle finger — and start from a slow tempo. Practicing in separate combinations, such as kick and snare only, or hi-hat and snare only, is also recommended.
+
+*[Figure: outline of a hand with dotted lines from pads to fingertips, and tempo text "50BPM 100BPM 150BPM…"]*
+  - Kick: pad 1 (thumb)
+  - Snare: pad 2 (index finger)
+  - Hi-hat: pad 3 (middle finger)
+
+<!-- page 27 -->
+
+# PART 2 — Part: Sampling
+
+## Your own voice becomes an instrument! Take on voice percussion
+
+- Any sound can be used as an "instrument"
+- Record easily with the built-in microphone
+- Recorded sounds can be played on the pads right away
+
+*[Figure: photo of the SXC-1 resting on a stack of books on a wooden table, pads lit in multiple colors, next to a wooden frog güiro and other small instruments]*
+
+<!-- page 28 -->
+
+*Voice percussion with your own voice! — PART 2: Part: Sampling*
+
+Using the "sampling" feature, which lets you record, play back, and edit any sound you like, let's take on voice percussion.
+
+## Getting ready to start sampling
+
+1. In Performance mode, select a bank that has pads with no recorded sound (sample) assigned (at left, BANK 15 is selected).
+
+    *[Figure: front panel of the SXC-1 with the directional buttons circled and labeled "Select with the directional buttons"; the display reads SELECT BANK 15 and the 16 pads below are unlit]*
+
+    *[Figure: display screenshot reading "SELECT BANK 15"]*
+
+    > **Note:** Pads with no sample assigned do not light up.
+    > In BANK 14, you can sample to the pads that are unlit.
+    >
+    > *[Figure: pads section labeled "BANK14 ▶", with some pads lit and pads 4, 8, and 12 unlit]*
+
+2. Use the `INPUT SELECT` switch to select "MIC" (built-in microphone).
+
+    *[Figure: side view of the unit with the INPUT SELECT switch (labeled MIC ♪ USB) circled, a magnified view of the built-in microphone hole with a microphone illustration, and a close-up of the INPUT VOL slider]*
+      - Set INPUT VOL to maximum.
+
+You can also record from an instrument or external device connected to this unit.
+
+- To record an instrument performance or the like connected to the AUDIO IN (♪) jack → set the `INPUT SELECT` switch to `♪`
+- To record playback sound from a smartphone connected to the DATA port → set the `INPUT SELECT` switch to `USB`
+
+*[Figure: bottom edge of the unit showing the AUDIO IN (♪) jack, DATA port, and POWER/DATA port circled]*
+
+> **Note:**
+> - Be sure to read "Connections" on p. 8.
+> - Use the included USB cable to connect to a smartphone.
+> - Adjust the volume of the connected device and this unit's INPUT VOL so that the level meter display does not peak out (swing all the way) while recording.
+
+<!-- page 29 -->
+
+*Voice percussion with your own voice! — PART 2: Part: Sampling*
+
+## Try sampling to a pad in BANK 15
+
+*[Figure: top of the unit with the display reading SELECT BANK 15, and an illustration of the directional buttons being pressed]*
+  - In Performance mode, select BANK 15
+
+3. Press the `REC` button to enter Sampling mode.
+
+    *[Figure: front panel with the display showing "SAMPLING MODE: AUTO TRIGGER / L / R"; the REC button is highlighted with the callout "flashing", and the empty pads are outlined with the callout "empty pads flash"]*
+
+    At this point, make sure the display shows `AUTO TRIGGER`.
+    (Select it with the directional buttons `←`/`→`.)
+
+    *[Figure: display screenshot reading "SAMPLING MODE: AUTO TRIGGER" with L and R level meters, AUTO TRIGGER circled]*
+
+    **AUTO TRIGGER (auto trigger)** is a setting that starts recording automatically when sound is input. There are several other settings as well, but for now let's proceed as is.
+
+4. Select the pad you want to assign the sample to (here, select pad `4`).
+
+    *[Figure: photo of a fingertip pressing pad 4, which is lit]*
+
+    If you select `MANUAL TRIGGER` in step 3, recording starts the moment you select a pad.
+    Choose this when you want to decide the sampling start timing yourself.
+
+<!-- page 30 -->
+
+*Voice percussion with your own voice! — PART 2: Part: Sampling*
+
+## Try sampling
+
+5. Speak toward the microphone, and recording starts automatically.
+
+    *[Figure: front panel with the built-in microphone circled; the display shows "SAMPLING MODE: AUTO TRIGGER" with active L/R level meters, callout "the meter swings in time with the sound"; the REC button is highlighted with the callout "lit"; illustration of a person wearing headphones speaking into the unit]*
+
+    As a test, try putting in "Den-tak!"
+
+6. To stop recording, press pad `4` again or press the `REC` button.
+
+    *[Figure: photo of a fingertip pressing pad 4]*
+
+    *[Figure: front panel with the REC button highlighted and the callout "unlit"; pad 4 is lit with a speech balloon "Den-tak!" pointing to it]*
+
+    > **Note:** If, before recording, you count "1, 2, 3, 4" in your head, then speak and stop with good timing, you can create samples that are easy to work with.
+    >
+    > *[Figure: timing diagram with a metronome: beat numbers 1 2 3 4 1 2 3 4; "Den-tak" spans beats 1–2 of the second measure, labeled "fit it within 2 counts"; a marker at beat 3 labeled "stop!"]*
+
+    A pad with a sample assigned to it lights up yellow.
+    Tap pad `4` again to check the sound.
+
+    > **Note:** You can change the lighting color later. (See PART 4, p. 49)
+    >
+    > *[Figure: eight pad-4 icons lit in different colors: yellow, orange, red, purple, white, light blue, green, blue]*
+
+> To delete an assigned sample, go to p. 32 ↓
+
+<!-- page 31 -->
+
+*Voice percussion with your own voice! — PART 2: Part: Sampling*
+
+7. Return to step 3 once more and, in the same way, assign samples to pads `8` and `12` as well.
+
+    *[Figure: close-up of the pads section with pad 12 outlined and the callout "Chh!" and pad 8 outlined with the callout "Don!"; illustration of a person wearing headphones speaking into the unit]*
+
+    "Den-tak" took 2 counts, but record "Don" and "Chh" so each fits within 1 count.
+
+    *[Figure: timing diagram with a metronome: beat numbers 1 2 3 4 1 2 3 4; "Den-tak" shown in gray spanning beats 1–2; "Don" and "Chh" each fit within beat 1, with a marker at beat 2 labeled "stop!"]*
+
+## Play a rhythm pattern with the 3 pads!
+
+*[Figure: sequence diagram over a waveform, left to right: "Don" = pad 8, "Chh" = pad 12, "Don" = pad 8, "Chh" = pad 12, with "Den-tak" = pad 4 placed beneath the first and third hits; photo of a fingertip tapping pad 12 on the unit]*
+
+**Record your favorite phrases and play them freely!**
+
+> **Tip (SXC robot mascot):** Enjoy different ways of sounding your samples!
+> A sample immediately after recording is treated as a one-shot sound, and you can change how it sounds using the `ONE SHOT` button and the `LOOP` button!
+>
+> *[Figure: close-up of the function button row with the ONE SHOT button lit]*
+>
+> For details, go to PART 1, p. 21 ↑
+
+<!-- page 32 -->
+
+*Voice percussion with your own voice! — PART 2: Part: Sampling*
+
+## To delete a sample assigned to a pad
+
+1. Press the `DEL` button, and the pads that have samples assigned to them flash.
+
+    *[Figure: top panel with the DEL button highlighted; pads 4, 8, and 12 are outlined with the callout "flashing"]*
+
+2. Press the pad whose sample you want to delete.
+
+    *[Figure: photo of a fingertip pressing pad 12, with the callout "lit" on pad 12 and "flashing" on pads 8 and 4]*
+
+    When you select a pad, it lights up white, and the pads other than the one you pressed keep flashing. You can also select multiple pads and delete them all at once.
+
+3. Confirm with the `A` button, and the sample is deleted and the pad goes out.
+
+    *[Figure: front panel with the display reading DELETING and the A button circled; pad 12 is outlined with the callout "unlit"; illustration of the A/B/C/D buttons with a hand pressing A]*
+
+<!-- page 33 -->
+
+*Voice percussion with your own voice! — PART 2: Part: Sampling*
+
+## Various features that make it even more fun
+
+### Editing samples
+
+In "EDIT" mode, where you edit samples, you can change the pitch and volume, adjust the playback position, and more. The preset samples that are already assigned can also be edited.
+
+*[Figure: two screen shots side by side]*
+- Left screen: `SOUND EDIT` menu showing `PITCH :0`, `VOLUME :100`, `GROUP :0`, `COLOR :6`
+- Left caption: EDIT mode, where you can change PITCH (pitch of the sound) and other settings
+- Right screen: `MASTER BPM:---` / `BANK D:6  PAD:16  BPM:95` with a waveform display
+- Right caption: You can even cut out part of a sample and play it!
+
+> **With the dedicated app, waveform editing is even more convenient!**
+
+*[Figure: smartphone showing the CASIO Sampler App with a waveform display and buttons including ONE SHOT, LOOP, EDIT]*
+
+### Resampling
+
+Sampling a sample assigned to a pad **once again onto a different pad**. By copying the same sample, or adding new sounds or applying effects as you do so, you expand the range of ways you can use it.
+
+*[Figure: a pad labeled "4" with the word デンタク (dentaku, "calculator") below it, an arrow pointing to a second pad with the same word below it — copying a sample from one pad to another]*
+
+### Chop
+
+**Splitting a sample into small pieces and distributing them across multiple pads** so they are easier to work with freely. There is also a feature that samples a long phrase and automatically distributes it beat by beat.
+
+*[Figure: scissors cutting the word デンタク (dentaku, "calculator") into separate syllables デ・ン・タ・ク scattered across pads]*
+
+**For details, go to PART 4** *(arrow icon)*
+
+
+<!-- page 34 -->
+
+*PART 2: Part: Sampling*
+
+*[Figure: "CREATIVE NOTE" column header with an illustration of the SXC-1 mascot robot reading a book with a pencil]*
+
+### Sampling changed the style of music production
+
+Sampling — the technique of making music using existing sounds as material — was born in the 1980s. At first, only very short sounds could be sampled, but once longer phrases and rhythm patterns could also be handled, it came to be used heavily in hip-hop, house, and other genres, and the music production process changed dramatically. That technology is also used in the sounds of electronic musical instruments.
+
+*[Figure: photo of a vintage Casio sampling keyboard against a colorful waveform background]*
+
+## Try making an original bank with "sounds all your own"!
+
+The key to mastering sampling is to record any sound that catches your interest, one after another, and grow your own personal "sound library". With the SXC-1, which lets you sample with simple operations, recording and deleting are easy too.
+
+Using the preset banks as a reference, if you put together rhythm-type, bass-type, chord-type, and other samples in one bank in a well-balanced way, it will not only be convenient for pad performance — it will also make it easier to create songs using the sequencer feature explained in PART 3.
+
+*[Figure: illustration of pads with instrument groups labeled]*
+- リズム系 → Rhythm type (drum kit)
+- ベース系 → Bass type (bass guitar)
+- コード系 → Chord type (grand piano)
+
+
+<!-- page 35 -->
+
+# PART 3 — Part: Sequencer
+
+## Create a groove! Take on drum pattern making
+
+- You can record your pad performance
+- Edit the patterns you make just the way you want
+- You can even layer pad playing over a playing pattern
+
+*[Figure: photo of a person wearing headphones holding the SXC-1 with the pads lit in various colors]*
+
+
+<!-- page 36 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+The SXC-1 also has a sequencer feature that arranges samples freely and plays rhythms, melodies, and more automatically. You can easily experience the production style known as "step-based music production".
+
+## "Sequence mode" for creating sequences
+
+1. In Performance mode, long-press one of the `A`–`D` buttons to enter Sequence mode.
+   *[Figure: display and buttons with a callout "long-press" circling the `A` button. Screen shows `MASTER BPM:---` / `BANK A:1  PAD:12  BPM:110` with a waveform]*
+2. On the sequence selection display, choose "OK (A)" with the `A` button.
+   (To cancel, press the `B` button.)
+   *[Figure: screen showing `SEQUENCE SLCT` / `BANK = 1` / `OK(A) CANCEL(B)` with a callout "flashing" on the `A` button]*
+3. Sequence mode is displayed.
+   *[Figure: screen showing `BANK A:1  BPM:120` with the step grid, and a callout "lit" circling the `A` button]*
+
+> Long-press the lit button to return to Performance mode.
+
+### What is a sequence?
+
+On this unit, a performance pattern of up to 8 measures made with the samples of one bank is called a "sequence", and you can create up to 50 patterns.
+
+*[Figure: circular icon with the label "Up to 50 patterns"]*
+
+### Where sequences are saved = the "sequence bank"
+
+The patterns you create are saved as sequence banks 1–50. By default, sequence banks 1–4 are assigned to the `A`–`D` buttons.
+
+*[Figure: diagram of the four buttons with labels]*
+- `D` → BANK4
+- `C` → BANK3
+- `A` → BANK1
+- `B` → BANK2
+
+When saving a pattern to sequence bank 5 or higher, use the directional buttons at the time of sequence selection to choose the bank number. When you choose OK (`A`), Sequence mode is displayed, and the sequence is assigned to the currently selected `A`–`D` button.
+
+*[Figure: directional buttons next to a screen showing `SEQUENCE SLCT` / `BANK = 5` / `OK(A) CANCEL(B)`]*
+
+> Sequence banks are easy to manage using the dedicated app. (See PART 4, p. 60)
+
+
+<!-- page 37 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+## Sequence mode display
+
+This display shows the state of creating a 1-measure sequence using the samples of BANK1.
+
+*[Figure: annotated display screen showing `BANK A:1`, `BPM:120`, measure numbers `1|2|3|4|5|6|7|8|`, a metronome icon `:ON`, pad numbers 1–6 down the left side, and a 16-column step grid]*
+
+**Bank**
+Shows which of the bank select buttons `A`–`D` is selected — that is, which sound bank will be played.
+
+**Tempo**
+Shows the tempo of the sequence.
+
+**Metronome**
+Shows whether the metronome will sound during sequence recording/playback.
+
+**Number of measures**
+Shows the number of measures in the sequence, and which measure's information is shown in the cells below.
+
+**Pad number**
+Shows the pad numbers.
+**For pad 7 and beyond, scroll with the directional buttons to display them.**
+
+**Pad input**
+Divides 1 measure into 16 parts and shows which pad's sample will sound at which timing.
+
+*[Figure: photo of hands holding the SXC-1 with the Sequence mode screen displayed]*
+
+
+<!-- page 38 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+## Decide the number of measures for the pattern you will create
+
+Here, let's try creating a 2-measure pattern.
+
+> **Note:** The samples used in Sequence mode are set to BANK1. If you want to use samples from a different bank, change it with "SOUND BANK" in the EDIT function (see p. 44).
+
+*[Figure: callout box reading "Pay attention to the circled areas!" next to a magnified view of the screen showing the cursor in the step grid, and the full screen `BANK A:1  BPM:120` with the grid]*
+
+Press the up directional button and the cursor moves.
+
+*[Figure: directional buttons with a finger pressing up, a magnified view of the cursor now on the measure-number row, and the full screen]*
+
+With the right directional button, move the ▲ below the numbers to 2, then press the `A` button. Then return to 1 for now with the left directional button.
+
+*[Figure: directional buttons with a finger pressing right, then the `A` button; magnified view showing measure numbers `1|2` selected, and the full screen]*
+
+## You are now ready to create a 2-measure pattern
+
+> Pressing the `B` button also lets you **reduce the number of measures**.
+
+*[Figure: two screens side by side connected by an arrow, showing the measure count display changing — measures `1|2` highlighted on both screens]*
+
+
+<!-- page 39 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+## Give it a try right away
+
+Let's play a simple 8-beat pattern on the pads and record it as a sequence.
+
+*[Figure: pattern chart showing the metronome count ("Ki, ko, ko, ko" click sounds) across the top and three rows of the step grid]*
+- パッド1（キック） → Pad 1 (kick)
+- パッド2（スネア） → Pad 2 (snare)
+- パッド3（ハイハット） → Pad 3 (hi-hat)
+- これを2回（2小節分）繰り返します → Repeat this twice (2 measures' worth)
+
+*[Figure: standard drum notation in 4/4 time showing the kick, snare, and hi-hat pattern]*
+
+*[Figure: function buttons with the ▶/■ and REC buttons circled in a dashed line and a callout "flashing"]*
+
+When you press the lit `REC` button, the `▶/■` button also flashes together with it. **After the metronome count sounds 4 times, start playing.** The tempo is set to BPM = 120 by default, and can be changed with "BPM" in the EDIT function (see p. 44).
+
+*[Figure: pads 1–4 with fingers tapping pads 2 and 3]*
+
+Tap pads `1`–`3` in time with the count.
+
+*[Figure: screen showing `BANK A:1  BPM:120` with cells in the step grid filled in white]*
+
+**The cells at the timing where you tapped a pad are filled in white.** Once you finish tapping through the 2 measures, **playback of the drum pattern continues even if you do not tap the pads**.
+
+*[Figure: function buttons with the ▶/■ and REC buttons circled and a callout "lit"]*
+
+When you press the `▶/■` button, recording ends and the buttons return from **flashing to lit**. In this state, pressing the `▶/■` button plays back what you entered.
+
+
+<!-- page 40 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+## Edit until you are satisfied
+
+You can freely edit afterward — adjusting the timing at which sounds play, adding sounds, or erasing them.
+
+*[Figure: function buttons with the ▶/■ and REC buttons circled and a callout "lit"]*
+
+Here, we will edit **with recording/playback stopped**.
+(Editing is also possible during recording/playback.)
+
+*[Figure: screen showing the step grid with a cell circled, next to the directional buttons]*
+
+Using the directional buttons, move the cursor to the **sound you want to fix**.
+
+*[Figure: screen with the circled cell now empty, next to the `A`–`D` buttons with a finger pressing `B`]*
+
+Press the `B` button and **the sound the cursor is on is erased**.
+
+*[Figure: screen with a new cell circled, next to the directional buttons and then the `A`–`D` buttons with a finger pressing `A`]*
+
+Move the cursor to the cell with the correct timing using the directional buttons and press the `A` button, and a sound is entered at that timing.
+
+*[Figure: function buttons with a finger pressing the ▶/■ button]*
+
+Play the sequence with the `▶/■` button and check the result.
+
+### About quantize
+
+*[Figure: the SXC-1 mascot robot with musical notes]*
+
+The smallest unit of sound handled in the SXC-1's Sequence mode is the **"16th note"** — one measure of 4/4 time divided into 16. If the timing of your pad taps is off by less than that unit, it is corrected to the nearest timing. This kind of feature is called **"quantize"**.
+
+
+<!-- page 41 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+## Try creating various drum patterns
+
+### Example 1: Dance beat
+
+*[Figure: step-grid diagram showing an 8-beat dance pattern across two measures for three rows]*
+- Pad 1 (kick)
+- Pad 2 (snare)
+- Pad 3 (hi-hat)
+
+### Example 2: 16-beat
+
+*[Figure: step-grid diagram showing a 16-beat pattern across two measures for three rows]*
+- Pad 1 (kick)
+- Pad 2 (snare)
+- Pad 3 (hi-hat)
+
+### Example 3: Half time
+
+*[Figure: step-grid diagram showing a half-time pattern across two measures for three rows]*
+- Pad 1 (kick)
+- Pad 2 (snare)
+- Pad 3 (hi-hat)
+
+> **Note:** If you do not need the metronome sound, you can also turn it OFF with `METRONOME` in the EDIT function (see p. 44).
+
+Once you know how to input and edit, try your hand at drum patterns other than the 8-beat. The above are only examples, so feel free to play around however you like — copy the drum pattern of a song you love, or build an original beat of your own.
+
+*[Illustration: red drum kit]*
+
+> **Tip (character callout):**
+>
+> ### Use the two input styles for different situations
+>
+> Recording your pad performance exactly as you play it is called "real-time input", and it is perfect for intuitive pattern making. When it is hard to play multiple pads at once, as with a drum pattern, it is also OK to input one pad at a time.
+>
+> **[Example]** First perform just the hi-hat → while listening to that sound, perform the kick → finally layer the snare on top — done!
+>
+> On the other hand, the method of inputting by filling in the on-screen cells one note at a time, as explained on p. 40, is called "step input". Being able to make full use of various input methods like these to create complex patterns is one of the joys of the sequencer!
+
+<!-- page 42 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+## Try creating a pattern that includes non-drum sounds too
+
+Let's add synth sounds to the drum pattern you created on pp. 38–41 to give it more of a song-like feel.
+
+1. In the same way as on p. 38, change the number of measures to 4 measures.
+
+   *[Figure: two sequencer screens connected by an arrow — the measure indicator changes from "1 2" to "1 2 3 4"; both show `BANK A:1  BPM:120` and the step grid]*
+
+2. Press the `REC` button and input the same drum pattern as measures 1–2 into measures 3–4 as well.
+   (You can also use "step input" while stopped.)
+
+   *[Figure: sequencer screen showing `BANK A:1  BPM:120`, measures 1–4 with the drum pattern entered]*
+
+   *[Figure: smartphone showing the CASIO Sampler App sequence screen with a step grid, an edit toolbar, and a bottom navigation bar]*
+   - Toolbar: Cut / Copy / Paste / Duplicate to next measure / Clear
+   - `01: SEQUENCE1` / `SND: 1` / `BPM: 120` *(on-screen labels)*
+   - Bottom navigation: Home / Pads / Sequence / Support
+
+> **Note:** Using the dedicated app, you can create and edit sequences even more conveniently — for example, copying and pasting patterns you have input. (See PART 4, p. 59)
+
+<!-- page 43 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+3. While listening to the drum pattern, use real-time input to enter the synth chords of pads `5`, `6`, `7`, and `8` at the top of each measure.
+
+   *[Figure: four sequencer screens, each showing `BANK A:1  BPM:120` with a circle marking the newly input note at the start of the measure]*
+   - Measure 1
+   - Measure 2
+   - Measure 3
+   - Measure 4
+
+   *[Photo: the SXC-1 connected by USB cable, with a finger tapping pad 6]*
+
+Only one-shot sounds can be incorporated into a sequence, but it is possible to layer looped sounds by performing in real time while the sequence plays back. (See PART 4, p. 47)
+
+> **Tip (character callout):**
+>
+> ### When you want to practice before inputting
+>
+> When adding new sounds to a sequence you have created by playing the pads, as shown above, it is a good idea to practice for a while with the sequence playing, and then press the `REC` button to start inputting!
+>
+> *[Figure: two pairs of function buttons showing LED states]*
+> - Flashing (`▶/■`), Lit (`REC`) — label: Practicing
+> - Flashing (`▶/■`), Flashing (`REC`) — label: Inputting
+
+<!-- page 44 -->
+
+*Let's make an original drum pattern — PART 3: Part: Sequencer*
+
+## Various settings in Sequence mode
+
+### ▶ Settings available with the EDIT function
+
+In Sequence mode, press the `EDIT` button and the screen shown below appears, where you can make various sequence settings. Use the directional buttons ↑/↓ to select an item, and ←/→ to set it. Press the `EDIT` button again to return to Sequence mode.
+
+*[Illustration: a finger pressing the EDIT button]*
+
+#### SOUND BANK
+
+Sets the sound bank used for creating and playing the sequence.
+
+*[Figure: screen — `SEQUENCE EDIT` menu with `SOUND BANK:1` highlighted; other items: `BPM:120`, `CLEAR:BAR`, `METRONOME:ON`]*
+
+#### BPM
+
+Changes the tempo of the sequence.
+
+*[Figure: screen — `SEQUENCE EDIT` menu with `BPM:120` highlighted]*
+
+#### CLEAR
+
+Lets you delete sounds in bulk.
+
+- `TRACK` — Deletes one measure's worth of the sound of the pad where the cursor is placed.
+- `BAR` — Deletes all the sounds in the measure where the cursor is placed.
+- `ALL` — Deletes all the sounds in the currently selected sequence.
+
+*[Figure: screen — `SEQUENCE EDIT` menu with `CLEAR:BAR` highlighted]*
+
+When you press the `A` button, the display shown below appears; press the `A` button to execute, or the `B` button to cancel.
+
+*[Figure: screen — `CLEAR ALL?  OK(A)  CANCEL(B)`]*
+
+#### METRONOME
+
+Settings for the metronome that sounds while creating and playing back a sequence. You can set the metronome ON/OFF, `VOLUME` (volume: 1–3), and `PATTERN` (sounding pattern: 1 or 2).
+
+*[Figure: screen — `SEQUENCE EDIT` menu with `METRONOME:ON` highlighted, showing sub-items `VOLUME:2` and `PATTERN:1`]*
+
+#### PRECOUNT
+
+Sets whether or not a pre-count (4 counts at the beginning) sounds when creating a sequence with real-time input.
+
+*[Figure: screen — `SEQUENCE EDIT` menu with `PRECOUNT:ON` highlighted, below `METRONOME:ON`, `VOLUME:2`, `PATTERN:1`]*
+
+<!-- page 45 -->
+
+*PART 3: Part: Sequencer*
+
+# CREATIVE NOTE
+
+*[Illustration: mascot character reading a book, with a pencil motif]*
+
+## The sequencer: from a standalone piece of gear to one function among many
+
+The sequencer is an indispensable tool for creating music by combining the individual elements of music — rhythm, harmony, melody — one by one, using synthesizers and other instruments. In the past, the "sequencer" existed as a standalone piece of hardware, but today it has become one of the functions built into music production systems known as DAWs and into gear like the SXC-1.
+
+*[Photo: a person working at a computer running DAW software in a studio]*
+
+## It's OK to start building a song from any part!
+
+This unit's sequencer is pared down to the most basic functions, so even people using a sequencer for the first time can enjoy songwriting without getting stuck. Another thing beginners will appreciate is that simply lining up samples produces something that already feels like a song. Starting from a rhythm pattern is fine; so is starting from a chord progression that feels good, or from a melody that suddenly comes to you — tackle it in whatever way works best for you.
+
+*[Photo: a hand stacking wooden blocks printed with musical notes]*
+
+<!-- page 46 -->
+
+# PART 4 — Part: Leveling up
+
+## Unleash the vibes! Toward unlimited sound play with the SXC-1
+
+- Layer other rhythms and performances over the sequences you have created
+- Achieve a wider range of expression with sample editing and resampling
+- Plus a dedicated app that makes it even easier to use
+
+*[Photo: the SXC-1 and a smartphone running the CASIO Sampler App side by side on a desk, with headphones and a USB cable]*
+
+<!-- page 47 -->
+
+# Try layering pad performance over sequence playback
+
+*PART 4: Part: Leveling up*
+
+Play synths and sound effects in real time while playing back a beat you have crafted, or improvise rhythms over a chord-playing sequence — how you have fun is up to your ideas!
+
+> **For example:** Let's layer pad performance from BANK2 over the sequence you created in PART 3, p. 42 onward — "Try creating a pattern that includes non-drum sounds too" (assigned to sequence bank 1).
+
+1. In Performance mode, select the bank that has the sounds you want to perform in real time.
+
+   *[Figure: top of the unit with the display showing `SELECT BANK 2`; the `B` button is circled]*
+
+2. Press the `A`–`D` button to which the sequence bank you want to play is assigned together with the `▶/■` button, and sequence playback starts.
+
+   *[Figure: top of the unit with the display showing `SELECT BANK 2`; the `A` button is circled and labeled, and the `▶/■` button is outlined]*
+   - Lit (`A` button)
+   - Flashing (`▶/■` button)
+
+3. Pad play along with the sequence!
+
+   *[Photo: a finger tapping the pads on the SXC-1]*
+
+BANK2 is stocked with a rich variety of EDM-style sounds, such as handclaps, sound effects, synth riffs, and rhythm loops. No matter which pad you tap, it is sure to fit right in!
+
+> **Tip (character callout):**
+>
+> ### Looped sounds sync to the sequence tempo!
+>
+> If you play back a sequence with Beat Sync turned ON and then trigger a loop sample that has a BPM set, the sample automatically plays in time with the tempo of the sequence. Conversely, if you trigger the loop sample first and then play back the sequence, the sequence plays at the sample's tempo!
+
+<!-- page 48 -->
+
+# Try processing and editing samples
+
+*PART 4: Part: Leveling up*
+
+The samples assigned to each pad are plenty of fun used just as they are, but by changing settings in an item called SOUND EDIT, or by editing their waveforms, you can arrange them into sounds with more personality.
+
+You can edit the sample for each pad individually.
+
+*[Figure: top panel of the unit with numbered callouts — 3 on the directional buttons, 1 on the EDIT button, 2 on the pads; the display shows the `SOUND EDIT` menu (`PITCH:0`, `VOLUME:100`, `GROUP:0`, `COLOR:4`)]*
+
+1. In Performance mode, press the `EDIT` button.
+2. Tap the pad to which the sample you want to edit is assigned.
+3. Use ↑/↓ to select an item, and ←/→ to change the value.
+
+### ▶PITCH
+
+You can set the pitch in semitone steps over a range of ±2 octaves* (±24).
+
+> **Note:** *The sample's playback speed also changes.
+
+*[Figure: comic illustration — an arrow labeled "Raise the pitch" next to fast, high notes ("Den-taku!") and an arrow labeled "Lower the pitch" next to slow, drawn-out notes ("Deh~so~ta~ku~")]*
+- Raise the pitch
+- Lower the pitch
+
+### ▶VOLUME
+
+You can set the volume in the range 0–100.
+
+*[Figure: screen — `SOUND EDIT` menu with `VOLUME:100` highlighted; other items: `PITCH:0`, `GROUP:0`, `COLOR:1`]*
+
+### ▶GROUP
+
+**Use "grouping" for sounds you don't want to overlap. When sounds are grouped, a new sound can stop the previous one.**
+
+When you set a number from 1 to 16, pads with the same number are grouped, and the sound of the pad tapped last takes priority (set 0 for no grouping). Group settings are shared across all banks. For example, you can use a sound of the same group in a different bank to stop a sound that is playing in one bank.
+
+*[Figure: diagram comparing behavior — column header "Order tapped: 1, 2"]*
+- Not grouped: pad 2's sound layers on top of pad 1's sound
+- Grouped: pad 1's sound stops and only pad 2's sound plays
+
+<!-- page 49 -->
+
+# Try processing and editing samples (continued)
+
+*PART 4: Part: Leveling up*
+
+### ▶COLOR
+
+Color-coding pads to match the content of their sounds makes the unit easier to use. Try using the preset banks as a reference.
+
+*[Figure: SOUND EDIT screen with the cursor on `COLOR :1` (items shown: `PITCH :0`, `VOLUME :100`, `GROUP :0`, `COLOR :1`)]*
+
+Sets the lighting color of the pad.
+
+*[Figure: eight pad illustrations showing each lighting color]*
+
+| Setting | Color |
+|---|---|
+| COLOR: 1 | **Neon Yellow** |
+| COLOR: 2 | **Orange** |
+| COLOR: 3 | **Red** |
+| COLOR: 4 | **Purple** |
+| COLOR: 5 | **Blue** |
+| COLOR: 6 | **Light Blue** |
+| COLOR: 7 | **Green** |
+| COLOR: 8 | **Light Green** |
+
+### ▶BPM
+
+For samples whose BPM was automatically analyzed during recording, a value is displayed here.
+It can also be set manually. You can also long-press the left button to set the BPM to ---, which excludes that sample from Beat Sync.
+
+*[Figure: SOUND EDIT screen with the cursor on `BPM :---` (items shown: `VOLUME :100`, `GROUP :0`, `COLOR :1`, `BPM :---`)]*
+
+## Waveform editing
+
+Turning a dial in EDIT mode brings up the waveform editing display, where you can change where sample playback starts and ends.
+
+*[Figure: waveform editing screen showing `MASTER BPM:---`, `BANK D:6  PAD:16  BPM:95`, with a waveform and arrows marking two adjustable points]*
+- Start point
+- End point
+
+*[Photo: fingers turning both dials on the unit at the same time]*
+- You can do it with both dials at once!
+
+A handy function for when you want to use only part of a sample. Play just a portion of a long phrase, cut a single sound out of a rhythm pattern — the uses are endless. Adjust while tapping the pad and listening to the sound.
+
+<!-- page 50 -->
+
+# Enrich your expression with resampling
+
+*PART 4: Part: Leveling up*
+
+Sampling a saved sample again is called "resampling." On this unit, a sample assigned to a pad can be copied to another pad by resampling. As you do so, you can also add new sounds or apply effects.
+
+1. ### In Sampling mode (press `REC` in Performance mode), select `RESAMPLING`
+
+   *[Figure: screen showing `SAMPLING MODE: RESAMPLING` with L/R level meters]*
+
+   *[Figure: directional buttons with left/right highlighted]*
+   - Select with the directional buttons
+
+   *[Figure: pads section — most pads outlined and flashing, pads 4, 8, 12 unlit]*
+   - Pads available for assignment flash white; all others go out.
+   - Flashing
+
+2. ### Select an empty pad you want to assign the sample to
+
+   *[Figure: screen showing `WAIT FOR SOUND / PAD COPY` with L/R level meters]*
+
+   *[Figure: pads section with a finger pressing pad 16]*
+   - Lit
+   - When you select the pad you want to assign to, it changes to lit white and the other pads flash. (Here, pad `16` is selected.)
+   - Flashing / Flashing
+
+3. ### Set the `INPUT SELECT` switch
+
+   *[Figure: the `INPUT SELECT` switch with positions `MIC`, `♪`, `USB`]*
+   - `MIC`: when adding sound from the built-in mic during resampling
+   - `♪` or `USB`: when adding sound from an external input during resampling, or when adding nothing
+
+<!-- page 51 -->
+
+# Enrich your expression with resampling (continued)
+
+*PART 4: Part: Leveling up*
+
+4. ### Tap the copy-source pad to start resampling
+
+   During resampling, the buttons are in the following state.
+
+   *[Figure: function button row with `▶/■`, `REC`, and `ONE SHOT` highlighted]*
+   - Lit
+
+   When the copy-source sample finishes sounding, resampling ends automatically, and the copy-destination pad lights yellow.
+
+   *[Figure: pad 16 lit yellow]*
+
+   *[Figure: function button row with `REC` unlit and `ONE SHOT` lit]*
+   - Unlit / Lit
+
+   > **Note:** When copying a looped sound as well, resampling ends after the sample has sounded once.
+
+   *[Figure: pads section showing an arrow from pad 4 up to pad 16]*
+   - [Example] Copying the sound of pad `4` to pad `16`
+
+## ■ Resampling across banks
+
+After selecting the copy-destination pad, select the bank containing the copy-source sound with the `A`–`D` buttons → Tap the copy-source pad to start resampling.
+
+> **Note:** Assign the banks containing the sounds you want to copy to the `A`–`D` buttons in advance.
+
+## ■ Resampling while adding a new sound
+
+If you input sound from the mic or an external input while the sample is sounding, the copy-source sample and the input sound are recorded to the copy-destination pad mixed together.
+
+## ■ Resampling a sound with an effect applied
+
+If you apply an effect as described in PART 1, p. 24 when you tap the copy-source pad, the sound is recorded to the copy-destination pad with the effect applied.
+
+> **Note:** The effect is also applied to newly added sound (AUDIO IN or USB).
+
+*[Illustration: mascot robot character]*
+
+**Here's what you can do with this!**
+
+- Distribute a sound you want to hit repeatedly across multiple pads
+- Express effect ON/OFF by tapping different pads
+- Gather favorite sounds from multiple banks into a single bank, and more
+
+<!-- page 52 -->
+
+# Automatically distribute a sample across multiple pads
+
+*PART 4: Part: Leveling up*
+
+When sampling a rhythm pattern or phrase from an external input (AUDIO IN or USB), the unit can analyze the BPM of the input phrase, split it beat by beat, and automatically assign it to multiple pads.
+
+1. ### In Sampling mode, select `AUTO CHOP`
+
+   *[Figure: screen showing `SAMPLING MODE: AUTO TRIGGER` with L/R level meters, changing to a screen showing `SAMPLING MODE: AUTO CHOP`]*
+
+   *[Figure: directional buttons with left/right highlighted]*
+   - Specify with the directional buttons
+
+2. ### Select the multiple pads you want to assign the sound to
+
+   *[Figure: pads section with pads 1–4 selected (highlighted along the bottom row)]*
+
+   *[Figure: screen showing `WAIT FOR SOUND / AUTO CHOP 1 X 4` with the "4" circled, and L/R level meters]*
+
+3. ### Specify the number of beats to distribute to each pad (1, 2, 4, or 8)
+
+   *[Figure: directional buttons with left/right highlighted]*
+   - Specify with the directional buttons
+
+   *[Figure: screen showing `WAIT FOR SOUND / AUTO CHOP 4 X 4` with the first "4" circled, and L/R level meters]*
+
+You're now ready to assign 4 beats each to 4 pads!
+
+<!-- page 53 -->
+
+# Automatically distribute a sample across multiple pads (continued)
+
+*PART 4: Part: Leveling up*
+
+4. ### Recording starts when the phrase you want to sample is input
+
+   *[Photo: the unit on a table next to a smartphone running a voice recorder app]*
+
+   *[Figure: four quarter notes and a four-measure staff]*
+   - When analysis of 4 beats × 4 = 4 measures is complete, recording ends automatically.
+
+   **For example, a phrase like this...**
+
+   *[Figure: musical staff in 4/4 showing a melody]*
+   - Do Re Mi Fa / Mi Re Do / Mi Fa Sol La / Sol Fa Mi
+
+   **...is distributed like this**
+
+   *[Figure: the same staff with the melody divided into four boxed segments, each connected to one of pads 1–4]*
+   - Do Re Mi Fa → pad 1
+   - Mi Re Do → pad 2
+   - Mi Fa Sol La → pad 3
+   - Sol Fa Mi → pad 4
+
+   *[Figure: four waveform-editing screens (`MASTER BPM:--- / BANK A:15 PAD:1–4 BPM:---`), each highlighting a different quarter of the same waveform]*
+
+   The start and end points of the distributed samples can be changed with waveform editing in SOUND EDIT (p. 49).
+   You can also extend each sample's range forward or backward. (This does not affect the other distributed samples.)
+
+   > **Note:** When you do this, the sample may no longer connect smoothly with the samples before and after it. Also, a sample that has been edited cannot be returned to its pre-edit state, so we recommend copying the original sample by resampling or the like before editing.
+
+*[Illustration: mascot robot character]*
+
+**Master the chop!**
+
+"Chopping" — rearranging broken-up samples or shifting their playback timing to create new phrases — is a technique unique to samplers. Set auto-chopped samples to the same group (p. 48) and tap the pads freely, and you can perform as if you were rearranging the song itself!
+
+<!-- page 54 -->
+
+# Automatically distribute a sample across multiple pads (continued)
+
+*PART 4: Part: Leveling up*
+
+Instead of splitting automatically beat by beat, you can also split at whatever timing you like.
+
+1. ### In Sampling mode, select `AUTO TRIGGER` or `MANUAL TRIGGER`
+
+   *[Figure: screen showing `SAMPLING MODE: AUTO TRIGGER`, or a screen showing `SAMPLING MODE: MANUAL TRIGGER`, each with L/R level meters]*
+
+2. ### Press one empty pad you want to assign the sample to
+
+   With `MANUAL TRIGGER`, recording starts at this point.
+
+   *[Photo: a finger pressing pad 1]*
+
+3. ### Input the phrase you want to sample
+
+   With `AUTO TRIGGER`, recording starts at this point.
+
+   *[Photo: singing into a microphone toward the unit; screen shows `RECORDING / AUTO BPM 0` with L/R level meters]*
+
+4. ### At the timing where you want to split, press the next empty pad
+
+   *[Photo: pad 1 lit, a finger pressing pad 2]*
+
+5. ### Repeat this, then press the last pad again or end recording with the `REC` button
+
+   *[Photo: a finger pressing pad 3 while pads 1 and 2 are lit; or a finger pressing the `REC` button]*
+   - or
+
+<!-- page 55 -->
+
+# System settings you can customize to your liking
+
+*PART 4: Part: Leveling up*
+
+*[Photo: the unit with the SYSTEM SETTING screen displayed, and a callout to the `EDIT` button]*
+- In Performance mode, long-press the `EDIT` button
+- *[Figure: screen showing `SYSTEM SETTING` with items `AUTO Trig Lv:3`, `Beat Sync :ON`, `LED Bright :3`, `Disp Bright :5`]*
+- Select an item with the up/down directional buttons, and change the setting with the left/right buttons.
+
+## ■ AUTO Trig Lv
+
+When AUTO TRIGGER is selected in Sampling mode, sets the volume at which recording starts automatically, in 5 levels from 1 to 5 (-28 dB to -12 dB in 4 dB steps / default is 3). The smaller the value, the quieter the sound at which recording starts. Set it so that recording doesn't start on an unintended sound — or, conversely, so that recording doesn't fail to start.
+
+## ■ Beat Sync
+
+Sets the automatic beat matching described on p. 18 to ON/OFF. The default is OFF.
+
+## ■ LED Bright
+
+Sets the brightness of the pad and button LEDs in 5 levels from 0 to 4 (0 = unlit). The default is 3.
+
+## ■ Disp Bright
+
+Sets the brightness of the display in 5 levels from 1 to 5. The default is 5.
+
+## ■ APO Time
+
+Sets the time until Auto Power Off: 20 minutes, 1 hour, 2 hours, or off. The default is 20 minutes.
+
+## ■ BATTERY Type
+
+Switches between BAT-A (alkaline batteries) and BAT-e (eneloop). The default is BAT-A.
+
+## ■ POWER Supply
+
+When running on USB power, a power-cord icon is displayed. When running on batteries, the remaining charge is displayed in 3 levels.
+
+## ■ FW Version
+
+Displays the firmware version (view only).
+
+## ■ SERIAL No.
+
+Displays the serial number when you press the right directional button (view only).
+
+## ■ Initialize
+
+Initializes the unit to its factory default state. After pressing the right directional button, confirm with the `A` button. After initialization, the unit restarts.
+
+> **Note:** If you initialize, the data you have sampled will be deleted, so please take care.
+
+<!-- page 56 -->
+
+# Even more fun and convenient with the dedicated app!
+
+*PART 4: Part: Leveling up*
+
+By linking with the iOS/Android app "CASIO Sampler App," you can use this unit's functions even more conveniently.
+
+*[Photo: a person holding a smartphone]*
+
+*[Figure: QR code]*
+- Download here
+
+https://www.casio.com/jp/support/creator-economy/sampler/content/application/
+
+## Connect this unit to your smartphone
+
+*[Figure: smartphone screenshot of CASIO Sampler App showing a waveform, buttons labeled `ONE SHOT`, `LOOP`, `EDIT`, a 4×4 pad grid, and a bottom navigation bar]*
+- Assign sound (app button)
+- Delete sound (app button)
+- Home / Pads / Sequence / Support (bottom navigation)
+
+Connect this unit's `DATA` port to your smartphone with the included USB Type-C cable.
+
+> **Note:** If you cannot connect with the included USB Type-C cable, see the support page.
+
+*[Figure: rear connector section showing `PHONE`, `LINE OUT`, `AUDIO IN ♪`, `DATA` (circled), `POWER/DATA`, with a cable running from the DATA port to a smartphone]*
+
+After launching the app, turn on this unit's power, and the pads will be displayed to match the state of the unit.
+
+<!-- page 57 -->
+
+*Even more fun and convenient with the dedicated app! — PART 4: Part: Leveling up*
+
+## Assign samples to pads
+
+You can use the app to assign samples from other banks or sounds saved on your smartphone. This section shows how to assign a sample from another bank to a pad.
+
+1. **Tap an empty pad, then tap "Assign Sound" (音源登録)**
+
+   *[Figure: smartphone showing the CASIO Sampler App pad view (15: SOUND BANK15) with an empty pad 5 selected, plus an enlarged view of a finger tapping empty pad 5]*
+   - 音源が登録されていません → No sound is assigned
+   - 音源登録 → Assign Sound
+   - ホーム / パッド / シーケンス / サポート (tab bar) → Home / Pad / Sequence / Support
+
+   > **Note:** If the pad view is not displayed, select the Pad *[pad icon]* tab in the tab bar at the bottom of the screen.
+
+2. **A window for choosing the source appears**
+
+   *[Figure: pop-up window on the app screen with a finger tapping the second option]*
+   - 音源登録 → Assign Sound
+   - ファイルから選択 → Select from file
+   - 他のバンクから選択 → Select from another bank
+   - キャンセル → Cancel
+
+   > **Note:** ※ With "Select from file", WAV, MP3, and FLAC sound files or .cswp files can be used.
+
+3. **Select the bank containing the sample you want to assign, then tap the pad**
+
+   The sample is now assigned to the previously empty pad.
+
+   *[Figure: two app screens — on the left, a finger taps pad 5 in the source bank (a checkmark appears on it) above a "選択する" (Select) button; an arrow points to the right screen, where the sample now appears on the previously empty pad 5]*
+   - 選択する → Select
+
+   > **Tip:** Try collecting all kinds of samples to create a new bank of your own.
+
+<!-- page 58 -->
+
+*Even more fun and convenient with the dedicated app! — PART 4: Part: Leveling up*
+
+## Copy samples
+
+You can easily copy samples within the same bank.
+
+1. **Tap the pad with the sound you want to copy**
+
+   *[Figure: smartphone showing the app pad view (15: SOUND BANK15) with pad 5 selected and its waveform displayed, plus an enlarged view of a finger tapping pad 5]*
+
+2. **Swipe it straight to the copy destination pad**
+
+   *[Figure: enlarged app view showing pad 5 being dragged onto pad 6, with a "他のバンクにコピーする" button at the bottom]*
+   - 他のバンクにコピーする → Copy to another bank
+
+   > **Note:** ※ You can also copy to another bank.
+
+   *[Figure: smartphone showing the pad view with pads 5 and 6 both containing the sample, and a speech bubble reading "コピー完了！"]*
+   - コピー完了！ → Copy complete!
+
+> **Tip:** For example, if you copy a single piano note and prepare multiple samples with the pitch changed using SOUND EDIT (p. 48), you can enjoy pad play with a keyboard-like feel.
+
+<!-- page 59 -->
+
+*Even more fun and convenient with the dedicated app! — PART 4: Part: Leveling up*
+
+## Edit waveforms
+
+After selecting a pad, tap **EDIT** in the app or press the **EDIT** button on this unit to switch to the EDIT view. In the app's EDIT view, you can adjust the sample's playback start and end points with greater precision.
+
+*[Figure: three smartphone screens of the app's EDIT view for PAD 13, showing the waveform with start/end point handles, the ONE SHOT / LOOP / EDIT buttons, and parameter sliders]*
+- ピッチ → Pitch
+- ボリューム → Volume
+- グループ → Group
+- カラー → Color (オレンジ → Orange)
+- BPM → BPM
+- (middle screen) You can adjust the start/end points by swiping.
+- (right screen) The slider lets you zoom in on the waveform, allowing highly precise adjustment.
+
+## Creating sequences is convenient too
+
+The sequence view (the Sequence *[sequence icon]* tab in the tab bar) displays tracks for all pads, and you can enter notes by tapping the cells, just as on this unit. You can also copy by track or by measure, so the app is convenient when creating sequences with multiple measures.
+
+*[Figure: two app screenshots of the sequencer grid, each with an edit menu pop-up]*
+- パッド番号を長押し → Long-press a pad number
+- (upper menu) カット / コピー / ペースト / 次の小節に複製 / クリア → Cut / Copy / Paste / Duplicate to next measure / Clear
+- 小節番号を長押し → Long-press a measure number
+- (lower menu) カット / コピー / ペースト / クリア / 小節を無効 → Cut / Copy / Paste / Clear / Disable measure
+
+Long-press a pad number or measure number to display the edit window, where you can perform operations such as cut, copy, and paste.
+
+<!-- page 60 -->
+
+*Even more fun and convenient with the dedicated app! — PART 4: Part: Leveling up*
+
+## Data organization / download also available
+
+In addition to copying and deleting banks and sequences you have created, you can download them to your smartphone or assign downloaded data to this unit. You can also rename the banks and sequences displayed in the app.
+
+Tap the icon at the top right of the screen.
+
+*[Figure: smartphone showing the app's sequence view (04: SEQUENCE4, SND: 10, BPM: 105) with a finger tapping the icon at the top right; an enlarged view shows the sequence management screen with a menu opened from the "⋮" button next to 04: SEQUENCE4]*
+- シーケンス管理 → Sequence Management
+- 01: SEQUENCE1 … 09: SEQUENCE9 (list; A–D labels shown for assigned sequences)
+- (menu) シーケンス登録 / シーケンス削除 / シーケンスコピー / ダウンロード / 名前を変更 → Assign Sequence / Delete Sequence / Copy Sequence / Download / Rename
+
+## Updates / settings also available
+
+Tap Home *[home icon]* in the tab bar; if an update is available for this unit's software, you can easily update it from here. You can also check this unit's information, make backups, and configure various settings.
+
+Tap the *[gear icon]* icon at the top right of the screen.
+
+*[Figure: a hand holding a smartphone showing the app's home screen with an illustration of the SXC-1 and the message "サンプラーと接続済みです" (Connected to the sampler); an enlarged view shows the settings screen]*
+- サンプラーと接続済みです → Connected to the sampler
+- 設定 → Settings
+- サンプラーの各種設定および更新を行います。 → Configure and update the sampler.
+- システムアップデート → System Update
+- システム情報 → System Information
+- 本体設定 → Unit Settings
+- バックアップ → Backup
+- リストア → Restore
+- システム初期化 → System Initialization
+
+<!-- page 61 -->
+
+*PART 4: Part: Leveling up*
+
+# CREATIVE NOTE
+
+*[Figure: illustration of a game-controller character reading a book, with a notebook-and-pencil motif]*
+
+## Imagination overflows from the palm of your hand!
+
+A "sampler with pads plus sequencer" like the SXC-1 is a staple piece of gear beloved by creators across a wide range of genres, centered on dance music. This unit realizes that concept with the design and feel of a handheld game console. You will experience the surprise and joy of creating cool sounds while playing around with it, almost without realizing it.
+
+*[Figure: photo of a hand playing the illuminated pads in a dimly lit room]*
+
+## Creating your own original songs isn't just a dream!
+
+The SXC-1 invites playful hands-on use, but as introduced in PART 4, it is also capable of serious work. You can even create original songs with this unit alone. If you start by imitating songs you like, you should be able to master its various features smoothly. From play to creation — the SXC-1 will show you a kind of fun you never knew before.
+
+*[Figure: photo of a person playing the SXC-1 on a table; photo of a hand holding the SXC-1 with its pads lit in various colors]*
+
+<!-- page 62 -->
+
+# Appendix
+
+- Troubleshooting
+- Product specifications
+- Reference information
+- Index
+
+<!-- page 63 -->
+
+# Troubleshooting
+
+*Appendix*
+
+## If these symptoms occur
+
+### The power does not turn on
+
+- Check that the USB AC adaptor is connected properly and that the batteries are inserted in the correct orientation (see p. 12).
+- Replace the batteries with new ones (sold separately) (see p. 9).
+- If you are using eneloop batteries, recharge them.
+
+### The power turns off even though nothing is being operated
+
+- The power was turned off by the Auto Power Off function.
+  Turn the power back on.
+- The batteries are running low.
+  Replace the batteries with new ones (sold separately) (see p. 9).
+- If you are using eneloop batteries, recharge them.
+- The display is turned off by the screen saver function.
+  You can restore it by operating a button or a pad.
+
+### The Auto Power Off function does not work
+
+- Check the Auto Power Off setting (see p. 55).
+- The Auto Power Off function does not operate during sound playback.
+
+### Battery life is shorter than stated
+
+- The LED brightness is set high.
+  Lower the brightness setting (see p. 55).
+
+### The display suddenly goes off, or the unit restarts
+
+- The batteries are running low.
+  Replace the batteries with new ones (sold separately) (see p. 9).
+- If you are using eneloop batteries, recharge them.
+
+<!-- page 64 -->
+
+*Troubleshooting — Appendix*
+
+### Cannot communicate
+
+- The connection is not correct.
+  Check that this unit and the smartphone are correctly connected with the USB cable (see p. 56).
+- Use the included USB Type-C cable (see p. 12).
+
+### No sound can be heard
+
+- The volume is not set appropriately.
+  Adjust the volume (see p. 10).
+- When headphones are connected, no sound comes from the speaker.
+  Unplug the headphones.
+- The headphones are not connected correctly.
+  Check that the headphone plug is fully inserted all the way in.
+- You are using incompatible headphones.
+  Use headphones with a 3.5 mm stereo mini (3-pole) plug.
+
+### The sound is distorted
+
+- The volume is too high.
+  Adjust the volume (see p. 10).
+- The batteries are running low.
+  Replace the batteries with new ones (see p. 9).
+
+### The display does not light, or it flashes
+
+- The batteries are running low.
+  Replace the batteries with new ones (see p. 9).
+
+### The display is off, but the pads are lit
+
+- To protect the screen, the display turns off after 30 minutes (screen saver function).
+  You can restore it by operating a button or a pad.
+
+<!-- page 65 -->
+
+*Troubleshooting — Appendix*
+
+### No sound is recorded
+
+- The recording input level is not appropriate.
+  Adjust `INPUT VOL` or the volume of the external device (see p. 28).
+- Check that the input source used for recording (side-panel `INPUT SELECT` switch) matches the corresponding jack (`USB` or `AUDIO IN`) (see p. 28).
+- Check that the plug is inserted correctly, all the way in (see p. 13).
+
+## Error message list
+
+| Message display | Solution |
+|---|---|
+| SAMPLING ERROR！<br>LOW STRAGE SPACE | There is not enough memory space, so recording is not possible. Delete stored data and then record again. |
+| SAMPLING ALERT！<br>REC TIME EXCEEDED | The recording time limit has been reached. Finish recording within 15 minutes. |
+| SAMPLING ERROR！<br>DATA SAVE FAILED | Saving the data failed. Save it again. |
+| REPLACE THE BATTERY | Replace with new batteries (sold separately). Or use a USB AC adaptor (sold separately). If you are using eneloop batteries, recharge them. |
+
+<!-- page 66 -->
+
+# Product specifications
+
+*Appendix*
+
+| Item | Specification |
+|---|---|
+| Built-in microphone | Monaural × 1 |
+| Built-in speaker | Monaural × 1, output 0.4 W |
+| Sampling function | Sampling rate: 16-bit linear / 48 kHz<br>Recording time: up to 15 minutes (approx. 173 MB)<br>Recording format: WAV (stereo)<br>Recording trigger: automatic recording (threshold detection) / manual recording |
+| Maximum polyphony | Up to 16 notes (stereo)<br>\* Changes as follows depending on usage conditions.<br>&nbsp;&nbsp;• Beat Sync: When ON, time-stretched sounds up to 4 notes, normal sounds up to 8 notes<br>&nbsp;&nbsp;• Effect: When ON, up to 10 notes<br>&nbsp;&nbsp;• Beat Sync & effect: When ON, time-stretched sounds up to 4 notes, normal sounds up to 4 notes |
+| Built-in storage size | 64 GB<br>\* Includes approx. 100 MB of preset sounds |
+| Power supply | USB power: connect to the `POWER/DATA` port<br>Batteries: four AAA rechargeable nickel-metal hydride batteries (eneloop) or AAA alkaline batteries<br>&nbsp;&nbsp;Battery life: approx. 2 hours with eneloop batteries. With alkaline batteries, or depending on usage conditions, this may be 1 hour or less.<br>Auto Power Off: configurable as no setting, 20 minutes, 1 hour, or 2 hours (default setting is 20 minutes) |
+| Current consumption | DC 5 V 0.57 A (USB power), DC 6 V 0.52 A (batteries) |
+| Display (OLED display) | Monochrome, 1.3 inches (128 × 64 pixels), with brightness adjustment |
+| Input/output jacks | • `PHONE` jack: 3.5 mm stereo mini jack<br>• `LINE OUT` jack: 3.5 mm stereo mini jack<br>• `AUDIO IN` jack: 3.5 mm stereo mini jack<br>• `DATA` port: USB port<br>• `POWER/DATA` port: USB port |
+| Operating temperature range | 0°C to 40°C |
+| Size | Width 100 mm × depth 177 mm × height 27 mm (including feet) |
+| Weight | Approx. 315 g (excluding batteries) |
+| Included accessories | USB Type-C cable, Startup Guide (with warranty) |
+| Options (sold separately) | AD-XJ06J Type-C (USB AC adaptor),<br>CB-30USB (USB Type-A to Type-C cable) |
+
+\* Specifications are subject to change without notice due to product improvement and other reasons.
+
+<!-- page 67 -->
+
+# Reference information
+
+*Appendix*
+
+## Intended market
+
+- This unit is intended for use in Japan. Use outside Japan may violate that country's radio-related standards and other regulations, and CASIO accepts no responsibility whatsoever for such use.
+
+> This unit conforms to the technical standards of the VCCI Council (Class B).
+
+> **JIS C 61000-3-2 compliant product**
+> This unit conforms to the harmonic current standard "JIS C 61000-3-2".
+
+## Trademarks
+
+The following terms are registered trademarks or trademarks of their respective companies.
+
+- QR Code is a registered trademark of DENSO WAVE INCORPORATED.
+- "eneloop" is a registered trademark of the Panasonic Group.
+- "USB Type-C™" is a trademark of USB Implementers Forum.
+- IOS is a trademark or registered trademark of Cisco in the United States.
+- Android is a trademark or registered trademark of Google LLC.
+- All other trademarks and registered trademarks are the trademarks and registered trademarks of their respective owners.
+
+## OSS (open source software)
+
+The software of this unit includes open source software.
+The copyrights and licenses of each piece of software can be checked on the CASIO support page below.
+https://www.casio.com/jp/support/creator-economy/sampler/manual/?model=SXC-1
+
+<!-- page 68 -->
+
+*Reference information — Appendix*
+
+## Copyright precaution
+
+Music, video, computer programs, databases, and other works are protected by copyright law, and the rights of their authors and copyright holders are protected. Such works may be used only for personal or household purposes, or for other purposes permitted by law. If you copy, modify, transfer, or distribute such works over a network without the rights holder's permission beyond the purposes stated above, you may be subject to claims for damages or criminal penalties for infringement of copyright and other rights. When using this unit to copy copyrighted works, please comply with copyright law and use it appropriately.
+
+- The copyright to the content built into or included with this unit (sound waveform data, sequence patterns, image data, etc.) is held by CASIO.
+- Provided you comply with the conditions stated in this manual, CASIO's permission is not required for you to perform, record, distribute, or otherwise use works you have created using the content built into or included with this unit as material.
+- Do not extract the content built into or included with this unit as is, or in a substantially identical form, and use it (including fixing it to another storage medium for distribution or making it public over a computer network).
+
+## After-sales service contacts
+
+*[Figure: two contact information panels with toll-free phone icons ("mobile OK") and QR codes, plus two smaller boxes below]*
+
+**Inquiries about functions, operation, and where to buy**
+
+**0120-088928**
+We ask that you enable caller ID when calling.
+https://www.casio.com/jp/support/inquiry/186/
+
+Check our website for reception hours
+https://www.casio.com/jp/support/creator-economy/sampler/inquiry/advice/
+- Contact point for questions about using the unit and options, failure diagnosis, etc.
+
+**Repair inquiries**
+
+**0120-004161**
+We ask that you enable caller ID when calling.
+https://www.casio.com/jp/support/inquiry/186/
+
+Check our website for reception hours
+https://www.casio.com/jp/support/creator-economy/sampler/inquiry/repair/
+- Contact point for repair charges, repair periods, etc.
+
+**Where to request repairs**
+
+When requesting repairs directly from Casio, please use the safe and convenient WEB repair acceptance service.
+
+*[Figure: QR code]*
+You can apply via our website.
+https://casio.jp/support/repair/contact/
+
+**Information provided on our website**
+
+We provide product Q&A, helpful information about products and repairs, various support information, and information about function/operation and repair inquiries on our website.
+Please see the "Customer Support" pages, accessible from the Casio website https://www.casio.com/jp/
+
+Repair services for Casio products are handled by Casio Techno Co., Ltd.
+- Telephone numbers and other details are subject to change. Thank you for your understanding.
+
+<!-- page 69 -->
+
+# Index
+
+*Appendix*
+
+*(The index is ordered by the Japanese syllabary; the original Japanese terms' kana-row group headings are retained below.)*
+
+### あ row
+
+| Term | Pages |
+|---|---|
+| Active speaker (アクティブスピーカー) | 13 |
+| After-sales service (アフターサービス) | 68 |
+| Auto chop (オートチョップ) | 52-53 |
+| Auto trigger (オートトリガー) | 29 |
+| Auto Power Off (オートパワーオフ) | 9, 12, 55, 63, 66 |
+
+### か row
+
+| Term | Pages |
+|---|---|
+| Function list (機能一覧) | 11 |
+| Function buttons (機能ボタン) | 10-11 |
+| Quantize (クォンタイズ) | 18, 40 |
+| Grouping (グループ化) | 22, 48 |
+
+### さ row
+
+| Term | Pages |
+|---|---|
+| Sampling (サンプリング) | 27-34, 50-54 |
+| Sampling mode (サンプリングモード) | 29, 50, 52, 54-55 |
+| Directional buttons (十字ボタン) | 10-11 |
+| Sequencer (シーケンサー) | 35-45 |
+| Sequence mode (シーケンスモード) | 11, 36-44 |
+| Sequence bank (シーケンスバンク) | 36, 47 |
+| System settings (システム設定) | 55 |
+| Trademarks (商標) | 67 |
+| Initialization (初期化) | 55 |
+| Step input (ステップ入力) | 41 |
+| Screen saver (スクリーンセイバー) | 7, 63, 64 |
+| Slider (スライダー) | 10 |
+| Strap (ストラップ) | 6, 8 |
+| Product specifications (製品仕様) | 66 |
+
+### た row
+
+| Term | Pages |
+|---|---|
+| Time stretch (タイムストレッチ) | 18, 66 |
+| Dial (ダイヤル) | 10, 24-25, 49 |
+| Chop (チョップ) | 33, 53 |
+| Power switch (電源スイッチ) | 9-10, 12 |
+| Battery replacement (電池交換) | 9, 12 |
+| Battery life (電池寿命) | 9, 63, 66 |
+| Battery cover (電池ブタ) | 9-10, 12 |
+
+### な row
+
+| Term | Pages |
+|---|---|
+| Built-in speaker (内蔵スピーカー) | 7-10, 13, 64, 66 |
+| Built-in microphone (内蔵マイク) | 7, 10-11, 28, 50, 66 |
+
+### は row
+
+| Term | Pages |
+|---|---|
+| Waveform (波形) | 10, 19, 33, 49, 53, 59, 68 |
+| Waveform editing (波形編集) | 10, 49, 53, 59 |
+| Pad (パッド) | 7, 10-11, 14-26, 37, 47, 63-64 |
+| Pad play (パッドプレイ) | 14-26 |
+| Bank (バンク) | 10-11, 15-17, 23, 37, 44, 51, 57 |
+| Display (表示部) | 5, 7, 10, 66 |
+| Finger drumming (フィンガードラム) | 19-20, 26 |
+| Preset (プリセット) | 16-17, 21, 33, 34, 49 |
+| Voice percussion (ボイスパーカッション) | 27-31 |
+
+### ま row
+
+| Term | Pages |
+|---|---|
+| Mixer (ミキサー) | 10, 13 |
+| Metronome (メトロノーム) | 37, 39, 41, 44 |
+
+### や row
+
+| Term | Pages |
+|---|---|
+| User area (ユーザーエリア) | 16 |
+
+### ら row
+
+| Term | Pages |
+|---|---|
+| Real-time input (リアルタイム入力) | 41, 43-44 |
+| Resampling (リサンプリング) | 33, 50-51 |
+| Looped sound (ループ音源) | 17-18, 20-21, 43, 47, 51 |
+| Recording (録音) | 7-10, 27-34, 50-54, 65-66, 68 |
+
+### わ row
+
+| Term | Pages |
+|---|---|
+| One-shot sound (ワンショット音源) | 17, 21, 23, 31, 43 |
+
+<!-- page 70 -->
+
+*Index — Appendix*
+
+### A–Z
+
+| Term | Pages |
+|---|---|
+| AD-XA06J Type-C | 8, 12, 66 |
+| Android | 56, 67 |
+| APO Time | 55 |
+| AUDIO IN jack | 10, 28, 51-52, 65-66 |
+| AUTO Trig Lv | 55 |
+| BAR | 44 |
+| BAT-A | 55 |
+| BAT-e | 9, 55 |
+| BATTERY Type | 9, 55 |
+| Beat Sync | 18, 20, 47, 49, 55, 66 |
+| BIT CRUSHER | 25 |
+| BPM | 11, 18, 39, 44, 47, 49, 52 |
+| CASIO Sampler App | 56-60 |
+| CB-30USB | 66 |
+| CLEAR | 44 |
+| COLOR | 49 |
+| DAW | 45 |
+| DATA port | 7-8, 10, 12, 28, 56, 66 |
+| DEL | 10-11, 32 |
+| DELAY | 25 |
+| Disp Bright | 55 |
+| EDIT | 10-11, 33, 44, 48-49, 59 |
+| EDM | 47 |
+| eneloop | 9, 12, 55, 63, 65-67 |
+| FILTER | 25 |
+| FLAC | 57 |
+| FLANGER | 25 |
+| FW Version | 55 |
+| FX (effect) | 10-11, 24-25, 51, 66 |
+| GROUP | 48 |
+| Initialize | 16, 55 |
+| INPUT SELECT | 10, 28, 50, 65 |
+| INPUT VOL | 10, 28, 65 |
+| iOS | 56, 67 |
+| LED Bright | 55 |
+| LED | 8-9, 55, 63 |
+| LINE OUT jack | 8, 10, 66 |
+| LOOP | 10, 21 |
+| MAIN VOL | 7, 8, 10 |
+| METRONOME | 44 |
+| MIC | 10, 28 |
+| MIDI | 10 |
+| MP3 | 57 |
+| ONE SHOT | 10, 21 |
+| PHASER | 25 |
+| PHONE jack | 8, 10, 13, 66 |
+| PITCH | 33, 48 |
+| POWER/DATA port | 8, 10, 66 |
+| POWER Supply | 55 |
+| PRECOUNT | 44 |
+| REC | 10-11, 65 |
+| REPLACE THE BATTERY | 9, 65 |
+| ROLL | 25 |
+| SERIAL No. | 55 |
+| SOUND BANK | 44 |
+| TRACK | 44 |
+| USB Type-C | 7, 12, 56, 64, 66, 67 |
+| USB AC adaptor | 3, 7-9, 12, 63, 65-66 |
+| USB cable | 3-5, 8, 11-12, 28, 64 |
+| VOLUME | 44, 48 |
+| WAV | 57, 66 |
+
+<!-- page 71 -->
+
+*(Back cover)*
+
+*[Figure: CASIO® logo]*
+
+Created May 2026&nbsp;&nbsp;&nbsp;&nbsp;MA2605-A
+© 2026 CASIO COMPUTER CO., LTD.
+
+!SXC1-DOC startup-guide en 15
+# SXC-1 Startup Guide
+
+> This is an English translation of *SXC-1_SUG_WB_JA.pdf* (SXC-1 Startup Guide, Japanese original by Casio). Translated from the Japanese original; CASIO has not reviewed this translation. Translation date: August 6, 2026.
+
+<!-- page 1 -->
+
+## Portable Standalone Sampler SXC-1
+
+## Startup Guide
+
+Before use, be sure to read the "Safety precautions" in the User's Guide carefully and use the product correctly.
+
+**JA**
+
+*[Figure: line drawing of the SXC-1 front panel — display, directional buttons, dials, sliders, function buttons, and the 4×4 pad area]*
+
+*[QR code]* CASIO Sampler App
+
+*[QR code]* User's Guide
+https://s.casio.jp/f/10917ja/
+
+*[QR code]* Tutorial videos
+https://s.casio.jp/f/10924ja/
+
+**CASIO**
+
+*[Barcode]* M001JP010
+
+<!-- page 2 -->
+
+## Please note the following
+
+- Every effort has been made to ensure the accuracy of the contents of this manual. Should you have any questions or notice anything that seems incorrect, please contact us.
+- CASIO assumes no responsibility whatsoever for any damages, lost profits, or claims from third parties arising from the use of, or malfunction of, this manual or this unit.
+- CASIO assumes no responsibility whatsoever for any damages, lost profits, or other losses arising from the loss of memory contents due to malfunction, repair, or any other reason.
+- Reproduction of this manual, in part or in whole, without permission is prohibited. Note that aside from your own personal use, any use of this manual without the permission of CASIO is forbidden under copyright law.
+- The contents of this manual are subject to change without notice for the purpose of improvement.
+- Before use, be sure to read the "Safety precautions" in the User's Guide carefully and use the product correctly.
+- Using the unit without performing the preparation and settings described in this manual may interfere with your use of the unit.
+- Keep this manual in a safe place for future reference after reading it.
+- The explanations, display examples, and illustrations in this manual and the User's Guide may differ from the actual product.
+
+## Safety precautions
+
+| | |
+|---|---|
+| ⚠ **Warning** | Indicates content with the possibility of death or serious injury. |
+| ⚠ **Caution** | Indicates content with the possibility of minor injury, and the possibility of property damage. |
+
+🚫 The ⊘ symbol means "something you must not do."
+
+❗ The ● symbol means "something you must do."
+
+### ⚠ Warning
+
+> **Warning:** 🚫 **Never use any USB cable other than the specified one.**
+> Creates the risk of fire and electric shock.
+
+> **Warning:** ❗ **Do not use the unit in an abnormal state, such as when it is emitting smoke, an unusual odor, or heat. Do not continue using it if it is damaged, such as after being dropped.**
+> **Creates the risk of fire and electric shock. Immediately take the following steps.**
+> 1. Turn the power off.
+> 2. Disconnect the USB cable.
+> 3. Contact the "Repair inquiries" contact.
+
+### ⚠ Caution
+
+> **Caution:** 🚫 **Do not connect anything other than the specified items to the connector section.**
+> Can create the risk of fire and electric shock.
+
+The rating label of this unit is located in the area exposed by opening the battery cover.
+
+<!-- page 3 -->
+
+## Introduction
+
+Before use, check that you have the main unit and all of the included accessories.
+
+- Main unit
+
+*[Figure: line drawing of the SXC-1 main unit]*
+
+- USB Type-C™ cable
+
+*[Figure: line drawing of the USB Type-C cable]*
+
+- This manual (with warranty)
+
+## About this manual
+
+This manual is a Startup Guide for understanding the basic operations of the SXC-1 (hereinafter, "this unit"). It is structured so that first-time users can perform the basic operations smoothly.
+
+For more detailed explanations of each function and the specifications of this unit, refer to the User's Guide.
+
+Tutorial videos are also available, letting you learn through video how to actually play the unit and create songs. We encourage you to make use of them.
+
+*[QR code]* User's Guide
+https://s.casio.jp/f/10917ja/
+
+*[QR code]* Tutorial videos
+https://s.casio.jp/f/10924ja/
+
+## About CASIO Sampler App
+
+This unit supports the dedicated smartphone app CASIO Sampler App. Using CASIO Sampler App, you can check the display on your smartphone screen and perform operations that are not possible on the unit itself, such as organizing and downloading data.
+
+To use the app, connect the unit to your smartphone with the included USB Type-C cable.
+
+*[QR code]* CASIO Sampler App
+
+<!-- page 4 -->
+
+## Names of parts
+
+*[Figure: front, top, and side views of the SXC-1 with numbered callouts 1–10 indicating the parts listed in the table below]*
+
+| No. | Item | Description |
+|---|---|---|
+| 1 | Display (OLED display) | Displays various information, such as waveforms and settings. |
+| 2 | Directional buttons | Used to select menus, change values, and more. |
+| 3 | Bank select buttons (A/B/C/D) | Used to switch sound banks and sequences during performance. |
+| 4 | Sliders | • INPUT VOL: Adjusts the input level for recording.<br>• MAIN VOL: Adjusts the volume of the built-in speaker and headphones. |
+| 5 | FX1 button/dial<br>FX2 button/dial | Used to apply effects to the sound and to edit waveforms.<br>The buttons switch effects ON/OFF; the dials select effects and change parameters. |
+| 6 | Function buttons | • ▶/■: Play/stop<br>• REC: Start/stop recording (sampling)<br>• ONE SHOT: Toggles full-sound playback<br>• LOOP: Toggles loop playback<br>• DEL: Delete sounds<br>• EDIT: Switches editing modes (parameter and waveform editing) |
+| 7 | Pads section | Used to play, record, and edit sounds. A sound is assigned to each pad, and pressing a pad plays it. |
+| 8 | Connector section<br>• PHONE jack<br>• LINE OUT jack<br>• AUDIO IN jack<br>• DATA port<br>• POWER/DATA port | Connects headphones or earphones (3.5 mm stereo mini).<br>Connects to a mixer or speakers to output sound (3.5 mm stereo mini).<br>Connects an external device to input sound (3.5 mm stereo mini).<br>USB port for data communication with a smartphone (MIDI/audio transfer).<br>USB port for power supply and data communication with a smartphone (MIDI/audio transfer). |
+| 9 | Power switch | Turns the power of the unit ON/OFF. |
+| 10 | INPUT SELECT switch | Switches the input source for recording.<br>MIC: built-in microphone / ♪: AUDIO IN jack / USB: USB port |
+
+## Connecting external devices
+
+This unit can be used with headphones, external speakers, and other devices connected. Note that because the unit has a built-in microphone and speaker, recording and playback are possible without connecting any external devices.
+
+*[Figure: connection example showing devices connected to the unit's connector section]*
+- Connection example:
+- Headphones
+- Speaker
+- Keyboard
+- Smartphone
+- Household power outlet
+- AC adaptor
+
+<!-- page 5 -->
+
+## Operation overview
+
+The functions of this unit are listed below. For an explanation of each function, see the corresponding page.
+
+*[Figure: mode map showing screens and the buttons that switch between them. Center: Performance mode screen (`MASTER BPM:95` / `BANK A:1  PAD:10  BPM:95` with waveform). From Performance mode: `A`–`D` / pad → bank selection screen (`SELECT BANK 1`); long-press `A`–`D` → sequence selection screen (`SEQUENCE SLCT / BANK = 1 / OK(A) CANCEL(B)`); `A` → Sequence mode screen (step grid); `EDIT` ↔ sequence settings screen (`SEQUENCE EDIT / SOUND BANK:1 / BPM:95 / CLEAR:BAR / METRONOME:OFF`); long-press `EDIT` ↔ system settings screen (`SYSTEM SETTING / Beat Sync:ON / LED Bright:3 / Disp Bright:5 / APO Time:20min`); `REC` → REC mode screen (`SAMPLING MODE: AUTO TRIGGER` with L/R level meters); `DEL` → DEL mode screen (`DELETE SELECT PAD`); `EDIT` → EDIT mode screen (`SOUND EDIT / PITCH:0 / VOLUME:100 / GROUP:0 / COLOR:6`). Long-press `A`–`D` (while selected) switches between Sequence mode and sequence selection.]*
+- シーケンス選択 → Sequence selection
+- シーケンスモード → Sequence mode
+- シーケンス設定 → Sequence settings
+- バンク選択 → Bank selection
+- 演奏モード → Performance mode
+- システム設定 → System settings
+- REC モード → REC mode
+- DEL モード → DEL mode
+- EDIT モード → EDIT mode
+- A～D 長押し → Long-press `A`–`D`
+- A～D（選択中）長押し → Long-press `A`–`D` (while selected)
+- パッド → Pad
+- EDIT 長押し → Long-press `EDIT`
+
+| Function | Description | Reference |
+|---|---|---|
+| Performance mode | The normal mode for performing. | – |
+| Bank selection | After a short press of the **A**–**D** buttons, use the **directional buttons** to select the bank to assign to each of the **A**–**D** buttons. | – |
+| Sequence selection | After a long press of the **A**–**D** buttons, use the **directional buttons** to select the sequence to assign to each of the **A**–**D** buttons. | – |
+| Sequence mode | Create patterns of up to 8 measures using the **directional buttons**, **A/B buttons**, and pads. Created patterns can be played back from Performance mode. | p. 9 |
+| Sequence settings | Change settings such as the bank used for the sequence and the BPM. | p. 9 |
+| REC mode | Capture sounds from outside using the built-in microphone, a USB cable, or other sources. | p. 11 |
+| DEL mode | Delete sounds assigned to pads. | p. 12 |
+| EDIT mode | Change the pitch and playback timing of sounds assigned to pads. | p. 12 |
+| Effect function | Apply various changes to the sound during playback. | p. 10 |
+| System settings | Change settings that affect the sampler as a whole. | – |
+
+> **What is a bank?**: A group of 16 sounds assigned to the pads. This unit lets you create up to 80 groups.
+>
+> **What is a sequence?**: A performance pattern of up to 8 measures made with the sounds of one bank. This unit lets you create up to 50 patterns.
+>
+> *[Figure: diagram of Bank 1, Bank 2, … Bank 80, each containing pad 1, pad 2, … pad 16; and Sequence 1 (Bank ●), Sequence 2 (Bank ▲), … Sequence 50 (Bank ■)]*
+> - バンク 1／2／80 → Bank 1 / Bank 2 / Bank 80
+> - パッド 1／2／16 → pad 1 / pad 2 / pad 16
+> - シーケンス 1／2／50 → Sequence 1 / Sequence 2 / Sequence 50
+>
+> By assigning them to the **A–D buttons**, you can instantly call up four banks and four sequences at any time.
+
+<!-- page 6 -->
+
+## Get ready to turn the power on and make sound
+
+### About the power supply
+
+For powering this unit, use the separately available USB AC adaptor (AD-XA06J Type-C) or a commercially available USB AC adaptor.
+
+When using a commercially available USB AC adaptor, use a product that conforms to the USB standard with an output of DC 5 V / 1 A or higher. Also, for the USB cable used with a commercially available USB AC adaptor, use a product that conforms to the USB 2.0 standard and is no longer than 1 m.
+
+You can also use commercially available AAA rechargeable nickel-metal hydride batteries eneloop (hereinafter, "eneloop") or AAA alkaline batteries.
+
+Connection example: using the separately available USB AC adaptor (AD-XA06J Type-C)
+
+*[Figure: connection diagram — USB cable ② into the POWER/DATA port, plugged into the AC adaptor ①, which plugs into a household power outlet ③]*
+- POWER/DATA 端子 → POWER/DATA port
+- USB ケーブル → USB cable
+- 家庭用コンセント → Household power outlet
+- AC アダプター → AC adaptor
+
+### Using batteries
+
+1. Remove the battery cover on the back of the unit. It can be removed by sliding it while pressing the raised part ("−" shape) of the battery cover.
+2. Load the batteries.
+   Align them with the markings on the unit, making sure not to reverse the ⊕⊖ orientation.
+3. Attach the battery cover.
+
+> **Note:** As a guideline, continuous operation on batteries is about 2 hours when using eneloop. When using alkaline batteries, or depending on usage conditions, this may be 1 hour or less.
+> For extended performance or operation, we recommend powering the unit with a USB AC adaptor.
+
+### Turn the power on
+
+1. Slide the power switch to the [ON] position.
+
+   *[Figure: side view of the unit with the power switch being slid up to ON]*
+
+   The startup screen appears and the unit is ready for use.
+
+2. To turn the power of the unit off, slide the power switch to the [OFF] position.
+
+### Adjusting the volume
+
+Use the **MAIN VOL** slider to adjust the volume level of the built-in speaker and the **PHONE jack**. Slide the slider to the left to lower the sound, and to the right to raise the sound.
+
+*[Figure: MAIN VOL slider with − and + markings]*
+
+<!-- page 7 -->
+
+## Try making some sound
+
+### Performing with the preset sounds
+
+Preset sounds are assigned to this unit in advance. Press the **A button** to select bank 1. If bank 1 is not selected on the **A button**, you can change it with the **directional buttons**.
+
+*[Figure: sequence of images — pressing the A button among the A/B/C/D buttons → `SELECT BANK 1` screen → pressing a pad on the 4×4 pad grid → Performance mode screen (`MASTER BPM:95` / `BANK A:1  PAD:10  BPM:95` with waveform)]*
+
+In the preset sounds, sound data suited to looped sounds is assigned to the orange and purple pads, and sound data suited to one-shot sounds is assigned to the yellow and blue pads.
+
+> **Looped sound:**
+> Sound data created on the premise of repeated playback (looping) — mainly rhythm and melody patterns that form the background of a song.
+>
+> **One-shot sound:**
+> Single-hit sound data meant to be played only once, such as drum kicks, snares, and sound effects.
+
+First, press an orange or purple pad to play a looped sound.
+
+Along with the sound being played, freely press the yellow and blue pads and try performing.
+
+*[Figure: hand pressing a pad on the 4×4 pad grid]*
+
+### Changing how sounds play
+
+Try changing how sounds play with the **ONE SHOT/LOOP buttons**. By turning both **ONE SHOT** and **LOOP** ON, a pad pressed once will keep playing back repeatedly.
+
+*[Figure: row of function buttons ▶/■, REC, ONE SHOT, LOOP, DEL, EDIT, with a hand pressing ONE SHOT and LOOP]*
+
+| Button | When the setting is ON | When the setting is OFF |
+|---|---|---|
+| ONE SHOT | Pressing the pad plays the sound to the end | The sound plays only while the pad is held down |
+| LOOP | When the sound plays to the end, the playback position automatically returns to the beginning and playback repeats | When the sound plays to the end, playback stops there |
+
+You can stop a sound that is playing by pressing the **▶/■ button**.
+
+<!-- page 8 -->
+
+## Try switching banks
+
+### Switching banks to change the sounds
+
+A different sound bank is assigned to each of the **A**–**D** buttons. Press the **B/C/D buttons** and try performing with the other banks as well.
+
+Also, by pressing the **directional buttons** after pressing an **A**–**D button**, you can assign any sound bank from 1 to 80 to the four bank select buttons.
+
+1. Press one of the **A/B/C/D buttons**.
+
+   The bank number assigned to the selected button is displayed.
+
+   *[Figure: hand pressing the A button among the A/B/C/D buttons → `SELECT BANK 1` screen]*
+
+2. Use the **directional buttons** to switch the bank number. The up/down buttons change it by 1, and the left/right buttons change it by 10.
+
+   *[Figure: hand pressing the directional buttons → `SELECT BANK 2` screen]*
+
+   Pressing a pad plays the sound assigned to the selected bank.
+
+<!-- page 9 -->
+
+## Try creating a sequence
+
+### Creating a sequence
+
+Long-press any one of the bank select buttons (`A`/`B`/`C`/`D`). Use the **directional buttons** to select where to save the sequence, then confirm with the **A button**. You can create up to 50 sequence patterns.
+
+*[Figure: directional buttons with a finger long-pressing the A button → screen showing `SEQUENCE SLCT  BANK = 1  OK(A) CANCEL(B)` → directional buttons with a finger pressing the A button → sequencer step-grid screen showing `BANK A:1  BPM:120`]*
+- 長押し → Long-press
+
+First, let's use the **directional buttons** and the **A/B buttons** to create a pattern like the one below. Move the cursor to a cell in the sequence pattern information and press the **A button** — the cell is filled in white; press the **B button** to delete the sound at the cursor position.
+
+*[Figure: sequencer grid screen (`BANK A:1  BPM:95`) with two callouts pointing to filled cells]*
+- 小節1の1拍目でパッド1を再生する → Plays pad 1 on beat 1 of measure 1
+- 小節1の2拍目でパッド2を再生する → Plays pad 2 on beat 2 of measure 1
+
+Press the **▶/■ button** to play the sequence you created. Press the **EDIT button** to change settings such as the sound (bank) to use and the BPM. Press the **EDIT button** again to return to Sequence mode.
+
+### Entering notes with the pads
+
+Press the **REC button**, and any pads you tap during playback are entered automatically into the sequence pattern at the playback position.
+Tap the pads in time with the sequence playback and try adding sounds to the sequence.
+
+*[Figure: sequencer grid screen (`BANK A:1  BPM:95`) with a circled cell, and an arrow from the pads section where a finger is tapping a pad]*
+
+### Playing a sequence from Performance mode
+
+You can also play the sequences you have created from Performance mode.
+Long-press the currently selected bank select button (lit) to return to Performance mode.
+
+*[Figure: sequencer grid screen → directional buttons with a finger long-pressing the A button → Performance mode screen showing `MASTER BPM:95` / `BANK A:1  PAD:10  BPM:95` with a waveform]*
+- 長押し → Long-press
+
+Press the **▶/■ button** together with the bank select button of the bank where you created the sequence, and the sequence plays. Tap the pads along with the sequence and perform.
+
+*[Figure: function button row (`▶/■`, `REC`, `ONE SHOT`, `LOOP`, `DEL`, `EDIT`) with a finger pressing `▶/■`, a plus sign, and the directional buttons with a finger pressing the A button]*
+
+<!-- page 10 -->
+
+## Try applying an effect
+
+### Applying an effect
+
+Applying an "effect" to the sound being played can change it into a sound with a completely different feel. Muffle it with the filter, add echoes with delay — play around with the sound and try all kinds of things.
+
+### How to use the FX1/FX2 buttons
+
+#### About FX1
+
+- Use the **FX1 dial** to select the type of effect to apply.
+
+*[Figure: screen showing `EFFECT INFO  FX1:FILTER  FX2:ROLL 1` → FX1 dial being turned → screen showing `EFFECT INFO  FX1:BIT CRUSHER  FX2:ROLL 1`]*
+
+- Press the **FX1 button** to turn the effect ON. Press the **FX1 button** again to turn it OFF.
+
+*[Figure: FX1 dial with a finger pressing the FX1 button]*
+
+- While the effect is ON, operating the **FX1 dial** further changes the effect's parameter.
+
+*[Figure: FX1 dial being turned → screen showing `EFFECT INFO  FX1:BIT CRUSHER` with a longer parameter bar, `FX2:ROLL 1`]*
+
+#### About FX2
+
+- In the same way, you can use the **FX2 dial** to select the effect and change its parameter, and the **FX2 button** to switch it ON/OFF.
+- It can be used at the same time as FX1.
+
+## Try sampling
+
+### Sampling
+
+Sampling is a feature that records sound from the built-in microphone or an external device and saves it to a pad. Try recording familiar sounds such as hand claps, or part of a favorite song, and use them in your performance.
+
+<!-- page 11 -->
+
+### Try recording with the built-in microphone
+
+Use the built-in microphone to record familiar sounds and save them to pads.
+
+1. Select a bank (BANK 15 or later) that has an empty pad (a pad that is not lit).
+2. Operate the **INPUT SELECT switch** to switch the input source to **MIC**.
+
+   *[Figure: side view of the unit with a close-up of the INPUT SELECT switch, labeled MIC ♪ USB]*
+
+3. Adjust the recording level with the **INPUT VOL** slider.
+
+   *[Figure: the INPUT VOL slider with − and + markings]*
+
+4. Press the **REC button**.
+
+   *[Figure: function button row with a finger pressing `REC`]*
+
+   The Sampling mode menu appears.
+
+5. The empty pads flash, so press the empty pad you want to save to.
+
+   The pad changes to lit and the unit enters recording standby. When sound is input, recording starts automatically.
+
+   *[Figure: pads section with a finger tapping a pad → the unit's built-in microphone picking up "SOUND"]*
+
+6. To finish sampling, press the selected pad, or press the **REC button** again.
+
+### Try recording an external sound
+
+Use the **AUDIO IN jack** or the USB port to record sound from an external device and save it to a pad. Try recording an instrument performance or sound from a smartphone.
+
+1. Connect an external device to the **AUDIO IN jack** or the USB port.
+
+   *[Figure: rear connector section showing the `PHONE`, `LINE OUT`, `AUDIO IN ♪` jacks and the `DATA`, `POWER/DATA` ports]*
+
+2. Select the input source with the **INPUT SELECT switch**. Select ♪ when connecting to the **AUDIO IN jack**, or **USB** when connecting to the USB port.
+3. In the same way, adjust the recording level with **INPUT VOL**, then press the **REC button** and select a pad to start recording.
+
+<!-- page 12 -->
+
+## Try deleting and editing sounds
+
+### Deleting a sound
+
+You can delete sounds you no longer need.
+
+1. Press the **DEL button**. The pads that have sounds saved to them flash.
+
+   *[Figure: function button row with a finger pressing `DEL` → screen showing `DELETE  SELECT PAD`]*
+
+2. Press the pad you want to delete. You can also press multiple pads to select more than one.
+
+   *[Figure: pads section with a finger tapping a pad]*
+
+   A confirmation message appears, so press the **A button**.
+
+   *[Figure: screen showing `DELETE SELECTED PAD?  OK(A) CANCEL(B)` → directional buttons with a finger pressing the A button]*
+
+   The sounds assigned to the selected pads are deleted.
+
+### Editing a sound
+
+You can edit recorded sounds in "EDIT mode". Adjust the speed, pitch (of the sound), volume, and more to make them just the way you like.
+
+1. Press the **EDIT button**.
+
+   *[Figure: function button row with a finger pressing `EDIT`]*
+
+2. Press a pad, and the list of parameters set for the selected pad's sound appears. You can change the values with the **directional buttons**.
+
+   *[Figure: screen showing `SOUND EDIT` with `PITCH :0`, `VOLUME :100`, `GROUP :0`, `COLOR :6`]*
+
+3. You can edit the playback start position with the **FX1 dial** and the end position with the **FX2 dial**. This lets you cut out and play just one part of the sound.
+
+   *[Figure: FX1 dial, INPUT VOL and MAIN VOL sliders, FX2 dial → screen showing `MASTER BPM:50` / `BANK A:1  PAD:16  BPM:50` with a waveform and start/end markers]*
+
+4. When you finish editing, press the **EDIT button**. The edited content is saved and the LED goes out.
+
+<!-- page 13 -->
+
+## Troubleshooting
+
+If a problem occurs, check and address the following.
+
+### No sound
+
+- Adjust the volume with the **MAIN VOL** slider.
+- Check that headphones, external speakers, or the like are correctly connected to the **PHONE** or **LINE OUT jack**.
+
+> **Note:** When headphones or the like are connected to the **PHONE jack**, no sound comes from the built-in speaker.
+
+### Cannot record
+
+- Check that the **INPUT SELECT switch** is in the correct position.
+- The remaining storage space may be insufficient. Use the **DEL button** to delete sounds you do not need.
+- Select an empty pad and start recording.
+- Check that the external device is connected.
+
+### Cannot connect with the app
+
+- Check that this unit and the smartphone are connected with the included USB Type-C cable.
+
+### Power does not turn on
+
+- Check that the USB AC adaptor is connected to this unit's **POWER/DATA port**.
+- Replace the batteries with new ones.
+
+### When you want to initialize (return to the factory default state)
+
+When you want to initialize the settings, you can do so with the following procedure. Also, if you have deleted preset sounds, initialization can restore that data.
+
+> **Note:** Be aware that initializing deletes any data you have sampled.
+
+1. Long-press the **EDIT button**.
+   The system settings appear.
+2. Use the **directional buttons** (up/down) to select [Initialize], then press the **directional button** (right).
+   A confirmation screen appears.
+3. Select the **A button**.
+   Initialization of this unit starts.
+
+<!-- page 14 -->
+
+## Operating precautions
+
+- Do not drop the unit, place heavy objects on it, bump it hard, or apply pressure to it. Doing so can cause malfunction. Also, take care not to put it in a bag together with hard objects.
+- Do not operate the buttons or pads with a ballpoint pen or other pointed object.
+- Do not apply strong force to the display, or poke it with a ballpoint pen or other pointed object.
+  Part of the screen is made of glass, so it could become scratched or crack.
+- Never try to take the unit apart. If disassembly results in malfunction, repairs will be charged even during the warranty period.
+- Before turning on the power or connecting headphones, set this unit's volume to minimum.
+- Do not attempt connections or other use in ways not described in this guide or the User's Guide.
+- When connecting to the **DATA port**, be sure to use the included USB Type-C cable.
+- If the USB cable or the batteries become disconnected, data being recorded and information such as settings may be lost. Check carefully that they are securely connected.
+- When a smartphone is connected to the **POWER/DATA port**, depending on the smartphone model, this unit may be powered from the smartphone (in some cases it will not be). If you want to communicate without drawing power from the smartphone, connect the smartphone to the **DATA port** and the USB AC adaptor to the **POWER/DATA port**.
+
+### Operating environment
+
+- Do not leave the unit in any of the following locations.
+  - Extremely hot or cold locations outside the operating temperature range
+  - Locations exposed to direct sunlight, or with high humidity, dust, or sand
+  - Near air conditioning equipment or other locations subject to extreme changes in temperature or humidity
+  - Inside a car during the day, or locations with strong vibration
+- Use the unit out of the reach of small children.
+- The unit is not waterproof. Do not touch it with wet hands or let it get wet.
+
+> **Warning:** If Auto Power Off is set to off, the power will no longer turn off automatically and the unit will continue to consume power.
+
+> **Warning:** *[Icon: battery]* **Precautions concerning batteries**
+>
+> **The following could cause explosion, or leaking of flammable liquid or gas, and must be avoided.**
+>
+> - Replacement with a battery type not specified for this unit
+> - Disposal in fire or a furnace, or mechanical crushing or cutting
+> - Excessively high or low temperatures during use, storage, or transport
+> - Excessively low air pressure during use, storage, or transport
+
+### Make backup copies of important data.
+
+Take a backup of important content stored on this unit. Malfunction, repair, or other causes can result in loss of stored content. For details about backup, see the User's Guide.
+
+### Auto Power Off
+
+This unit has an "Auto Power Off function" that automatically turns the power off when no operation is performed for a certain amount of time.
+
+- Set time
+  Default setting: 20 minutes
+- How to restore power
+  If Auto Power Off has activated, operate the power switch. The unit returns to its normal startup state.
+- Caution
+  With Auto Power Off turned off, the unit continues to consume power, so take care.
+  For detailed settings and more, see the User's Guide.
+
+## Copyright precaution
+
+Music, video, computer programs, databases, and the like are protected by copyright law, with rights belonging to their authors, copyright holders, and others. Such works may be used only for personal or household purposes, or within other limits recognized by copyright law and other legislation. Exceeding those limits — copying, modifying, transferring, or distributing works over computer networks and the like without the rights holders' permission — can result in claims for damages or criminal penalties as copyright infringement. If you use this unit to make copies or otherwise use copyrighted works, be sure to comply with copyright law and use them appropriately.
+
+- The copyrights of the content built into or included with this unit (sound waveform data, sequence patterns, image data, etc.) are retained by CASIO.
+- CASIO's permission is not required when you perform, record, or distribute works you have created using the content built into or included with this unit as material, provided you comply with the conditions stated in this guide.
+- Do not extract the content built into or included with this unit, as is or in a substantially identical form, and use it (including fixing it to other recording media for distribution, or making it public over computer networks).
+
+## Trademarks
+
+The following terms are registered trademarks or trademarks of their respective companies.
+
+- QR Code is a registered trademark of DENSO WAVE INCORPORATED.
+- "eneloop" is a registered trademark of the Panasonic Group.
+- USB Type-C™ is a trademark of USB Implementers Forum.
+- Other trademarks and registered trademarks are the trademarks and registered trademarks of their respective owners.
+
+<!-- page 15 -->
+
+*[Back cover: mostly blank page with publisher information at the bottom]*
+
+**CASIO COMPUTER CO., LTD.**
+1-6-2, Hon-machi, Shibuya-ku, Tokyo 151-8543, Japan
+
+Created: May 2026
+MA2605-B
+
+© 2026 CASIO COMPUTER CO., LTD.
+!SXC1-DOC midi en 6
+# SXC-1: About the MIDI implementation
+
+> This document is an English translation of *SXC-1_MIDI_JA.pdf* (Japanese original by CASIO).
+> Translation date: 2026-08-06.
+
+<!-- page 1 -->
+
+Version 1.2
+
+2026.7.29
+
+## 1. Overview
+
+This document describes the MIDI functions included in this unit and their implementation. Firmware Ver. 1.1.1\* and later supports MIDI IN/OUT and the transmission and reception of Control Change commands. Settings for the transmit/receive channels for MIDI messages are made with the `MIDI IN Ch.` and `MIDI OUT Ch.` items in the unit's system settings.
+
+\* For information on updating the unit's firmware, see the User's Guide.
+
+### 1.1 Configuring the MIDI transmit/receive channels
+
+This section explains the procedure for setting the transmit/receive channels on this unit.
+
+1. From normal Performance mode, long-press the `EDIT` button to enter the system settings.
+
+   *[Figure: screen showing the SYSTEM SETTING menu with the cursor (▶) on "AUTO Trig Lv:3", followed by "Beat Sync :OFF", "LED Bright :3", "Disp Bright :5"]*
+
+2. Scroll with the down button to move the cursor to `MIDI IN Ch.` or `MIDI OUT Ch.`
+
+   *[Figure: screen showing the SYSTEM SETTING menu with "LED Bright :3", "Disp Bright :5", the cursor (▶) on "MIDI IN Ch. :1", and "MIDI OUT Ch. :1"]*
+
+3. You can change the channel with the left/right buttons.
+
+   *[Figure: screen showing the SYSTEM SETTING menu with "LED Bright :3", "Disp Bright :5", the cursor (▶) on "MIDI IN Ch. :3", and "MIDI OUT Ch. :1"]*
+
+4. Press the `EDIT` button again to exit the system settings.
+
+   \* By default, both IN and OUT are set to 1. Changed setting values are retained even when the power is turned off.
+
+<!-- page 2 -->
+
+## 2. Product information
+
+| | |
+|---|---|
+| Product name | CASIO Standalone Sampler |
+| Model name | SXC-1 |
+| Unit firmware version | Ver.1.3.0 |
+| MIDI version | MIDI 1.0 |
+
+## 3. MIDI implementation chart
+
+| Function | | Transmit | Receive | Remarks |
+|---|---|---|---|---|
+| **Basic channel** | Default | 1 | 1 | |
+| | Changed | 1–16 | 1–16, All | |
+| **Mode** | Default | Mode 3 | Mode 3 | |
+| | Messages | × | × | |
+| | Altered | × | × | |
+| **Note number** | | 36–99 | 36–115 | See Note mapping |
+| **Velocity** | Note ON | × | × | |
+| | Note OFF | × | × | |
+| **After touch** | Key's | × | × | |
+| | Channel's | × | × | |
+| **Pitch bend** | | × | × | |
+| **Control Change** | | ○ | ○ | See Control Change list |
+| **Program Change** | | × | × | |
+| **System Exclusive** | | × | × | |
+| **Common** | Song Position | × | × | |
+| | Song Select | × | × | |
+| | Tune | × | × | |
+| **Real-time messages** | Clock | × | × | |
+| | Start | × | × | |
+| | Continue | × | × | |
+| | Stop | × | × | |
+| **Other** | All Sound Off | × | × | |
+| | Reset All Controllers | × | × | |
+| | Local ON/OFF | × | × | |
+| | All Notes Off | × | × | |
+| | Active Sensing | × | × | |
+| | Reset | × | × | |
+
+Mode 1: Omni On, Poly&nbsp;&nbsp;&nbsp;&nbsp;Mode 2: Omni On, Mono&nbsp;&nbsp;&nbsp;&nbsp;○: Yes
+Mode 3: Omni Off, Poly&nbsp;&nbsp;&nbsp;&nbsp;Mode 4: Omni Off, Mono&nbsp;&nbsp;&nbsp;&nbsp;×: No
+
+<!-- page 3 -->
+
+## 4. Control Change list
+
+| Function | | CC No. | Transmit | Receive | Remarks |
+|---|---|---|---|---|---|
+| SLIDE BAR | INPUT VOL | 11 | 0-127 | 0-127 | Changes continuously from 0 at the left end to 127 at the right end |
+| | MAIN VOL | 7 | 0-127 | 0-127 | Changes continuously from 0 at the left end to 127 at the right end |
+| Dial | FX1 | 16 | 0-127 | \*1 | When transmitting: initial value 0, +1 for clockwise rotation, -1 for counterclockwise rotation; stops when 0-127 would be exceeded. When receiving: see \*1 |
+| | FX2 | 17 | 0-127 | | |
+| Bank Select | A | 80 | 0,127 | 0,127 | 127 when pressed, 0 when released |
+| | B | 81 | 0,127 | 0,127 | |
+| | C | 82 | 0.127 | 0,127 | |
+| | D | 83 | 0,127 | 0,127 | |
+| Directional | Up | 85 | 0,127 | 0,127 | 127 when pressed, 0 when released |
+| | Down | 86 | 0,127 | 0,127 | |
+| | Right | 87 | 0,127 | 0,127 | |
+| | Left | 89 | 0,127 | 0,127 | |
+| | ▶/■ | 102 | 0,127 | 0,127 | 127 when pressed, 0 when released |
+| | REC | 103 | 0,127 | 0,127 | |
+| | ONE SHOT | 104 | 0,127 | 0,127 | |
+| | LOOP | 105 | 0,127 | 0,127 | |
+| | DEL | 106 | 0,127 | 0,127 | |
+| | EDIT | 107 | 0,127 | 0,127 | |
+| EFFECT | FX1 | 108 | 0,127 | 0,127 | 127 when pressed, 0 when released |
+| | FX2 | 109 | 0,127 | 0,127 | |
+| | INPUT SWITCH | 110 | 0,64,127 | 0,64,127 | MIC:0, AUDIO IN:64, USB:127 |
+
+\*1 The parameters and behavior when Dial FX1 and FX2 are received are as follows. The meaning of the received parameter value differs depending on whether each FX button is ON or OFF.
+
+| | | When the FX1 button is OFF | When the FX1 button is ON |
+|---|---|---|---|
+| Dial | FX1 | Effect selection<br>0 : FILTER<br>1 : FLANGER<br>2 : PHASER<br>3 : BIT CRUSHER<br>4 : MASTER PAN<br>5 and up : NOP (invalid) | Parameter of the currently selected effect<br>0–100 : effect parameter value (values of 100 or more received are treated as 100)<br>- FILTER: 0 – 50 – 100<br>&nbsp;&nbsp;\* 0 : -100, 50 : 0, 100 : +100<br>&nbsp;&nbsp;(imagine it changing in steps of 2 marks)<br>- FLANGER/PHASER: 0 – 100<br>&nbsp;&nbsp;\* 0 : 0, 100 : 100<br>- BIT CRUSHER: 0 – 16<br>&nbsp;&nbsp;\* 0 : 0, 100 : 16 (divided at equal intervals)<br>- MASTER PAN: 0 – 100<br>&nbsp;&nbsp;\* 0 : L50, 50 : 0, 100 : R50 |
+| | | **When the FX2 button is OFF** | **When the FX2 button is ON** |
+| Dial | FX2 | Effect selection<br>0 : ROLL1<br>1 : ROLL1/2<br>2 : ROLL1/4<br>3 : ROLLPATTERN<br>4 : DELAY3/4<br>5 : DELAY3/16<br>6 and up : NOP (invalid) | Parameter of the currently selected effect<br>0–100 : effect parameter value (values of 100 or more received are treated as 100)<br>- 0 (DRY) – 100 (WET)<br>ROLL types: 0–100 (0 : 0, 100 : 100)<br>DELAY types: 0–100 (0 : 0, 100 : 100) |
+
+<!-- page 4 -->
+
+## 5. Note mapping
+
+| Pad | Bank A | Bank B | Bank C | Bank D | Active (receive only)\* |
+|---|---|---|---|---|---|
+| Pad 1 | 36 | 52 | 68 | 84 | 100 |
+| Pad 2 | 37 | 53 | 68 | 85 | 101 |
+| Pad 3 | 38 | 54 | 70 | 86 | 102 |
+| Pad 4 | 39 | 55 | 71 | 87 | 103 |
+| Pad 5 | 40 | 56 | 72 | 88 | 104 |
+| Pad 6 | 41 | 57 | 73 | 89 | 105 |
+| Pad 7 | 42 | 58 | 74 | 90 | 106 |
+| Pad 8 | 43 | 59 | 75 | 91 | 107 |
+| Pad 9 | 44 | 60 | 76 | 92 | 108 |
+| Pad 10 | 45 | 61 | 77 | 93 | 109 |
+| Pad 11 | 46 | 62 | 78 | 94 | 110 |
+| Pad 12 | 47 | 63 | 79 | 95 | 111 |
+| Pad 13 | 48 | 64 | 80 | 96 | 112 |
+| Pad 14 | 49 | 65 | 81 | 97 | 113 |
+| Pad 15 | 50 | 66 | 82 | 98 | 114 |
+| Pad 16 | 51 | 67 | 83 | 99 | 115 |
+
+\* Regardless of the bank or the unit's mode, these behave the same as pressing the current pad. (Example: 100 → Pad 1)
+
+<!-- page 5 -->
+
+## Revision history
+
+This section lists the revision history of this document.
+
+| Version | Revision date | Supported FW version | Revisions |
+|---|---|---|---|
+| Version 1.0 | 2026/5/28 | 1.1.1 | First edition published<br>- Support for MIDI IN/OUT (NOTE ON/OFF, Control Change) |
+| Version 1.1 | 2026/6/22 | 1.2.0 | - Support for receiving Control Change from the Dials (FX1, FX2)<br>&nbsp;&nbsp;For details, see 4. Control Change list |
+| Version 1.2 | 2026/7/29 | 1.3.0 | - Control Change list revised due to the addition of MASTER PAN to FX1<br>&nbsp;&nbsp;For details, see 4. Control Change list |
+
+<!-- page 6 -->
+
+*[Figure: CASIO logo with registered trademark symbol, centered on an otherwise blank page]*
+!SXC1-DOC oss en 16
+# SXC-1: About OSS (Open-Source Software)
+
+> This document is an English translation of *SXC-1_OSS_JA.pdf* (Japanese original by CASIO).
+> Translation date: 2026-08-06.
+
+<!-- page 1 -->
+
+This document contains the notices and license texts required under the respective license terms for the software described herein.
+
+**Apache-2.0**
+- CMSIS/5.9.0/Copyright (c) 2009-2021 Arm Limited. All rights reserved
+- CMSIS/6.1.0/Copyright (c) 2009-2023 Arm Limited. All rights reserved
+
+**BSD-3-Clause**
+- tinycrypt/0.2.8 Copyright (C) 2017 by Intel Corporation, All Rights Reserved
+- fsp/5.9.0/Copyright 2020 - 2025, Renesas Electronics Corporation and/or its affiliates
+- SDK_2.x_FRDM-MCXC242/2.16.000/Copyright (c) 2015-2016, Freescale Semiconductor, Inc./Copyright 2018-2025 NXP
+
+**MIT**
+- FreeRTOS/11.1.0/Copyright (C) 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved
+
+**MICROSOFT AZURE RTOS**
+- ThreadX/6.4.0/Copyright (c) Microsoft Corporation. All rights reserved
+- FileX/6.4.0/Copyright (c) Microsoft Corporation. All rights reserved
+- USBX/6.4.0/Copyright (c) Microsoft Corporation. All rights reserved
+
+## Apache-2.0
+
+CMSIS 5.9.0
+
+**Apache License**
+
+Version 2.0, January 2004
+
+http://www.apache.org/licenses/
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. Definitions.
+
+   "License" shall mean the terms and conditions for use, reproduction, and distribution as defined by Sections 1 through 9 of this document.
+
+   "Licensor" shall mean the copyright owner or entity authorized by the copyright owner that is granting the License.
+
+   "Legal Entity" shall mean the union of the acting entity and all other entities that control, are controlled by, or are under common control with that entity. For the purposes of this definition, "control" means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding shares, or (iii) beneficial ownership of such entity.
+
+   "You" (or "Your") shall mean an individual or Legal Entity exercising permissions granted by this License.
+
+<!-- page 2 -->
+
+   "Source" form shall mean the preferred form for making modifications, including but not limited to software source code, documentation source, and configuration files.
+
+   "Object" form shall mean any form resulting from mechanical transformation or translation of a Source form, including but not limited to compiled object code, generated documentation, and conversions to other media types.
+
+   "Work" shall mean the work of authorship, whether in Source or Object form, made available under the License, as indicated by a copyright notice that is included in or attached to the work (an example is provided in the Appendix below).
+
+   "Derivative Works" shall mean any work, whether in Source or Object form, that is based on (or derived from) the Work and for which the editorial revisions, annotations, elaborations, or other modifications represent, as a whole, an original work of authorship. For the purposes of this License, Derivative Works shall not include works that remain separable from, or merely link (or bind by name) to the interfaces of, the Work and Derivative Works thereof.
+
+   "Contribution" shall mean any work of authorship, including the original version of the Work and any modifications or additions to that Work or Derivative Works thereof, that is intentionally submitted to Licensor for inclusion in the Work by the copyright owner or by an individual or Legal Entity authorized to submit on behalf of the copyright owner. For the purposes of this definition, "submitted" means any form of electronic, verbal, or written communication sent to the Licensor or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems that are managed by, or on behalf of, the Licensor for the purpose of discussing and improving the Work, but excluding communication that is conspicuously marked or otherwise designated in writing by the copyright owner as "Not a Contribution."
+
+   "Contributor" shall mean Licensor and any individual or Legal Entity on behalf of whom a Contribution has been received by Licensor and subsequently incorporated within the Work.
+
+2. Grant of Copyright License. Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare Derivative Works of, publicly display, publicly perform, sublicense, and distribute the Work and such Derivative Works in Source or Object form.
+
+3. Grant of Patent License. Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable (except as stated in this section) patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer the Work, where such license applies only to those patent claims licensable by such Contributor that are necessarily infringed by their Contribution(s) alone or by combination of their Contribution(s) with the Work to which such Contribution(s) was submitted. If You institute patent litigation against any entity (including a cross-claim or counterclaim in a lawsuit) alleging that the Work or a Contribution incorporated within the Work constitutes direct or contributory patent infringement, then any patent licenses granted to You under this License for that Work shall terminate as of the date such litigation is filed.
+
+<!-- page 3 -->
+
+4. Redistribution. You may reproduce and distribute copies of the Work or Derivative Works thereof in any medium, with or without modifications, and in Source or Object form, provided that You meet the following conditions:
+
+   (a) You must give any other recipients of the Work or Derivative Works a copy of this License; and
+
+   (b) You must cause any modified files to carry prominent notices stating that You changed the files; and
+
+   (c) You must retain, in the Source form of any Derivative Works that You distribute, all copyright, patent, trademark, and attribution notices from the Source form of the Work, excluding those notices that do not pertain to any part of the Derivative Works; and
+
+   (d) If the Work includes a "NOTICE" text file as part of its distribution, then any Derivative Works that You distribute must include a readable copy of the attribution notices contained within such NOTICE file, excluding those notices that do not pertain to any part of the Derivative Works, in at least one of the following places: within a NOTICE text file distributed as part of the Derivative Works; within the Source form or documentation, if provided along with the Derivative Works; or, within a display generated by the Derivative Works, if and wherever such third-party notices normally appear. The contents of the NOTICE file are for informational purposes only and do not modify the License. You may add Your own attribution notices within Derivative Works that You distribute, alongside or as an addendum to the NOTICE text from the Work, provided that such additional attribution notices cannot be construed as modifying the License.
+
+   You may add Your own copyright statement to Your modifications and may provide additional or different license terms and conditions for use, reproduction, or distribution of Your modifications, or for any such Derivative Works as a whole, provided Your use, reproduction, and distribution of the Work otherwise complies with the conditions stated in this License.
+
+5. Submission of Contributions. Unless You explicitly state otherwise, any Contribution intentionally submitted for inclusion in the Work by You to the Licensor shall be under the terms and conditions of this License, without any additional terms or conditions. Notwithstanding the above, nothing herein shall supersede or modify the terms of any separate license agreement you may have executed with Licensor regarding such Contributions.
+
+6. Trademarks. This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
+
+7. Disclaimer of Warranty. Unless required by applicable law or agreed to in writing, Licensor provides the Work (and each Contributor provides its Contributions) on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are solely responsible for determining the appropriateness of using or redistributing the Work and assume any risks associated with Your exercise of permissions under this License.
+
+<!-- page 4 -->
+
+8. Limitation of Liability. In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall any Contributor be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Work (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if such Contributor has been advised of the possibility of such damages.
+
+9. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this License. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
+
+END OF TERMS AND CONDITIONS
+
+APPENDIX: How to apply the Apache License to your work.
+
+To apply the Apache License to your work, attach the following boilerplate notice, with the fields enclosed by brackets "{}" replaced with your own identifying information. (Don't include the brackets!) The text should be enclosed in the appropriate comment syntax for the file format. We also recommend that a file or class name and description of purpose be included on the same "printed page" as the copyright notice for easier identification within third-party archives.
+
+Copyright (c) 2009-2021 Arm Limited. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+<!-- page 5 -->
+
+## Apache-2.0
+
+CMSIS 6.1.0
+
+**Apache License**
+
+Version 2.0, January 2004
+
+http://www.apache.org/licenses/
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. Definitions.
+
+   "License" shall mean the terms and conditions for use, reproduction, and distribution as defined by Sections 1 through 9 of this document.
+
+   "Licensor" shall mean the copyright owner or entity authorized by the copyright owner that is granting the License.
+
+   "Legal Entity" shall mean the union of the acting entity and all other entities that control, are controlled by, or are under common control with that entity. For the purposes of this definition, "control" means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding shares, or (iii) beneficial ownership of such entity.
+
+   "You" (or "Your") shall mean an individual or Legal Entity exercising permissions granted by this License.
+
+   "Source" form shall mean the preferred form for making modifications, including but not limited to software source code, documentation source, and configuration files.
+
+   "Object" form shall mean any form resulting from mechanical transformation or translation of a Source form, including but not limited to compiled object code, generated documentation, and conversions to other media types.
+
+   "Work" shall mean the work of authorship, whether in Source or Object form, made available under the License, as indicated by a copyright notice that is included in or attached to the work (an example is provided in the Appendix below).
+
+   "Derivative Works" shall mean any work, whether in Source or Object form, that is based on (or derived from) the Work and for which the editorial revisions, annotations, elaborations, or other modifications represent, as a whole, an original work of authorship. For the purposes of this License, Derivative Works shall not include works that remain separable from, or merely link (or bind by name) to the interfaces of, the Work and Derivative Works thereof.
+
+<!-- page 6 -->
+
+   "Contribution" shall mean any work of authorship, including the original version of the Work and any modifications or additions to that Work or Derivative Works thereof, that is intentionally submitted to Licensor for inclusion in the Work by the copyright owner or by an individual or Legal Entity authorized to submit on behalf of the copyright owner. For the purposes of this definition, "submitted" means any form of electronic, verbal, or written communication sent to the Licensor or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems that are managed by, or on behalf of, the Licensor for the purpose of discussing and improving the Work, but excluding communication that is conspicuously marked or otherwise designated in writing by the copyright owner as "Not a Contribution."
+
+   "Contributor" shall mean Licensor and any individual or Legal Entity on behalf of whom a Contribution has been received by Licensor and subsequently incorporated within the Work.
+
+2. Grant of Copyright License. Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare Derivative Works of, publicly display, publicly perform, sublicense, and distribute the Work and such Derivative Works in Source or Object form.
+
+3. Grant of Patent License. Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable (except as stated in this section) patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer the Work, where such license applies only to those patent claims licensable by such Contributor that are necessarily infringed by their Contribution(s) alone or by combination of their Contribution(s) with the Work to which such Contribution(s) was submitted. If You institute patent litigation against any entity (including a cross-claim or counterclaim in a lawsuit) alleging that the Work or a Contribution incorporated within the Work constitutes direct or contributory patent infringement, then any patent licenses granted to You under this License for that Work shall terminate as of the date such litigation is filed.
+
+4. Redistribution. You may reproduce and distribute copies of the Work or Derivative Works thereof in any medium, with or without modifications, and in Source or Object form, provided that You meet the following conditions:
+
+   (a) You must give any other recipients of the Work or Derivative Works a copy of this License; and
+
+   (b) You must cause any modified files to carry prominent notices stating that You changed the files; and
+
+   (c) You must retain, in the Source form of any Derivative Works that You distribute, all copyright, patent, trademark, and attribution notices from the Source form of the Work, excluding those notices that do not pertain to any part of the Derivative Works; and
+
+<!-- page 7 -->
+
+   (d) If the Work includes a "NOTICE" text file as part of its distribution, then any Derivative Works that You distribute must include a readable copy of the attribution notices contained within such NOTICE file, excluding those notices that do not pertain to any part of the Derivative Works, in at least one of the following places: within a NOTICE text file distributed as part of the Derivative Works; within the Source form or documentation, if provided along with the Derivative Works; or, within a display generated by the Derivative Works, if and wherever such third-party notices normally appear. The contents of the NOTICE file are for informational purposes only and do not modify the License. You may add Your own attribution notices within Derivative Works that You distribute, alongside or as an addendum to the NOTICE text from the Work, provided that such additional attribution notices cannot be construed as modifying the License.
+
+   You may add Your own copyright statement to Your modifications and may provide additional or different license terms and conditions for use, reproduction, or distribution of Your modifications, or for any such Derivative Works as a whole, provided Your use, reproduction, and distribution of the Work otherwise complies with the conditions stated in this License.
+
+5. Submission of Contributions. Unless You explicitly state otherwise, any Contribution intentionally submitted for inclusion in the Work by You to the Licensor shall be under the terms and conditions of this License, without any additional terms or conditions. Notwithstanding the above, nothing herein shall supersede or modify the terms of any separate license agreement you may have executed with Licensor regarding such Contributions.
+
+6. Trademarks. This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
+
+7. Disclaimer of Warranty. Unless required by applicable law or agreed to in writing, Licensor provides the Work (and each Contributor provides its Contributions) on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are solely responsible for determining the appropriateness of using or redistributing the Work and assume any risks associated with Your exercise of permissions under this License.
+
+8. Limitation of Liability. In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall any Contributor be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Work (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if such Contributor has been advised of the possibility of such damages.
+
+<!-- page 8 -->
+
+9. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this License. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
+
+END OF TERMS AND CONDITIONS
+
+APPENDIX: How to apply the Apache License to your work.
+
+To apply the Apache License to your work, attach the following boilerplate notice, with the fields enclosed by brackets "{}" replaced with your own identifying information. (Don't include the brackets!) The text should be enclosed in the appropriate comment syntax for the file format. We also recommend that a file or class name and description of purpose be included on the same "printed page" as the copyright notice for easier identification within third-party archives.
+
+Copyright (c) 2009-2023 Arm Limited. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License.
+
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+See the License for the specific language governing permissions and limitations under the License.
+
+<!-- page 9 -->
+
+## BSD-3-Clause
+
+tinycrypt 0.2.8
+
+Copyright (C) 2017 by Intel Corporation, All Rights Reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+- Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+- Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+- Neither the name of Intel Corporation nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+fsp 5.9.0
+
+Copyright 2020 - 2025, Renesas Electronics Corporation and/or its affiliates
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+- Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+- Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+- Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+<!-- page 10 -->
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+SDK_2.x_FRDM-MCXC242 2.16.000
+
+Copyright (c) 2015-2016, Freescale Semiconductor, Inc.
+Copyright 2018-2025 NXP
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+<!-- page 11 -->
+
+## MIT
+
+FreeRTOS 11.1.0
+
+Copyright (C) 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
+
+## MICROSOFT AZURE RTOS
+
+Threadx,FileX,USBX,6.4.0
+
+MICROSOFT SOFTWARE LICENSE TERMS
+
+**MICROSOFT AZURE RTOS**
+
+These license terms are an agreement between you and Microsoft Corporation (or one of its affiliates). They apply to the software named above and any Microsoft services or software updates (except to the extent such services or updates are accompanied by new or additional terms, in which case those different terms apply prospectively and do not alter your or Microsoft's rights relating to pre-updated software or services). IF YOU COMPLY WITH THESE LICENSE TERMS, YOU HAVE THE RIGHTS BELOW. BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS.
+
+1. INSTALLATION AND USE RIGHTS.
+
+   a) General. You may (I) install, use and modify the software and (ii) install and use the included Microsoft Applications (if any), each solely for internal development, testing and evaluation purposes. Distribution or production use is governed by the license terms set forth in Section 2. You may also obtain distribution or production use rights through a separate agreement with Microsoft.
+
+   b) Contributions. Microsoft welcomes contributions to this software. In the event that you make a contribution to this software you will be required to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant Microsoft the rights to use your contribution. For details,visit https://cla.microsoft.com.
+
+<!-- page 12 -->
+
+   c) Included Microsoft Applications. The software may include other Microsoft applications which are governed by the licenses embedded in or made available with those applications.
+
+   d) Third Party Components. The software may include third party components with separate legal notices or governed by other agreements, as may be described within the software or in the ThirdPartyNotices file(s) accompanying the software.
+
+   e) Competitive Benchmarking. If you are a direct competitor, and you access or use the software for purposes of competitive benchmarking, analysis, or intelligence gathering, you waive as against Microsoft, its subsidiaries, and its affiliated companies (including prospectively) any competitive use, access, and benchmarking test restrictions in the terms governing your software to the extent your terms of use are, or purport to be, more restrictive than Microsoft's terms. If you do not waive any such purported restrictions in the terms governing your software, you are not allowed to access or use this software, and will not do so.
+
+2. DISTRIBUTION AND PRODUCTION USE. If you have obtained and/or are developing on microprocessor(s) and/or microcontroller(s) ("hardware") listed in the file named "LICENSED-HARDWARE.txt" included in the repository and/or distributed with the software you have the following rights in and to the software solely when used in combination with the hardware. In the event hardware is not listed in the LICENSED-HARDWARE.txt file, you do not have the rights in this Section 2.
+
+   a) Distribution and Production Use Rights.
+
+      i. You may use the software in production (e.g. program the modified or unmodified software to devices you own or control) and distribute (i.e. make available to third parties) the modified or unmodified binary image produced from this code.
+
+      ii. You may permit your device distributors or developers to copy and distribute the binary image as programmed or to be programmed to your devices.
+
+      iii. You may redistribute the unmodified or modified source to your device distributors or developers. Modifications must be clearly marked. Any redistribution in source code form must contain this license and any other licenses that accompany the software.
+
+   b) Requirements. For any code you distribute, you must:
+
+      i. when distributed in binary form, except as embedded in a device, include with such distribution the terms of this agreement;
+
+      ii. when distributed in source code form to distributors or developers of your devices, include with such distribution the terms of this agreement; and
+
+      iii. indemnify, defend and hold harmless Microsoft from any claims, including claims arising from any High Risk Uses, and inclusive of attorneys' fees, related to the distribution or use of your devices that include the software, except to the extent that any intellectual property claim is based solely on the unmodified software.
+
+   c) Restrictions. You may not:
+
+      i. use or modify the software to create competing real time operating system software;
+
+      ii. remove any copyright notices or licenses contained in the software;
+
+      iii. use Microsoft's trademarks or trade dress in your application in any way that suggests your device or application comes from or is endorsed by Microsoft;
+
+<!-- page 13 -->
+
+      iv. transfer individual components, specific libraries, classes, functions or code fragments of the software separately for purposes unrelated to the software; or
+
+      v. use or distribute the software in any way that would subject the software or Microsoft's intellectual property or technology to any other license terms.
+
+3. SCOPE OF LICENSE. The software is licensed, not sold. Microsoft reserves all other rights. Unless applicable law gives you more rights despite this limitation, you will not (and have no right to):
+
+   a) remove, minimize, block, or modify any notices of Microsoft or its suppliers in the software;
+
+   b) use the software in any way that is against the law or to create or propagate malware; or
+
+   c) share, publish, distribute, or lease the software (except as permitted in Section 2 above), or provide the software as a stand-alone offering for others to use.
+
+4. DATA. This software may interact with other Microsoft products that collect data that is transmitted to Microsoft. To learn more about how Microsoft processes personal data we collect, please see the Microsoft Privacy Statement at https://go.microsoft.com/fwlink/?LinkId=248681.
+
+5. EXPORT RESTRICTIONS. You must comply with all domestic and international export laws and regulations that apply to the software, which include restrictions on destinations, end users, and end use. For further information on export restrictions, visit https://aka.ms/exporting.
+
+6. SUPPORT SERVICES. Microsoft is not obligated under this agreement to provide any support services for the software. Any support provided is "as is", "with all faults", and without warranty of any kind.
+
+7. UPDATES. Microsoft may periodically update the software. You may obtain updates only from Microsoft or Microsoft-authorized sources. Updates may not include or support all existing software features, services, or peripheral devices.
+
+8. TERMINATION. Without prejudice to any other rights, Microsoft may terminate this agreement if you fail to comply with any of its terms or conditions. In such event, you must destroy all copies of the software and all of its component parts.
+
+9. ENTIRE AGREEMENT. This agreement, and any other terms Microsoft may provide for supplements, updates, or third-party applications, is the entire agreement for the software. To the extent you have entered into a separate agreement with Microsoft relating specifically to the software, the terms in such agreement shall control.
+
+10. APPLICABLE LAW AND PLACE TO RESOLVE DISPUTES. If you acquired the software in the United States or Canada, the laws of the state or province where you live (or, if a business, where your principal place of business is located) govern the interpretation of this agreement, claims for its breach, and all other claims (including consumer protection, unfair competition, and tort claims), regardless of conflict of laws principles. If you acquired the software in any other country, its laws apply. If U.S. federal jurisdiction exists, you and Microsoft consent to exclusive jurisdiction and venue in the federal court in King County, Washington for all disputes heard in court. If not, you and Microsoft consent to exclusive jurisdiction and venue in the Superior Court of King County, Washington for all disputes heard in court.
+
+<!-- page 14 -->
+
+11. CONSUMER RIGHTS; REGIONAL VARIATIONS. This agreement describes certain legal rights. You may have other rights, including consumer rights, under the laws of your state or country. Separate and apart from your relationship with Microsoft, you may also have rights with respect to the party from which you acquired the software. This agreement does not change those other rights if the laws of your state or country do not permit it to do so. For example, if you acquired the software in one of the below regions, or mandatory country law applies, then the following provisions apply to you:
+
+    a) Australia. You have statutory guarantees under the Australian Consumer Law and nothing in this agreement is intended to affect those rights.
+
+    b) Germany and Austria.
+
+       i. Warranty. The properly licensed software will perform substantially as described in any Microsoft materials that accompany the software. However, Microsoft gives no contractual guarantee in relation to the licensed software.
+
+       ii. Limitation of Liability. In case of intentional conduct, gross negligence, claims based on the Product Liability Act, as well as, in case of death or personal or physical injury, Microsoft is liable according to the statutory law.
+
+    Subject to the foregoing clause ii., Microsoft will only be liable for slight negligence if Microsoft is in breach of such material contractual obligations, the fulfillment of which facilitate the due performance of this agreement, the breach of which would endanger the purpose of this agreement and the compliance with which a party may constantly trust in (so-called "cardinal obligations"). In other cases of slight negligence, Microsoft will not be liable for slight negligence.
+
+12. DISCLAIMER OF WARRANTY.
+
+    a) THE SOFTWARE IS LICENSED "AS IS." YOU BEAR THE RISK OF USING IT. MICROSOFT GIVES NO EXPRESS WARRANTIES, GUARANTEES, OR CONDITIONS. TO THE EXTENT PERMITTED UNDER APPLICABLE LAWS, MICROSOFT EXCLUDES ALL IMPLIED WARRANTIES, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+    b) HIGH RISK USE DISCLAIMER. WARNING: THE SOFTWARE IS NOT DESIGNED OR INTENDED FOR USE WHERE FAILURE OR FAULT OF ANY KIND OF THE SOFTWARE COULD RESULT IN DEATH OR SERIOUS BODILY INJURY, OR IN PHYSICAL OR ENVIRONMENTAL DAMAGE ("collectively High Risk Use"). Accordingly, You must design and implement your hardware and software such that, in the event of any interruption, defect, error, or other failure of the software, the safety of people, property, and the environment are not reduced below a level that is reasonable, appropriate, and legal, whether in general or for a specific industry. Your High Risk Use of the software is at Your own risk.
+
+13. LIMITATION ON AND EXCLUSION OF DAMAGES. IF YOU HAVE ANY BASIS FOR RECOVERING DAMAGES DESPITE THE PRECEDING DISCLAIMER OF WARRANTY, YOU CAN RECOVER FROM MICROSOFT AND ITS SUPPLIERS ONLY DIRECT DAMAGES UP TO U.S. $5.00. YOU CANNOT RECOVER ANY OTHER DAMAGES, INCLUDING CONSEQUENTIAL, LOST PROFITS, SPECIAL, INDIRECT, OR INCIDENTAL DAMAGES.
+
+<!-- page 15 -->
+
+This limitation applies to (a) anything related to the software, services, content (including code) on third party Internet sites, or third party applications; and (b) claims for breach of contract, warranty, guarantee, or condition; strict liability, negligence, or other tort; or any other claim; in each case to the extent permitted by applicable law.
+
+It also applies even if Microsoft knew or should have known about the possibility of the damages. The above limitation or exclusion may not apply to you because your state, province, or country may not allow the exclusion or limitation of incidental, consequential, or other damages.
+
+Please note: As this software is distributed in Canada, some of the clauses in this agreement are provided below in French.
+
+Remarque: Ce logiciel étant distribué au Canada, certaines des clauses dans ce contrat sont fournies ci-dessous en français.
+
+EXONÉRATION DE GARANTIE.
+
+a) Le logiciel visé par une licence est offert « tel quel. Toute utilisation de ce logiciel est à votre seule risque et péril. Microsoft n'accorde aucune autre garantie expresse. Vous pouvez bénéficier de droits additionnels en vertu du droit local sur la protection des consommateurs, que ce contrat ne peut modifier. La ou elles sont permises par le droit locale, les garanties implicites de qualité marchande, d'adéquation à un usage particulier et d'absence de contrefaçon sont exclues.
+
+b) CLAUSE D'EXCLUSION DE RESPONSABILITÉ RELATIVE À L'UTILISATION À HAUT RISQUE. AVERTISSEMENT: LE LOGICIEL N'EST PAS CONÇU OU DESTINÉ À ÊTRE UTILISÉ LORSQU'UNE DÉFAILLANCE OU UN DÉFAUT DE QUELQUE NATURE QUE CE SOIT POURRAIT ENTRAÎNER LA MORT OU DES BLESSURES CORPORELLES GRAVES, OU DES DOMMAGES PHYSIQUES OU ENVIRONNEMENTAUX (« Utilisation à haut risque »). Par conséquent, vous devez concevoir et mettre en œuvre votre équipement et votre logiciel de manière à ce que, en cas d'interruption, de défaut, d'erreur ou de toute autre défaillance du logiciel, la sécurité des personnes, des biens et de l'environnement ne soit pas réduite en dessous d'un niveau raisonnable, approprié et légal, que ce soit en général ou pour un secteur spécifique. Votre utilisation à haut risque du logiciel est à vos propres risques.
+
+LIMITATION DES DOMMAGES-INTÉRÊTS ET EXCLUSION DE RESPONSABILITÉ POUR LES DOMMAGES. Vous pouvez obtenir de Microsoft et de ses fournisseurs une indemnisation en cas de dommages directs uniquement à hauteur de 5,00 $ US. Vous ne pouvez prétendre à aucune indemnisation pour les autres dommages, y compris les dommages spéciaux, indirects ou accessoires et pertes de bénéfices.
+
+<!-- page 16 -->
+
+Cette limitation concerne:
+
+- tout ce qui est relié au logiciel, aux services ou au contenu (y compris le code) figurant sur des sites Internet tiers ou dans des programmes tiers; et
+
+- les réclamations au titre de violation de contrat ou de garantie, ou au titre de responsabilité stricte, de négligence ou d'une autre faute dans la limite autorisée par la loi en vigueur.
+
+Elle s'applique également, même si Microsoft connaissait ou devrait connaître l'éventualité d'un tel dommage. Si votre pays n'autorise pas l'exclusion ou la limitation de responsabilité pour les dommages indirects, accessoires ou de quelque nature que ce soit, il se peut que la limitation ou l'exclusion ci-dessus ne s'appliquera pas à votre égard.
+
+EFFET JURIDIQUE. Le présent contrat décrit certains droits juridiques. Vous pourriez avoir d'autres droits prévus par les lois de votre pays. Le présent contrat ne modifie pas les droits que vous confèrent les lois de votre pays si celles-ci ne le permettent pas.
