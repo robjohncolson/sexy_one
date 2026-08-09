@@ -17,7 +17,12 @@
    *                               breadcrumb
    *   #app > #sxc1-content-stats always [hidden]; never rendered visibly
    *   #app > ... one of:
-   *     #sxc1-home                  ul.manual-list > li > a.manual-card
+   *     #sxc1-home                  p (blurb)
+   *                                  aside#sxc1-phone-qr (laptop->phone QR)
+   *                                    p.phone-qr-title, p.phone-qr-hint
+   *                                    a.phone-qr-link > img#sxc1-phone-qr-img
+   *                                    p.phone-qr-url > a
+   *                                  ul.manual-list > li > a.manual-card
    *     #sxc1-toc                   section.toc-group > h2.toc-group-title
    *                                  + ol.toc-sections > li > a + span.toc-page
    *                                  (+ ul.toc-subs > li > a)
@@ -279,12 +284,79 @@
   }
 
   /* -------------------------------------------------------------------
-     Home: manual list cards.
+     Home: blurb, laptop->phone QR, manual list cards.
      ------------------------------------------------------------------- */
 
-  #sxc1-home p {
+  #sxc1-home > p {
     color: var(--muted);
     margin: 0 0 1.5rem;
+  }
+
+  /* QR handoff: useful when the site is open on a laptop screen. The
+     modules stay pure black on white (forced below) so a phone camera
+     can read them under dark mode or a dim room. Hidden on narrow
+     viewports -- if you're already on a phone, scanning your own screen
+     is the wrong direction. */
+  #sxc1-phone-qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0 1.75rem;
+    padding: 1.1rem 1rem 1.15rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+
+  #sxc1-phone-qr .phone-qr-title {
+    margin: 0;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+  }
+
+  #sxc1-phone-qr .phone-qr-hint {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  #sxc1-phone-qr .phone-qr-link {
+    display: inline-block;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    line-height: 0;
+  }
+
+  #sxc1-phone-qr-img {
+    display: block;
+    width: 11.25rem;
+    height: 11.25rem;
+    max-width: 100%;
+  }
+
+  #sxc1-phone-qr .phone-qr-url {
+    margin: 0.35rem 0 0;
+    font-size: 0.8rem;
+    word-break: break-all;
+  }
+
+  #sxc1-phone-qr .phone-qr-url a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  #sxc1-phone-qr .phone-qr-url a:hover,
+  #sxc1-phone-qr .phone-qr-url a:focus-visible {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 40rem) {
+    #sxc1-phone-qr { display: none; }
   }
 
   .manual-list {

@@ -432,16 +432,52 @@ deviceStateView :: T.Text -> View model action
 deviceStateView t = H.div_ [ P.id_ "sxc1-device-state", P.hidden_ True ] [ text (ms t) ]
 
 --------------------------------------------------------------------------
--- Home ("#/"): project blurb + one card per manual.
+-- Home ("#/"): project blurb + phone QR + one card per manual.
 --------------------------------------------------------------------------
+
+-- | The shareable production URL encoded in @site\/static\/qr-phone.svg@.
+-- Kept as a named constant so the visible link and the image never drift
+-- apart in source -- if the QR asset is regenerated for a new host, this
+-- string is the one place to update (and the SVG must be rebuilt to match).
+phoneQrUrl :: T.Text
+phoneQrUrl = "https://sexy-one-gray.vercel.app/"
 
 homeView :: Lang -> Manuals -> ProgHandlers action -> ProgData -> View model action
 homeView lang mn ph pd = H.section_ [ P.id_ "sxc1-home" ]
   ( [ H.p_ [] [ text (ms (iHomeBlurb lang)) ]
+    , phoneQrView lang
     , H.ul_ [ P.class_ "manual-list" ] (map (manualCard lang mn) (mnStats mn) ++ [ trainingCard lang ])
     ]
     ++ Progress.progressHomeView ph pd
   )
+
+-- | Laptop -> phone handoff: a static QR for the Vercel mirror, so a
+-- learner with the site open on a laptop can point a phone camera at the
+-- screen and land on the same app. Home-only (not every route) -- the
+-- use case is "I found this on my computer, open it on the device in my
+-- hand". The image is a pre-generated SVG under the static shell (no
+-- runtime QR library; zero cost to app.wasm beyond these few nodes).
+phoneQrView :: Lang -> View model action
+phoneQrView lang = H.aside_ [ P.id_ "sxc1-phone-qr", textProp "aria-label" (ms (iPhoneQrTitle lang)) ]
+  [ H.p_ [ P.class_ "phone-qr-title" ] [ text (ms (iPhoneQrTitle lang)) ]
+  , H.p_ [ P.class_ "phone-qr-hint" ] [ text (ms (iPhoneQrHint lang)) ]
+  , H.a_ [ P.class_ "phone-qr-link", P.href_ (ms phoneQrUrl)
+         , textProp "target" "_blank", textProp "rel" "noopener noreferrer" ]
+      [ H.img_
+          [ P.id_ "sxc1-phone-qr-img"
+          , P.src_ "qr-phone.svg"
+          , P.alt_ (ms (iPhoneQrAlt lang))
+          , textProp "width" "180"
+          , textProp "height" "180"
+          , textProp "decoding" "async"
+          ]
+      ]
+  , H.p_ [ P.class_ "phone-qr-url" ]
+      [ H.a_ [ P.href_ (ms phoneQrUrl)
+             , textProp "target" "_blank", textProp "rel" "noopener noreferrer" ]
+          [ text (ms phoneQrUrl) ]
+      ]
+  ]
 
 -- | The Training entry point (briefs/M2-manifest.json, task
 -- "exercise-ui", item 4): links to "#/x", the exercise index -- reuses

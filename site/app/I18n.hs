@@ -52,6 +52,7 @@ module I18n
   , iLangSplitNotice, iLangSplitButton
   , iBreadcrumbAria, iTraining, iPageOf
   , iHomeBlurb, iTrainingCardSub, iPagesSections, iTocPageAbbrev
+  , iPhoneQrTitle, iPhoneQrHint, iPhoneQrAlt
   , iHideOriginal, iShowOriginal, iManualPagesAria, iPrevPage, iNextPage
   , iJaImageAlt, iJaImageCaption
   , iNotFoundTitle, iNoPageMatches, iDisclaimer
@@ -254,6 +255,20 @@ iPageOf Ja n total = tshow total <> "\12506\12540\12472\20013" <> tshow n <> "\1
 iHomeBlurb :: Lang -> Text
 iHomeBlurb En = "An interactive reader for the SXC-1 manuals: browse each translated document page by page, with the original Japanese page a tap away."
 iHomeBlurb Ja = "SXC-1\12510\12491\12517\12450\12523\12398\12452\12531\12479\12521\12463\12486\12451\12502\12522\12540\12480\12540\12290\32763\35379\28168\12415\12398\21508\12489\12461\12517\12513\12531\12488\12434\12506\12540\12472\12372\12392\12395\38322\35239\12391\12365\12289\26085\26412\35486\12398\21407\26412\12506\12540\12472\12418\12377\12368\12395\34920\31034\12391\12365\12414\12377\12290"
+
+-- | Home-page QR block: title above the code (laptop -> phone handoff).
+iPhoneQrTitle :: Lang -> Text
+iPhoneQrTitle = t "Open on your phone" "\12473\12510\12507\12391\38283\12367"
+
+-- | One-line instruction under the title.
+iPhoneQrHint :: Lang -> Text
+iPhoneQrHint = t "Scan with your phone camera"
+                 "\12473\12510\12507\12398\12459\12513\12521\12391\35501\12415\21462\12387\12390\12367\12384\12373\12356"
+
+-- | img alt text (the visible caption is separate).
+iPhoneQrAlt :: Lang -> Text
+iPhoneQrAlt = t "QR code linking to this site on your phone"
+                "\12371\12398\12469\12452\12488\12434\12473\12510\12507\12391\38283\12367QR\12467\12540\12489"
 
 iTrainingCardSub :: Lang -> Text
 iTrainingCardSub = t "Quizzes, drills and lookups from the manuals"
