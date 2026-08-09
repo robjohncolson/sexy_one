@@ -294,9 +294,9 @@
 
   /* QR handoff: useful when the site is open on a laptop screen. The
      modules stay pure black on white (forced below) so a phone camera
-     can read them under dark mode or a dim room. Hidden on narrow
-     viewports -- if you're already on a phone, scanning your own screen
-     is the wrong direction. */
+     can read them under dark mode or a dim room. Keep the handoff visible
+     at every viewport width: phones and narrow browser windows are also
+     common places to discover and share the site. */
   #sxc1-phone-qr {
     display: flex;
     flex-direction: column;
@@ -326,7 +326,10 @@
 
   #sxc1-phone-qr .phone-qr-link {
     display: inline-block;
-    padding: 0.5rem;
+    /* qr-phone.svg has a two-module internal border. At its rendered
+       size this extra white padding takes the effective quiet zone past
+       the four modules QR readers expect. */
+    padding: 1rem;
     border-radius: 0.5rem;
     background: #ffffff;
     line-height: 0;
@@ -353,10 +356,6 @@
   #sxc1-phone-qr .phone-qr-url a:hover,
   #sxc1-phone-qr .phone-qr-url a:focus-visible {
     text-decoration: underline;
-  }
-
-  @media (max-width: 40rem) {
-    #sxc1-phone-qr { display: none; }
   }
 
   .manual-list {
