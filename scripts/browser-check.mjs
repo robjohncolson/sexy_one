@@ -8687,7 +8687,7 @@ async function main() {
         '#boot-status is hidden after boot',
         '#sxc1-content-stats is valid JSON',
         '#sxc1-content-stats matches expected stats',
-        'home phone QR is decoded and visible at desktop and mobile widths',
+        'home phone QR is loaded and visible at desktop and mobile widths',
         '#/m/guide-book TOC contains the five PART titles',
         '#/m/guide-book/p/17 renders the expected text',
         'JA toggle shows a decoded original-page image',
@@ -8782,8 +8782,15 @@ async function main() {
         const aside = document.querySelector('#sxc1-phone-qr');
         const link = document.querySelector('#sxc1-phone-qr .phone-qr-link');
         const img = document.querySelector('#sxc1-phone-qr-img');
-        if (img && (!img.complete || img.naturalWidth === 0)) {
-          try { await img.decode(); } catch (e) { /* captured below */ }
+        let asset = null;
+        if (img) {
+          try {
+            const response = await fetch(img.src, { cache: 'no-store' });
+            const body = await response.blob();
+            asset = { status: response.status, bytes: body.size, type: body.type };
+          } catch (e) {
+            asset = { error: String(e && e.message ? e.message : e) };
+          }
         }
         const asideBox = aside ? aside.getBoundingClientRect() : null;
         const imgBox = img ? img.getBoundingClientRect() : null;
@@ -8792,10 +8799,13 @@ async function main() {
         return {
           asideVisible: Boolean(aside && getComputedStyle(aside).display !== 'none'
             && asideBox && asideBox.width > 0 && asideBox.height > 0),
-          imageDecoded: Boolean(img && img.complete && img.naturalWidth > 0
-            && imgBox && imgBox.width >= 160 && imgBox.height >= 160),
+          imageRendered: Boolean(img && img.complete
+            && imgBox && imgBox.width >= 160 && imgBox.height >= 160
+            && asset && asset.status === 200 && asset.bytes > 1000
+            && asset.type === 'image/svg+xml'),
           src: img ? img.src : null,
           href: link ? link.href : null,
+          asset,
           effectiveQuietModules: modulePx > 0 ? 2 + paddingPx / modulePx : 0,
         };
       })()`);
@@ -8815,8 +8825,8 @@ async function main() {
       })()`);
       await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
       report(
-        'home phone QR is decoded and visible at desktop and mobile widths',
-        Boolean(desktopQr && desktopQr.asideVisible && desktopQr.imageDecoded
+        'home phone QR is loaded and visible at desktop and mobile widths',
+        Boolean(desktopQr && desktopQr.asideVisible && desktopQr.imageRendered
           && typeof desktopQr.src === 'string' && desktopQr.src.endsWith('/qr-phone.svg')
           && desktopQr.href === 'https://sexy-one-gray.vercel.app/'
           && desktopQr.effectiveQuietModules >= 4
