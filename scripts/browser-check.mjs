@@ -8687,6 +8687,7 @@ async function main() {
         '#boot-status is hidden after boot',
         '#sxc1-content-stats is valid JSON',
         '#sxc1-content-stats matches expected stats',
+        'home phone QR is decoded and visible at desktop and mobile widths',
         '#/m/guide-book TOC contains the five PART titles',
         '#/m/guide-book/p/17 renders the expected text',
         'JA toggle shows a decoded original-page image',
@@ -8772,7 +8773,58 @@ async function main() {
         report('#sxc1-content-stats matches expected stats', false, 'skipped: stats JSON did not parse');
       }
 
-      // -- 3. guide-book TOC has the five exact PART titles -----------------------
+      // -- 3. Home phone handoff: the SVG loads and remains visible at both the
+      // desktop and mobile widths where users can discover/share it. The SVG's
+      // own two-module border plus the link's white padding must also provide
+      // the four-module quiet zone camera QR readers expect.
+      await goto('#/', '#sxc1-phone-qr');
+      const desktopQr = await evaluate(`(async () => {
+        const aside = document.querySelector('#sxc1-phone-qr');
+        const link = document.querySelector('#sxc1-phone-qr .phone-qr-link');
+        const img = document.querySelector('#sxc1-phone-qr-img');
+        if (img && (!img.complete || img.naturalWidth === 0)) {
+          try { await img.decode(); } catch (e) { /* captured below */ }
+        }
+        const asideBox = aside ? aside.getBoundingClientRect() : null;
+        const imgBox = img ? img.getBoundingClientRect() : null;
+        const modulePx = imgBox ? imgBox.width / 33 : 0;
+        const paddingPx = link ? parseFloat(getComputedStyle(link).paddingLeft) : 0;
+        return {
+          asideVisible: Boolean(aside && getComputedStyle(aside).display !== 'none'
+            && asideBox && asideBox.width > 0 && asideBox.height > 0),
+          imageDecoded: Boolean(img && img.complete && img.naturalWidth > 0
+            && imgBox && imgBox.width >= 160 && imgBox.height >= 160),
+          src: img ? img.src : null,
+          href: link ? link.href : null,
+          effectiveQuietModules: modulePx > 0 ? 2 + paddingPx / modulePx : 0,
+        };
+      })()`);
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 390, height: 844, deviceScaleFactor: 3, mobile: true,
+      }, sessionId);
+      const mobileQr = await evaluate(`(() => {
+        const aside = document.querySelector('#sxc1-phone-qr');
+        const box = aside ? aside.getBoundingClientRect() : null;
+        return {
+          visible: Boolean(aside && getComputedStyle(aside).display !== 'none'
+            && box && box.width > 0 && box.height > 0),
+          display: aside ? getComputedStyle(aside).display : null,
+          width: box ? box.width : null,
+          viewport: window.innerWidth,
+        };
+      })()`);
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      report(
+        'home phone QR is decoded and visible at desktop and mobile widths',
+        Boolean(desktopQr && desktopQr.asideVisible && desktopQr.imageDecoded
+          && typeof desktopQr.src === 'string' && desktopQr.src.endsWith('/qr-phone.svg')
+          && desktopQr.href === 'https://sexy-one-gray.vercel.app/'
+          && desktopQr.effectiveQuietModules >= 4
+          && mobileQr && mobileQr.visible && mobileQr.viewport === 390),
+        { desktopQr, mobileQr },
+      );
+
+      // -- 4. guide-book TOC has the five exact PART titles -----------------------
       await goto('#/m/guide-book', '#sxc1-toc');
       const tocText = await evaluate(`(() => {
         const e = document.querySelector('#sxc1-toc');
@@ -8785,7 +8837,7 @@ async function main() {
         { missingParts },
       );
 
-      // -- 4. guide-book p.17 renders #page-17 with the expected text ------------
+      // -- 5. guide-book p.17 renders #page-17 with the expected text ------------
       await goto('#/m/guide-book/p/17', '#page-17');
       const page17 = await evaluate(`(() => {
         const e = document.querySelector('#page-17');
@@ -8797,7 +8849,7 @@ async function main() {
         (page17 || '').slice(0, 120),
       );
 
-      // -- 5. JA toggle: image really decodes, then hides again -------------------
+      // -- 6. JA toggle: image really decodes, then hides again -------------------
       await clickAssert('#btn-ja-toggle', 'click #btn-ja-toggle');
       const jaShown = await evaluate(`(async () => {
         const start = Date.now();

@@ -465,7 +465,7 @@ phoneQrView lang = H.aside_ [ P.id_ "sxc1-phone-qr", textProp "aria-label" (ms (
          , textProp "target" "_blank", textProp "rel" "noopener noreferrer" ]
       [ H.img_
           [ P.id_ "sxc1-phone-qr-img"
-          , P.src_ "qr-phone.svg"
+          , P.src_ "./qr-phone.svg"
           , P.alt_ (ms (iPhoneQrAlt lang))
           , textProp "width" "180"
           , textProp "height" "180"
