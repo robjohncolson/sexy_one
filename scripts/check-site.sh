@@ -924,6 +924,7 @@ REQUIRED_FILES=(
   "index.js"
   "app.wasm"
   "ghc_wasm_jsffi.js"
+  "qr-phone.svg"
   ".nojekyll"
   "vendor/browser_wasi_shim/index.js"
   # M6 W1 (briefs/M6-plan.md, ruling 1): the per-language exercise
@@ -948,6 +949,36 @@ for rel in "${REQUIRED_FILES[@]}"; do
     fail "required file present: $rel (observed: missing)"
   fi
 done
+
+# A browser may fetch a malformed SVG successfully (HTTP 200) but refuse to
+# decode it. Parse the QR as XML here so duplicate attributes and broken
+# numeric output such as viewBox="0 0 NaN NaN" fail before deployment.
+QR_FILE="$DIR/qr-phone.svg"
+QR_XML_OUT=""
+if [ -f "$QR_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  QR_XML_OUT="$(python3 -c '
+import math
+import pathlib
+import sys
+import xml.etree.ElementTree as ET
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+root = ET.fromstring(text)
+assert root.tag.endswith("svg"), "root element is not svg"
+view_box = [float(value) for value in root.attrib["viewBox"].split()]
+assert len(view_box) == 4 and all(math.isfinite(value) for value in view_box), "viewBox is not finite"
+assert view_box[2] > 0 and view_box[3] > 0, "viewBox has no area"
+assert "nan" not in text.lower(), "SVG contains NaN"
+' "$QR_FILE" 2>&1)" || true
+  if [ -z "$QR_XML_OUT" ]; then
+    ok "qr-phone.svg is well-formed XML with a finite, non-empty viewBox"
+  else
+    fail "qr-phone.svg is well-formed XML with a finite, non-empty viewBox (observed: $QR_XML_OUT)"
+  fi
+else
+  fail "qr-phone.svg is well-formed XML with a finite, non-empty viewBox (observed: qr-phone.svg or python3 missing)"
+fi
 
 # ===========================================================================
 # Check 2: app.wasm begins with the 8-byte \0asm + version-1 magic.

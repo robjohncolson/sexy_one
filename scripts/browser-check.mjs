@@ -8775,14 +8775,18 @@ async function main() {
 
       // -- 3. Home phone handoff: the SVG loads and remains visible at both the
       // desktop and mobile widths where users can discover/share it. The SVG's
-      // own two-module border plus the link's white padding must also provide
-      // the four-module quiet zone camera QR readers expect.
+      // own four-module border plus the link's white padding must also provide
+      // the quiet zone camera QR readers expect. img.decode()/naturalWidth are
+      // intentional: a successful fetch is not proof that the browser could
+      // parse and render an SVG (malformed XML can still return HTTP 200).
       await goto('#/', '#sxc1-phone-qr');
       const desktopQr = await evaluate(`(async () => {
         const aside = document.querySelector('#sxc1-phone-qr');
         const link = document.querySelector('#sxc1-phone-qr .phone-qr-link');
         const img = document.querySelector('#sxc1-phone-qr-img');
         let asset = null;
+        let decoded = false;
+        let decodeError = null;
         if (img) {
           try {
             const response = await fetch(img.src, { cache: 'no-store' });
@@ -8791,22 +8795,32 @@ async function main() {
           } catch (e) {
             asset = { error: String(e && e.message ? e.message : e) };
           }
+          try {
+            await img.decode();
+            decoded = img.naturalWidth > 0 && img.naturalHeight > 0;
+          } catch (e) {
+            decodeError = String(e && e.message ? e.message : e);
+          }
         }
         const asideBox = aside ? aside.getBoundingClientRect() : null;
         const imgBox = img ? img.getBoundingClientRect() : null;
-        const modulePx = imgBox ? imgBox.width / 33 : 0;
+        const modulePx = imgBox ? imgBox.width / 37 : 0;
         const paddingPx = link ? parseFloat(getComputedStyle(link).paddingLeft) : 0;
         return {
           asideVisible: Boolean(aside && getComputedStyle(aside).display !== 'none'
             && asideBox && asideBox.width > 0 && asideBox.height > 0),
-          imageRendered: Boolean(img && img.complete
+          imageRendered: Boolean(img && img.complete && decoded
             && imgBox && imgBox.width >= 160 && imgBox.height >= 160
             && asset && asset.status === 200 && asset.bytes > 1000
             && asset.type === 'image/svg+xml'),
           src: img ? img.src : null,
           href: link ? link.href : null,
           asset,
-          effectiveQuietModules: modulePx > 0 ? 2 + paddingPx / modulePx : 0,
+          decoded,
+          decodeError,
+          naturalWidth: img ? img.naturalWidth : null,
+          naturalHeight: img ? img.naturalHeight : null,
+          effectiveQuietModules: modulePx > 0 ? 4 + paddingPx / modulePx : 0,
         };
       })()`);
       await cdp.send('Emulation.setDeviceMetricsOverride', {
