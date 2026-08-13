@@ -13,10 +13,11 @@ hardware.
 1. Export a trimmed sample from Audacity. WAV at 48 kHz, 16-bit PCM is the safest
    match for the SXC-1's own recording format. The planner accepts the official
    app's documented file choices: WAV, MP3, FLAC, and `.cswp`.
-2. Open `#/samples` and import an Audacity batch into Sample Inbox. Audition a
-   sound, then tap or drag it onto the 4×4 pad mockup; `Fill empty pads` places
-   the Inbox in order without overwriting anything. Bank numbers are limited to
-   the SXC-1 user-bank range, 15-80.
+2. Open `#/samples` and add an Audacity batch to Sample Library. Search or
+   audition a sound, send it to the active project's Inbox, then tap or drag it
+   onto the 4×4 pad mockup; `Fill empty pads` places the Inbox in order without
+   overwriting anything. Bank numbers are limited to the SXC-1 user-bank range,
+   15-80. Direct pad and Inbox imports also join the Library automatically.
 3. Add the human context the file cannot carry: pad name, where it came from,
    tags, colour, one-shot/loop intent, BPM, and mute group.
 4. Save/share one `.sxc1lab` project file. Import that file on the phone; all
@@ -86,4 +87,5 @@ audio stay in browser APIs; leaving `#/samples` restores the existing Miso app
 unchanged.
 
 The bulk-organizing and validation extension is specified in
-[`SAMPLE-INBOX.md`](SAMPLE-INBOX.md).
+[`SAMPLE-INBOX.md`](SAMPLE-INBOX.md); the shared catalog, deduplication, and
+named-project layer is specified in [`SAMPLE-LIBRARY.md`](SAMPLE-LIBRARY.md).

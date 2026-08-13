@@ -67,7 +67,7 @@ content, total time, and memory. No measurement is transmitted.
 
 The permanent browser gate proves that:
 
-- the manifest, scope, icon, registered worker, and current `m13-v1` core cache agree;
+- the manifest, scope, icon, registered worker, and current `m14-v1` core cache agree;
 - a genuinely network-disabled fresh page boots the real optimized WASM app
   from cache and shows the offline live region;
 - the same checks pass from both the origin root and a nested deployment path;

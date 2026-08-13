@@ -10,7 +10,7 @@ round of work.
 - Vercel deployment: `dpl_66kAbncHPkcb6wsMRoUK38yygVfq`
 - Immutable deployment URL: <https://sexy-e3rn2q3ns-roberts-projects-19fe2013.vercel.app/>
 - Course: 50 decks, 352 exercises, 467 prompts; no page-lookup exercises.
-- Last complete local gate: 136/136 checks, with 238/238 browser assertions at
+- Last complete local gate: 136/136 checks, with 240/240 browser assertions at
   both the origin root and a nested deployment path.
 - Last production quick gate: 75/75 assertions.
 
@@ -113,7 +113,7 @@ round of work.
 - The mobile boot regressions cap initial WASM memory at 24 MiB and impersonate
   an older iPhone engine to prove it receives recovery guidance without an
   `app.wasm` request.
-- The phone-ready regressions require a registered `m13-v1` worker, relative
+- The phone-ready regressions require a registered `m14-v1` worker, relative
   standalone manifest, real network-disabled WASM boot at root and nested scope,
   the visible offline live region, byte-identical `.sxc1` download/file load,
   no pre-commit storage mutation, and a 320 px passport layout.

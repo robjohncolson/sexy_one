@@ -191,6 +191,16 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   full 136/136 release gate with 238/238 browser assertions at both the origin
   root and nested-path deployment, then passed 75/75 against production.
   Contract: `docs/SAMPLE-INBOX.md`.
+- **M14 — Sample Library + named projects.** Add one searchable, staged local
+  catalog shared across projects; deduplicate identical imports without adding
+  startup work; retain source, tags, edit notes, permission/credit, BPM, and
+  format facts; and reuse one stored sound in multiple named project Inboxes.
+  Existing M12/M13 state migrates automatically, the active project remains
+  mirrored for rollback, and `.sxc1lab` stays a bounded one-project phone
+  transfer. **IMPLEMENTATION AND RELEASE GATE COMPLETE 2026-08-14; production
+  deployment pending.** The optimized artifact passed 136/136 checks with
+  240/240 browser assertions at both root and nested deployment paths.
+  Contract: `docs/SAMPLE-LIBRARY.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 
