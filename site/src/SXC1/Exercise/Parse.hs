@@ -398,14 +398,19 @@ exerciseOutputs file deckChapterText exS =
     answerRepeatIssue = [ mkIssue E_ROLE_REPEATED (Loc file ln) "### Answer may appear at most once"
                          | (ln, _, _) <- drop 1 answerChunks ]
 
-    -- Why/Hint/Answer roles carry no fields of their own -- ANY
-    -- field-shaped line there is unknown.
+    -- Why/Hint carry no fields. Answer may carry one learner-visible
+    -- distractor, which turns a recall-only quiz into a binary flashcard.
     roleNoFieldIssues =
       [ mkIssue E_FIELD_UNKNOWN (Loc file (flLine f)) ("unknown field \"" <> flKey f <> "\" (this role takes no fields)")
-      | (_, rtxt, rlines) <- whyChunks ++ hintChunks ++ answerChunks
-      , T.strip rtxt `elem` (["Why", "Hint", "Answer"] :: [Text])
+      | (_, rtxt, rlines) <- whyChunks ++ hintChunks
+      , T.strip rtxt `elem` (["Why", "Hint"] :: [Text])
       , let (fs, _) = scanFieldBlock rlines
       , f <- fs
+      ]
+    answerFieldIssues = concat
+      [ checkFieldBlock file (Loc file rln) [("distractor", Opt1)] fs
+      | (rln, _, rlines) <- answerChunks
+      , let (fs, _) = scanFieldBlock rlines
       ]
 
     hasChoiceList = case synExChoiceRaw exS of { Just _ -> True; Nothing -> False }
@@ -419,19 +424,20 @@ exerciseOutputs file deckChapterText exS =
 
     -- Reuses the ALREADY-BUILT 'Choice' options (from
     -- "SXC1.Exercise.Reader") rather than reconstructing them.
-    choiceIssues = case synExChoicePrompt exS of
-      Just (Choice opts) ->
-        let n = length opts
-            countIssue = [ mkIssue E_CHOICE_COUNT exLoc
-                             ("choice list has " <> T.pack (show n) <> " options (want 2..6)")
-                         | n < 2 || n > 6 ]
-            correctIssue = [ mkIssue E_CHOICE_NO_CORRECT exLoc "no option is marked [x]"
-                            | not (any optCorrect opts) ]
-            renderedLabels = [ inlinesText (optLabel o) | o <- opts ]
-            dupIssue = [ mkIssue E_CHOICE_DUPLICATE exLoc "two or more option labels render identically"
-                       | length renderedLabels /= length (dedupText renderedLabels) ]
-        in countIssue ++ correctIssue ++ dupIssue
-      _ -> []
+    choiceIssues = concatMap checkChoice [synExChoicePrompt exS, synExFlashPrompt exS]
+      where
+        checkChoice (Just (Choice opts)) =
+          let n = length opts
+              countIssue = [ mkIssue E_CHOICE_COUNT exLoc
+                               ("choice list has " <> T.pack (show n) <> " options (want 2..6)")
+                           | n < 2 || n > 6 ]
+              correctIssue = [ mkIssue E_CHOICE_NO_CORRECT exLoc "no option is marked [x]"
+                              | not (any optCorrect opts) ]
+              renderedLabels = [ inlinesText (optLabel o) | o <- opts ]
+              dupIssue = [ mkIssue E_CHOICE_DUPLICATE exLoc "two or more option labels render identically"
+                         | length renderedLabels /= length (dedupText renderedLabels) ]
+          in countIssue ++ correctIssue ++ dupIssue
+        checkChoice _ = []
 
     recallRequired = mKind == Just KQuiz && not hasChoiceList
     answerMissingIssue =
@@ -457,7 +463,7 @@ exerciseOutputs file deckChapterText exS =
     allIssues = concat
       [ exFieldIssues, typeUnknownIssue, idSyntaxIssue, exCiteIssues, exTagIssues
       , findIssues, limitIssues, bodyIndentedIssues, roleUnknownIssues
-      , whyRepeatIssue, hintRepeatIssue, answerRepeatIssue, roleNoFieldIssues
+      , whyRepeatIssue, hintRepeatIssue, answerRepeatIssue, roleNoFieldIssues, answerFieldIssues
       , quizModeAmbiguousIssue, choiceIssues, answerMissingIssue
       , stepCountIssue, concat stepIssuesAll, findMissingIssue, lookupSpoilerIssue
       ]
@@ -477,6 +483,9 @@ exerciseOutputs file deckChapterText exS =
       , case synExChoicePrompt exS of
           Just (Choice opts) -> [ (exLoc, inlinesText (optLabel o)) | o <- opts ]
           _                   -> []
+      , case synExDistractorField exS of
+          Just f  -> [(exLoc, flValue f)]
+          Nothing -> []
       , concat stepLintTargetsAll
       ]
 

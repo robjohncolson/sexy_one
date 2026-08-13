@@ -19,9 +19,9 @@
 -- checks @peOutcome ev == 'Completed'@ to decide whether a PROMPTLESS
 -- event is an exercise-completion marker (bump 'psDone') rather than a
 -- no-op. This is a structural ROUTING check, not a grading
--- interpretation -- it never influences a 'Grade' or a schedule, and
--- "SXC1.Progress.Types".'SXC1.Progress.Types.gradeOfOutcome' remains the
--- only place the four-way 'Grade' mapping itself is computed. In
+-- interpretation -- it never influences a 'Grade' or a schedule. Legacy
+-- events map through 'gradeOfOutcome'; events carrying M11's explicit
+-- review map through 'gradeOfReview'. In
 -- practice "SXC1.Exercise.Engine"'s real event producer (@mkEvent@'s
 -- call sites) only ever pairs @peOutcome = Completed@ with
 -- @pePrompt = Nothing@, so this check and the @pePrompt@ shape agree by
@@ -49,7 +49,7 @@ import           Data.Ord              (comparing)
 import           Data.Text             (Text)
 
 import           SXC1.Exercise.Engine  (Outcome (..), ProgressEvent (..))
-import           SXC1.Exercise.Types   (ExId (..), PromptId (..))
+import           SXC1.Exercise.Types   (DeckId (..), ExId (..), PromptId (..))
 import           SXC1.Progress.Types
 
 --------------------------------------------------------------------------
@@ -112,6 +112,25 @@ touchFirstDay day st
   | psFirstDay st == DayNum 0 = st { psFirstDay = day }
   | otherwise                 = st
 
+appendPulse :: PulseEntry -> [PulseEntry] -> [PulseEntry]
+appendPulse entry entries =
+  let xs = entries ++ [entry]
+      extra = length xs - pulseHistoryCap
+  in if extra > 0 then drop extra xs else xs
+
+pulseEntry :: DayNum -> Grade -> ProgressEvent -> PulseEntry
+pulseEntry today grade ev = PulseEntry
+  { plDay = today
+  , plDeck = deckText
+  , plExercise = exerciseText
+  , plPrompt = promptText
+  , plGrade = grade
+  }
+  where
+    DeckId deckText = peDeck ev
+    ExId exerciseText = peExercise ev
+    promptText = fmap (\(PromptId t) -> t) (pePrompt ev)
+
 -- | Fold one 'ProgressEvent' into a 'ProgressState'. TAKES NO CLOCK
 -- ARGUMENT AT ALL -- the day comes from the event's own 'peAt' via
 -- 'dayOf' (see the module Haddock on why: pure replay from a stored log
@@ -122,7 +141,10 @@ applyEvent :: ProgressEvent -> ProgressState -> ProgressState
 applyEvent ev st0 = case pePrompt ev of
   Just (PromptId pidTxt) ->
     let existing  = Map.findWithDefault freshRec pidTxt (psRecs st1)
-        grade     = gradeOfOutcome (peOutcome ev) (peAttempt ev) (peRevealed ev) (peHints ev)
+        grade     = maybe
+          (gradeOfOutcome (peOutcome ev) (peAttempt ev) (peRevealed ev) (peHints ev))
+          gradeOfReview
+          (peReview ev)
         interval' = nextIntervalDays existing grade
         ease'     = clampEase (rcEase existing + easeDelta grade)
         reps'     = if grade == GAgain then 0 else rcReps existing + 1
@@ -138,11 +160,15 @@ applyEvent ev st0 = case pePrompt ev of
          , psStreakDay = streakDay'
          , psStreakLen = streakLen'
          , psLastPrompt = pidTxt  -- v2 (NEW12): true last-activity pointer
+         , psPulse = appendPulse (pulseEntry today grade ev) (psPulse st1)
          }
   Nothing
     | peOutcome ev == Completed ->
         let ExId eidTxt = peExercise ev
-        in st1 { psDone = Map.insert eidTxt (Map.findWithDefault 0 eidTxt (psDone st1) + 1) (psDone st1) }
+        in st1
+             { psDone = Map.insert eidTxt (Map.findWithDefault 0 eidTxt (psDone st1) + 1) (psDone st1)
+             , psPulse = appendPulse (pulseEntry today GGood ev) (psPulse st1)
+             }
     | otherwise -> st1
   where
     today = dayOf (peAt ev)

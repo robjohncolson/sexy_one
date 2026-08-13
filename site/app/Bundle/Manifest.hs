@@ -48,8 +48,6 @@ import           Data.Word (Word32)
 manifestDecks :: [FilePath]
 manifestDecks =
   [ "000-ch0-01.ex.md"
-  , "002-ch0-02.ex.md"
-  , "004-ch0-03.ex.md"
   , "006-ch0-04.ex.md"
   , "008-ch0-05.ex.md"
   , "010-ch0-06.ex.md"
@@ -102,24 +100,24 @@ manifestDecks =
   ]
 
 manifestDeckCount :: Int
-manifestDeckCount = 52
+manifestDeckCount = 50
 
 -- | Aggregate corpus counts, derived at build time from the SAME
 -- emission the bundles are written from and identical for both
 -- languages (the emitter refuses to emit when they disagree).
 manifestExercises :: Int
-manifestExercises = 435
+manifestExercises = 352
 
 manifestPrompts :: Int
-manifestPrompts = 550
+manifestPrompts = 467
 
 -- | FNV-1a\/32 over the WHOLE emitted exercise bundle's UTF-8 bytes --
 -- the catch-all identity check
 -- ("Exercises.Corpus".'Exercises.Corpus.fnv1a32' recomputes it over the
 -- fetched text). 'Nothing' for a language this build did not emit.
 manifestFingerprint :: Text -> Maybe Word32
-manifestFingerprint "en" = Just 918201363
-manifestFingerprint "ja" = Just 205948798
+manifestFingerprint "en" = Just 770179603
+manifestFingerprint "ja" = Just 2747662516
 manifestFingerprint _    = Nothing
 
 -- | Every manual document slug, in the reader's fixed presentation

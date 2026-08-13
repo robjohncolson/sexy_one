@@ -26,7 +26,7 @@ import qualified Data.IntSet            as IntSet
 import           Data.List              (intercalate, isPrefixOf, isSuffixOf, sortOn)
 import qualified Data.Map.Strict        as Map
 import           Data.Map.Strict        (Map)
-import           Data.Maybe             (mapMaybe)
+import           Data.Maybe             (mapMaybe, maybeToList)
 import qualified Data.Set               as Set
 import           Data.Text              (Text)
 import qualified Data.Text              as T
@@ -54,6 +54,8 @@ import           SXC1.Exercise.Types
 import           SXC1.Exercise.Verify
 import           SXC1.Midi.Spec
 import           SXC1.Midi.Table        (parsePadNotes)
+import           SXC1.Mastery
+import           SXC1.Progress.Types
 import           SXC1.Route             (Route (..), parseRoute, renderRoute)
 
 --------------------------------------------------------------------------
@@ -1124,10 +1126,10 @@ firstDiff xs ys = go 0 xs ys
 runBrowserFixture :: Opts -> IO ()
 runBrowserFixture opts = do
   loaded <- collectFromDirs realCorpusScope (optContentDir opts) (optTranslationsDir opts)
-  case (findQuiz loaded, findDrill loaded, findLookup loaded) of
-    (Just qz, Just dr, Just lk) -> putStrLn (T.unpack (browserFixtureJson qz dr lk))
+  case (findQuiz loaded, findDrill loaded) of
+    (Just qz, Just dr) -> putStrLn (T.unpack (browserFixtureJson qz dr (findLookup loaded)))
     _ -> do
-      hPutStrLn stderr "exercise-check --browser-fixture: real content does not yet have one of each exercise kind"
+      hPutStrLn stderr "exercise-check --browser-fixture: real content needs at least one quiz and one drill"
       exitWith (ExitFailure 1)
 
 data QuizFixture = QuizFixture { qfDeck, qfId, qfCorrectOpt, qfWrongOpt, qfCiteSlug :: Text, qfCitePage :: Int }
@@ -1183,10 +1185,10 @@ firstJust :: [a] -> Maybe a
 firstJust (x : _) = Just x
 firstJust []      = Nothing
 
-browserFixtureJson :: QuizFixture -> DrillFixture -> LookupFixture -> Text
-browserFixtureJson qz dr lk =
+browserFixtureJson :: QuizFixture -> DrillFixture -> Maybe LookupFixture -> Text
+browserFixtureJson qz dr mLk =
   "{" <> T.intercalate ","
-    [ "\"quiz\":" <> obj
+    ([ "\"quiz\":" <> obj
         [ kv "deck" (str (qfDeck qz)), kv "id" (str (qfId qz))
         , kv "correctOpt" (str ("opt-" <> qfCorrectOpt qz)), kv "wrongOpt" (str ("opt-" <> qfWrongOpt qz))
         , kv "citeSlug" (str (qfCiteSlug qz)), kv "citePage" (T.pack (show (qfCitePage qz)))
@@ -1196,10 +1198,11 @@ browserFixtureJson qz dr lk =
         , kv "steps" (T.pack (show (dfSteps dr))), kv "hasVerify" (if dfHasVerify dr then "true" else "false")
         , kv "citeSlug" (str (dfCiteSlug dr)), kv "citePage" (T.pack (show (dfCitePage dr)))
         ]
-    , "\"lookup\":" <> obj
+    ] ++ [ "\"lookup\":" <> obj
         [ kv "deck" (str (lfDeck lk)), kv "id" (str (lfId lk))
         , kv "targetSlug" (str (lfTargetSlug lk)), kv "targetPage" (T.pack (show (lfTargetPage lk))) ]
-    ] <> "}"
+      | lk <- maybeToList mLk
+      ]) <> "}"
   where
     obj kvs = "{" <> T.intercalate "," kvs <> "}"
     kv k v = str k <> ":" <> v
@@ -1375,7 +1378,7 @@ stLabel 7  = "7. engine: wrong-then-right retry path (attempts do not lock the p
 stLabel 8  = "8. engine: hint counting"
 stLabel 9  = "9. engine: ProgressEvent fields, incl. exercise-completed on Advance past the end"
 stLabel 10 = "10. engine: PromptId stability (<exercise-id>#<step>)"
-stLabel 11 = "11. route: CONSTRUCTOR assertions for the three new routes (round-trip alone is vacuous, P-M)"
+stLabel 11 = "11. route: constructor assertions for exercise and mastery routes (round-trip alone is vacuous, P-M)"
 stLabel 12 = "12. route: totality on malformed inputs"
 stLabel 13 = "13. seam: E-BLOCK-UNPARSED via parseBlocksEngineWith (the only way it is reachable)"
 stLabel 14 = "14. resolution: resolveCitation/resolveVerify/resolveChapter/resolveInventoryId on synthetic data"
@@ -1387,10 +1390,12 @@ stLabel 19 = "19. M3: StaticCode totality sweep (codeText/issueClassOf WHNF non-
 stLabel 20 = "20. M4: SXC1.Midi.Spec vs translations/midi.md -- decode/match/pads/ports/describe + the six live verify: hooks"
 stLabel 21 = "21. M6: `ja:` variant lines -- skipped for EN (byte-identical Deck), invisible to the validator, line numbers preserved"
 stLabel 22 = "22. M6 W4: JA completeness (E-JA-MISSING) -- per-unit-kind negative controls, the documented exclusions, and a sweep over the REAL corpus"
+stLabel 23 = "23. mastery map: deterministic DAG layout, evidence bands, due-first recommendation, advisory prerequisites"
+stLabel 24 = "24. flashcards: every live recall has a bilingual distractor and explicit two-step review grading"
 stLabel n  = show n ++ ". ?"
 
 stMaxGroup :: Int
-stMaxGroup = 22
+stMaxGroup = 24
 
 stGroupsAllOk :: Int -> [STCheck] -> Bool
 stGroupsAllOk maxG cs = all oneGroupOk [1 .. maxG]
@@ -1404,6 +1409,7 @@ runSelfTest = do
   indexCountChecks <- indexDrivenEmbeddingChecks root
   midiSpecCks      <- midiSpecChecks root
   jaCompleteCks    <- jaCompletenessCorpusChecks root
+  flashcardCks     <- flashcardCorpusChecks root
   let allChecks = concat
         [ grammarChecks, new12GuardSelfChecks, choiceChecks, recallChecks, confirmChecks
         , findPageChecks, retryChecks, hintChecks, progressEventChecks, promptIdChecks
@@ -1413,6 +1419,8 @@ runSelfTest = do
         , midiSpecCks
         , jaVariantChecks
         , jaCompletenessChecks, jaCompleteCks
+        , masteryChecks
+        , flashcardCks
         ]
   forM_ [1 .. stMaxGroup] $ \g -> do
     let inGroup = filter ((== g) . stGroup) allChecks
@@ -2061,6 +2069,88 @@ jaCompletenessCorpusChecks root = do
                          ++ (case issues of { (i : _) -> T.unpack (renderIssue i); [] -> "<none>" })))
 
 --------------------------------------------------------------------------
+-- Group 24: the M11 flashcard migration and review-grade seam.
+--------------------------------------------------------------------------
+
+flashcardCorpusChecks :: FilePath -> IO [STCheck]
+flashcardCorpusChecks root = do
+  let exercisesDir = root </> "content" </> "exercises"
+      indexPath = exercisesDir </> "INDEX"
+  indexExists <- doesFileExist indexPath
+  if not indexExists
+    then pure [mkST 24 "flashcards/corpus-not-found" False (indexPath ++ " does not exist")]
+    else do
+      indexRaw <- readUtf8File indexPath
+      loaded <- forM (map snd (parseIndexEntries indexRaw)) $ \name -> do
+        let fp = exercisesDir </> T.unpack name
+        exists <- doesFileExist fp
+        if not exists then pure (Left fp) else do
+          raw <- readUtf8File fp
+          pure (Right (readDeckSyn fp raw, raw))
+      let missing = [fp | Left fp <- loaded]
+          syns = [syn | Right (syn, _) <- loaded]
+          raws = [raw | Right (_, raw) <- loaded]
+          exSyns = concatMap synExercises syns
+          decks = mapMaybe synDeck syns
+          flashOptions = [opts | exS <- exSyns, Just (Choice opts) <- [synExFlashPrompt exS]]
+          liveRecalls =
+            [ unExIdLocal (exId ex)
+            | deck <- decks, ex <- dkExercises deck, prompt <- exPrompts ex
+            , Recall _ <- [prBody prompt]
+            ]
+          correctSides =
+            [optId opt | opts <- flashOptions, opt <- opts, optCorrect opt]
+          authoredEn = sum (map (T.count "\ndistractor:") raws)
+          authoredJa = sum (map (T.count "\nja: distractor:") raws)
+          binaryOneCorrect opts = length opts == 2 && length (filter optCorrect opts) == 1
+      pure
+        ([ mkST 24 "flashcards/all-index-files-loaded" (null missing)
+            ("missing INDEX files: " ++ show missing)
+        , mkST 24 "flashcards/128-bilingual-authored-distractors"
+            (authoredEn == 128 && authoredJa == 128)
+            ("EN=" ++ show authoredEn ++ " JA=" ++ show authoredJa ++ ", want 128 each")
+        , mkST 24 "flashcards/128-binary-one-correct-prompts"
+            (length flashOptions == 128 && all binaryOneCorrect flashOptions)
+            ("generated=" ++ show (length flashOptions) ++ ", malformed="
+              ++ show (length (filter (not . binaryOneCorrect) flashOptions)))
+        , mkST 24 "flashcards/live-corpus-has-no-self-certified-recall"
+            (null liveRecalls)
+            ("Recall prompts survived in: " ++ show liveRecalls)
+        , mkST 24 "flashcards/correct-side-varies-stably"
+            (Set.fromList correctSides == Set.fromList ["a", "b"])
+            ("correct option ids=" ++ show correctSides)
+        ] ++ explicitReviewGradeChecks)
+  where
+    unExIdLocal (ExId t) = t
+
+explicitReviewGradeChecks :: [STCheck]
+explicitReviewGradeChecks =
+  let st0 = initialState (ExId "st-single-choice-ex") (MonoMs 1000)
+      (st1, _) = step singleChoiceExercise (Toggle 0 "a") st0
+      (st2, checkEvents) = step singleChoiceExercise (Check 0 False) st1
+      (st3, rateEvents) = step singleChoiceExercise
+        (Rate 0 ReviewGood (MonoMs 1800) (WallMs 86400000)) st2
+      (_, duplicateEvents) = step singleChoiceExercise
+        (Rate 0 ReviewEasy (MonoMs 1900) (WallMs 86400100)) st3
+      (unsureState, unsureEvents) = step singleChoiceExercise (Check 0 True) st0
+      (_, hardEvents) = step singleChoiceExercise
+        (Rate 0 ReviewHard (MonoMs 1600) (WallMs 86400000)) unsureState
+  in
+  [ mkST 24 "review/check-evaluates-without-persisting"
+      (null checkEvents && IntMap.lookup 0 (esEvaluated st2) == Just Correct)
+      ("events=" ++ show checkEvents ++ " evaluated=" ++ show (esEvaluated st2))
+  , mkST 24 "review/good-is-carried-verbatim"
+      (case rateEvents of { [ev] -> peOutcome ev == Correct && peReview ev == Just ReviewGood; _ -> False })
+      (show rateEvents)
+  , mkST 24 "review/rating-is-idempotent"
+      (null duplicateEvents) (show duplicateEvents)
+  , mkST 24 "review/not-sure-branches-to-hard"
+      (null unsureEvents && IntMap.lookup 0 (esEvaluated unsureState) == Just Incorrect
+        && case hardEvents of { [ev] -> peReview ev == Just ReviewHard; _ -> False })
+      ("check=" ++ show unsureEvents ++ " rate=" ++ show hardEvents)
+  ]
+
+--------------------------------------------------------------------------
 -- Group 2: NEW12-safe runner demonstration (mirrors CheckContent.hs's
 -- group-16/group-22 pattern: a permanent, self-verifying comparison of
 -- the OLD (insufficient) exit condition against 'stGroupsAllOk').
@@ -2238,7 +2328,8 @@ recallChecks =
       (case ev2 of { [e] -> peOutcome e == Correct && peRevealed e; _ -> False }) (show ev2)
   , mkST 4 "recall/self-grade-missed-is-incorrect"
       (let (_, ev) = step recallExercise (SelfGrade_ 0 Missed (MonoMs 1500) (WallMs 2000)) st1
-       in case ev of { [e] -> peOutcome e == Incorrect; _ -> False }) "Missed must grade Incorrect"
+       in case ev of { [e] -> peOutcome e == Incorrect && peRevealed e; _ -> False })
+      "Missed after showing the model answer must grade Incorrect and retain revealed=true"
   ]
 
 confirmChecks :: [STCheck]
@@ -2365,6 +2456,7 @@ promptIdChecks =
 routeConstructorChecks :: [STCheck]
 routeConstructorChecks =
   [ mkST 11 "route/x-is-RExercises" (parseRoute "#/x" == RExercises) (show (parseRoute "#/x"))
+  , mkST 11 "route/x-today-is-RSession" (parseRoute "#/x/today" == RSession) (show (parseRoute "#/x/today"))
   , mkST 11 "route/x-is-not-RNotFound"
       -- P-M: "#/x" already round-tripped as RNotFound BEFORE these routes
       -- existed, so a bare round-trip assertion is vacuous. This is the
@@ -2383,6 +2475,13 @@ routeConstructorChecks =
       (case parseRoute "#/x/pad-play-banks/pad-play-bank-a-button" of { RNotFound _ -> False; _ -> True })
       (show (parseRoute "#/x/pad-play-banks/pad-play-bank-a-button"))
   , mkST 11 "route/round-trip-RExercises" (parseRoute (renderRoute RExercises) == RExercises) "round-trip"
+  , mkST 11 "route/round-trip-RSession" (parseRoute (renderRoute RSession) == RSession) "round-trip"
+  , mkST 11 "route/x-map-is-RMastery" (parseRoute "#/x/map" == RMastery) (show (parseRoute "#/x/map"))
+  , mkST 11 "route/x-map-is-not-RDeck" (parseRoute "#/x/map" /= RDeck "map") (show (parseRoute "#/x/map"))
+  , mkST 11 "route/round-trip-RMastery" (parseRoute (renderRoute RMastery) == RMastery) "round-trip"
+  , mkST 11 "route/x-week-is-RWeekly" (parseRoute "#/x/week" == RWeekly) (show (parseRoute "#/x/week"))
+  , mkST 11 "route/x-week-is-not-RDeck" (parseRoute "#/x/week" /= RDeck "week") (show (parseRoute "#/x/week"))
+  , mkST 11 "route/round-trip-RWeekly" (parseRoute (renderRoute RWeekly) == RWeekly) "round-trip"
   , mkST 11 "route/round-trip-RDeck" (parseRoute (renderRoute (RDeck "d")) == RDeck "d") "round-trip"
   , mkST 11 "route/round-trip-RExercise"
       (parseRoute (renderRoute (RExercise "d" "e")) == RExercise "d" "e") "round-trip"
@@ -2396,6 +2495,103 @@ routeTotalityChecks =
   | input <- ["", "#", "#/x/", "#/x//y", "#/x/a/b/c"]
   ]
   where lengthForced s = length s `seq` length s
+
+--------------------------------------------------------------------------
+-- Group 23: mastery graph. The visual layer consumes only this projection,
+-- so these checks pin the meaning of every color and recommendation.
+--------------------------------------------------------------------------
+
+masteryChecks :: [STCheck]
+masteryChecks =
+  [ mkST 23 "mastery/prompt-bands"
+      ( [ promptBand Nothing
+        , promptBand (Just (masteryRec 0 0 100))
+        , promptBand (Just (masteryRec 1 7 100))
+        , promptBand (Just (masteryRec 3 7 100))
+        ] == [PUnseen, PFragile, PBuilding, PDurable] )
+      "missing, lapsed, single-rep, and mature prompts must classify distinctly"
+  , mkST 23 "mastery/authored-edge"
+      (mgEdges emptyGraph == [GraphEdge "map-a" "map-b"])
+      (show (mgEdges emptyGraph))
+  , mkST 23 "mastery/topological-depth"
+      (map gnDepth (mgNodes emptyGraph) == [0, 1])
+      (show (map gnDepth (mgNodes emptyGraph)))
+  , mkST 23 "mastery/empty-is-unseen"
+      (map (dmBand . gnMastery) (mgNodes emptyGraph) == [MUnseen, MUnseen])
+      (show (map (dmBand . gnMastery) (mgNodes emptyGraph)))
+  , mkST 23 "mastery/recommend-first-incomplete"
+      (mgRecommended strongGraph == Just "map-b")
+      (show (mgRecommended strongGraph))
+  , mkST 23 "mastery/strong-requires-completion-and-durable-recall"
+      (nodeBand "map-a" strongGraph == Just MStrong)
+      (show (nodeBand "map-a" strongGraph))
+  , mkST 23 "mastery/due-is-consolidating-and-recommended-first"
+      (nodeBand "map-a" dueGraph == Just MConsolidating && mgRecommended dueGraph == Just "map-a")
+      (show (nodeBand "map-a" dueGraph, mgRecommended dueGraph))
+  , mkST 23 "mastery/prerequisites-are-advisory"
+      (case findMastery "map-b" emptyGraph of
+         Just dm -> not (dmPrereqsMet dm)
+         Nothing -> False)
+      "dependent node must remain present while its advisory prerequisite is incomplete"
+  , mkST 23 "mastery/layout-stable-across-progress"
+      (map coords (mgNodes emptyGraph) == map coords (mgNodes dueGraph))
+      "progress may recolor the graph but must never move its authored nodes"
+  , mkST 23 "mastery/band-count-ledger"
+      (bandCount MConsolidating dueGraph == 1 && bandCount MUnseen dueGraph == 1)
+      (show (Map.toList (mgBandCounts dueGraph)))
+  ]
+  where
+    today = DayNum 100
+    emptyGraph = buildMasteryGraph today emptyProgress masteryDecks
+    strongGraph = buildMasteryGraph today strongProgress masteryDecks
+    dueGraph = buildMasteryGraph today dueProgress masteryDecks
+    coords n = (gnX n, gnY n)
+
+masteryDecks :: [Deck]
+masteryDecks =
+  [ masteryDeck "map-a" "Map A" "Chapter A" [] "map-a-ex" "map-a-ex#1"
+  , masteryDeck "map-b" "Map B" "Chapter B" ["map-a"] "map-b-ex" "map-b-ex#1"
+  ]
+
+masteryDeck :: Text -> Text -> Text -> [Text] -> Text -> Text -> Deck
+masteryDeck did title chapter requires eid pid = Deck
+  { dkId = DeckId did, dkTitle = title, dkChapter = chapter
+  , dkSummary = [], dkCites = [], dkIntro = [], dkTags = []
+  , dkTier = "core", dkRequires = requires
+  , dkExercises =
+      [ choiceExercise
+          { exId = ExId eid
+          , exDeck = DeckId did
+          , exTitle = title
+          , exPrompts = [ Prompt (PromptId pid) [] [] (Recall []) ]
+          }
+      ]
+  }
+
+masteryRec :: Int -> Int -> Int -> Rec
+masteryRec reps interval due = Rec
+  { rcReps = reps, rcLapses = 0, rcEase = 2500, rcInterval = interval
+  , rcDue = DayNum due, rcLastSeen = DayNum 90, rcSeen = max 1 reps
+  }
+
+strongProgress :: ProgressState
+strongProgress = emptyProgress
+  { psDone = Map.fromList [("map-a-ex", 1)]
+  , psRecs = Map.fromList [("map-a-ex#1", masteryRec 3 7 110)]
+  }
+
+dueProgress :: ProgressState
+dueProgress = strongProgress
+  { psRecs = Map.fromList [("map-a-ex#1", masteryRec 3 7 100)] }
+
+findMastery :: Text -> MasteryGraph -> Maybe DeckMastery
+findMastery slug graph =
+  case [ gnMastery n | n <- mgNodes graph, dkId (gnDeck n) == DeckId slug ] of
+    (dm : _) -> Just dm
+    []       -> Nothing
+
+nodeBand :: Text -> MasteryGraph -> Maybe MasteryBand
+nodeBand slug = fmap dmBand . findMastery slug
 
 --------------------------------------------------------------------------
 -- Group 13: E-BLOCK-UNPARSED, via the parseBlocksEngineWith test seam --

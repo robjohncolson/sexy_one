@@ -19,6 +19,9 @@ data Route
   | RManual    !Text               -- ^ \"#/m/guide-book\"
   | RPage      !Text !Int !Bool    -- ^ \"#/m/guide-book/p/17\" (+ \"/ja\")
   | RExercises                     -- ^ \"#/x\" (M2)
+  | RSession                       -- ^ \"#/x/today\" focused daily session
+  | RMastery                       -- ^ \"#/x/map\" mastery DAG
+  | RWeekly                        -- ^ \"#/x/week\" Weekly Pulse
   | RDeck      !Text               -- ^ \"#/x/\<deck\>\" (M2)
   | RExercise  !Text !Text         -- ^ \"#/x/\<deck\>/\<ex\>\" (M2)
   | RNotFound !Text
@@ -96,6 +99,9 @@ classify ["m", slug, "p", nTxt, "ja"] | isRouteId slug = case parseDigits nTxt o
 -- assert the CONSTRUCTOR (@parseRoute \"#/x\" == RExercises@) and carry a
 -- negative control that it is NOT 'RNotFound'.
 classify ["x"] = RExercises
+classify ["x", "today"] = RSession
+classify ["x", "map"] = RMastery
+classify ["x", "week"] = RWeekly
 classify ["x", deck] | isRouteId deck = RDeck deck
 classify ["x", deck, ex] | isRouteId deck, isRouteId ex = RExercise deck ex
 classify segs = notFound segs
@@ -133,6 +139,9 @@ renderRoute (RManual slug)   = "#/m/" <> slug
 renderRoute (RPage slug n ja) =
   "#/m/" <> slug <> "/p/" <> T.pack (show n) <> (if ja then "/ja" else "")
 renderRoute RExercises            = "#/x"
+renderRoute RSession              = "#/x/today"
+renderRoute RMastery              = "#/x/map"
+renderRoute RWeekly               = "#/x/week"
 renderRoute (RDeck deck)          = "#/x/" <> deck
 renderRoute (RExercise deck exId) = "#/x/" <> deck <> "/" <> exId
 renderRoute (RNotFound path) = "#/" <> path

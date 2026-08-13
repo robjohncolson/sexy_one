@@ -1,18 +1,18 @@
 {
-  "measured_at": "2026-08-09",
+  "measured_at": "2026-08-11",
   "m6_final_gzip_bytes": 887732,
-  "m7_final_gzip_bytes": 838748,
-  "shrink_bytes": 48984,
+  "m7_final_gzip_bytes": 865232,
+  "shrink_bytes": 22500,
   "ceiling_bytes": 1000000,
-  "content_bundle_en_gzip_bytes": 76602,
-  "content_bundle_ja_gzip_bytes": 91130,
-  "content_bundle_combined_gzip_bytes": 167732,
+  "content_bundle_en_gzip_bytes": 68189,
+  "content_bundle_ja_gzip_bytes": 81002,
+  "content_bundle_combined_gzip_bytes": 149191,
   "content_bundle_ceiling_bytes": 300000,
   "manual_bundle_en_gzip_bytes": 57818,
   "manual_bundle_ja_gzip_bytes": 60205,
   "manual_bundle_combined_gzip_bytes": 118023,
   "manual_bundle_ceiling_bytes": 250000,
-  "all_bundles_combined_gzip_bytes": 285755,
+  "all_bundles_combined_gzip_bytes": 267214,
   "total_bundle_ceiling_bytes": 550000,
   "ruling": "Coordinator, 2026-08-09 (briefs/M7-plan.md rulings 1/6), FINAL (wave 3): the MANUAL TEXT moved OUT of app.wasm into per-language fetched bundles (site/public/content/manuals.{en,ja}.txt, emitted by the same scripts/emit-content-bundles.py run that emits the exercise bundles and the wasm-embedded expectation, loaded at boot via the same JS-side-guarded window.__sxc1Content bridge under the same single 15s deadline, and accepted all-or-nothing against site/app/Bundle/Manifest.hs), and wave 2 then filled the ja bundle with the real Japanese transcription of all 108 pages. m6_final is the M6 shipping artifact as deployed (M6 was never tagged; it shipped pre-tag at the owner's request)'s gzip (887,732 -- the pre-manual-externalization baseline and check-site's floor at M7 entry); m7_final is the shipping artifact (838,748; -48,984), UNCHANGED by waves 2/3 because the Japanese text lands in the ja BUNDLE and never in the binary -- which is precisely what ruling 1 bought. Ruling 1 projected roughly -67K from shedding 193,460 raw bytes of embedded translations; the measured -48,984 is smaller because that prose compressed better INSIDE the wasm than the linear projection assumed -- the same direction M6's own estimate missed in, and comfortably above the pinned M7_SHRINK_MIN=30,000 floor. The frozen WASM_GZIP_CEILING_BYTES=1000000 is untouched and remains the only wasm ceiling: headroom is 161,252 bytes. THE BUNDLE-CEILING RAISE, with its arithmetic, is a visible edit to scripts/check-site.sh and is pinned there as two literals plus their sum: the M6 exercise-bundle ceiling stays at 300,000 (unchanged, holding 167,732 -- briefs/M6-budget.json is frozen as the historical record and its pin therefore cannot move), a M7_MANUAL_BUNDLE_CEILING=250,000 covers the manual pair (holding 118,023: en 57,818 + ja 60,205, the ja bundle now carrying all four documents' REAL Japanese text -- 217,070 raw against the EN bundle's 193,578 -- for 2,395 gzip bytes more than the EN-fallback bundle wave 1 shipped; headroom 131,967), and M7_BUNDLE_TOTAL_CEILING=550,000 = 300,000 + 250,000 gates everything the app fetches at boot (285,755 today, headroom 264,235). check-site asserts this file MATCHES those pins -- including all three ceilings -- so raising a ceiling stays a visible check-site.sh edit and can never be authorized by this mutable file; m7_final and the bundle figures are additionally held to a 3,000-byte window around the live measurement (gzip's exact output is a property of the local gzip build). M7-e also took over the LIVE-ARTIFACT half of M6-e, a documented handoff recorded in check-site.sh: M6's window had a lower bound of m6_entry-3000 = 856,745, which this milestone lawfully shed past, and M6-e now judges only the M6 record and the (untouched) exercise-bundle figures.",
   "evidence": [
@@ -21,6 +21,8 @@
     "manual bundles: gzip -c | wc -c of the emitted manuals.en.txt (193,578 raw / 57,818 gzip) and manuals.ja.txt (217,070 raw / 60,205 gzip) -- the same measurement check-site's manual bundle ledger records (state/manual-bundle-ledger.tsv); combined 118,023 of the 250,000 ceiling.",
     "content bundles: unchanged by this milestone (284,108 / 358,497 raw; 76,602 + 91,130 = 167,732 gzip), re-measured on this tree and equal to briefs/M6-budget.json's record byte for byte.",
     "Wave 3 state of the manual bundles: manuals.ja.txt's four !SXC1-DOC records now ALL read 'ja' (guide-book 71, startup-guide 15, midi 6, oss 16 -- 108 pages of real Japanese text), so no document takes ruling 4's EN fallback any more. The fallback MECHANISM is unchanged and still enforced: check-site's M7-i proves the emitter flips a record with its .ja.md file, the manual-language-of-record browser stage's precondition requires every record to say 'ja' (an untranslated document turns it red by name), and exercise-check --manual-structural-diff holds the two corpora page-for-page structurally identical (109/109).",
-    "2026-08-09 coordinator: two figure callouts using a full-width colon with Japanese kind words (\u5199\u771f\uff1a/\u30a4\u30e9\u30b9\u30c8\uff1a) normalized to the corpus's Photo:/Illustration: vocabulary so all 174 whole-line callouts render Kind + caption alike (W3 finding, reported not fixed by the wave); ja manual bundle 60215 -> 60205 gzip."
+    "2026-08-09 coordinator: two figure callouts using a full-width colon with Japanese kind words (\u5199\u771f\uff1a/\u30a4\u30e9\u30b9\u30c8\uff1a) normalized to the corpus's Photo:/Illustration: vocabulary so all 174 whole-line callouts render Kind + caption alike (W3 finding, reported not fixed by the wave); ja manual bundle 60215 -> 60205 gzip.",
+    "2026-08-11 M10 remeasurement: the optimized schema-v3 Weekly Pulse artifact is 2,354,203 raw / 857,672 gzip. The bounded 200-mark ledger and route kept the binary 30,060 bytes below the M6 baseline.",
+    "2026-08-11 M11 remeasurement after forward-only review and hands-on Skip: the optimized artifact is 2,378,088 raw / 865,232 gzip. The current UI remains 22,500 bytes below the M6 baseline and 134,768 below the unchanged 1,000,000 ceiling. The historical manual-externalization architecture is intact; the current-tree floor remains 20,000. Authored distractors keep exercise bundles at 68,189 + 81,002 = 149,191 gzip; manual bundles remain 118,023, for 267,214 of the 550,000 combined ceiling."
   ]
 }

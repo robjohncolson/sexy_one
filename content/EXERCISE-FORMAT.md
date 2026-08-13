@@ -153,7 +153,7 @@ as code), and no two option labels may read the same after trimming whitespace.
 | `requires` | optional | comma-separated deck slugs (same `[a-z0-9-]+` shape as `tags`) — deck-level prerequisites for course-map ordering. Every named slug must be a real deck (`E-DECK-REQUIRES-UNKNOWN`), and the `requires:` graph as a whole must not contain a cycle (`E-DECK-REQUIRES-CYCLE`) — both checked across the WHOLE corpus, like `E-ID-DUPLICATE` |
 | `summary` | **required** | one line, learner-facing (linted for terminology) |
 | `cite` | **required**, repeatable | at least one `<slug> <page> "<anchor>"` |
-| `tags` | optional | comma-separated `[a-z0-9-]+` |
+| `tags` | optional | comma-separated `[a-z0-9-]+`; add `visual-source` when the deck's questions depend on their cited panel diagram or screen image — the runner will place each exercise's first cited page beside its prompt |
 
 ### Fields common to every exercise type (the field block right after a `##` title)
 
@@ -162,22 +162,30 @@ as code), and no two option labels may read the same after trimming whitespace.
 | `type` | **required** | one of `quiz`, `drill`, `lookup` |
 | `id` | **required** | must appear in `content/exercise-inventory.md`, **permanent** |
 | `cite` | **required** for `quiz`/`drill`; optional for `lookup` | `lookup` already has `find:` |
-| `tags` | optional | comma-separated; the inventory's `intro`/`core`/`stretch` tags are a good default |
+| `tags` | optional | comma-separated; the inventory's `intro`/`core`/`stretch` tags are a good default; `visual-source` may also be set on one exercise instead of the whole deck |
 
 Roles common to every type: `### Why` (0 or 1 — the "why this matters" explanation) and
 `### Hint` (0 to 3, in order — escape hatches for a stuck learner).
 
-### `type: quiz` — two modes, inferred, never both
+### `type: quiz` — authored choices or flashcard shorthand
 
-A quiz is either **choice mode** (a task list is present) or **recall mode** (no task
-list, and a `### Answer` role holds the model answer) — never both at once
-(`E-QUIZ-MODE-AMBIGUOUS` if you accidentally leave both).
+A quiz is either **choice mode** (a task list is present) or **flashcard shorthand**
+(no task list; `### Answer` holds the correct answer and an authored `distractor:`
+field) — never both at once (`E-QUIZ-MODE-AMBIGUOUS` if you leave both). The reader
+turns the shorthand into a two-option, one-correct Choice prompt; the correct side is
+stable per exercise id and varies across the corpus. Learners always answer an actual
+question—live content must not ask them merely whether they knew something.
 
-| Choice mode | Recall mode |
+| Choice mode | Flashcard shorthand |
 |---|---|
 | 2–6 options, at least one `[x]` | no task list in the body |
 | multiple `[x]` = multi-select, exact-set grading | `### Answer` role **required**, exactly once |
-| option labels must be pairwise distinct | learner self-grades against the answer |
+| option labels must be pairwise distinct | one non-empty `distractor:` plus the correct answer body |
+
+For Japanese, place `ja: distractor:` immediately after `distractor:` just like other
+learner-visible variant fields. A bare Answer without a distractor remains readable by
+the backwards-compatible parser for old fixtures, but is not valid live-course
+authoring practice and the corpus regression requires zero such recall prompts.
 
 ### `type: drill` — a "do this on your SXC-1 now" mission
 
@@ -320,7 +328,7 @@ and adding the one-line fix a content author actually needs. `--list-codes` prin
 | `E-CHAPTER-UNKNOWN` | file | `chapter:` isn't exactly one of the SIX course-map titles (`Front matter` plus five `Part: X` titles) | copy the title from `content/exercise-inventory.md`'s course map |
 | `E-DECK-TIER-UNKNOWN` | file | `tier:` isn't `intro`, `core` or `stretch` | fix the value |
 | `E-ROLE-UNKNOWN` | file | a `###` heading isn't a role this exercise type allows | fix the role name, or move the content into the body |
-| `E-ROLE-MISSING` | file | a required role is absent (recall-mode quiz needs `### Answer`) | add it |
+| `E-ROLE-MISSING` | file | a required role is absent (flashcard shorthand needs `### Answer`) | add it |
 | `E-ROLE-REPEATED` | file | a role that may appear at most once (or, for `### Hint`, more than three times) appeared too often | merge into one block, or delete the extra |
 | `E-CHOICE-COUNT` | file | a choice list has fewer than 2 or more than 6 options | add or remove options |
 | `E-CHOICE-NO-CORRECT` | file | no option is marked `[x]` | mark at least one correct option |
@@ -436,11 +444,12 @@ validator accepts as-is — this document's own verification runs each one throu
 `exercise-check`. They are drawn from real pages of `translations/guide-book.md`
 (pages 15, 17 and 55).
 
-### 11.1 A choice-mode quiz, plus a recall-mode quiz in the same deck
+### 11.1 An explicit choice quiz plus flashcard shorthand in the same deck
 
-Two exercises in one deck, from Guide Book p. 15 ("First, select BANK 1"). The first is
-choice mode (a task list); the second is recall mode (`### Answer`, no task list) — the
-two modes can coexist in the same deck file, just never in the same exercise.
+Two exercises in one deck, from Guide Book p. 15 ("First, select BANK 1"). The first
+authors its full choice list; the second uses `### Answer` plus one plausible
+`distractor:` to produce a compact binary flashcard. The forms can coexist in one deck
+file, just never in the same exercise.
 
 ```exercise
 # Choosing a bank
@@ -479,10 +488,12 @@ id: q-2-04
 cite: guide-book 15 "the state the unit was in when the power was last turned off"
 tags: banks, core
 
-Describe what determines which `A`-`D` button is lit, and which color each pad
-lights up in, immediately after power-on.
+Which statement correctly describes the lit `A`-`D` button and pad colors immediately
+after power-on?
 
 ### Answer
+
+distractor: The unit always starts on `A`, and every pad returns to its factory color.
 
 Whichever state the unit was in when the power was last turned off: the same
 `A`-`D` button stays lit and each pad keeps the color it had.

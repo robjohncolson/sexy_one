@@ -1,9 +1,9 @@
-# Reading order for the M3 full course: 52 decks, 435 live ids.
-# Order follows briefs/M3-plan.md §2.4, chapter by chapter in course order.
+# Reading order for the operation-first course: 50 decks, 352 live ids.
+# Manual-navigation/reference lookups are intentionally retired: the digital
+# reader links source material directly, while the course tests SXC-1 use.
+# Order otherwise follows briefs/M3-plan.md §2.4, chapter by chapter.
 # Chapter 0 — Front matter
 000-ch0-01.ex.md
-002-ch0-02.ex.md
-004-ch0-03.ex.md
 006-ch0-04.ex.md
 008-ch0-05.ex.md
 010-ch0-06.ex.md

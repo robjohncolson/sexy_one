@@ -469,7 +469,7 @@ Options:
                        alert AND zero decks in #sxc1-exercise-stats with
                        the degraded #/x notice -- never a smaller-but-
                        "healthy" course; the control must show no banner
-                       and the whole 52-deck course. Nothing is injected:
+                       and the whole 50-deck course. Nothing is injected:
                        the served bytes are the input.
   --check-content-stalled
                        M6 gate round 1 (finding M6-R1-5) stalled-fetch
@@ -526,7 +526,7 @@ Options:
                        VISIBLE #sxc1-content-error alert and the named
                        #sxc1-manual-degraded body with #btn-content-retry
                        on a real manual route, WHILE the exercise course
-                       still reports its whole 52 decks; the control must
+                       still reports its whole 50 decks; the control must
                        show no banner, a readable manual page and the
                        whole course. 14/14. Nothing is injected: the
                        SERVED BYTES are the input.
@@ -1058,7 +1058,7 @@ window.__SXC1_BOOTED = true;
   // -- the SR-labels assertion pins the EXACT per-language string).
   var EXPORT_ARIA_NAME = sel('uiLangAria') ? 'Exported progress data' : trFx('Exported progress data', 'エクスポートされた進捗データ');
   var EXPORT_LABEL_ATTR = sel('a11ySrLabels') ? '' : (' aria-label="' + EXPORT_ARIA_NAME + '"');
-  var SUMMARY_HTML = '<section id="ex-summary" tabindex="-1"><p>You have completed this exercise.</p></section>';
+  var SUMMARY_HTML = '<section id="ex-summary" tabindex="-1"><p>You have completed this exercise.</p><div class="wizard-actions"><a id="btn-ex-next-card" class="wizard-choice wizard-yes" href="#/x/demo-deck/demo-quiz">Yes — next card</a><button id="btn-ex-restart-summary" class="wizard-choice wizard-no">No — restart this card</button></div></section>';
 
   // -----------------------------------------------------------------------
   // M3 harness wave: a small, self-contained, DELIBERATELY INDEPENDENT
@@ -2649,7 +2649,7 @@ const COLD_BASELINE_ASSERTION_NAME =
 // M3 harness wave, urgent item: the RACE FIX for #sxc1-prompt-baseline.
 // This used to sample the element ONCE, immediately after the cold
 // target reported window.__SXC1_BOOTED === true. Measured (M3 designer,
-// against the full 52-deck/435-exercise artifact, which boots slower
+// against the full 50-deck/352-exercise artifact, which boots slower
 // than M2's): 1 failure in 7 runs on the slower artifact, 0 in 5 on a
 // faster one, then five clean re-runs of that SAME slow artifact right
 // after -- classic timing-window inference (house verification standard
@@ -2694,15 +2694,15 @@ const BASELINE_POLL_INTERVAL_MS = 40;
 // ---------------------------------------------------------------------------
 
 const KB_QUIZ_ASSERTION_NAME =
-  'keyboard-only quiz completion: Tab/Enter alone (CDP dispatchKeyEvent, no mouse) restarts, selects, submits and advances to #ex-summary';
+  'keyboard-only quiz completion: Tab/Space/Enter alone (CDP dispatchKeyEvent, no mouse) selects, submits and advances to the next card';
 const KB_DRILL_ASSERTION_NAME =
-  'keyboard-only drill completion: Tab/Enter alone (CDP dispatchKeyEvent, no mouse) restarts and confirms every step to #ex-summary';
+  'keyboard-only drill completion: Tab/Enter alone (CDP dispatchKeyEvent, no mouse) confirms every step and continues';
 const KB_LOOKUP_ASSERTION_NAME =
-  'keyboard-only lookup completion: Tab + typed digits + Enter alone (CDP dispatchKeyEvent, no mouse) restarts, submits and advances to #ex-summary';
+  'keyboard-only lookup completion: Tab + typed digits + Enter alone (CDP dispatchKeyEvent, no mouse) submits and advances to #ex-summary';
 const FOCUS_QUIZ_ASSERTION_NAME =
-  'focus on advance (quiz): after the final Next, document.activeElement is #ex-summary -- never dropped to <body>';
+  'focus on advance (quiz): after the final grade, the next card heading receives focus -- never <body>';
 const FOCUS_DRILL_ASSERTION_NAME =
-  'focus on advance (drill): after each confirm, document.activeElement is the NEXT .ex-step (then #ex-summary) -- never dropped to <body>';
+  'focus on advance (drill): each confirm focuses the next step, then the next card heading -- never <body>';
 const SR_LABELS_ASSERTION_NAME =
   'SR labels: #sxc1-export-blob carries an aria-label accessible name; a verify-hooked drill\'s .ex-verify is aria-live=polite';
 
@@ -2765,7 +2765,7 @@ const JA_NAME_SUFFIX = ' [ja]';
 const WRONG_QUIZ_FEEDBACK_ASSERTION_NAME =
   'wrong quiz answer: #ex-feedback starts with "Not quite" and carries class "incorrect"';
 const CORRECT_QUIZ_FEEDBACK_ASSERTION_NAME =
-  'correct quiz answer: #ex-feedback starts with "Correct", class "correct", #ex-note visible, #btn-ex-next present';
+  'correct quiz answer: feedback and rationale appear, then exactly Good/Easy replace Check/Unsure (legacy fixture: Next)';
 const LOOKUP_WRONG_ASSERTION_NAME =
   'lookup: wrong page submits to "Not quite"';
 const LOOKUP_CORRECT_ASSERTION_NAME =
@@ -2789,11 +2789,11 @@ const UILANG_ROUNDTRIP_ASSERTION_NAME =
   'UI language toggle roundtrip: switching back restores EN (uiLang "en" after another reboot, #btn-ui-lang shows the switch-to-ja label again)';
 
 // ---------------------------------------------------------------------------
-// M6 W4: THE JA COURSE ITSELF -- the five assertions that make "the site
+// M6 W4 + M8: THE JA COURSE ITSELF -- the six assertions that make "the site
 // is available in Japanese" a checked claim rather than a shipped file.
 //
 // Everything above pins the UI STRINGS (I18n.hs) under ja; these pin the
-// COURSE: the Japanese the 52 decks were translated into in wave 3,
+// COURSE: the Japanese the 50 live decks are translated into,
 // fetched from the bundle the site actually ships, rendered by the real
 // wasm, all the way through completing a quiz in Japanese.
 //
@@ -2816,7 +2816,7 @@ const UILANG_ROUNDTRIP_ASSERTION_NAME =
 // perturb what those assertions observe.
 // ---------------------------------------------------------------------------
 const JA_COURSE_PINS = {
-  totals: { decks: 52, exercises: 435 },
+  totals: { decks: 50, exercises: 352 },
   deck: {
     slug: 'pad-04',
     route: '#/x/pad-04',
@@ -2911,7 +2911,7 @@ const JA_MANUAL_TOC_ASSERTION_NAME =
   'ja manual: [JAM4] the manual TOC renders the Japanese outline (a pinned JA section link) with no .manual-fallback-note anywhere';
 
 const JA_COURSE_BUNDLE_ASSERTION_NAME =
-  'ja course: [JAC1] the SHIPPED ja bundle carries the whole course -- #sxc1-exercise-stats reports 52 decks / 435 exercises and the pinned deck\'s title is its JAPANESE title (an EN-fallback ja bundle fails here)';
+  'ja course: [JAC1] the SHIPPED ja bundle carries the whole course -- #sxc1-exercise-stats reports 50 decks / 352 exercises and the pinned deck\'s title is its JAPANESE title (an EN-fallback ja bundle fails here)';
 const JA_COURSE_INDEX_ASSERTION_NAME =
   'ja course: [JAC2] the deck index card, the deck page title and the deck summary: all render the corpus Japanese for the pinned deck';
 const JA_COURSE_QUIZ_RENDER_ASSERTION_NAME =
@@ -2920,6 +2920,10 @@ const JA_COURSE_QUIZ_COMPLETE_ASSERTION_NAME =
   'ja course: [JAC4] completing that quiz in Japanese -- clicking the JA correct option grades Correct (JA feedback) and #ex-note renders the JA rationale';
 const JA_COURSE_DRILL_ASSERTION_NAME =
   'ja course: [JAC5] a real corpus drill step shows its Japanese check: sentence in #ex-step-1-check';
+const JA_COURSE_MASTERY_ASSERTION_NAME =
+  'ja course: [JAC6] the mastery journey localizes its JS-owned priorities, evidence tiers, and fetched deck titles';
+const JA_COURSE_WEEKLY_ASSERTION_NAME =
+  'ja course: [JAC7] the Weekly Pulse localizes its JS-owned rhythm, outlook, insight headings, and next-focus action';
 
 // Trusted keyboard input for a session: returns pressKey(key) driving the
 // full keyDown/keyUp pair through CDP's Input domain. 'Tab'/'Enter' are
@@ -2994,13 +2998,20 @@ async function assertColdFirstTryElapsed(coldH, fixture, waitMs, lang = 'en') {
       if (fb && fb.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0) break;
       await new Promise((r) => setTimeout(r, 20));
     }
+    const feedback = fb ? fb.textContent : null;
+    const grade = document.querySelector('#btn-ex-grade-easy');
+    if (grade) grade.click();
     let log = null;
-    try {
-      const el = document.querySelector('#sxc1-event-log');
-      log = JSON.parse(el ? el.textContent : 'null');
-    } catch { /* reported as null below */ }
+    while (Date.now() - start < 7000) {
+      try {
+        const el = document.querySelector('#sxc1-event-log');
+        log = JSON.parse(el ? el.textContent : 'null');
+      } catch { log = null; }
+      if (Array.isArray(log) && log.length > 0) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
     return {
-      feedback: fb ? fb.textContent : null,
+      feedback,
       firstEvent: Array.isArray(log) && log.length > 0 ? log[0] : null,
       logLength: Array.isArray(log) ? log.length : null,
     };
@@ -3043,6 +3054,7 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
   // (and the en pass stays byte-identical to before W2).
   const T = UI_TEXT[lang] || UI_TEXT.en;
   const SUF = lang === 'en' ? '' : JA_NAME_SUFFIX;
+  const hasLookup = Boolean(fixture.lookup && fixture.lookup.deck && fixture.lookup.id);
   const results = [];
   const report = (name, ok, observed) => {
     const n = name + SUF;
@@ -3108,6 +3120,11 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
   const warmFirstWaitMs = 900;
   await sleep(warmFirstWaitMs);
   await h.clickAssert(`#${fixture.quiz.wrongOpt}`, `click the wrong quiz option (${fixture.quiz.wrongOpt})`);
+  await waitForTrue(
+    h.evaluate,
+    "document.querySelector('#btn-ex-submit') !== null && !document.querySelector('#btn-ex-submit').disabled",
+    3000,
+  );
   await h.clickAssert('#btn-ex-submit', 'click #btn-ex-submit (wrong answer)');
   // Submitting reads both clocks via an async IO round trip (real Main.hs:
   // Miso's 'io' runs "after the VDOM has been patched", and Miso.Date's
@@ -3129,6 +3146,31 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     Boolean(wrongFeedback && wrongFeedback.text.startsWith(T.notQuitePrefix) && wrongFeedback.cls.split(/\s+/).includes('incorrect')),
     wrongFeedback,
   );
+  // The production flow separates evaluation from scheduling. An
+  // incorrect check offers Again/Hard; choose Again so the first timed
+  // event is persisted. All ratings now continue forward, so return to
+  // the completed card and explicitly restart it before this shared
+  // regression performs its historical wrong-then-right sequence. The
+  // old self-test fixture has no grade phase and stays on the prompt.
+  const ratedWrong = await h.evaluate("document.querySelector('#btn-ex-grade-again') !== null");
+  if (ratedWrong) {
+    const wrongRoute = `#/x/${fixture.quiz.deck}/${fixture.quiz.id}`;
+    await h.evaluate("document.querySelector('#btn-ex-grade-again').click(); true");
+    await waitForTrue(h.evaluate, `window.location.hash !== ${JSON.stringify(wrongRoute)}`, 5000);
+    await h.goto('#/', '#sxc1-home');
+    await h.goto(wrongRoute, '#sxc1-exercise');
+    await waitForTrue(
+      h.evaluate,
+      `window.location.hash === ${JSON.stringify(wrongRoute)} && document.querySelector('#ex-summary') !== null`,
+      5000,
+    );
+    await h.evaluate("(() => { const b = document.querySelector('#btn-ex-restart'); if (!b) return false; b.click(); return true; })()");
+    await waitForTrue(
+      h.evaluate,
+      `document.querySelector(${JSON.stringify(`#${fixture.quiz.correctOpt}`)}) !== null && document.querySelector('#ex-feedback') === null`,
+      4000,
+    );
+  }
   // M2 gate fix (H1/M5): this wrong-answer submit is the exercise's
   // FIRST-EVER graded event this session (Begin just fired via the
   // h.goto above), and gradeStep computes/re-baselines elapsedMs the
@@ -3160,6 +3202,13 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
   // how the single/multi selection-arity defect (SXC1.Exercise.Engine's
   // 'Toggle') shipped past this harness -- see FIX 1.
   await h.clickAssert(`#${fixture.quiz.correctOpt}`, `click the correct quiz option (${fixture.quiz.correctOpt})`);
+  await h.evaluate(`(async () => {
+    const start = Date.now();
+    while (Date.now() - start < 3000 && document.querySelector('#btn-ex-submit')?.disabled) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return !document.querySelector('#btn-ex-submit')?.disabled;
+  })()`);
   await h.clickAssert('#btn-ex-submit', 'click #btn-ex-submit (correct answer)');
   // #ex-feedback already EXISTS (from the wrong attempt above), so this
   // polls for its TEXT to actually flip to "Correct" -- existence alone
@@ -3174,16 +3223,24 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     }
     const note = document.querySelector('#ex-note');
     const next = document.querySelector('#btn-ex-next');
+    const grades = Array.from(document.querySelectorAll('#ex-grade-actions > button'));
     return fb ? {
       text: fb.textContent, cls: fb.className,
       noteVisible: Boolean(note) && note.offsetParent !== null,
       nextPresent: Boolean(next),
+      gradeCount: grades.length,
+      gradeIds: grades.map((b) => b.id),
+      oldActionsPresent: Boolean(document.querySelector('#ex-choice-actions')),
     } : null;
   })()`);
   report(
     CORRECT_QUIZ_FEEDBACK_ASSERTION_NAME,
     Boolean(rightFeedback && rightFeedback.text.startsWith(T.correctPrefix) && rightFeedback.cls.split(/\s+/).includes('correct')
-      && rightFeedback.noteVisible && rightFeedback.nextPresent),
+      && rightFeedback.noteVisible
+      && (rightFeedback.nextPresent || (rightFeedback.gradeCount === 2
+        && rightFeedback.gradeIds.includes('btn-ex-grade-good')
+        && rightFeedback.gradeIds.includes('btn-ex-grade-easy')
+        && rightFeedback.oldActionsPresent === false))),
     rightFeedback,
   );
 
@@ -3218,6 +3275,34 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
   })()`);
   report('going back preserves the quiz prompt with the previous selection still applied', backOk === true, backOk);
 
+  // Production: Easy is the forward-moving grade and must skip the old
+  // repeat decision entirely. Legacy fixtures still use Next + summary,
+  // preserving coverage for backward-compatible exercise rendering.
+  const advancedQuiz = await h.evaluate(`(async () => {
+    const advance = document.querySelector('#btn-ex-grade-easy') || document.querySelector('#btn-ex-next');
+    if (!advance) return { ok: false, reason: 'advance control absent' };
+    const rated = advance.id === 'btn-ex-grade-easy';
+    const origin = window.location.hash;
+    advance.click();
+    const start = Date.now();
+    while (Date.now() - start < 5000) {
+      if (rated && window.location.hash !== origin
+        && !document.querySelector('#ex-summary')
+        && document.querySelector('#sxc1-exercise #ex-title')) {
+        return {
+          ok: true, rated, origin, destination: window.location.hash,
+          summaryPresent: Boolean(document.querySelector('#ex-summary')),
+          repeatPresent: Boolean(document.querySelector('#ex-summary #btn-ex-restart')),
+        };
+      }
+      if (!rated && document.querySelector('#ex-summary')) {
+        return { ok: true, rated, origin, destination: window.location.hash, summaryPresent: true };
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return { ok: false, rated, origin, destination: window.location.hash };
+  })()`);
+
   // 4b (M2 gate fix H7). RESTART IS A FRESH SCREEN. The quiz above is
   // still sitting in its "answered correctly, previous selection
   // restored" state from the back-navigation just above -- exactly the
@@ -3225,7 +3310,33 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
   // looking at when they click Restart. Requires the FRESH prompt to
   // carry none of the previous attempt's grading: no #ex-feedback text,
   // no #ex-note, no #btn-ex-next, and no option left aria-pressed=true.
-  await h.clickAssert('#btn-ex-restart', 'click #btn-ex-restart after a correct quiz answer');
+  if (advancedQuiz?.rated) {
+    report(
+      'forward rating automatically opens a different next card',
+      advancedQuiz.ok === true
+        && /^#\/x\/[^/]+\/[^/]+$/.test(advancedQuiz.destination || '')
+        && advancedQuiz.destination !== advancedQuiz.origin,
+      advancedQuiz,
+    );
+    report(
+      'forward rating exposes no redundant completion or repeat decision',
+      advancedQuiz.summaryPresent === false && advancedQuiz.repeatPresent === false,
+      advancedQuiz,
+    );
+    await h.goto('#/', '#sxc1-home');
+    await h.goto(`#/x/${fixture.quiz.deck}/${fixture.quiz.id}`, '#ex-summary');
+    await h.evaluate("(() => { const b = document.querySelector('#btn-ex-restart'); if (!b) return false; b.click(); return true; })()");
+    await h.evaluate(`(async () => {
+      const start = Date.now();
+      while (Date.now() - start < 3000 && !document.querySelector(${JSON.stringify(`#${fixture.quiz.correctOpt}`)})) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      return true;
+    })()`);
+  } else {
+    if (!advancedQuiz?.ok) report('quiz Next advances to the summary', false, { advancedQuiz });
+    await h.clickAssert('#btn-ex-restart', 'click #btn-ex-restart from the completed quiz summary');
+  }
   const afterRestart = await h.evaluate(`(async () => {
     const start = Date.now();
     // Restart round-trips through the same async clock IO as a submit
@@ -3310,30 +3421,66 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     })()`);
     await h.clickAssert(`#btn-ex-confirm-${stepN}`, `click #btn-ex-confirm-${stepN}`);
   }
-  const drillCiteHrefs = await h.evaluate(`(async () => {
+  const drillOrigin = `#/x/${fixture.drill.deck}/${fixture.drill.id}`;
+  const drillCompletionMode = await h.evaluate(`(async () => {
     const start = Date.now();
-    let anchors = [];
-    while (Date.now() - start < 3000) {
-      anchors = Array.prototype.map.call(document.querySelectorAll('#ex-steps a.cite'), (a) => a.getAttribute('href'));
-      if (anchors.length > 0) break;
+    while (Date.now() - start < 5000) {
+      if (window.location.hash !== ${JSON.stringify(drillOrigin)}) return 'automatic';
+      if (document.querySelector('#ex-summary')) return 'summary';
       await new Promise((r) => setTimeout(r, 20));
     }
-    return anchors;
+    return 'missing';
+  })()`);
+  if (drillCompletionMode === 'automatic') {
+    await h.goto('#/', '#sxc1-home');
+    await h.goto(drillOrigin, '#ex-summary');
+  }
+  const completedDrill = await h.evaluate(`(async () => {
+    const start = Date.now();
+    let anchors = [];
+    let next = null;
+    while (Date.now() - start < 8000) {
+      anchors = Array.prototype.map.call(document.querySelectorAll('#ex-steps a.cite'), (a) => a.getAttribute('href'));
+      next = document.querySelector('#btn-ex-next-card');
+      if (anchors.length > 0 && next) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const alternate = document.querySelector('#ex-summary .wizard-no');
+    const choices = document.querySelectorAll('#ex-summary .wizard-choice');
+    return {
+      anchors,
+      nextHref: next ? next.getAttribute('href') : null,
+      alternateTag: alternate ? alternate.tagName : null,
+      alternateText: alternate ? alternate.textContent.trim() : null,
+      choiceCount: choices.length,
+      nextGreen: Boolean(next && next.classList.contains('wizard-yes')),
+      alternateRed: Boolean(alternate && alternate.classList.contains('wizard-no')),
+    };
   })()`);
   // M2 re-gate LOW fix: beyond well-formedness, at least one rendered
   // href must EQUAL the fixture's DECLARED citation target -- a drill
   // rendering some other (valid-looking) manual URL must fail.
   const declaredDrillHref = `#/m/${fixture.drill.citeSlug}/p/${fixture.drill.citePage}`;
   report(
-    `a completed drill renders a.cite hrefs that are well-formed AND include the declared ${declaredDrillHref}`,
-    Array.isArray(drillCiteHrefs) && drillCiteHrefs.length > 0
-      && drillCiteHrefs.every((href) => /^#\/m\/[a-z0-9][a-z0-9-]*\/p\/[0-9]+$/.test(href))
-      && drillCiteHrefs.includes(declaredDrillHref),
-    { drillCiteHrefs, declaredDrillHref },
+    `a completed drill keeps its citation and offers green-next / red-restart wizard choices`,
+    (drillCompletionMode === 'automatic' || drillCompletionMode === 'summary')
+      && Boolean(completedDrill) && Array.isArray(completedDrill.anchors) && completedDrill.anchors.length > 0
+      && completedDrill.anchors.every((href) => /^#\/m\/[a-z0-9][a-z0-9-]*\/p\/[0-9]+$/.test(href))
+      && completedDrill.anchors.includes(declaredDrillHref)
+      && /^#\/x\/[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/.test(completedDrill.nextHref || '')
+      && completedDrill.alternateTag === 'BUTTON'
+      && typeof completedDrill.alternateText === 'string'
+      && completedDrill.alternateText.length > 0
+      && completedDrill.choiceCount === 2
+      && completedDrill.nextGreen === true
+      && completedDrill.alternateRed === true,
+    { drillCompletionMode, completedDrill, declaredDrillHref },
   );
 
-  // 6. LOOKUP -- CDP Input.insertText, never a synthetic input event (P-D).
-  await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
+  // 6. LOOKUP -- retained for parser/UI fixtures, but optional for a
+  // shipped operation-first corpus that intentionally has no lookup cards.
+  if (hasLookup) {
+    await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
 
   // 6a (M2 gate fix H8). UNGRADED: zero citations before any submission
   // -- a lookup must not spoil its own answer.
@@ -3407,6 +3554,7 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
     Boolean(lastEvent && lastEvent.outcome === 'correct' && lastEvent.exercise === fixture.lookup.id),
     { length: Array.isArray(eventLog) ? eventLog.length : eventLog, lastEvent },
   );
+  }
 
   // 7b (M5 a11y pass). KEYBOARD-ONLY COMPLETION, FOCUS-ON-ADVANCE, SR
   // LABELS -- see the M5 assertion-name block above for the design
@@ -3465,84 +3613,114 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
       `(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return false; e.click(); return true; })()`,
     );
 
-    // -- FOCUS ON ADVANCE, quiz (click-driven; the quiz is blank after
-    // 4b's restart, so restart -> correct -> submit -> Next is a full
-    // fresh pass whose final advance removes the focused Next button).
+    // -- FOCUS ON ADVANCE, quiz (click-driven). A home round-trip opens a
+    // fresh card without depending on the old third "Restart" action on a
+    // completed wizard screen.
+    await h.goto('#/', '#sxc1-home');
     await h.goto(`#/x/${fixture.quiz.deck}/${fixture.quiz.id}`, '.kind-quiz');
-    await fClick('#btn-ex-restart');
-    await waitFor("document.querySelector('#ex-feedback') === null");
+    let fqFresh = await waitFor("document.querySelector('#ex-feedback') === null && document.querySelector('#btn-ex-submit') !== null", 500);
+    if (!fqFresh) {
+      await fClick('#btn-ex-restart');
+      fqFresh = await waitFor("document.querySelector('#ex-feedback') === null && document.querySelector('#btn-ex-submit') !== null");
+    }
     await fClick(`#${fixture.quiz.correctOpt}`);
+    await waitFor("document.querySelector('#btn-ex-submit') !== null && !document.querySelector('#btn-ex-submit').disabled");
     await fClick('#btn-ex-submit');
     await waitFor(`(() => { const e = document.querySelector('#ex-feedback'); return e && e.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0; })()`);
-    await fClick('#btn-ex-next');
-    const fqSummary = await waitFor("document.querySelector('#ex-summary') !== null");
-    const fqFocus = await waitFocusOn('ex-summary');
+    const fqAdvance = await h.evaluate("document.querySelector('#btn-ex-grade-easy') ? 'btn-ex-grade-easy' : 'btn-ex-next'");
+    const fqOrigin = await h.evaluate('window.location.hash');
+    await fClick(`#${fqAdvance}`);
+    const fqRated = fqAdvance === 'btn-ex-grade-easy';
+    const fqComplete = fqRated
+      ? await waitFor(`window.location.hash !== ${JSON.stringify(fqOrigin)} && document.querySelector('#ex-summary') === null && document.querySelector('#ex-title') !== null`)
+      : await waitFor("document.querySelector('#ex-summary') !== null");
+    const fqFocus = await waitFocusOn(fqRated ? 'ex-title' : 'ex-summary');
     report(
       FOCUS_QUIZ_ASSERTION_NAME,
-      fqSummary === true && Boolean(fqFocus) && fqFocus.ok === true,
-      { fqSummary, fqFocus },
+      fqFresh === true && fqComplete === true && Boolean(fqFocus) && fqFocus.ok === true,
+      { fqFresh, fqRated, fqOrigin, fqDestination: await h.evaluate('window.location.hash'), fqComplete, fqFocus },
     );
 
-    // -- FOCUS ON ADVANCE, drill (click-driven): restart, then confirm
+    // -- FOCUS ON ADVANCE, drill (click-driven): open fresh, then confirm
     // each step and require focus to land on the NEXT step's li -- and,
     // for the final confirm, on #ex-summary.
+    await h.goto('#/', '#sxc1-home');
     await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
-    await fClick('#btn-ex-restart');
-    await waitFor("document.querySelector('#btn-ex-confirm-1') !== null");
+    let fdFresh = await waitFor("document.querySelector('#btn-ex-confirm-1') !== null", 500);
+    if (!fdFresh) {
+      await fClick('#btn-ex-restart');
+      fdFresh = await waitFor("document.querySelector('#btn-ex-confirm-1') !== null");
+    }
+    const fdAutomatic = await h.evaluate("document.querySelector('#btn-ex-skip') !== null");
+    const fdOrigin = await h.evaluate('window.location.hash');
     const fdSeq = [];
     for (let s = 1; s <= fixture.drill.steps; s += 1) {
       const present = await waitFor(`document.querySelector('#btn-ex-confirm-${s}') !== null`);
       if (!present) { fdSeq.push({ step: s, present: false }); break; }
       await fClick(`#btn-ex-confirm-${s}`);
-      const want = s === fixture.drill.steps ? 'ex-summary' : `ex-step-${s + 1}`;
+      if (s === fixture.drill.steps && fdAutomatic) {
+        await waitFor(`window.location.hash !== ${JSON.stringify(fdOrigin)} && document.querySelector('#ex-summary') === null`);
+      }
+      const want = s === fixture.drill.steps
+        ? (fdAutomatic ? 'ex-title' : 'ex-summary')
+        : `ex-step-${s + 1}`;
       fdSeq.push({ step: s, want, focus: await waitFocusOn(want) });
     }
     report(
       FOCUS_DRILL_ASSERTION_NAME,
-      fdSeq.length === fixture.drill.steps && fdSeq.every((e) => e.focus && e.focus.ok === true),
-      fdSeq,
+      fdFresh === true && fdSeq.length === fixture.drill.steps && fdSeq.every((e) => e.focus && e.focus.ok === true),
+      { fdFresh, fdSeq },
     );
 
-    // -- KEYBOARD-ONLY QUIZ (dispatchKeyEvent only from here on: the
-    // focus flows above left the quiz/drill completed, so each keyboard
-    // flow starts by Tab+Enter on the always-rendered Restart button).
+    // -- KEYBOARD-ONLY QUIZ. The home round-trip is test setup; every
+    // interaction inside the fresh card is a trusted keyboard event.
+    await h.goto('#/', '#sxc1-home');
     await h.goto(`#/x/${fixture.quiz.deck}/${fixture.quiz.id}`, '.kind-quiz');
     await kbBlur();
-    const kbq = { restart: await kbTabTo('btn-ex-restart') };
-    if (kbq.restart.found) await h.pressKey('Enter');
-    // Sync only (never a pass criterion): whether the restart left a
-    // genuinely blank prompt is the dedicated Restart assertion's own
-    // claim (H7) -- and legacy-all deliberately breaks exactly that, so
-    // gating THIS assertion on blankness would misattribute an H7
-    // failure to the keyboard flow. The keyboard proof below is the
-    // aria-pressed flip + the summary, both keyboard-caused.
-    await waitFor("document.querySelector('#btn-ex-submit') !== null");
-    await sleep(250); // let the app's own restart focus move settle before walking
+    const kbq = { fresh: await waitFor("document.querySelector('#btn-ex-submit') !== null && document.querySelector('#ex-summary') === null", 500) };
+    if (!kbq.fresh) {
+      await fClick('#btn-ex-restart');
+      kbq.fresh = await waitFor("document.querySelector('#btn-ex-submit') !== null && document.querySelector('#ex-summary') === null");
+    }
+    await sleep(250);
     kbq.option = await kbTabTo(fixture.quiz.correctOpt);
-    if (kbq.option.found) await h.pressKey('Enter');
+    // Native radio controls activate with Space. Enter happened to work
+    // for the old button-shaped options, but is not the correct keyboard
+    // interaction for the lighter semantic controls used by M11.
+    if (kbq.option.found) await h.pressKey(' ');
     kbq.pressed = await waitFor(`(() => { const o = document.querySelector('#${fixture.quiz.correctOpt}'); return o && o.getAttribute('aria-pressed') === 'true'; })()`);
     kbq.submit = await kbTabTo('btn-ex-submit');
     if (kbq.submit.found) await h.pressKey('Enter');
     kbq.correct = await waitFor(`(() => { const e = document.querySelector('#ex-feedback'); return e && e.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0; })()`);
-    kbq.next = await kbTabTo('btn-ex-next');
+    kbq.advanceId = await h.evaluate("document.querySelector('#btn-ex-grade-easy') ? 'btn-ex-grade-easy' : 'btn-ex-next'");
+    kbq.origin = await h.evaluate('window.location.hash');
+    kbq.next = await kbTabTo(kbq.advanceId);
     if (kbq.next.found) await h.pressKey('Enter');
-    kbq.summary = await waitFor("document.querySelector('#ex-summary') !== null");
+    kbq.rated = kbq.advanceId === 'btn-ex-grade-easy';
+    kbq.completed = kbq.rated
+      ? await waitFor(`window.location.hash !== ${JSON.stringify(kbq.origin)} && document.querySelector('#ex-summary') === null && document.querySelector('#ex-title') !== null`)
+      : await waitFor("document.querySelector('#ex-summary') !== null");
     report(
       KB_QUIZ_ASSERTION_NAME,
-      Boolean(kbq.restart.found && kbq.option.found && kbq.pressed && kbq.submit.found
-        && kbq.correct && kbq.next.found && kbq.summary),
+      Boolean(kbq.fresh && kbq.option.found && kbq.pressed && kbq.submit.found
+        && kbq.correct && kbq.next.found && kbq.completed),
       kbq,
     );
 
     // -- KEYBOARD-ONLY DRILL.
+    await h.goto('#/', '#sxc1-home');
     await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
     await kbBlur();
-    const kbd = { restart: await kbTabTo('btn-ex-restart') };
-    if (kbd.restart.found) await h.pressKey('Enter');
-    kbd.fresh = await waitFor("document.querySelector('#btn-ex-confirm-1') !== null && document.querySelector('#ex-summary') === null");
+    const kbd = { fresh: await waitFor("document.querySelector('#btn-ex-confirm-1') !== null && document.querySelector('#ex-summary') === null", 500) };
+    if (!kbd.fresh) {
+      await fClick('#btn-ex-restart');
+      kbd.fresh = await waitFor("document.querySelector('#btn-ex-confirm-1') !== null && document.querySelector('#ex-summary') === null");
+    }
+    kbd.automatic = await h.evaluate("document.querySelector('#btn-ex-skip') !== null");
+    kbd.origin = await h.evaluate('window.location.hash');
     await sleep(250);
     kbd.steps = [];
-    let kbdOk = Boolean(kbd.restart.found && kbd.fresh);
+    let kbdOk = Boolean(kbd.fresh);
     for (let s = 1; kbdOk && s <= fixture.drill.steps; s += 1) {
       await waitFor(`document.querySelector('#btn-ex-confirm-${s}') !== null`);
       const t = await kbTabTo(`btn-ex-confirm-${s}`);
@@ -3550,35 +3728,42 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
       if (!t.found) { kbdOk = false; break; }
       await h.pressKey('Enter');
     }
-    kbd.summary = kbdOk && await waitFor("document.querySelector('#ex-summary') !== null && document.querySelector('.btn-ex-confirm') === null");
-    report(KB_DRILL_ASSERTION_NAME, Boolean(kbdOk && kbd.summary), kbd);
+    kbd.completed = kbdOk && (kbd.automatic
+      ? await waitFor(`window.location.hash !== ${JSON.stringify(kbd.origin)} && document.querySelector('#ex-summary') === null`)
+      : await waitFor("document.querySelector('#ex-summary') !== null && document.querySelector('.btn-ex-confirm') === null"));
+    report(KB_DRILL_ASSERTION_NAME, Boolean(kbdOk && kbd.completed), kbd);
 
-    // -- KEYBOARD-ONLY LOOKUP (typed digits travel as trusted key events
-    // with text payloads -- the same real-input rule as Input.insertText
-    // in typeText, one key at a time).
-    await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
-    await kbBlur();
-    const kbl = { restart: await kbTabTo('btn-ex-restart') };
-    if (kbl.restart.found) await h.pressKey('Enter');
-    kbl.blank = await waitFor("document.querySelector('#ex-feedback') === null && document.querySelector('#ex-find-input') !== null");
-    await sleep(250);
-    kbl.input = await kbTabTo('ex-find-input');
-    if (kbl.input.found) {
-      for (const ch of String(fixture.lookup.targetPage)) await h.pressKey(ch);
+    if (hasLookup) {
+      // -- KEYBOARD-ONLY LOOKUP (typed digits travel as trusted key events
+      // with text payloads -- the same real-input rule as Input.insertText
+      // in typeText, one key at a time).
+      await h.goto('#/', '#sxc1-home');
+      await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
+      await kbBlur();
+      const kbl = { blank: await waitFor("document.querySelector('#ex-feedback') === null && document.querySelector('#ex-find-input') !== null && document.querySelector('#ex-summary') === null", 500) };
+      if (!kbl.blank) {
+        await fClick('#btn-ex-restart');
+        kbl.blank = await waitFor("document.querySelector('#ex-feedback') === null && document.querySelector('#ex-find-input') !== null && document.querySelector('#ex-summary') === null");
+      }
+      await sleep(250);
+      kbl.input = await kbTabTo('ex-find-input');
+      if (kbl.input.found) {
+        for (const ch of String(fixture.lookup.targetPage)) await h.pressKey(ch);
+      }
+      kbl.typed = await waitFor(`(() => { const e = document.querySelector('#ex-find-input'); return e && e.value === ${JSON.stringify(String(fixture.lookup.targetPage))}; })()`);
+      kbl.submit = await kbTabTo('btn-ex-find-submit');
+      if (kbl.submit.found) await h.pressKey('Enter');
+      kbl.correct = await waitFor(`(() => { const e = document.querySelector('#ex-feedback'); return e && e.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0; })()`);
+      kbl.next = await kbTabTo('btn-ex-next');
+      if (kbl.next.found) await h.pressKey('Enter');
+      kbl.summary = await waitFor("document.querySelector('#ex-summary') !== null");
+      report(
+        KB_LOOKUP_ASSERTION_NAME,
+        Boolean(kbl.blank && kbl.input.found && kbl.typed && kbl.submit.found
+          && kbl.correct && kbl.next.found && kbl.summary),
+        kbl,
+      );
     }
-    kbl.typed = await waitFor(`(() => { const e = document.querySelector('#ex-find-input'); return e && e.value === ${JSON.stringify(String(fixture.lookup.targetPage))}; })()`);
-    kbl.submit = await kbTabTo('btn-ex-find-submit');
-    if (kbl.submit.found) await h.pressKey('Enter');
-    kbl.correct = await waitFor(`(() => { const e = document.querySelector('#ex-feedback'); return e && e.textContent.indexOf(${JSON.stringify(T.correctPrefix)}) === 0; })()`);
-    kbl.next = await kbTabTo('btn-ex-next');
-    if (kbl.next.found) await h.pressKey('Enter');
-    kbl.summary = await waitFor("document.querySelector('#ex-summary') !== null");
-    report(
-      KB_LOOKUP_ASSERTION_NAME,
-      Boolean(kbl.restart.found && kbl.blank && kbl.input.found && kbl.typed && kbl.submit.found
-        && kbl.correct && kbl.next.found && kbl.summary),
-      kbl,
-    );
 
     // -- SR LABELS (the device-panel half lives in the D-suite's D27,
     // whose scenario drill always carries verify hooks; here the check
@@ -3603,10 +3788,12 @@ async function runExerciseAssertions(h, fixture, expectedExerciseJson, coldLoadF
       { srExport, wantAria: T.exportAria, srVerify },
     );
 
-    // Restore the pre-existing route context: section 8 below has always
-    // measured the RUNNER's overflow (the lookup was the last runner on
-    // screen before this M5 section existed).
-    await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
+    // Restore a runner route for the overflow measurement below.
+    if (hasLookup) {
+      await h.goto(`#/x/${fixture.lookup.deck}/${fixture.lookup.id}`, '.kind-lookup');
+    } else {
+      await h.goto(`#/x/${fixture.drill.deck}/${fixture.drill.id}`, '.kind-drill');
+    }
   }
 
   // 8. 390x844: no horizontal overflow on the runner.
@@ -3849,7 +4036,18 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
       return true;
     })()`);
     const submittedJa = clickedJaOption
-      ? await h.evaluate("(() => { const e = document.querySelector('#btn-ex-submit'); if (!e) return false; e.click(); return true; })()")
+      ? await h.evaluate(`(async () => {
+          const start = Date.now();
+          while (Date.now() - start < 3000) {
+            const e = document.querySelector('#btn-ex-submit');
+            if (e && !e.disabled) {
+              e.click();
+              return true;
+            }
+            await new Promise((r) => setTimeout(r, 20));
+          }
+          return false;
+        })()`)
       : false;
     const gradedJa = submittedJa
       ? await h.evaluate(`(async () => {
@@ -3888,6 +4086,57 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
       JA_COURSE_DRILL_ASSERTION_NAME,
       typeof drillCheckJa === 'string' && drillCheckJa.indexOf(P.drill.step1CheckJa) !== -1,
       { drillCheckJa, want: P.drill.step1CheckJa },
+    );
+
+    // (f) The JS-owned mastery surface carries its own complete locale
+    // record because it hydrates outside wasm. Pin that exception end to
+    // end under the same real JA bundle, including one content title.
+    await h.goto('#/x/map', '#mastery-next');
+    const masteryJa = await h.evaluate(`(async () => {
+      const start = Date.now();
+      while (Date.now() - start < 4000 && !window.__sxc1MasteryJourney) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      const pinned = document.querySelector('#mastery-full-list a[data-deck=${JSON.stringify(P.deck.slug)}]');
+      return {
+        title: document.querySelector('#sxc1-mastery h1')?.textContent.trim() || null,
+        nextTitle: document.querySelector('#mastery-next h2')?.textContent.trim() || null,
+        nodes: document.querySelectorAll('#mastery-full-list a[data-deck]').length,
+        pinnedTitle: pinned?.textContent.trim() || null,
+        bandLabels: Array.from(document.querySelectorAll('#mastery-full-list .mastery-band')).map((el) => el.textContent.trim()),
+        state: window.__sxc1MasteryJourney || null,
+      };
+    })()`);
+    const jaBandLabels = new Set(['未学習', '学習中', '練習済み', '復習時期', '定着']);
+    report(
+      JA_COURSE_MASTERY_ASSERTION_NAME,
+      Boolean(masteryJa) && masteryJa.title === '習熟の道筋' && masteryJa.nextTitle === '次にやること'
+        && masteryJa.nodes === P.totals.decks && masteryJa.pinnedTitle === P.deck.titleJa
+        && masteryJa.bandLabels.length === P.totals.decks
+        && masteryJa.bandLabels.every((label) => jaBandLabels.has(label))
+        && masteryJa.state && masteryJa.state.renderer === 'dom' && masteryJa.state.nodeCount === P.totals.decks,
+      { masteryJa, wantPinnedTitle: P.deck.titleJa },
+    );
+
+    await h.goto('#/x/week', '#sxc1-weekly .weekly-hero');
+    const weeklyJa = await h.evaluate(`(() => ({
+      title: document.querySelector('#sxc1-weekly h1')?.textContent.trim() || null,
+      forecast: document.querySelector('.weekly-forecast-section h2')?.textContent.trim() || null,
+      strength: document.querySelector('.weekly-strengths h2')?.textContent.trim() || null,
+      friction: document.querySelector('.weekly-friction h2')?.textContent.trim() || null,
+      focus: document.querySelector('#btn-weekly-focus')?.textContent.trim() || null,
+      bars: document.querySelectorAll('.weekly-forecast > li').length,
+      state: window.__SXC1_WEEKLY || null,
+    }))()`);
+    report(
+      JA_COURSE_WEEKLY_ASSERTION_NAME,
+      Boolean(weeklyJa) && weeklyJa.title === '週間パルス'
+        && weeklyJa.forecast === '7日間の復習見通し'
+        && weeklyJa.strength === '伸びているスキル'
+        && weeklyJa.friction === 'もう一度取り組む価値あり'
+        && typeof weeklyJa.focus === 'string' && weeklyJa.focus.length > 4
+        && weeklyJa.bars === 7 && weeklyJa.state?.renderer === 'dom',
+      weeklyJa,
     );
   }
 
@@ -4215,7 +4464,7 @@ const PROGRESS_ASSERTION_NAMES = {
   // lexicographic Map-scan Continue implementation (which would pick
   // l-* on the same-day tie) fails this while the psLastPrompt pointer
   // passes: the assertion is red against the pre-fix code by design.
-  continueMatchesLast: "#sxc1-continue links the LAST-graded exercise (lookup graded first, quiz re-graded second -> continue must point at the quiz, not the lexicographically-first lookup)",
+  continueMatchesLast: "#sxc1-continue links the LAST-graded exercise (another exercise completed first, quiz re-graded second -> continue points at the quiz)",
   // c3, DELIBERATELY NOT part of runProgressAssertionsPre/Post or the
   // --self-test-negative sweep -- see --check-storage-refused's own
   // --help text and this task's final report. Kept here only so its
@@ -4283,8 +4532,15 @@ async function runProgressAssertionsPost(h, cfg) {
   // non-empty". -------------------------------------------------------
   await h.goto(`#/x/${cfg.quizDeck}/${cfg.quizId}`, `#${cfg.quizCorrectOpt}`);
   await h.clickAssert(`#${cfg.quizCorrectOpt}`, 'M3: click the correct quiz option (first try, clean)');
+  await waitForTrue(
+    h.evaluate,
+    "document.querySelector('#btn-ex-submit') !== null && !document.querySelector('#btn-ex-submit').disabled",
+    3000,
+  );
   await h.clickAssert('#btn-ex-submit', 'M3: submit the first-try correct answer');
   await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
+  await h.evaluate("(() => { const b = document.querySelector('#btn-ex-grade-easy'); if (b) b.click(); return true; })()");
+  await waitForProgressPredicate(h.evaluate, 'p.records === 1', 3000);
   await h.reload(`#${cfg.quizCorrectOpt}`);
 
   const payloadA = await readSxc1Progress(h.evaluate);
@@ -4321,6 +4577,10 @@ async function runProgressAssertionsPost(h, cfg) {
     emptiedForImport,
   );
 
+  // Progress tools are intentionally collapsed on the real home page.
+  // Open their native disclosure before sending trusted keyboard text;
+  // the self-test fixture has no enclosing details and needs no change.
+  await h.evaluate("(() => { let e = document.querySelector('#sxc1-import-input'); while (e) { const d = e.closest('details'); if (!d) break; d.open = true; e = d.parentElement; } return true; })()");
   await h.typeText('#sxc1-import-input', exportedBlob);
   // The placeholder text ("Paste text above to see how many records it
   // contains.") is itself non-empty, so waiting for "non-empty" would be
@@ -4374,8 +4634,14 @@ async function runProgressAssertionsPost(h, cfg) {
   // banner (or its absence) be read back.
   await h.goto(`#/x/${cfg.quizDeck}/${cfg.quizId}`, `#${cfg.quizCorrectOpt}`);
   await h.clickAssert(`#${cfg.quizCorrectOpt}`, 'M3: click the correct quiz option (while progress is corrupt)');
+  await waitForTrue(
+    h.evaluate,
+    "document.querySelector('#btn-ex-submit') !== null && !document.querySelector('#btn-ex-submit').disabled",
+    3000,
+  );
   await h.clickAssert('#btn-ex-submit', 'M3: submit an answer while progress is corrupt');
   await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
+  await h.evaluate("(() => { const b = document.querySelector('#btn-ex-grade-easy'); if (b) b.click(); return true; })()");
   await h.reload(`#${cfg.quizCorrectOpt}`);
   await h.goto('#/', '#sxc1-progress-tools');
   const rawAfterAnswer = await readLocalStorageRaw(h.evaluate, PROGRESS_KEY);
@@ -4545,7 +4811,14 @@ async function runProgressAssertionsPost(h, cfg) {
   // TRANSITION (due>=1 -> due=0) rather than a vacuous initial zero.
   await h.goto(`#/x/${cfg.quizDeck}/${cfg.quizId}`, `#${cfg.quizWrongOpt}`);
   await h.clickAssert(`#${cfg.quizWrongOpt}`, 'M3: click the wrong quiz option (E: manufacture a due-today record)');
+  await waitForTrue(
+    h.evaluate,
+    "document.querySelector('#btn-ex-submit') !== null && !document.querySelector('#btn-ex-submit').disabled",
+    3000,
+  );
   await h.clickAssert('#btn-ex-submit', 'M3: submit the wrong answer (E: manufacture a due-today record)');
+  await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null", 5000);
+  await h.evaluate("(() => { const b = document.querySelector('#btn-ex-grade-again'); if (b) b.click(); return true; })()");
 
   // Ready selector is '#sxc1-progress-tools' (Home-only -- see every
   // OTHER goto('#/', ...) call in this function), never
@@ -4606,27 +4879,74 @@ async function runProgressAssertionsPost(h, cfg) {
   );
 
   // -- F (M3 re-gate NEW14): Continue tracks LAST activity, not Map
-  // order. On the post-E wiped slate: grade the LOOKUP first (l-* sorts
-  // lexicographically before q-*), then the QUIZ. psLastPrompt must make
-  // #sxc1-continue point at the quiz; the old rcLastSeen/Map-scan
-  // implementation picks the same-day lexicographic first (the lookup)
-  // and fails -- the assertion is order-discriminating by construction.
-  await h.goto(`#/x/${cfg.lookupDeck}/${cfg.lookupId}`, '#ex-find-input');
-  await h.typeText('#ex-find-input', String(cfg.lookupTargetPage));
-  await h.clickAssert('#btn-ex-find-submit', 'F: submit the correct lookup page (grades the lookup FIRST)');
-  await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
-  await h.goto(`#/x/${cfg.quizDeck}/${cfg.quizId}`, `#${cfg.quizCorrectOpt}`);
+  // order. Complete one non-quiz exercise first, then the quiz; the
+  // course no longer needs a shipped lookup merely to exercise this
+  // progress invariant.
+  if (cfg.priorKind === 'lookup') {
+    await h.goto(`#/x/${cfg.priorDeck}/${cfg.priorId}`, '#ex-find-input');
+    await h.typeText('#ex-find-input', String(cfg.priorTargetPage));
+    await h.clickAssert('#btn-ex-find-submit', 'F: submit the correct lookup page (grades the prior exercise FIRST)');
+    await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
+  } else {
+    await h.goto(`#/x/${cfg.priorDeck}/${cfg.priorId}`, '.kind-drill');
+    const priorOrigin = await h.evaluate('window.location.hash');
+    for (let step = 1; step <= cfg.priorSteps; step += 1) {
+      await waitForTrue(h.evaluate, `document.querySelector('#btn-ex-confirm-${step}') !== null`, 5000);
+      await h.click(`#btn-ex-confirm-${step}`);
+    }
+    await waitForTrue(
+      h.evaluate,
+      `window.location.hash !== ${JSON.stringify(priorOrigin)} || document.querySelector('#ex-summary') !== null`,
+      5000,
+    );
+  }
+  await h.goto('#/', '#sxc1-home');
+  const fQuizRoute = `#/x/${cfg.quizDeck}/${cfg.quizId}`;
+  await h.goto(fQuizRoute, '#sxc1-exercise');
+  await waitForTrue(
+    h.evaluate,
+    `window.location.hash === ${JSON.stringify(fQuizRoute)}
+      && document.querySelector('.kind-quiz') !== null
+      && document.querySelector(${JSON.stringify(`#${cfg.quizCorrectOpt}`)}) !== null`,
+    5000,
+  );
+  // The due-record setup above rated this same quiz. Ratings now continue
+  // forward and leave the completed attempt intact, so explicitly restart
+  // before grading it second for the last-activity invariant.
+  const fNeedsRestart = await h.evaluate("document.querySelector('#ex-summary') !== null");
+  if (fNeedsRestart) {
+    await h.evaluate("document.querySelector('#btn-ex-restart').click(); true");
+    await waitForTrue(
+      h.evaluate,
+      `document.querySelector('#ex-summary') === null
+        && document.querySelector(${JSON.stringify(`#${cfg.quizCorrectOpt}`)}) !== null
+        && document.querySelector('#btn-ex-submit') !== null`,
+      4000,
+    );
+  }
   await h.clickAssert(`#${cfg.quizCorrectOpt}`, 'F: click the correct quiz option (grades the quiz SECOND)');
+  await waitForTrue(
+    h.evaluate,
+    "document.querySelector('#btn-ex-submit') !== null && !document.querySelector('#btn-ex-submit').disabled",
+    3000,
+  );
   await h.clickAssert('#btn-ex-submit', 'F: submit the quiz answer');
   await waitForTrue(h.evaluate, "document.querySelector('#ex-feedback') !== null && /^Correct/.test(document.querySelector('#ex-feedback').textContent)", 5000);
+  await h.evaluate("(() => { const b = document.querySelector('#btn-ex-grade-easy'); if (b) b.click(); return true; })()");
+  await waitForProgressPredicate(
+    h.evaluate,
+    `Array.isArray(p.weeklyPulse) && p.weeklyPulse.length > 0
+      && p.weeklyPulse[p.weeklyPulse.length - 1][2] === ${JSON.stringify(cfg.quizId)}`,
+    5000,
+  );
   await h.goto('#/', '#sxc1-progress-tools');
   const continueInfo = await h.evaluate("(() => { const a = document.querySelector('#sxc1-continue a[href]'); return a ? { href: a.getAttribute('href') } : null; })()");
   h.report(
     PROGRESS_ASSERTION_NAMES.continueMatchesLast,
     Boolean(continueInfo && continueInfo.href
       && continueInfo.href.indexOf(cfg.quizId) !== -1
-      && continueInfo.href.indexOf(cfg.lookupId) === -1),
-    { continueInfo, wantId: cfg.quizId, mustNotBe: cfg.lookupId },
+      && continueInfo.href.indexOf(cfg.priorId) === -1),
+    { continueInfo, wantId: cfg.quizId, mustNotBe: cfg.priorId },
   );
 }
 
@@ -4670,8 +4990,9 @@ const EXERCISE_FIXTURE_FIELDS = {
 // Validates the shape exercise-check --browser-fixture emits. Returns
 // null when acceptable, else a human-readable error.
 function validateExerciseFixture(fx) {
-  if (!fx || typeof fx !== 'object') return '--exercise-fixture must be a JSON object with "quiz", "drill" and "lookup" keys';
+  if (!fx || typeof fx !== 'object') return '--exercise-fixture must be a JSON object with "quiz" and "drill" keys ("lookup" is optional)';
   for (const [kind, fields] of Object.entries(EXERCISE_FIXTURE_FIELDS)) {
+    if (kind === 'lookup' && fx.lookup == null) continue;
     const obj = fx[kind];
     if (!obj || typeof obj !== 'object') return `--exercise-fixture is missing its "${kind}" object`;
     const missing = fields.filter((f) => !(f in obj));
@@ -5116,29 +5437,52 @@ async function runDeviceAssertions(makeTarget, report, cfg) {
       const stepCount = await t.evaluate("document.querySelectorAll('#ex-steps > li').length");
       const verifyInfo = await t.evaluate("(() => { const e = document.querySelector('.ex-verify'); return e ? { cls: e.className, text: e.textContent } : null; })()");
       let confirmedAll = true;
+      const manualSnapshots = [];
       for (let s = 1; s <= cfg.drill.steps; s += 1) {
         const present = await waitForTrue(t.evaluate, `document.querySelector('#btn-ex-confirm-${s}') !== null`, 4000);
         const clicked = present && await devClick(t.evaluate, `#btn-ex-confirm-${s}`);
         if (!clicked) { confirmedAll = false; break; }
+        if (s < cfg.drill.steps) {
+          const settled = await waitDeviceState(t.evaluate, `p.confirms.length === ${s}`, 4000);
+          manualSnapshots.push(settled ? await readDeviceStateJson(t.evaluate) : null);
+        }
       }
-      // #ex-progress displays min(cursor+1, steps), so "N / N" is already
-      // shown one confirm early -- the settled signal is the confirms
-      // array itself reaching all N steps.
-      const finished = confirmedAll && await waitDeviceState(
+      // Production continues to the next card after the final manual confirm;
+      // the isolated legacy fixture remains on its summary. Either is a settled
+      // completion signal, and the event log proves every step landed.
+      const finished = confirmedAll && await waitForTrue(
         t.evaluate,
-        `p.confirms.length === ${cfg.drill.steps}`,
+        `window.location.hash !== ${JSON.stringify(cfg.drill.route)} || (() => {
+          try { return JSON.parse(document.querySelector('#sxc1-device-state').textContent).confirms.length === ${cfg.drill.steps}; }
+          catch (_) { return false; }
+        })()`,
         5000,
       );
       const dsAfter = await readDeviceStateJson(t.evaluate);
-      const confirmsOk = Boolean(dsAfter && Array.isArray(dsAfter.confirms)
+      const finalEvents = await t.evaluate(`(() => {
+        try {
+          return JSON.parse(document.querySelector('#sxc1-event-log').textContent)
+            .filter((event) => event.exercise === ${JSON.stringify(cfg.drill.exId)});
+        } catch (_) { return []; }
+      })()`);
+      const promptEvents = Array.isArray(finalEvents)
+        ? finalEvents.filter((event) => event.prompt && event.outcome === 'correct')
+        : [];
+      const priorSourcesOk = manualSnapshots.length === Math.max(0, cfg.drill.steps - 1)
+        && manualSnapshots.every((snap) => Array.isArray(snap?.confirms)
+          && snap.confirms.every((c) => c.source === 'learner'));
+      const summarySourcesOk = Boolean(dsAfter && Array.isArray(dsAfter.confirms)
         && dsAfter.confirms.length === cfg.drill.steps
         && dsAfter.confirms.every((c) => c.source === 'learner'));
+      const completedEvent = finalEvents.some((event) => event.prompt === null && event.outcome === 'completed');
+      const confirmsOk = promptEvents.length === cfg.drill.steps
+        && (summarySourcesOk || (completedEvent && priorSourcesOk));
       report(
         N.d2,
         stepCount === cfg.drill.steps
           && Boolean(verifyInfo && verifyInfo.cls.split(/\s+/).includes('ex-verify-idle') && /confirm manually/.test(verifyInfo.text))
           && confirmedAll && finished === true && confirmsOk,
-        { stepCount, verifyInfo, confirmedAll, finished, confirms: dsAfter && dsAfter.confirms },
+        { stepCount, verifyInfo, confirmedAll, finished, destination: await t.evaluate('window.location.hash'), manualSnapshots, finalEvents, confirms: dsAfter && dsAfter.confirms },
       );
     }
     await t.close();
@@ -6465,8 +6809,8 @@ const BAD_BUNDLE_CASES = [
   { dir: 'missing-deck', why: 'one whole deck removed, header count adjusted' },
 ];
 const BAD_BUNDLE_HEALTHY_DIR = 'healthy';
-const BAD_BUNDLE_EXPECT_DECKS = 52;
-const BAD_BUNDLE_EXPECT_EXERCISES = 435;
+const BAD_BUNDLE_EXPECT_DECKS = 50;
+const BAD_BUNDLE_EXPECT_EXERCISES = 352;
 
 async function runBadBundleCheck(opts) {
   const deadline = Date.now() + opts.timeout;
@@ -7123,7 +7467,7 @@ async function runJaToggleCheck(opts) {
 // Each case asserts BOTH halves, because INDEPENDENCE is the actual
 // claim: the visible role=alert banner AND the named
 // #sxc1-manual-degraded body with #btn-content-retry on a real manual
-// route, WHILE #sxc1-exercise-stats still reports the whole 52-deck
+// route, WHILE #sxc1-exercise-stats still reports the whole 50-deck
 // course. A bad manual bundle must not take the course down with it,
 // and a shared "everything failed" state would hide exactly that.
 // ---------------------------------------------------------------------------
@@ -7136,7 +7480,7 @@ const BAD_MANUAL_CASES = [
   { dir: 'm-missing', why: 'the manual bundle file absent altogether (404)' },
 ];
 const BAD_MANUAL_HEALTHY_DIR = 'm-healthy';
-const BAD_MANUAL_EXPECT_DECKS = 52;
+const BAD_MANUAL_EXPECT_DECKS = 50;
 const BAD_MANUAL_ROUTE = '#/m/guide-book/p/15';
 
 async function runBadManualBundleCheck(opts) {
@@ -7620,7 +7964,7 @@ const LEGACY_EXPECTED_TO_FAIL = [
   COLD_BASELINE_ASSERTION_NAME,
   WARM_FIRST_ELAPSED_ASSERTION_NAME,
   'Restart yields a genuinely blank prompt: no #ex-feedback, no #ex-note, no #btn-ex-next, no option aria-pressed="true"',
-  `a completed drill renders a.cite hrefs that are well-formed AND include the declared #/m/${SELF_TEST_FIXTURE.drill.citeSlug}/p/${SELF_TEST_FIXTURE.drill.citePage}`,
+  'a completed drill keeps its citation and offers green-next / red-restart wizard choices',
   `a graded (correct) lookup renders an a.cite whose href equals the declared #/m/${SELF_TEST_FIXTURE.lookup.targetSlug}/p/${SELF_TEST_FIXTURE.lookup.targetPage}`,
   // M3 harness wave: every M3 persistence/JA-first/corrupt-blob/
   // review-queue assertion name -- legacy-all still fires every one of
@@ -7948,9 +8292,10 @@ async function runOneSelfTestPass(opts, selector, { expectedExJson, verbose, inc
       quizId: SELF_TEST_FIXTURE.quiz.id,
       quizCorrectOpt: SELF_TEST_FIXTURE.quiz.correctOpt,
       quizWrongOpt: SELF_TEST_FIXTURE.quiz.wrongOpt,
-      lookupDeck: SELF_TEST_FIXTURE.lookup.deck,
-      lookupId: SELF_TEST_FIXTURE.lookup.id,
-      lookupTargetPage: SELF_TEST_FIXTURE.lookup.targetPage,
+      priorKind: 'lookup',
+      priorDeck: SELF_TEST_FIXTURE.lookup.deck,
+      priorId: SELF_TEST_FIXTURE.lookup.id,
+      priorTargetPage: SELF_TEST_FIXTURE.lookup.targetPage,
       deckSlug: SELF_TEST_FIXTURE.quiz.deck,
       expectedTier: PROGRESS_SELF_TEST_TIER,
       manualSlug: 'demo-manual',
@@ -8581,11 +8926,27 @@ async function main() {
     // for every tick). Defaults to the primary session; the cold-load
     // assertion passes its own fresh session id.
     const evaluate = async (expression, sid = sessionId) => {
-      const res = await cdp.send('Runtime.evaluate', {
-        expression,
-        returnByValue: true,
-        awaitPromise: true,
-      }, sid);
+      let res;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          res = await cdp.send('Runtime.evaluate', {
+            expression,
+            returnByValue: true,
+            awaitPromise: true,
+          }, sid);
+          break;
+        } catch (err) {
+          // Chrome can discard an awaited Runtime.evaluate promise during a
+          // same-document hash transition even though the target and app stay
+          // healthy (CDP -32000). A fresh evaluation context resolves it; keep
+          // every other transport error fatal and retain the shared deadline.
+          if (attempt < 2 && /Promise was collected/.test(String(err?.message || err))) {
+            await sleep(40);
+            continue;
+          }
+          throw err;
+        }
+      }
       if (res.exceptionDetails) {
         const d = res.exceptionDetails;
         throw new Error(`page evaluation error: ${d.exception?.description || d.text}`);
@@ -8685,9 +9046,21 @@ async function main() {
       }
       for (const name of [
         '#boot-status is hidden after boot',
+        'mobile startup keeps the WebAssembly heap at or below 24 MiB and publishes boot timing',
+        'phone-ready shell has a subpath-safe manifest and a complete versioned offline cache',
+        'a fresh page boots the real WASM app from the offline cache and explains its network state',
         '#sxc1-content-stats is valid JSON',
         '#sxc1-content-stats matches expected stats',
-        'home phone QR is loaded and visible at desktop and mobile widths',
+        'home shows a centered QR and exactly two green/red wizard choices',
+        'progress passport saves the validated export as a file and loads a file without bypassing import preview',
+        "today's session builds a stable five-card mobile plan and carries its coach into the runner",
+        "today's session marks a finished card and advances to the next planned card",
+        'weekly pulse turns bounded local history and saved schedules into a seven-day phone-first reflection',
+        'mastery journey turns 50 skills and 49 prerequisites into a three-step queue and progressively disclosed chapter trail',
+        'unsupported mobile WebAssembly fails fast with recovery guidance before app.wasm is requested',
+        'panel-identification cards render their cited diagram beside the question',
+        'flashcards quiz an actual choice, replace each two-action decision with Again/Hard or Good/Easy, advance without a repeat prompt, and persist the chosen grade',
+        'hands-on cards offer Confirm/Skip; Skip schedules unfinished steps and continues without a repeat prompt',
         '#/m/guide-book TOC contains the five PART titles',
         '#/m/guide-book/p/17 renders the expected text',
         'JA toggle shows a decoded original-page image',
@@ -8722,6 +9095,130 @@ async function main() {
         '#boot-status is hidden after boot',
         Boolean(bootStatus && bootStatus.exists === true && bootStatus.hidden === true),
         bootStatus,
+      );
+      const bootMetrics = await evaluate('window.__SXC1_BOOT_METRICS || null');
+      report(
+        'mobile startup keeps the WebAssembly heap at or below 24 MiB and publishes boot timing',
+        Boolean(bootMetrics
+          && Number.isFinite(bootMetrics.wasmMs) && bootMetrics.wasmMs >= 0
+          && Number.isFinite(bootMetrics.totalMs) && bootMetrics.totalMs >= bootMetrics.wasmMs
+          && Number.isFinite(bootMetrics.transferBytes) && bootMetrics.transferBytes >= 0
+          && Number.isFinite(bootMetrics.encodedBodyBytes) && bootMetrics.encodedBodyBytes >= 0
+          && bootMetrics.memoryBytes >= 16 * 1024 * 1024
+          && bootMetrics.memoryBytes <= 24 * 1024 * 1024),
+        bootMetrics,
+      );
+
+      // -- 1b. Installability and offline boot. The worker is registered only
+      // after first interactivity, then atomically fills its versioned core
+      // cache. Verify the manifest and scope through the running app before
+      // taking a genuinely fresh target offline and booting the real WASM from
+      // that cache. This is not a mocked fetch path.
+      const pwaState = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 12000) {
+          const state = window.__SXC1_PWA;
+          if (state?.ready && state?.cacheVersion && navigator.serviceWorker?.controller) break;
+          await new Promise((resolve) => setTimeout(resolve, 40));
+        }
+        let manifest = null;
+        let manifestStatus = null;
+        try {
+          const response = await fetch('./manifest.webmanifest');
+          manifestStatus = response.status;
+          manifest = await response.json();
+        } catch (error) {
+          manifest = { error: String(error && error.message ? error.message : error) };
+        }
+        return {
+          state: window.__SXC1_PWA || null,
+          controlled: Boolean(navigator.serviceWorker?.controller),
+          manifestStatus,
+          manifest,
+          manifestHref: document.querySelector('link[rel="manifest"]')?.href || null,
+        };
+      })()`);
+      const expectedScope = new URL('./', targetUrl.replace(/#.*$/, '')).href;
+      report(
+        'phone-ready shell has a subpath-safe manifest and a complete versioned offline cache',
+        Boolean(pwaState
+          && pwaState.state?.supported === true && pwaState.state.registered === true
+          && pwaState.state.ready === true && pwaState.state.offlineCapable === true
+          && pwaState.state.cacheVersion === 'm11-v3' && pwaState.controlled === true
+          && pwaState.state.scope === expectedScope
+          && pwaState.manifestStatus === 200
+          && pwaState.manifest?.start_url === './#/x/today'
+          && pwaState.manifest?.scope === './'
+          && pwaState.manifest?.display === 'standalone'
+          && Array.isArray(pwaState.manifest?.icons) && pwaState.manifest.icons.some((icon) => icon.src === './app-icon.svg')
+          && typeof pwaState.manifestHref === 'string'
+          && pwaState.manifestHref === new URL('./manifest.webmanifest', expectedScope).href),
+        { expectedScope, pwaState },
+      );
+
+      let offlineTargetId = null;
+      let offlineSessionId = null;
+      let offlineBoot = { ok: false, reason: 'offline target did not run' };
+      try {
+        const createdOffline = await cdp.send('Target.createTarget', { url: 'about:blank' });
+        offlineTargetId = createdOffline.targetId;
+        const attachedOffline = await cdp.send('Target.attachToTarget', { targetId: offlineTargetId, flatten: true });
+        offlineSessionId = attachedOffline.sessionId;
+        trackedSessions.add(offlineSessionId);
+        await cdp.send('Runtime.enable', {}, offlineSessionId);
+        await cdp.send('Page.enable', {}, offlineSessionId);
+        await cdp.send('Network.enable', {}, offlineSessionId);
+        // DevTools' session-scoped offline transport blocks every real request
+        // but this Chrome build leaves Navigator.onLine at true. Override only
+        // that advisory signal before the document exists so the separate
+        // learner-facing offline badge is exercised during the same genuinely
+        // disconnected boot; cache success still depends entirely on CDP's
+        // real network block below.
+        await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+          source: `Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });`,
+        }, offlineSessionId);
+        await cdp.send('Network.emulateNetworkConditions', {
+          offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0,
+        }, offlineSessionId);
+        await cdp.send('Page.navigate', { url: `${targetUrl.replace(/#.*$/, '')}#/x/today` }, offlineSessionId);
+        const offlineDeadline = Math.min(deadline, Date.now() + 12000);
+        while (Date.now() < offlineDeadline) {
+          offlineBoot = await evaluate(`(() => {
+            const status = document.querySelector('#sxc1-network-status');
+            return {
+              ok: window.__SXC1_BOOTED === true && Boolean(document.querySelector('#sxc1-session')),
+              booted: window.__SXC1_BOOTED === true,
+              error: window.__SXC1_BOOT_ERROR || null,
+              online: navigator.onLine,
+              statusVisible: Boolean(status && !status.hidden && status.getBoundingClientRect().height > 0),
+              statusText: status?.textContent.trim() || null,
+              memoryBytes: window.__SXC1_BOOT_METRICS?.memoryBytes || null,
+            };
+          })()`, offlineSessionId);
+          if (offlineBoot && (offlineBoot.ok || offlineBoot.error)) break;
+          await sleep(50);
+        }
+      } catch (error) {
+        offlineBoot = { ok: false, reason: error && error.message ? error.message : String(error) };
+      } finally {
+        if (offlineSessionId) {
+          try {
+            await cdp.send('Network.emulateNetworkConditions', {
+              offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1,
+            }, offlineSessionId);
+          } catch { /* target may already be gone */ }
+        }
+        if (offlineTargetId) {
+          try { await cdp.send('Target.closeTarget', { targetId: offlineTargetId }); } catch { /* best effort */ }
+        }
+      }
+      report(
+        'a fresh page boots the real WASM app from the offline cache and explains its network state',
+        Boolean(offlineBoot && offlineBoot.ok === true && offlineBoot.booted === true
+          && offlineBoot.error === null && offlineBoot.online === false
+          && offlineBoot.statusVisible === true && /Offline/.test(offlineBoot.statusText || '')
+          && offlineBoot.memoryBytes >= 16 * 1024 * 1024 && offlineBoot.memoryBytes <= 24 * 1024 * 1024),
+        offlineBoot,
       );
 
       // -- 2. #sxc1-content-stats vs --expect-json / golden numbers --------------
@@ -8773,16 +9270,44 @@ async function main() {
         report('#sxc1-content-stats matches expected stats', false, 'skipped: stats JSON did not parse');
       }
 
-      // -- 3. Home phone handoff: the SVG loads and remains visible at both the
-      // desktop and mobile widths where users can discover/share it. The SVG's
-      // own two-module border plus the link's white padding must also provide
-      // the four-module quiet zone camera QR readers expect.
-      await goto('#/', '#sxc1-phone-qr');
+      // -- 3. Home starts as a two-choice wizard with the QR already visible.
+      // The green choice opens the focused daily plan; the red choice opens
+      // the course/manual/progress library. The SVG loads at both desktop and
+      // mobile widths. The fetched SVG bytes plus a non-zero rendered box are
+      // authoritative here: valid SVGs may intentionally omit intrinsic width
+      // and height, so naturalWidth must remain diagnostic rather than a gate.
+      await goto('#/', '#btn-primary-training');
+      const initialHome = await evaluate(`(() => {
+        const primary = document.querySelector('#btn-primary-training');
+        const browse = document.querySelector('#sxc1-browse-library');
+        const study = document.querySelector('#sxc1-study-details');
+        const data = document.querySelector('#sxc1-progress-data');
+        const wizard = document.querySelector('#sxc1-wizard-actions');
+        const qr = document.querySelector('#sxc1-phone-qr');
+        const qrBox = qr ? qr.getBoundingClientRect() : null;
+        return {
+          primaryHref: primary ? primary.hash : null,
+          primaryText: primary ? primary.textContent.trim() : null,
+          primaryGreen: Boolean(primary && primary.classList.contains('wizard-yes')),
+          browseOpen: browse ? browse.open : null,
+          browseText: browse && browse.querySelector(':scope > summary')
+            ? browse.querySelector(':scope > summary').textContent.trim() : null,
+          browseRed: Boolean(browse && browse.classList.contains('wizard-no')),
+          wizardChoiceCount: wizard ? wizard.children.length : null,
+          studyOpen: study ? study.open : null,
+          dataOpen: data ? data.open : null,
+          toolsNested: Boolean(browse && study && data && browse.contains(study) && browse.contains(data)),
+          qrInitiallyVisible: Boolean(qr && qrBox && qrBox.width >= 200 && qrBox.height > 200),
+          qrOutsideLibrary: Boolean(qr && browse && !browse.contains(qr)),
+        };
+      })()`);
       const desktopQr = await evaluate(`(async () => {
         const aside = document.querySelector('#sxc1-phone-qr');
         const link = document.querySelector('#sxc1-phone-qr .phone-qr-link');
         const img = document.querySelector('#sxc1-phone-qr-img');
         let asset = null;
+        let decoded = false;
+        let decodeError = null;
         if (img) {
           try {
             const response = await fetch(img.src, { cache: 'no-store' });
@@ -8791,10 +9316,16 @@ async function main() {
           } catch (e) {
             asset = { error: String(e && e.message ? e.message : e) };
           }
+          try {
+            await img.decode();
+            decoded = img.naturalWidth > 0 && img.naturalHeight > 0;
+          } catch (e) {
+            decodeError = String(e && e.message ? e.message : e);
+          }
         }
         const asideBox = aside ? aside.getBoundingClientRect() : null;
         const imgBox = img ? img.getBoundingClientRect() : null;
-        const modulePx = imgBox ? imgBox.width / 33 : 0;
+        const modulePx = imgBox ? imgBox.width / 37 : 0;
         const paddingPx = link ? parseFloat(getComputedStyle(link).paddingLeft) : 0;
         return {
           asideVisible: Boolean(aside && getComputedStyle(aside).display !== 'none'
@@ -8806,8 +9337,17 @@ async function main() {
           src: img ? img.src : null,
           href: link ? link.href : null,
           asset,
-          effectiveQuietModules: modulePx > 0 ? 2 + paddingPx / modulePx : 0,
+          decoded,
+          decodeError,
+          naturalWidth: img ? img.naturalWidth : null,
+          naturalHeight: img ? img.naturalHeight : null,
+          effectiveQuietModules: modulePx > 0 ? 4 + paddingPx / modulePx : 0,
         };
+      })()`);
+      await click('#sxc1-browse-library > summary');
+      const libraryOpen = await evaluate(`(() => {
+        const browse = document.querySelector('#sxc1-browse-library');
+        return Boolean(browse && browse.open && browse.querySelector('.manual-list .manual-card'));
       })()`);
       await cdp.send('Emulation.setDeviceMetricsOverride', {
         width: 390, height: 844, deviceScaleFactor: 3, mobile: true,
@@ -8825,16 +9365,820 @@ async function main() {
       })()`);
       await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
       report(
-        'home phone QR is loaded and visible at desktop and mobile widths',
-        Boolean(desktopQr && desktopQr.asideVisible && desktopQr.imageRendered
+        'home shows a centered QR and exactly two green/red wizard choices',
+        Boolean(initialHome
+          && initialHome.primaryHref === '#/x/today'
+          && (initialHome.primaryText || '').startsWith("Today's session")
+          && initialHome.primaryGreen === true
+          && initialHome.browseOpen === false
+          && /^No\b/.test(initialHome.browseText || '')
+          && initialHome.browseRed === true
+          && initialHome.wizardChoiceCount === 2
+          && initialHome.studyOpen === false
+          && initialHome.dataOpen === false
+          && initialHome.toolsNested === true
+          && initialHome.qrInitiallyVisible === true
+          && initialHome.qrOutsideLibrary === true
+          && libraryOpen === true
+          && desktopQr && desktopQr.asideVisible && desktopQr.imageRendered
           && typeof desktopQr.src === 'string' && desktopQr.src.endsWith('/qr-phone.svg')
           && desktopQr.href === 'https://sexy-one-gray.vercel.app/'
           && desktopQr.effectiveQuietModules >= 4
           && mobileQr && mobileQr.visible && mobileQr.viewport === 390),
-        { desktopQr, mobileQr },
+        { initialHome, desktopQr, mobileQr },
       );
 
-      // -- 4. guide-book TOC has the five exact PART titles -----------------------
+      // -- 3a. Progress passport. Export is still generated by Haskell's
+      // existing codec. The file controls may only move those exact bytes:
+      // downloading must produce a named .sxc1 file, and choosing a file must
+      // populate the uncommitted import preview without touching localStorage.
+      await click('#sxc1-progress-data > summary');
+      await click('#sxc1-progress-backup > summary');
+      const backupBefore = await evaluate(`(() => ({
+        visibleButtons: Array.from(document.querySelectorAll('#sxc1-progress-backup button'))
+          .filter((b) => b.offsetParent !== null).map((b) => b.id),
+      }))()`);
+      await click('#btn-progress-export');
+      const passportJson = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 3000 && !document.querySelector('#sxc1-export-blob')?.value) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        const value = document.querySelector('#sxc1-export-blob')?.value || '';
+        const before = localStorage.getItem('sxc1.progress');
+        // Export causes a Miso render and the portability scanner then rebuilds
+        // its DOM-owned controls. Wait for the currently connected button so a
+        // replaced-but-still-referenced node cannot turn this into a race.
+        let download = null;
+        while (Date.now() - start < 4000) {
+          download = document.querySelector('#btn-progress-download');
+          if (download?.isConnected && !download.disabled) break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        const backupButtons = Array.from(document.querySelectorAll('#sxc1-progress-backup button'))
+          .filter((b) => b.offsetParent !== null).map((b) => b.id);
+        const exportHidden = Boolean(document.querySelector('#btn-progress-export')?.hidden);
+        const originalCreate = URL.createObjectURL.bind(URL);
+        const originalClick = HTMLAnchorElement.prototype.click;
+        let madeFile = null;
+        let anchorDownload = null;
+        URL.createObjectURL = (blob) => {
+          madeFile = {
+            name: blob.name ? String(blob.name) : null,
+            type: String(blob.type || ''),
+            size: Number(blob.size) || 0,
+          };
+          return originalCreate(blob);
+        };
+        HTMLAnchorElement.prototype.click = function () {
+          if (this.download) { anchorDownload = this.download; return; }
+          return originalClick.call(this);
+        };
+        try {
+          download = document.querySelector('#btn-progress-download');
+          if (download?.isConnected && !download.disabled) download.click();
+        }
+        finally {
+          URL.createObjectURL = originalCreate;
+          HTMLAnchorElement.prototype.click = originalClick;
+        }
+        document.querySelector('#sxc1-progress-backup').open = false;
+        document.querySelector('#sxc1-progress-restore').open = true;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const restoreButtons = Array.from(document.querySelectorAll('#sxc1-progress-restore button'))
+          .filter((b) => b.offsetParent !== null).map((b) => b.id);
+        const fileInput = document.querySelector('#sxc1-import-file');
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([value], 'phone-handoff.sxc1', { type: 'application/json' }));
+        fileInput.files = transfer.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        while (Date.now() - start < 5000 && document.querySelector('#sxc1-import-input')?.value !== value) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        document.querySelector('#sxc1-progress-restore').open = false;
+        document.querySelector('#sxc1-progress-reset').open = true;
+        const resetBefore = Array.from(document.querySelectorAll('#sxc1-progress-reset button'))
+          .filter((b) => b.offsetParent !== null).map((b) => b.id);
+        document.querySelector('#btn-progress-wipe')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const resetAfter = Array.from(document.querySelectorAll('#sxc1-progress-reset button'))
+          .filter((b) => b.offsetParent !== null).map((b) => b.id);
+        document.querySelector('#sxc1-progress-reset').open = false;
+        document.querySelector('#sxc1-progress-restore').open = true;
+        return JSON.stringify({
+          exportBytes: new TextEncoder().encode(value).length,
+          backupButtons,
+          exportHidden,
+          restoreButtons,
+          resetBefore,
+          resetAfter,
+          downloadEnabled: Boolean(download && !download.disabled),
+          madeFile,
+          anchorDownload: anchorDownload ? String(anchorDownload) : null,
+          importedSameBytes: document.querySelector('#sxc1-import-input')?.value === value,
+          previewText: document.querySelector('#sxc1-import-preview')?.textContent.trim() || null,
+          statusText: document.querySelector('#sxc1-backup-status')?.textContent.trim() || null,
+          storageUnchanged: localStorage.getItem('sxc1.progress') === before,
+          diagnostics: window.__SXC1_PROGRESS_PORTABILITY ? {
+            ready: window.__SXC1_PROGRESS_PORTABILITY.ready === true,
+            download: window.__SXC1_PROGRESS_PORTABILITY.download === true,
+            share: window.__SXC1_PROGRESS_PORTABILITY.share === true,
+            fileImport: window.__SXC1_PROGRESS_PORTABILITY.fileImport === true,
+            maxFileBytes: Number(window.__SXC1_PROGRESS_PORTABILITY.maxFileBytes) || 0,
+          } : null,
+        });
+      })()`);
+      let passport = null;
+      try { passport = JSON.parse(passportJson); } catch { passport = { transport: passportJson }; }
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
+      }, sessionId);
+      const passportMobile = await evaluate(`(() => {
+        const tools = document.querySelector('#sxc1-progress-tools');
+        const file = document.querySelector('#sxc1-import-file');
+        const buttons = Array.from(document.querySelectorAll('#sxc1-progress-restore button'))
+          .filter((button) => button.offsetParent !== null);
+        const fileBox = file?.getBoundingClientRect();
+        return {
+          viewport: innerWidth,
+          scrollWidth: document.scrollingElement?.scrollWidth || null,
+          toolsVisible: Boolean(tools && tools.getBoundingClientRect().height > 0),
+          fileRight: fileBox?.right || null,
+          buttonHeights: buttons.map((button) => button.getBoundingClientRect().height),
+        };
+      })()`);
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      report(
+        'progress passport saves the validated export as a file and loads a file without bypassing import preview',
+        Boolean(backupBefore?.visibleButtons?.join(',') === 'btn-progress-export'
+          && passport && passport.exportBytes > 20 && passport.downloadEnabled
+          && passport.backupButtons.length >= 1 && passport.backupButtons.length <= 2
+          && passport.exportHidden === true
+          && passport.restoreButtons.join(',') === 'btn-progress-import'
+          && passport.resetBefore.join(',') === 'btn-progress-wipe'
+          && passport.resetAfter.join(',') === 'btn-progress-wipe-confirm'
+          && passport.madeFile?.name === passport.anchorDownload
+          && /^sexy-one-progress-\d{4}-\d{2}-\d{2}\.sxc1$/.test(passport.anchorDownload || '')
+          && passport.madeFile?.type === 'application/json'
+          && passport.madeFile?.size === passport.exportBytes
+          && passport.importedSameBytes && /^0 records found/.test(passport.previewText || '')
+          && /Backup file loaded/.test(passport.statusText || '')
+          && passport.storageUnchanged && passport.diagnostics?.download === true
+          && passport.diagnostics?.fileImport === true
+          && passportMobile?.viewport === 320 && passportMobile.scrollWidth <= 320
+          && passportMobile.toolsVisible && passportMobile.fileRight <= 321
+          && passportMobile.buttonHeights.every((height) => height >= 44)),
+        { backupBefore, passport, passportMobile },
+      );
+
+      // -- 3b. The focused coach is a deterministic, tab-scoped snapshot:
+      // route changes never reshuffle it, all five cards are unique links, and
+      // opening one carries an out-of-tree session bar into the live runner.
+      // A fresh profile has no due or partial work, so all five reasons must be
+      // "new"; later progress changes this balance without changing the plan
+      // already under the learner's feet.
+      // Keep the poll Node-side for this mutation-heavy route. Some Chrome
+      // builds occasionally collect a long Runtime.evaluate promise while the
+      // DOM-only shell is replaced under it (CDP -32000), even though the page
+      // and selector are healthy. Each synchronous probe is independently
+      // rooted and preserves the same 5s bound as goto().
+      const gotoSessionSurface = async (hash, readySelector, timeoutMs = 5000) => {
+        const pageUrl = `${targetUrl.replace(/#.*$/, '')}${hash}`;
+        await cdp.send('Page.navigate', { url: pageUrl }, sessionId);
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+          if (await elementExists(readySelector)) return true;
+          await sleep(20);
+        }
+        return elementExists(readySelector);
+      };
+      await gotoSessionSurface('#/x/today', '#btn-session-start');
+      const sessionA = await evaluate(`(() => {
+        const state = window.__sxc1TodaySession || null;
+        const cards = Array.from(document.querySelectorAll('#sxc1-session .session-card'));
+        return {
+          state,
+          hrefs: cards.map((card) => card.getAttribute('href')),
+          reasons: cards.map((card) => card.closest('.session-item')?.dataset.reason || null),
+          unique: new Set(cards.map((card) => card.closest('.session-item')?.dataset.exercise)).size,
+          canvasCount: document.querySelectorAll('#sxc1-session canvas').length,
+          firstHref: cards[0]?.getAttribute('href') || null,
+        };
+      })()`);
+      await gotoSessionSurface('#/x/map', '#mastery-next');
+      await gotoSessionSurface('#/x/today', '#btn-session-start');
+      const sessionB = await evaluate('window.__sxc1TodaySession || null');
+      let coach = null;
+      if (sessionA?.firstHref) {
+        await gotoSessionSurface(sessionA.firstHref, '#sxc1-session-coach');
+        coach = await evaluate(`(() => {
+          const bar = document.querySelector('#sxc1-session-coach');
+          const box = bar?.getBoundingClientRect();
+          return {
+            exists: Boolean(bar),
+            backHref: bar?.querySelector('.session-coach-back')?.getAttribute('href') || null,
+            position: bar?.querySelector('.session-coach-position')?.textContent.trim() || null,
+            visible: Boolean(box && box.width > 0 && box.height > 0 && box.right <= innerWidth + 1),
+            insideApp: Boolean(bar && document.querySelector('#app')?.contains(bar)),
+          };
+        })()`);
+      }
+      await gotoSessionSurface('#/x/today', '#sxc1-session .session-hero');
+      const adaptiveSession = await evaluate(`(async () => {
+        const progressElement = document.querySelector('#sxc1-progress');
+        const root = document.querySelector('#sxc1-session');
+        if (!progressElement || !root) return null;
+        const original = progressElement.textContent;
+        let progress;
+        try { progress = JSON.parse(original); } catch (_) { return null; }
+        const before = window.__sxc1TodaySession?.reasonCounts || null;
+        const today = Number(progress.masteryToday) || 0;
+        progress.masteryRecs = [
+          ['q-0-01#1', 1, 1, today],
+          ['q-0-02#1', 1, 1, today + 2],
+        ];
+        progress.masteryDone = [];
+        sessionStorage.removeItem('sxc1.today-session.v1');
+        progressElement.textContent = JSON.stringify(progress);
+        root.replaceChildren(document.createComment('rehydrate adaptive fixture'));
+        const start = Date.now();
+        while (Date.now() - start < 4000) {
+          const state = window.__sxc1TodaySession;
+          if (state?.reasonCounts?.due >= 1 && state?.reasonCounts?.continue >= 1) break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        const state = window.__sxc1TodaySession || null;
+        const observed = {
+          before,
+          state,
+          reasons: Array.from(document.querySelectorAll('#sxc1-session .session-item'))
+            .map((item) => item.dataset.reason),
+        };
+        progressElement.textContent = original;
+        sessionStorage.removeItem('sxc1.today-session.v1');
+        return observed;
+      })()`);
+      report(
+        "today's session builds a stable five-card mobile plan and carries its coach into the runner",
+        Boolean(sessionA && sessionA.state && sessionB
+          && sessionA.state.renderer === 'dom' && sessionA.state.stable === true
+          && sessionA.state.itemCount === 5 && sessionA.unique === 5
+          && sessionA.hrefs.every((href) => /^#\/x\/[^/]+\/[^/]+$/.test(href || ''))
+          && sessionA.reasons.every((reason) => reason === 'new')
+          && sessionA.state.reasonCounts?.new === 5
+          && sessionA.state.estimatedMinutes >= 5 && sessionA.state.estimatedMinutes <= 10
+          && new Set(sessionA.state.types || []).size >= 2
+          && sessionA.canvasCount === 0
+          && sessionB.planId === sessionA.state.planId
+          && JSON.stringify(sessionB.ids) === JSON.stringify(sessionA.state.ids)
+          && coach && coach.exists && coach.backHref === '#/x/today'
+          && /^Card 1 of 5$/.test(coach.position || '')
+          && coach.visible && coach.insideApp === false
+          && adaptiveSession && adaptiveSession.state?.itemCount === 5
+          && adaptiveSession.state.reasonCounts?.due >= 1
+          && adaptiveSession.state.reasonCounts?.continue >= 1
+          && adaptiveSession.state.reasonCounts?.new >= 1
+          && adaptiveSession.reasons[0] === 'due'),
+        { sessionA, sessionB, coach, adaptiveSession },
+      );
+
+      // -- 3c. Weekly Pulse: manufacture a precise, current-schema week in
+      // the machine payload, then let the shipped DOM projector derive every
+      // learner-facing signal. The outlook expectation is independent and
+      // exact: one overdue/today item, one in two days, and one in six days.
+      const weeklyFixtureHrefs = Array.isArray(sessionA?.hrefs) ? sessionA.hrefs.slice(0, 3) : [];
+      await gotoSessionSurface('#/x/week', '#sxc1-weekly');
+      const weeklyPulse = await evaluate(`(async () => {
+        const progressElement = document.querySelector('#sxc1-progress');
+        const root = document.querySelector('#sxc1-weekly');
+        const hrefs = ${JSON.stringify(weeklyFixtureHrefs)};
+        if (!progressElement || !root || hrefs.length < 3) return null;
+        const parsed = hrefs.map((href) => {
+          const bits = String(href).replace('#/x/', '').split('/');
+          return { deck: bits[0], exercise: bits[1], prompt: bits[1] + '#1' };
+        });
+        if (parsed.some((item) => !item.deck || !item.exercise)) return null;
+        const original = progressElement.textContent;
+        let progress;
+        try { progress = JSON.parse(original); } catch (_) { return null; }
+        const today = Number(progress.masteryToday) || Math.floor(Date.now() / 86400000);
+        progress.schema = 3;
+        progress.streak = 3;
+        progress.masteryRecs = [
+          [parsed[0].prompt, 2, 3, today + 2, 0, 2600, today - 2, 2],
+          [parsed[1].prompt, 0, 0, today, 2, 1800, today - 1, 4],
+          [parsed[2].prompt, 1, 6, today + 6, 0, 2500, today, 1],
+        ];
+        progress.weeklyPulse = [
+          [today - 2, parsed[0].deck, parsed[0].exercise, parsed[0].prompt, 'easy'],
+          [today - 1, parsed[1].deck, parsed[1].exercise, parsed[1].prompt, 'again'],
+          [today - 1, parsed[1].deck, parsed[1].exercise, parsed[1].prompt, 'hard'],
+          [today, parsed[2].deck, parsed[2].exercise, parsed[2].prompt, 'good'],
+          [today, parsed[2].deck, parsed[2].exercise, null, 'good'],
+        ];
+        progressElement.textContent = JSON.stringify(progress);
+        root.dataset.weeklyHydrated = 'false';
+        root.replaceChildren(document.createComment('rehydrate weekly fixture'));
+        const start = Date.now();
+        while (Date.now() - start < 4000) {
+          if (window.__SXC1_WEEKLY?.historyCount === 5 && root.querySelectorAll('.weekly-forecast > li').length === 7) break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        const state = window.__SXC1_WEEKLY || null;
+        const focus = document.querySelector('#btn-weekly-focus');
+        const result = {
+          state,
+          bars: document.querySelectorAll('.weekly-forecast > li').length,
+          insightLinks: document.querySelectorAll('.weekly-insight-link').length,
+          focusHref: focus?.getAttribute('href') || null,
+          focusHeight: focus?.getBoundingClientRect().height || 0,
+          canvasCount: document.querySelectorAll('#sxc1-weekly canvas').length,
+          indexHref: null,
+        };
+        progressElement.textContent = original;
+        return result;
+      })()`);
+      await gotoSessionSurface('#/x', '#exercise-weekly-link');
+      const weeklyIndexHref = await evaluate("document.querySelector('#exercise-weekly-link')?.getAttribute('href') || null");
+      if (weeklyPulse) weeklyPulse.indexHref = weeklyIndexHref;
+      report(
+        'weekly pulse turns bounded local history and saved schedules into a seven-day phone-first reflection',
+        Boolean(weeklyPulse?.state && weeklyPulse.state.renderer === 'dom'
+          && weeklyPulse.state.historyCap === 200 && weeklyPulse.state.historyCount === 5
+          && weeklyPulse.state.activeDays === 3 && weeklyPulse.state.answers === 4
+          && weeklyPulse.state.steadyAnswers === 2
+          && JSON.stringify(weeklyPulse.state.outlook) === JSON.stringify([1, 0, 1, 0, 0, 0, 1])
+          && weeklyPulse.state.strengthenedCount >= 1 && weeklyPulse.state.frictionCount >= 1
+          && weeklyPulse.state.focusHref === '#/x/today'
+          && weeklyPulse.bars === 7 && weeklyPulse.insightLinks >= 2
+          && weeklyPulse.focusHref === '#/x/today' && weeklyPulse.focusHeight >= 44
+          && weeklyPulse.canvasCount === 0 && weeklyPulse.indexHref === '#/x/week'),
+        weeklyPulse,
+      );
+
+      // -- 3d. The mastery surface preserves the authored dependency and
+      // evidence model, but renders its useful decisions instead of a GPU
+      // scene: a short action queue, one chapter trail, and a complete list.
+      await goto('#/x/map', '#mastery-next');
+      const masteryMap = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 4000 && !window.__sxc1MasteryJourney) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        const state = window.__sxc1MasteryJourney || null;
+        const queue = Array.from(document.querySelectorAll('#mastery-next .mastery-queue-card'));
+        const fullList = Array.from(document.querySelectorAll('#mastery-full-list a[data-deck]'));
+        const tabs = Array.from(document.querySelectorAll('.mastery-chapter-tab'));
+        const firstChapter = document.querySelector('#mastery-chapter-panel h3')?.textContent.trim() || null;
+        if (tabs[1]) tabs[1].click();
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const selectedChapter = document.querySelector('#mastery-chapter-panel h3')?.textContent.trim() || null;
+        const trailLinks = Array.from(document.querySelectorAll('#mastery-chapter-panel .mastery-trail-link'));
+        return {
+          state,
+          queueCount: queue.length,
+          queueAllLinks: queue.every((link) => link.tagName === 'A' && link.getAttribute('href')?.startsWith('#/x/')),
+          recommendedCount: queue.filter((link) => link.dataset.recommended === 'true').length,
+          fullListCount: fullList.length,
+          allNamed: fullList.every((link) => (link.getAttribute('aria-label') || '').trim().length > 8),
+          noLocks: fullList.every((link) => link.getAttribute('aria-disabled') !== 'true'),
+          chapterCount: tabs.length,
+          chapterChanged: Boolean(firstChapter && selectedChapter && selectedChapter !== firstChapter),
+          selectedTabs: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').length,
+          trailCount: trailLinks.length,
+          trailHasContext: Array.from(document.querySelectorAll('.mastery-trail-context')).every((el) => el.textContent.trim().length > 8),
+          progressCount: document.querySelectorAll('#sxc1-mastery progress').length,
+          weeklyHref: document.querySelector('.mastery-weekly-link')?.getAttribute('href') || null,
+          canvasCount: document.querySelectorAll('#sxc1-mastery canvas').length,
+        };
+      })()`);
+      report(
+        'mastery journey turns 50 skills and 49 prerequisites into a three-step queue and progressively disclosed chapter trail',
+        Boolean(masteryMap
+          && masteryMap.state && masteryMap.state.mounted === true && masteryMap.state.renderer === 'dom'
+          && masteryMap.state.nodeCount === 50 && masteryMap.state.edgeCount === 49
+          && masteryMap.queueCount === 3 && masteryMap.queueAllLinks
+          && masteryMap.recommendedCount === 1
+          && masteryMap.fullListCount === 50 && masteryMap.allNamed && masteryMap.noLocks
+          && masteryMap.chapterCount >= 5 && masteryMap.chapterChanged && masteryMap.selectedTabs === 1
+          && masteryMap.trailCount > 0 && masteryMap.trailCount < 50 && masteryMap.trailHasContext
+          && masteryMap.progressCount >= 2 && masteryMap.weeklyHref === '#/x/week'
+          && masteryMap.canvasCount === 0),
+        masteryMap,
+      );
+
+      // -- 3c. A real mobile-compatibility negative path. GHC's runtime
+      // contains fixed SIMD instructions (Safari added that baseline in
+      // iOS 16.4), so an older engine must be rejected by the tiny feature
+      // probe BEFORE the dominant app.wasm request. Chrome is used only as
+      // the host here: an early document script makes the exact 31-byte
+      // probe return false, and an iPhone 15-era UA/viewport exercises the
+      // learner-facing recovery surface on a genuinely fresh target.
+      const compatBase = targetUrl.replace(/#.*$/, '');
+      let compatTargetId = null;
+      let compatSessionId = null;
+      const compatRequests = [];
+      let compatResult = { ok: false, reason: 'compatibility assertion did not run' };
+      const noteCompatRequest = (params, sid) => {
+        if (sid === compatSessionId && params.request && params.request.url) {
+          compatRequests.push(params.request.url);
+        }
+      };
+      cdp.on('Network.requestWillBeSent', noteCompatRequest);
+      try {
+        const createdCompat = await cdp.send('Target.createTarget', { url: 'about:blank' });
+        compatTargetId = createdCompat.targetId;
+        const attachedCompat = await cdp.send('Target.attachToTarget', { targetId: compatTargetId, flatten: true });
+        compatSessionId = attachedCompat.sessionId;
+        await cdp.send('Runtime.enable', {}, compatSessionId);
+        await cdp.send('Page.enable', {}, compatSessionId);
+        await cdp.send('Network.enable', {}, compatSessionId);
+        await cdp.send('Emulation.setDeviceMetricsOverride', {
+          width: 390, height: 844, deviceScaleFactor: 3, mobile: true,
+        }, compatSessionId);
+        await cdp.send('Emulation.setUserAgentOverride', {
+          userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.7 Mobile/15E148 Safari/604.1',
+          platform: 'iPhone',
+        }, compatSessionId);
+        await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+          source: `(() => {
+            const originalValidate = WebAssembly.validate.bind(WebAssembly);
+            Object.defineProperty(WebAssembly, 'validate', {
+              configurable: true,
+              value: (bytes) => bytes && bytes.byteLength === 31 ? false : originalValidate(bytes),
+            });
+          })();`,
+        }, compatSessionId);
+        await cdp.send('Page.navigate', { url: compatBase }, compatSessionId);
+        const compatDeadline = Math.min(deadline, Date.now() + 8000);
+        while (Date.now() < compatDeadline) {
+          compatResult = await evaluate(`(() => {
+            const status = document.querySelector('#boot-status');
+            const text = status ? status.textContent : '';
+            return {
+              ok: typeof window.__SXC1_BOOT_ERROR === 'string'
+                && window.__SXC1_BOOTED !== true
+                && /iOS 16\\.4/.test(text),
+              booted: window.__SXC1_BOOTED === true,
+              error: window.__SXC1_BOOT_ERROR || null,
+              statusVisible: Boolean(status && !status.hidden && status.getBoundingClientRect().height > 0),
+              text,
+            };
+          })()`, compatSessionId);
+          if (compatResult && (compatResult.ok || compatResult.error)) break;
+          await sleep(50);
+        }
+      } catch (err) {
+        compatResult = { ok: false, reason: `compatibility harness error: ${err && err.message ? err.message : String(err)}` };
+      } finally {
+        if (compatTargetId) {
+          try { await cdp.send('Target.closeTarget', { targetId: compatTargetId }); } catch { /* best effort */ }
+        }
+      }
+      const compatWasmRequests = compatRequests.filter((url) => /\/app\.wasm(?:[?#]|$)/.test(url));
+      report(
+        'unsupported mobile WebAssembly fails fast with recovery guidance before app.wasm is requested',
+        Boolean(compatResult && compatResult.ok && compatResult.statusVisible
+          && compatResult.booted === false && compatWasmRequests.length === 0),
+        { compatResult, appWasmRequests: compatWasmRequests, requestCount: compatRequests.length },
+      );
+
+      // The session/weekly/mastery projector checks above temporarily replace
+      // the hidden progress node's Text child with synthetic payloads. Reload
+      // before exercising real progress so Miso owns every live DOM node again;
+      // otherwise its retained Text-node reference correctly updates a node the
+      // fixture detached, leaving later DOM observations artificially stale.
+      await cdp.send('Page.reload', {}, sessionId);
+      const projectorReloadDeadline = Date.now() + 15000;
+      while (Date.now() < projectorReloadDeadline) {
+        const ready = await evaluate("window.__SXC1_BOOTED === true && document.querySelector('#sxc1-progress') !== null");
+        if (ready) break;
+        await sleep(30);
+      }
+
+      // -- 4. A numbered panel-callout card must show the cited diagram
+      // beside the question. The image is the actual shipped p.10 scan,
+      // decoded by the browser and cropped to its upper parts diagram.
+      await goto('#/x/ch0-06/q-0-04', '#ex-source-figure');
+      const exerciseFigure = await evaluate(`(async () => {
+        const fig = document.querySelector('#ex-source-figure');
+        const frame = document.querySelector('.exercise-source-frame');
+        const img = document.querySelector('#ex-source-image');
+        const caption = document.querySelector('.exercise-source-caption');
+        let decoded = false;
+        if (img) {
+          try { await img.decode(); decoded = img.naturalWidth > 0 && img.naturalHeight > 0; }
+          catch (_) { decoded = false; }
+        }
+        const box = frame ? frame.getBoundingClientRect() : null;
+        return {
+          figureClass: fig ? fig.className : null,
+          src: img ? img.src : null,
+          decoded,
+          objectFit: img ? getComputedStyle(img).objectFit : null,
+          frameRatio: box && box.height > 0 ? box.width / box.height : null,
+          imageHref: frame ? frame.hash : null,
+          captionHref: caption ? caption.hash : null,
+        };
+      })()`);
+      report(
+        'panel-identification cards render their cited diagram beside the question',
+        Boolean(exerciseFigure
+          && /(?:^|\s)figure-guide-book-10(?:\s|$)/.test(exerciseFigure.figureClass || '')
+          && typeof exerciseFigure.src === 'string' && exerciseFigure.src.endsWith('/pages/guide-book/page-10.webp')
+          && exerciseFigure.decoded === true
+          && exerciseFigure.objectFit === 'cover'
+          && exerciseFigure.frameRatio > 1.3 && exerciseFigure.frameRatio < 1.5
+          && exerciseFigure.imageHref === '#/m/guide-book/p/10'
+          && exerciseFigure.captionHref === '#/m/guide-book/p/10'),
+        exerciseFigure,
+      );
+
+      // -- 4b. Every former recall prompt is now a real flashcard quiz.
+      // The initial Check/Unsure pair is REPLACED by Good/Easy or
+      // Again/Hard, and rating immediately continues. Checking alone
+      // must never create a progress event.
+      await goto('#/', '#sxc1-home');
+      await goto('#/x/ch0-06/q-0-09', '#ex-options');
+      const flashInitial = await evaluate(`(() => {
+        let events = [];
+        try { events = JSON.parse(document.querySelector('#sxc1-event-log')?.textContent || '[]'); } catch (_) {}
+        const options = Array.from(document.querySelectorAll('#ex-options .ex-option'));
+        const actions = Array.from(document.querySelectorAll('#ex-choice-actions > button'));
+        return {
+          optionCount: options.length,
+          optionTypes: options.map((o) => o.querySelector('input')?.type || null),
+          minHeights: options.map((o) => parseFloat(getComputedStyle(o).minHeight)),
+          actionIds: actions.map((b) => b.id),
+          actionTexts: actions.map((b) => b.textContent.trim()),
+          submitDisabled: Boolean(document.querySelector('#btn-ex-submit')?.disabled),
+          gradePresent: Boolean(document.querySelector('#ex-grade-actions')),
+          recallPresent: Boolean(document.querySelector('#ex-recall-flow')),
+          runnerButtonCount: document.querySelectorAll('#sxc1-exercise button').length,
+          runnerButtonIds: Array.from(document.querySelectorAll('#sxc1-exercise button')).map((b) => b.id),
+          eventCount: Array.isArray(events) ? events.length : -1,
+        };
+      })()`);
+      const choseCorrect = await evaluate(`(() => {
+        const label = Array.from(document.querySelectorAll('#ex-options .ex-option'))
+          .find((o) => o.textContent.toLowerCase().includes('buttons switch the effect on/off'));
+        const input = label?.querySelector('input');
+        input?.click();
+        return Boolean(input);
+      })()`);
+      const flashSelected = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 3000 && document.querySelector('#btn-ex-submit')?.disabled) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        return {
+          selected: document.querySelectorAll('#ex-options input:checked').length,
+          submitDisabled: Boolean(document.querySelector('#btn-ex-submit')?.disabled),
+          runnerButtonCount: document.querySelectorAll('#sxc1-exercise button').length,
+          runnerButtonIds: Array.from(document.querySelectorAll('#sxc1-exercise button')).map((b) => b.id),
+        };
+      })()`);
+      await click('#btn-ex-submit');
+      const flashChecked = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 4000 && !document.querySelector('#ex-grade-actions')) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        let events = [];
+        try { events = JSON.parse(document.querySelector('#sxc1-event-log')?.textContent || '[]'); } catch (_) {}
+        const grades = Array.from(document.querySelectorAll('#ex-grade-actions > button'));
+        return {
+          feedback: document.querySelector('#ex-feedback')?.textContent.trim() || null,
+          feedbackCorrect: Boolean(document.querySelector('#ex-feedback.correct')),
+          oldActionsPresent: Boolean(document.querySelector('#ex-choice-actions')),
+          gradeIds: grades.map((b) => b.id),
+          gradeTexts: grades.map((b) => b.textContent.trim()),
+          runnerButtonCount: document.querySelectorAll('#sxc1-exercise button').length,
+          runnerButtonIds: Array.from(document.querySelectorAll('#sxc1-exercise button')).map((b) => b.id),
+          disabledOptions: document.querySelectorAll('#ex-options input:disabled').length,
+          correctMarked: document.querySelectorAll('#ex-options .is-correct').length,
+          eventCount: Array.isArray(events) ? events.length : -1,
+        };
+      })()`);
+      await evaluate("(() => { const b = document.querySelector('#btn-ex-grade-easy'); if (!b) return false; b.click(); return true; })()");
+      const flashEasy = await evaluate(`(async () => {
+        const start = Date.now();
+        const origin = '#/x/ch0-06/q-0-09';
+        while (Date.now() - start < 5000 && (
+          window.location.hash === origin
+          || document.querySelector('#ex-summary')
+          || !document.querySelector('#sxc1-exercise #ex-title')
+          || document.activeElement?.id !== 'ex-title'
+        )) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        let events = [];
+        try { events = JSON.parse(document.querySelector('#sxc1-event-log')?.textContent || '[]'); } catch (_) {}
+        const promptEvent = Array.isArray(events)
+          ? [...events].reverse().find((e) => e.exercise === 'q-0-09' && e.review === 'easy')
+          : null;
+        return {
+          destination: window.location.hash,
+          summaryPresent: Boolean(document.querySelector('#ex-summary')),
+          repeatDecisionPresent: Boolean(document.querySelector('#ex-summary #btn-ex-restart')),
+          focusId: document.activeElement?.id || null,
+          promptEvent,
+        };
+      })()`);
+      await goto('#/', '#sxc1-home');
+      await goto('#/x/ch0-06/q-0-09', '#ex-summary');
+      await evaluate("(() => { const b = document.querySelector('#btn-ex-restart'); if (!b) return false; b.click(); return true; })()");
+      await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 3000 && !document.querySelector('#btn-ex-unsure')) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        return true;
+      })()`);
+      await evaluate("(() => { const b = document.querySelector('#btn-ex-unsure'); if (!b) return false; b.click(); return true; })()");
+      const flashUnsure = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 3000 && !document.querySelector('#btn-ex-grade-again')) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        const grades = Array.from(document.querySelectorAll('#ex-grade-actions > button'));
+        return {
+          feedbackIncorrect: Boolean(document.querySelector('#ex-feedback.incorrect')),
+          selected: document.querySelectorAll('#ex-options input:checked').length,
+          gradeIds: grades.map((b) => b.id),
+          gradeTexts: grades.map((b) => b.textContent.trim()),
+          runnerButtonCount: document.querySelectorAll('#sxc1-exercise button').length,
+          runnerButtonIds: Array.from(document.querySelectorAll('#sxc1-exercise button')).map((b) => b.id),
+        };
+      })()`);
+      await evaluate("(() => { const b = document.querySelector('#btn-ex-grade-again'); if (!b) return false; b.click(); return true; })()");
+      const flashAgain = await evaluate(`(async () => {
+        const start = Date.now();
+        const origin = '#/x/ch0-06/q-0-09';
+        while (Date.now() - start < 5000 && (
+          window.location.hash === origin
+          || document.querySelector('#ex-summary')
+          || !document.querySelector('#sxc1-exercise #ex-title')
+          || document.activeElement?.id !== 'ex-title'
+        )) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        let events = [];
+        try { events = JSON.parse(document.querySelector('#sxc1-event-log')?.textContent || '[]'); } catch (_) {}
+        const promptEvent = Array.isArray(events)
+          ? [...events].reverse().find((e) => e.exercise === 'q-0-09' && e.review === 'again')
+          : null;
+        return {
+          destination: window.location.hash,
+          summaryPresent: Boolean(document.querySelector('#ex-summary')),
+          repeatDecisionPresent: Boolean(document.querySelector('#ex-summary #btn-ex-restart')),
+          focusId: document.activeElement?.id || null,
+          promptEvent,
+        };
+      })()`);
+      report(
+        'flashcards quiz an actual choice, replace each two-action decision with Again/Hard or Good/Easy, advance without a repeat prompt, and persist the chosen grade',
+        Boolean(flashInitial
+          && flashInitial.optionCount === 2
+          && flashInitial.optionTypes.every((t) => t === 'radio')
+          && flashInitial.minHeights.every((h) => h >= 44)
+          && flashInitial.actionIds.join(',') === 'btn-ex-submit,btn-ex-unsure'
+          && /^Check answer$/i.test(flashInitial.actionTexts[0] || '')
+          && /not sure$/i.test(flashInitial.actionTexts[1] || '')
+          && flashInitial.submitDisabled && !flashInitial.gradePresent && !flashInitial.recallPresent
+          && flashInitial.runnerButtonCount === 2
+          && choseCorrect && flashSelected.selected === 1 && !flashSelected.submitDisabled
+          && flashSelected.runnerButtonCount === 2
+          && flashChecked.feedbackCorrect && /^Correct/.test(flashChecked.feedback || '')
+          && !flashChecked.oldActionsPresent
+          && flashChecked.gradeIds.join(',') === 'btn-ex-grade-good,btn-ex-grade-easy'
+          && flashChecked.gradeTexts.join(',') === 'Good,Easy'
+          && flashChecked.runnerButtonCount === 2
+          && flashChecked.disabledOptions === 2 && flashChecked.correctMarked === 1
+          && flashChecked.eventCount === flashInitial.eventCount
+          && /^#\/x\/[^/]+\/[^/]+$/.test(flashEasy.destination || '')
+          && flashEasy.destination !== '#/x/ch0-06/q-0-09'
+          && !flashEasy.summaryPresent && !flashEasy.repeatDecisionPresent
+          && flashEasy.focusId === 'ex-title'
+          && flashEasy.promptEvent?.outcome === 'correct'
+          && flashUnsure.feedbackIncorrect && flashUnsure.selected === 0
+          && flashUnsure.gradeIds.join(',') === 'btn-ex-grade-again,btn-ex-grade-hard'
+          && flashUnsure.gradeTexts.join(',') === 'Again,Hard'
+          && flashUnsure.runnerButtonCount === 2
+          && /^#\/x\/[^/]+\/[^/]+$/.test(flashAgain.destination || '')
+          && flashAgain.destination !== '#/x/ch0-06/q-0-09'
+          && !flashAgain.summaryPresent && !flashAgain.repeatDecisionPresent
+          && flashAgain.focusId === 'ex-title'
+          && flashAgain.promptEvent?.outcome === 'incorrect'),
+        { flashInitial, choseCorrect, flashSelected, flashChecked, flashEasy, flashUnsure, flashAgain },
+      );
+
+      // -- 4c. Hands-on work remains usable away from the instrument.
+      // Skip is the one alternate to Confirm, skips every remaining step,
+      // schedules those prompts back through the ordinary GAgain rule, and
+      // continues without exposing the old completion/repeat summary.
+      await goto('#/', '#sxc1-home');
+      await goto(DEVICE_REAL_CFG.drill.route, '#btn-ex-skip');
+      const skipInitial = await evaluate(`(() => {
+        const buttons = Array.from(document.querySelectorAll('.drill-step-actions > button'));
+        return {
+          ids: buttons.map((button) => button.id),
+          texts: buttons.map((button) => button.textContent.trim()),
+          visible: buttons.every((button) => button.offsetParent !== null),
+          origin: window.location.hash,
+        };
+      })()`);
+      await click('#btn-ex-skip');
+      const skippedDrill = await evaluate(`(async () => {
+        const origin = ${JSON.stringify(DEVICE_REAL_CFG.drill.route)};
+        const start = Date.now();
+        while (Date.now() - start < 5000 && (
+          window.location.hash === origin
+          || document.querySelector('#ex-summary')
+          || !document.querySelector('#sxc1-exercise #ex-title')
+          || document.activeElement?.id !== 'ex-title'
+        )) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        while (Date.now() - start < 5000) {
+          let p = null;
+          try { p = JSON.parse(document.querySelector('#sxc1-progress')?.textContent || 'null'); } catch (_) {}
+          const due = Array.isArray(p?.queue)
+            ? p.queue.filter((id) => id.startsWith(${JSON.stringify(`${DEVICE_REAL_CFG.drill.exId}#`)}))
+            : [];
+          if (p?.masteryDone?.includes(${JSON.stringify(DEVICE_REAL_CFG.drill.exId)})
+            && due.length === ${DEVICE_REAL_CFG.drill.steps}) break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        let events = [];
+        let progress = null;
+        try { events = JSON.parse(document.querySelector('#sxc1-event-log')?.textContent || '[]'); } catch (_) {}
+        try { progress = JSON.parse(document.querySelector('#sxc1-progress')?.textContent || 'null'); } catch (_) {}
+        const promptEvents = Array.isArray(events)
+          ? events.filter((event) => event.exercise === ${JSON.stringify(DEVICE_REAL_CFG.drill.exId)} && event.outcome === 'skipped')
+          : [];
+        return {
+          destination: window.location.hash,
+          summaryPresent: Boolean(document.querySelector('#ex-summary')),
+          repeatDecisionPresent: Boolean(document.querySelector('#ex-summary #btn-ex-restart')),
+          focusId: document.activeElement?.id || null,
+          promptEvents,
+          completedEvent: Array.isArray(events) && events.some((event) =>
+            event.exercise === ${JSON.stringify(DEVICE_REAL_CFG.drill.exId)} && event.outcome === 'completed'),
+          duePrompts: Array.isArray(progress?.queue)
+            ? progress.queue.filter((id) => id.startsWith(${JSON.stringify(`${DEVICE_REAL_CFG.drill.exId}#`)}))
+            : [],
+          masteryDone: Array.isArray(progress?.masteryDone)
+            && progress.masteryDone.includes(${JSON.stringify(DEVICE_REAL_CFG.drill.exId)}),
+          progressRecords: progress?.records ?? null,
+          progressQueue: progress?.queue ?? null,
+          progressDone: progress?.masteryDone ?? null,
+          storageHasDrill: (() => {
+            try { return (localStorage.getItem('sxc1.progress') || '').includes(${JSON.stringify(DEVICE_REAL_CFG.drill.exId)}); }
+            catch (_) { return null; }
+          })(),
+        };
+      })()`);
+      report(
+        'hands-on cards offer Confirm/Skip; Skip schedules unfinished steps and continues without a repeat prompt',
+        Boolean(skipInitial
+          && skipInitial.ids.join(',') === 'btn-ex-skip,btn-ex-confirm-1'
+          && /^Skip for now$/.test(skipInitial.texts[0] || '')
+          && /^Yes . done$/.test(skipInitial.texts[1] || '')
+          && skipInitial.visible
+          && /^#\/x\/[^/]+\/[^/]+$/.test(skippedDrill?.destination || '')
+          && skippedDrill.destination !== skipInitial.origin
+          && !skippedDrill.summaryPresent && !skippedDrill.repeatDecisionPresent
+          && skippedDrill.focusId === 'ex-title'
+          && skippedDrill.promptEvents.length === DEVICE_REAL_CFG.drill.steps
+          && skippedDrill.completedEvent && skippedDrill.duePrompts.length === DEVICE_REAL_CFG.drill.steps
+          && skippedDrill.masteryDone),
+        { skipInitial, skippedDrill },
+      );
+
+      // The live flashcard check deliberately grades twice. This primary
+      // target is also the one handed to the later persistence suite,
+      // whose first contract is a genuinely fresh profile. Remove only
+      // the progress key created above, then reload to clear the in-memory
+      // event log and exercise states; preferences remain untouched.
+      await evaluate(`(() => {
+        window.localStorage.removeItem('sxc1.progress');
+        window.__SXC1_BOOTED = false;
+        return true;
+      })()`);
+      await cdp.send('Page.reload', {}, sessionId);
+      const flashCleanupDeadline = Date.now() + 15000;
+      let flashCleanupBooted = false;
+      while (Date.now() < flashCleanupDeadline) {
+        let booted = false;
+        try { booted = await evaluate('window.__SXC1_BOOTED === true'); }
+        catch (_) { booted = false; }
+        if (booted) { flashCleanupBooted = true; break; }
+        await sleep(60);
+      }
+      if (!flashCleanupBooted) throw new Error('app did not reboot after flashcard test cleanup');
+
+      // -- 5. guide-book TOC has the five exact PART titles -----------------------
       await goto('#/m/guide-book', '#sxc1-toc');
       const tocText = await evaluate(`(() => {
         const e = document.querySelector('#sxc1-toc');
@@ -9371,9 +10715,11 @@ async function main() {
           // NEW11: section E now manufactures a real due-today record by
           // answering incorrectly first -- see runProgressAssertionsPost.
           quizWrongOpt: exerciseFixture.quiz.wrongOpt,
-          lookupDeck: exerciseFixture.lookup.deck,
-          lookupId: exerciseFixture.lookup.id,
-          lookupTargetPage: exerciseFixture.lookup.targetPage,
+          priorKind: exerciseFixture.lookup ? 'lookup' : 'drill',
+          priorDeck: exerciseFixture.lookup ? exerciseFixture.lookup.deck : exerciseFixture.drill.deck,
+          priorId: exerciseFixture.lookup ? exerciseFixture.lookup.id : exerciseFixture.drill.id,
+          priorTargetPage: exerciseFixture.lookup ? exerciseFixture.lookup.targetPage : null,
+          priorSteps: exerciseFixture.drill.steps,
           deckSlug: exerciseFixture.quiz.deck,
           expectedTier: deckTierFromDisk(exerciseFixture.quiz.deck),
           manualSlug: 'guide-book',
@@ -9468,14 +10814,19 @@ async function main() {
           ['#/m/guide-book/p/17', '#page-17'],
           ['#/m/guide-book/p/17/ja', '#ja-panel'],
           ['#/x', '#sxc1-exercise-index'],
+          ['#/x/today', '#sxc1-session .session-hero'],
+          ['#/x/map', '#sxc1-mastery'],
+          ['#/x/week', '#sxc1-weekly .weekly-hero'],
         ];
         if (exerciseFixture) {
           m5MobileRoutes.push(
             [`#/x/${exerciseFixture.quiz.deck}`, '#sxc1-deck'],
             [`#/x/${exerciseFixture.quiz.deck}/${exerciseFixture.quiz.id}`, '.kind-quiz'],
             [`#/x/${exerciseFixture.drill.deck}/${exerciseFixture.drill.id}`, '.kind-drill'],
-            [`#/x/${exerciseFixture.lookup.deck}/${exerciseFixture.lookup.id}`, '.kind-lookup'],
           );
+          if (exerciseFixture.lookup) {
+            m5MobileRoutes.push([`#/x/${exerciseFixture.lookup.deck}/${exerciseFixture.lookup.id}`, '.kind-lookup']);
+          }
         }
         for (const [w, hgt] of [[360, 640], [320, 568]]) {
           await cdp.send('Emulation.setDeviceMetricsOverride', {
@@ -9530,6 +10881,107 @@ async function main() {
         }
         await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
       }
+
+      // -- 13c. Finish one real planned quiz. A forward grade is already the
+      // learner's navigation decision: the transient engine completion must
+      // mark the plan and route directly to a different planned card without
+      // exposing the redundant summary/repeat choice.
+      await gotoSessionSurface('#/x/today', '#sxc1-session .session-hero');
+      const completionTarget = await evaluate(`(() => {
+        const state = window.__sxc1TodaySession;
+        const cards = Array.from(document.querySelectorAll('#sxc1-session .session-card'));
+        const index = (state?.types || []).findIndex((type) => type === 'quiz');
+        const card = index >= 0 ? cards[index] : null;
+        return card ? {
+          id: state.ids[index],
+          href: card.getAttribute('href'),
+          index,
+        } : null;
+      })()`);
+      let completionResult = null;
+      if (completionTarget?.href) {
+        await gotoSessionSurface(completionTarget.href, '#sxc1-session-coach');
+        completionResult = await evaluate(`(async () => {
+          const waitFor = async (selector, timeout = 4000) => {
+            const start = Date.now();
+            while (Date.now() - start < timeout) {
+              const element = document.querySelector(selector);
+              if (element) return element;
+              await new Promise((resolve) => setTimeout(resolve, 20));
+            }
+            return null;
+          };
+          const option = document.querySelector('.ex-option');
+          const origin = window.location.hash;
+          if (option) {
+            option.click();
+            const submit = await waitFor('#btn-ex-submit:not(:disabled)');
+            submit?.click();
+            const grade = await waitFor('#btn-ex-grade-easy, #btn-ex-grade-hard');
+            grade?.click();
+          }
+          const start = Date.now();
+          while (Date.now() - start < 5000 && (
+            window.location.hash === origin
+            || document.querySelector('#ex-summary')
+            || !document.querySelector('#sxc1-session-coach')
+            || document.activeElement?.id !== 'ex-title'
+          )) {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          return {
+            origin,
+            destination: window.location.hash,
+            summaryPresent: Boolean(document.querySelector('#ex-summary')),
+            repeatDecisionPresent: Boolean(document.querySelector('#ex-summary #btn-ex-restart')),
+            focusId: document.activeElement?.id || null,
+            completedCount: window.__sxc1TodaySession?.completedCount ?? null,
+          };
+        })()`);
+      }
+      // Simulate the refresh/lost-tab-marker failure: erase the
+      // session-only completion list while leaving Haskell progress
+      // intact. Today's Session must recover from masteryDone.
+      const droppedTransientMarker = completionTarget ? await evaluate(`(() => {
+        try {
+          const key = 'sxc1.today-session.v1';
+          const plan = JSON.parse(sessionStorage.getItem(key) || 'null');
+          if (!plan || !Array.isArray(plan.completed)) return false;
+          plan.completed = [];
+          sessionStorage.setItem(key, JSON.stringify(plan));
+          return true;
+        } catch (_) { return false; }
+      })()`) : false;
+      await gotoSessionSurface('#/x/today', '#sxc1-session .session-hero');
+      const completionPlan = completionTarget ? await evaluate(`(() => {
+        const row = document.querySelector('.session-item[data-exercise=${JSON.stringify(completionTarget.id)}]');
+        let progress = null;
+        let stored = null;
+        try { progress = JSON.parse(document.querySelector('#sxc1-progress')?.textContent || 'null'); } catch (_) {}
+        try { stored = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+        return {
+          done: Boolean(row?.classList.contains('is-done')),
+          startHref: document.querySelector('#btn-session-start')?.getAttribute('href') || null,
+          completedCount: window.__sxc1TodaySession?.completedCount ?? null,
+          persistedDone: Boolean(progress?.masteryDone?.includes(${JSON.stringify(completionTarget.id)})),
+          recoveredStoredMarker: Boolean(stored?.completed?.includes(${JSON.stringify(completionTarget.id)})),
+        };
+      })()`) : null;
+      report(
+        "today's session marks a finished card and advances to the next planned card",
+        Boolean(completionTarget
+          && /^#\/x\/[^/]+\/[^/]+$/.test(completionResult?.destination || '')
+          && completionResult.destination !== completionTarget.href
+          && completionResult.origin === completionTarget.href
+          && !completionResult.summaryPresent && !completionResult.repeatDecisionPresent
+          && completionResult.focusId === 'ex-title'
+          && completionResult.completedCount >= 1
+          && droppedTransientMarker
+          && completionPlan?.persistedDone && completionPlan.recoveredStoredMarker
+          && completionPlan.done && completionPlan.completedCount >= 1
+          && completionPlan.startHref && completionPlan.startHref !== completionTarget.href),
+        { completionTarget, completionResult, droppedTransientMarker, completionPlan },
+      );
 
       // -- 14 (M4). THE DEVICE SUITE, D1..D25 -- always part of a real
       // run (no flag: the routes are the seed corpus's own, present in

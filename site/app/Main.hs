@@ -21,7 +21,8 @@ import           SXC1.Exercise.Types
 import           SXC1.Progress.Codec    (DecodeResult (..), Prefs (..), currentSchema,
                                          exportBlob, importBlob)
 import           SXC1.Progress.Scheduler (applyEvents, dueCount, retention, reviewQueue)
-import           SXC1.Progress.Types    (DayNum (..), ProgressState (..), dayOf, emptyProgress)
+import           SXC1.Progress.Types    (DayNum (..), Grade (..), ProgressState (..), PulseEntry (..),
+                                         Rec (..), dayOf, emptyProgress)
 import           SXC1.Route             (Route (..), parseDigits, parseRoute, renderRoute)
 
 import           I18n                   (Lang, iImportEmptyReason, langFromCode)
@@ -37,7 +38,7 @@ import           Exercises.Corpus       (checkedCorpusOf, exerciseStatsJsonOf, j
                                           jStr)
 import           View.Exercise          (DevView (..), ExHandlers (..))
 import qualified View.Exercise          as Exercise
-import           View.Pages             (Manuals, contentDegradedView, emptyManuals, mkManuals, viewRoute)
+import           View.Pages             (Manuals, contentDegradedView, emptyManuals, masteryShellView, mkManuals, sessionShellView, weeklyShellView, viewRoute)
 import           View.Progress          (ProgData (..), ProgHandlers (..))
 
 -- | Read window.location.hash via Miso's own DSL.
@@ -999,7 +1000,7 @@ applyExActions corpus sink exid acts = case findExerciseById corpus exid of
     let key            = unExId exid
         st0            = Map.findWithDefault (initialState exid (MonoMs 0)) key states
         (st1, evsAll)   = foldl' applyOne (st0, []) acts
-        applyOne (st, evs) act = let (st', ev') = step ex act st in (st', evs ++ ev')
+        applyOne (st, evs) act = let (st', ev') = stepLive ex act st in (st', evs ++ ev')
         startsFresh a = case a of { Begin _ _ -> True; Restart _ _ -> True; _ -> False }
         thisExPromptPrefix = key <> "#"
         clearStale = any startsFresh acts
@@ -1018,10 +1019,17 @@ applyExActions corpus sink exid acts = case findExerciseById corpus exid of
         minDay = DayNum 0
     modify (\m -> m
       { mExStates  = Map.insert key st1 (mExStates m)
-      , mExResults = foldr recordResult (dropStale (mExResults m)) evsAll
+      -- A manual Restart must not paint the previous attempt's result onto
+      -- the fresh prompt. Drop transient results after folding the batch so
+      -- any future compound restart action remains safe as well.
+      , mExResults = dropStale (foldr recordResult (mExResults m) evsAll)
       , mEventLog  = capEvents (mEventLog m ++ evsAll)
       , mProgress  = prog1
       , mToday     = max (mToday m) today'
+      -- Any new learning event makes the last generated passport stale.
+      -- Clearing it restores the single Export action; once regenerated,
+      -- JS replaces Export with the Save/Share pair again.
+      , mExportBlob = if null evsAll then mExportBlob m else Nothing
         -- M4 gate-1 fix (briefs/M4-codex-gate1.json, HIGH finding): a
         -- 'Begin' (every exercise load) or 'Restart' starts a FRESH
         -- attempt, so the attempt generation bumps in the same modify
@@ -1081,11 +1089,13 @@ applyExActions corpus sink exid acts = case findExerciseById corpus exid of
 exHandlersFor :: ExId -> ExHandlers Action
 exHandlersFor exid = ExHandlers
   { exOnToggle     = \i optIdent -> ExBatch exid [Toggle i optIdent]
-  , exOnSubmit     = \i -> ExClocked exid (\mono wall -> [Submit i mono wall])
-  , exOnReveal     = \i -> ExBatch exid [Reveal i]
-  , exOnGot        = \i -> ExClocked exid (\mono wall -> [SelfGrade_ i Got mono wall])
-  , exOnMissed     = \i -> ExClocked exid (\mono wall -> [SelfGrade_ i Missed mono wall])
+  , exOnCheck      = \i unsure -> ExBatch exid [Check i unsure]
+  , exOnRate       = \i grade -> ExClocked exid (\mono wall ->
+      [ Rate i grade mono wall
+      , Advance mono wall
+      ])
   , exOnConfirm    = \i -> Dev (DConfirm ByLearner exid (unPromptId (promptIdFor exid (i + 1))) Nothing)
+  , exOnSkip       = \remaining -> ExClocked exid (\mono wall -> replicate (max 1 remaining) (Advance mono wall))
   , exOnFindInput  = \i txt -> case parseDigits (fromMisoString txt) of
       Just n  -> ExBatch exid [EnterPage i n]
       Nothing -> NoOp
@@ -1124,9 +1134,15 @@ currentResult corpus m exid st = do
 exerciseBodyView :: [Deck] -> Maybe Text -> Model -> Route -> Maybe (View Model Action)
 exerciseBodyView corpus mContentErr m route = case route of
   RExercises   | Just err <- mContentErr -> Just (contentDegradedView lang err)
+  RSession     | Just err <- mContentErr -> Just (contentDegradedView lang err)
+  RMastery     | Just err <- mContentErr -> Just (contentDegradedView lang err)
+  RWeekly      | Just err <- mContentErr -> Just (contentDegradedView lang err)
   RDeck _      | Just err <- mContentErr -> Just (contentDegradedView lang err)
   RExercise _ _ | Just err <- mContentErr -> Just (contentDegradedView lang err)
   RExercises -> Just (Exercise.viewExerciseIndex lang (mProgress m) corpus)
+  RSession -> Just (sessionShellView lang)
+  RMastery -> Just (masteryShellView lang)
+  RWeekly -> Just (weeklyShellView lang)
   RDeck slug -> Just (Exercise.viewDeck lang (mProgress m) corpus slug)
   RExercise deckSlug exSlug ->
     let exid   = ExId exSlug
@@ -1152,9 +1168,16 @@ eventJson ev = jObj
   , jKV "attempt"   (jInt (peAttempt ev))
   , jKV "revealed"  (jBool (peRevealed ev))
   , jKV "hints"     (jInt (peHints ev))
+  , jKV "review"    (maybe "null" (jStr . reviewText) (peReview ev))
   , jKV "elapsedMs" (jInt (peElapsed ev))
   , jKV "at"        (jInteger (peAt ev))
   ]
+  where
+    reviewText review = case review of
+      ReviewAgain -> "again"
+      ReviewHard  -> "hard"
+      ReviewGood  -> "good"
+      ReviewEasy  -> "easy"
 
 kindText :: Kind -> Text
 kindText KQuiz   = "quiz"
@@ -1214,6 +1237,15 @@ progressJson corpus m = jObj
     -- when they differ the #sxc1-lang-split banner is on screen and the
     -- harness can assert the split by value rather than by prose.
   , jKV "contentLang" (jStr (mContentLang m))
+  , jKV "masteryToday" (jInt (unDayNum today))
+  , jKV "masteryRecs" (jArr
+      [ jArr [ jStr pid, jInt (rcReps rec), jInt (rcInterval rec), jInt (unDayNum (rcDue rec))
+             , jInt (rcLapses rec), jInt (rcEase rec), jInt (unDayNum (rcLastSeen rec)), jInt (rcSeen rec) ]
+      | (pid, rec) <- Map.toList (psRecs st)
+      ])
+  , jKV "masteryDone" (jArr
+      [ jStr eid | (eid, count) <- Map.toList (psDone st), count > 0 ])
+  , jKV "weeklyPulse" (jArr (map pulseJson (psPulse st)))
   ]
   where
     st    = mProgress m
@@ -1221,6 +1253,18 @@ progressJson corpus m = jObj
     (liveRecs, retiredRecs) =
       Map.partitionWithKey (\k _ -> Map.member k (allCorpusPromptIds corpus)) (psRecs st)
     liveState = st { psRecs = liveRecs }
+    pulseJson entry = jArr
+      [ jInt (unDayNum (plDay entry))
+      , jStr (plDeck entry)
+      , jStr (plExercise entry)
+      , maybe "null" jStr (plPrompt entry)
+      , jStr (gradeText (plGrade entry))
+      ]
+    gradeText grade = case grade of
+      GAgain -> "again"
+      GHard  -> "hard"
+      GGood  -> "good"
+      GEasy  -> "easy"
 
 -- | M3 (task "progress-ui"): the "View.Exercise"\/"View.Pages" call
 -- sites' handler bundle -- mirrors 'exHandlersFor' exactly. 'phJaFirst' is

@@ -19,6 +19,9 @@
 module View.Pages
   ( viewRoute
   , contentDegradedView
+  , masteryShellView
+  , sessionShellView
+  , weeklyShellView
     -- * M7 W1: the fetched manual corpus
   , Manuals
   , mkManuals
@@ -257,6 +260,35 @@ contentDegradedView lang err = H.section_ [ P.id_ "sxc1-exercise-degraded" ]
   , H.p_ [] [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RHome)) ] [ text (ms (iBackToManuals lang)) ] ]
   ]
 
+-- | A deliberately tiny shell: the already-loaded course bundle and the
+-- machine-readable progress payload are both available to index.js. Keeping
+-- journey hydration there avoids linking a second wide rendering surface into
+-- the size-constrained wasm artifact.
+masteryShellView :: Lang -> View model action
+masteryShellView lang = H.section_
+  [ P.id_ "sxc1-mastery"
+  , textProp "data-lang" (ms (langCode lang))
+  ] []
+
+-- | The daily coach is hydrated by the static shell from the same validated
+-- course bundle and machine-readable progress payload as the mastery journey.
+-- Keeping the Haskell surface this small avoids growing app.wasm for a view
+-- whose plan is intentionally tab-scoped and progressively enhanced.
+sessionShellView :: Lang -> View model action
+sessionShellView lang = H.article_
+  [ P.id_ "sxc1-session"
+  , textProp "data-lang" (ms (langCode lang))
+  ] []
+
+-- | M10's Weekly Pulse is another deliberately tiny, progressively hydrated
+-- shell. Its durable source is the versioned progress payload; the static DOM
+-- renderer keeps the phone surface out of the size-constrained wasm artifact.
+weeklyShellView :: Lang -> View model action
+weeklyShellView lang = H.section_
+  [ P.id_ "sxc1-weekly"
+  , textProp "data-lang" (ms (langCode lang))
+  ] []
+
 -- | M7 W1: the manual-route counterpart of 'contentDegradedView'. Same
 -- id vocabulary, same single retry affordance, same "what still works"
 -- reassurance in the other direction.
@@ -281,9 +313,15 @@ routeBody lang _   mn ph pd _          _             RHome              = homeVi
 routeBody lang _   mn _  _  _          _             (RManual slug)      = tocView lang mn slug
 routeBody lang act mn _  pd _          _             (RPage slug n ja)   = pageView lang act mn (pdJaFirst pd) slug n ja
 routeBody _    _   _  _  _  _          (Just exBody) RExercises          = exBody
+routeBody _    _   _  _  _  _          (Just exBody) RSession            = exBody
+routeBody _    _   _  _  _  _          (Just exBody) RMastery            = exBody
+routeBody _    _   _  _  _  _          (Just exBody) RWeekly             = exBody
 routeBody _    _   _  _  _  _          (Just exBody) (RDeck _)           = exBody
 routeBody _    _   _  _  _  _          (Just exBody) (RExercise _ _)     = exBody
 routeBody lang _   _  _  _  _          Nothing       r@RExercises        = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  _  _          Nothing       r@RSession          = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  _  _          Nothing       r@RMastery          = notFoundView lang (renderRoute r)
+routeBody lang _   _  _  _  _          Nothing       r@RWeekly           = notFoundView lang (renderRoute r)
 routeBody lang _   _  _  _  _          Nothing       r@(RDeck _)         = notFoundView lang (renderRoute r)
 routeBody lang _   _  _  _  _          Nothing       r@(RExercise _ _)   = notFoundView lang (renderRoute r)
 routeBody lang _   _  _  _  _          _             (RNotFound path)    = notFoundView lang path
@@ -333,6 +371,9 @@ breadcrumbFor lang mn (RPage slug n _ja) = case (statsFor mn slug, rawFor mn slu
   (Just st, Just raw) | n >= 1 && n <= stPages st -> [ pageBreadcrumb lang slug st (buildOutline raw) n ]
   _                                                 -> []
 breadcrumbFor lang _ RExercises      = [ trainingCrumb lang ]
+breadcrumbFor lang _ RSession        = [ trainingCrumb lang ]
+breadcrumbFor lang _ RMastery        = [ trainingCrumb lang ]
+breadcrumbFor lang _ RWeekly         = [ trainingCrumb lang ]
 breadcrumbFor lang _ (RDeck _)       = [ trainingCrumb lang ]
 breadcrumbFor lang _ (RExercise _ _) = [ trainingCrumb lang ]
 breadcrumbFor _ _ (RNotFound _) = []
@@ -432,7 +473,9 @@ deviceStateView :: T.Text -> View model action
 deviceStateView t = H.div_ [ P.id_ "sxc1-device-state", P.hidden_ True ] [ text (ms t) ]
 
 --------------------------------------------------------------------------
--- Home ("#/"): project blurb + phone QR + one card per manual.
+-- Home ("#/"): a visible phone handoff, then a two-choice wizard fork.
+-- The green path goes straight to the best next card; the red path opens
+-- the course/manual outline and advanced progress tools.
 --------------------------------------------------------------------------
 
 -- | The shareable production URL encoded in @site\/static\/qr-phone.svg@.
@@ -446,9 +489,18 @@ homeView :: Lang -> Manuals -> ProgHandlers action -> ProgData -> View model act
 homeView lang mn ph pd = H.section_ [ P.id_ "sxc1-home" ]
   ( [ H.p_ [] [ text (ms (iHomeBlurb lang)) ]
     , phoneQrView lang
-    , H.ul_ [ P.class_ "manual-list" ] (map (manualCard lang mn) (mnStats mn) ++ [ trainingCard lang ])
     ]
-    ++ Progress.progressHomeView ph pd
+    ++ Progress.progressHomeNotices pd
+    ++ [ H.div_ [ P.id_ "sxc1-wizard-actions", P.class_ "wizard-actions" ]
+          [ Progress.primaryTrainingView pd
+          , H.details_ [ P.id_ "sxc1-browse-library", P.class_ "home-disclosure wizard-choice wizard-no" ]
+              ( H.summary_ [] [ text (ms (iBrowseLibrary lang)) ]
+              : H.ul_ [ P.class_ "manual-list" ]
+                  (trainingCard lang : weeklyCard lang : masteryCard lang : map (manualCard lang mn) (mnStats mn))
+              : Progress.progressHomeView ph pd
+              )
+          ]
+       ]
   )
 
 -- | Laptop -> phone handoff: a static QR for the Vercel mirror, so a
@@ -479,14 +531,30 @@ phoneQrView lang = H.aside_ [ P.id_ "sxc1-phone-qr", textProp "aria-label" (ms (
       ]
   ]
 
--- | The Training entry point (briefs/M2-manifest.json, task
--- "exercise-ui", item 4): links to "#/x", the exercise index -- reuses
--- M1's own @.manual-card@ styling rather than inventing a new one.
+-- | Secondary access to the full course outline. The primary home action
+-- links directly to the next exercise; this link is for deliberate
+-- browsing and therefore lives inside the red wizard choice.
 trainingCard :: Lang -> View model action
 trainingCard lang = H.li_ []
   [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RExercises)) ]
       [ H.strong_ [] [ text (ms (iTraining lang)) ]
       , H.small_ [] [ text (ms (iTrainingCardSub lang)) ]
+      ]
+  ]
+
+masteryCard :: Lang -> View model action
+masteryCard lang = H.li_ []
+  [ H.a_ [ P.class_ "manual-card mastery-home-card", P.href_ (ms (renderRoute RMastery)) ]
+      [ H.strong_ [] [ text (ms (iMasteryTitle lang)) ]
+      , H.small_ [] [ text (ms (iMasteryCardSub lang)) ]
+      ]
+  ]
+
+weeklyCard :: Lang -> View model action
+weeklyCard lang = H.li_ []
+  [ H.a_ [ P.class_ "manual-card weekly-home-card", P.href_ (ms (renderRoute RWeekly)) ]
+      [ H.strong_ [] [ text (ms (iWeeklyTitle lang)) ]
+      , H.small_ [] [ text (ms (iWeeklyCardSub lang)) ]
       ]
   ]
 

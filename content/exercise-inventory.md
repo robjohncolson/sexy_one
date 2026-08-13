@@ -6,6 +6,8 @@
 
 **IDs.** Every candidate has a stable id `t-c-nn` where `t` is `q` (quiz/flashcard), `d` (device drill), or `l` (reference lookup); `c` is the chapter number **in this inventory's 0–5 order** (0 = front matter, pp. 1–11; 1 = Preparation … 5 = Leveling up — chapters 1–5 are offset by one from the book's own PART numbers, and chapter 0 covers the unnumbered material before the book's parts); `nn` is a two-digit sequence. Ids are stable: never renumber; retired items keep their id with a tombstone note.
 
+**Operation-first revision (2026-08-09).** All 81 `l-*` reference-lookup candidates, plus `q-2-29` and `q-3-12`, are retired from the shipped course. They tested navigation of the printed Guide Book rather than operation of the SXC-1. Their IDs remain tombstoned in `content/id-registry.tsv`; the lists below are retained only as historical inventory.
+
 **Difficulty tags.** `intro` = first-contact, single-fact or single-action; `core` = the chapter's central skills/facts; `stretch` = advanced, destructive, multi-mode, or spec-level material.
 
 Terminology follows `translations/glossary.md` (binding): on-device labels verbatim, "Part: X" chapter titles, "tap a pad", "assign" (never "register").
@@ -21,10 +23,9 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 2. Distinguish the five connectors of the connector section (PHONE, LINE OUT, AUDIO IN jacks; DATA, POWER/DATA ports); of the two USB ports, only POWER/DATA supplies power (p. 10).
 3. Map each `INPUT SELECT` position (`MIC` / `♪` / `USB`) to its input source (p. 10).
 4. Interpret the safety labels (Warning / Caution) and the Prohibited / Required graphic symbols (p. 3).
-5. Locate — not memorize — the applicable safety/operating precaution (batteries, USB cable/power, placement and environment, cleaning, volume, straps, backup) (pp. 2–9).
+5. Apply the applicable safety and operating precautions when using batteries, USB power, volume controls, and external equipment (pp. 2–9).
 6. Apply the everyday operating practices: MAIN VOL to minimum before power-on or headphones; close-range mic use; screen saver (≈30 min) vs Auto Power Off; USB power takes priority over batteries; LINE OUT does not silence the speaker (pp. 7–8).
 7. Navigate the Operation overview mode map: which press (short/long, which button) reaches each screen from Performance mode (p. 11).
-8. Use the p. 11 function table to find the page where each function is explained (p. 11).
 
 ### Chapter 1 — Part: Preparation (pp. 12–13; Startup Guide pp. 6, 13)
 1. Power the unit from an outlet: included USB Type-C cable → POWER/DATA port → USB AC adaptor (p. 12; Startup Guide p. 6).
@@ -134,7 +135,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 #### Device drill candidates
 *None — front matter contains no hands-on procedures; its material is identification (flashcards) and safety/spec reference (lookups), and the p. 11 mode-map transitions are drilled in the chapters that own each mode.*
 
-#### Reference-lookup candidates
+#### Retired reference-lookup candidates (historical; not shipped)
 - **l-0-01** (intro) On which page does each PART of the Guide Book begin? → CONTENTS (p. 1).
 - **l-0-02** (intro) What general notes precede use (accuracy, liability for damages and data loss, no reproduction, keep the manual)? → "Please note the following" (p. 2).
 - **l-0-03** (intro) What do the safety labels and graphic symbols mean in detail? → label table and symbol examples, head of "Safety precautions" (p. 3).
@@ -192,7 +193,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **d-1-05** (intro) **Output sound through headphones and the built-in speaker** — Play a sound with nothing in the PHONE jack (rear speaker sounds), connect headphones, play again (headphones only), adjust MAIN VOL. Success: speaker silent while headphones connected; MAIN VOL audibly changes level. (p. 13; Startup Guide p. 6)
 - **d-1-06** (intro) **Output sound through the LINE OUT jack** — Connect active speakers or a mixer to LINE OUT (3.5 mm stereo mini) and play. Success: sound from the external gear. (p. 13)
 
-#### Reference-lookup candidates
+#### Retired reference-lookup candidates (historical; not shipped)
 - **l-1-01** (intro) Where do you set the time until Auto Power Off? → System settings, `APO Time` (see p. 55; pointer on p. 12).
 - **l-1-02** (intro) What output rating must a commercially available USB AC adaptor have, and the cable requirements? → Power notes, p. 12 (also Startup Guide p. 6).
 - **l-1-03** (intro) Model number of the separately available USB AC adaptor? → p. 12 (also Startup Guide p. 6).
@@ -233,7 +234,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-2-26** (core) Quantize (Beat Sync) corrects slight timing errors when triggering a second looped sound, aligning loop starts precisely (p. 18). [Sequencer quantize is q-4-33.]
 - **q-2-27** (intro) When you tap a pad, the sound's waveform is displayed; a vertical line moves left to right as it plays (p. 19).
 - **q-2-28** (intro) Waveform axes: vertical = loudness, horizontal = passage of time (p. 19).
-- **q-2-29** (intro) The waveform display is also used in systems employed for professional recording (p. 19).
+- **q-2-29** (retired) Manual-context trivia: the waveform display is also used in systems employed for professional recording (p. 19).
 - **q-2-30** (core) `ONE SHOT` ON (lit): tap and the sound plays to the end; tapping again before it finishes restarts from the beginning (p. 21).
 - **q-2-31** (core) `ONE SHOT` OFF (unlit): the sound plays only while the pad is held and stops on release; tapping again restarts (p. 21).
 - **q-2-32** (core) `LOOP` ON (lit): the sound plays repeatedly; stops on pad tap or `▶/■` (p. 21).
@@ -275,7 +276,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **d-2-09** (core) **Select and apply effects with FX1/FX2** — With a loop playing: FX1 unlit + dial = type (watch `EFFECT INFO`), FX1 lit + dial = strength; repeat for FX2; apply both. Success: display shows `FX1:`/`FX2:` types; the whole mix audibly changes; FX2 sweeps dry (0) to wet (100). (pp. 24–25)
 - **d-2-10** (stretch) **Finger-drumming technique practice** — Assign fingers (kick=thumb, snare=index, hi-hat=middle), start ~50 BPM, practice kick+snare then hi-hat+snare, raise tempo (100, 150 BPM…). Success: steady pattern with assigned fingers at increasing tempos. (p. 26)
 
-#### Reference-lookup candidates
+#### Retired reference-lookup candidates (historical; not shipped)
 - **l-2-01** (core) What does each `ONE SHOT`/`LOOP` state combination do? → tables and four-row state diagram (p. 21).
 - **l-2-02** (intro) Which sounds are on which BANK1 pads? → pad-layout callout figure (p. 17).
 - **l-2-03** (core) Which effect types are on FX1/FX2 and what does each dial change? → "Effects explained" list (p. 25).
@@ -305,7 +306,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-3-09** (core) When sampling with the built-in microphone, set `INPUT VOL` to maximum (p. 28).
 - **q-3-10** (intro) Use the included USB cable to connect to a smartphone (p. 28).
 - **q-3-11** (core) Adjust the device volume and `INPUT VOL` so the level meter does not peak out while recording (p. 28).
-- **q-3-12** (intro) Before connecting external devices, read "Connections" on p. 8 (p. 28).
+- **q-3-12** (retired) Manual-navigation trivia: before connecting external devices, read "Connections" on p. 8 (p. 28).
 - **q-3-13** (intro) Pressing the `REC` button in Performance mode enters Sampling mode (p. 29). [Reinforces q-0-38.]
 - **q-3-14** (intro) In Sampling mode, the `REC` button flashes and the empty pads flash (p. 29).
 - **q-3-15** (intro) The Sampling mode display shows `SAMPLING MODE` with the trigger setting and L/R level meters (p. 29).
@@ -348,7 +349,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **d-3-08** (core) **Delete samples from pads** — `DEL` → assigned pads flash → select pad(s) (lit white) → confirm with `A`. Success: `DELETING` shown, pad goes out, tapping produces no sound. (p. 32)
 - **d-3-09** (stretch) **Record from an external source** — Connect instrument to AUDIO IN (♪) or smartphone to DATA (read "Connections", p. 8), set `INPUT SELECT` to `♪`/`USB`, level so the meter doesn't peak, sample as in d-3-03. Success: no peaking; pad lights yellow with the external sound. (pp. 28–30)
 
-#### Reference-lookup candidates
+#### Retired reference-lookup candidates (historical; not shipped)
 - **l-3-01** (intro) Which bank besides BANK 15 has empty pads to sample to? → note on p. 28 (BANK 14, unlit pads).
 - **l-3-02** (intro) Where are the connection instructions to read before recording external devices? → "Connections", p. 8 (referenced from p. 28).
 - **l-3-03** (core) What trigger settings exist in Sampling mode and what does each do? → steps 3–4, p. 29 (`AUTO TRIGGER`, `MANUAL TRIGGER`).
@@ -428,7 +429,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **d-4-10** (core) **Work through the SEQUENCE EDIT settings** — `EDIT`; change SOUND BANK (and back), BPM, METRONOME (ON/OFF, VOLUME 1–3, PATTERN 1/2), PRECOUNT; `EDIT` to return. Success: values change on screen, tempo audibly changes, PRECOUNT OFF removes the 4-count. (p. 44)
 - **d-4-11** (stretch) **Clear sounds in bulk (TRACK / BAR / ALL)** — Place the cursor, `EDIT` → CLEAR → `TRACK` → `A`, `A`; repeat for `BAR` and `ALL`. Success: confirmation before each execute; scopes empty exactly one pad-measure, one measure, then the whole grid. (p. 44)
 
-#### Reference-lookup candidates
+#### Retired reference-lookup candidates (historical; not shipped)
 - **l-4-01** (intro) Maximum sequence length and maximum number of sequences? → "What is a sequence?" box (p. 36).
 - **l-4-02** (intro) Default sequence-bank assignments and reaching bank 5+? → "Where sequences are saved" (p. 36).
 - **l-4-03** (intro) What does each area of the Sequence mode display mean? → annotated screen (p. 37).
@@ -562,7 +563,7 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **d-5-18** (stretch) **Edit a sequence in the app (copy/paste by track or measure)** — Sequence tab; tap cells to enter notes; long-press a pad number (Cut/Copy/Paste/Duplicate to next measure/Clear) and a measure number (Cut/Copy/Paste/Clear/Disable measure). Success: grid edits mirrored on the unit. (p. 59)
 - **d-5-19** (stretch) **Set the MIDI transmit/receive channels** — System settings → `MIDI IN Ch.` / `MIDI OUT Ch.` → change with ←/→ → exit with `EDIT`. Success: new channel shown (e.g. `MIDI IN Ch. :3`) and retained after power off. Requires firmware 1.1.1+. (midi.md p. 1)
 
-#### Reference-lookup candidates
+#### Retired reference-lookup candidates (historical; not shipped)
 - **l-5-01** (intro) Which COLOR number gives which pad lighting color? → COLOR table (1–8) (p. 49).
 - **l-5-02** (core) Ranges and defaults of every system setting? → system settings page (p. 55).
 - **l-5-03** (stretch) What dB values do `AUTO Trig Lv` levels 1–5 correspond to? → AUTO Trig Lv entry (-28 dB to -12 dB, 4 dB steps) (p. 55).

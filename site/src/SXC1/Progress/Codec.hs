@@ -109,7 +109,7 @@ tshow = T.pack . show
 --------------------------------------------------------------------------
 
 currentSchema :: Int
-currentSchema = 2
+currentSchema = 3
 
 magicProgress :: Text
 magicProgress = "SXC1PROGRESS"
@@ -125,7 +125,7 @@ data DecodeResult
   deriving Eq
 
 encodeState :: ProgressState -> Text
-encodeState st = T.unlines (headerLine : mLine : rLines ++ dLines)
+encodeState st = T.unlines (headerLine : mLine : rLines ++ dLines ++ wLines)
   where
     headerLine = T.intercalate "\t" [magicProgress, tshow currentSchema]
     mLine = T.intercalate "\t"
@@ -137,6 +137,13 @@ encodeState st = T.unlines (headerLine : mLine : rLines ++ dLines)
       , tshow (unDayNum (rcDue rc)), tshow (unDayNum (rcLastSeen rc)), tshow (rcSeen rc)
       ]
     dLines = [ T.intercalate "\t" [ "D", eid, tshow n ] | (eid, n) <- Map.toList (psDone st) ]
+    wLines =
+      [ T.intercalate "\t"
+          [ "W", tshow (unDayNum (plDay entry)), plDeck entry, plExercise entry
+          , maybe "-" id (plPrompt entry), tshow (fromEnum (plGrade entry))
+          ]
+      | entry <- psPulse st
+      ]
 
 -- | Accumulates the body (everything after the header line) leniently:
 -- an unrecognised leading tag, or a record whose field count or field
@@ -150,10 +157,25 @@ data BodyAcc = BodyAcc
   , baLastPrompt :: !Text
   , baRecs      :: !(Map Text Rec)
   , baDone      :: !(Map Text Int)
+  , baPulse     :: ![PulseEntry]
   }
 
 emptyBodyAcc :: BodyAcc
-emptyBodyAcc = BodyAcc (DayNum 0) 0 (DayNum 0) "" Map.empty Map.empty
+emptyBodyAcc = BodyAcc (DayNum 0) 0 (DayNum 0) "" Map.empty Map.empty []
+
+appendDecodedPulse :: PulseEntry -> [PulseEntry] -> [PulseEntry]
+appendDecodedPulse entry entries =
+  let xs = entries ++ [entry]
+      extra = length xs - pulseHistoryCap
+  in if extra > 0 then drop extra xs else xs
+
+wireGrade :: Int -> Maybe Grade
+wireGrade n = case n of
+  0 -> Just GAgain
+  1 -> Just GHard
+  2 -> Just GGood
+  3 -> Just GEasy
+  _ -> Nothing
 
 clampDay :: Int -> DayNum
 clampDay = DayNum . min dayCap
@@ -192,6 +214,18 @@ parseBodyLine acc line
       ("D", [eid, nTxt])
         | Just n <- parseDigits nTxt
         -> acc { baDone = Map.insert eid (min 1000000 n) (baDone acc) }
+      ("W", [dayTxt, deck, exercise, promptTxt, gradeTxt])
+        | Just dayNum <- parseDigits dayTxt, Just gradeNum <- parseDigits gradeTxt
+        , Just grade <- wireGrade gradeNum
+        , not (T.null deck), not (T.null exercise)
+        -> let entry = PulseEntry
+                 { plDay = clampDay dayNum
+                 , plDeck = deck
+                 , plExercise = exercise
+                 , plPrompt = if promptTxt == "-" then Nothing else Just promptTxt
+                 , plGrade = grade
+                 }
+           in acc { baPulse = appendDecodedPulse entry (baPulse acc) }
       _ -> acc
 
 -- | Decode one stored progress blob. Empty\/whitespace-only input is
@@ -217,6 +251,7 @@ decodeState raw
                   , psStreakLen = baStreakLen acc
                   , psFirstDay  = baFirstDay acc
                   , psLastPrompt = baLastPrompt acc
+                  , psPulse      = baPulse acc
                   }
             in migrate v st
         _ -> DecodeCorrupt "missing or malformed SXC1PROGRESS header"
@@ -254,6 +289,7 @@ migrate = migrateWith productionSteps
 -- v1, carried its first real migration without modification.
 productionSteps :: Int -> Maybe (ProgressState -> ProgressState)
 productionSteps 1 = Just id  -- v1 -> v2: psLastPrompt joins, defaulted "" by the body parser
+productionSteps 2 = Just id  -- v2 -> v3: psPulse joins, defaulted [] by the body parser
 productionSteps _ = Nothing
 
 --------------------------------------------------------------------------
