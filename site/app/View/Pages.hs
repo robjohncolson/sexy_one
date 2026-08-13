@@ -475,7 +475,8 @@ deviceStateView t = H.div_ [ P.id_ "sxc1-device-state", P.hidden_ True ] [ text 
 --------------------------------------------------------------------------
 -- Home ("#/"): a visible phone handoff, then a two-choice wizard fork.
 -- The green path goes straight to the best next card; the red path opens
--- the course/manual outline and advanced progress tools.
+-- the deferred local Sample Lab. Course/manual/progress tools remain in a
+-- quieter disclosure below, without becoming a third primary choice.
 --------------------------------------------------------------------------
 
 -- | The shareable production URL encoded in @site\/static\/qr-phone.svg@.
@@ -493,13 +494,18 @@ homeView lang mn ph pd = H.section_ [ P.id_ "sxc1-home" ]
     ++ Progress.progressHomeNotices pd
     ++ [ H.div_ [ P.id_ "sxc1-wizard-actions", P.class_ "wizard-actions" ]
           [ Progress.primaryTrainingView pd
-          , H.details_ [ P.id_ "sxc1-browse-library", P.class_ "home-disclosure wizard-choice wizard-no" ]
-              ( H.summary_ [] [ text (ms (iBrowseLibrary lang)) ]
-              : H.ul_ [ P.class_ "manual-list" ]
-                  (trainingCard lang : weeklyCard lang : masteryCard lang : map (manualCard lang mn) (mnStats mn))
-              : Progress.progressHomeView ph pd
-              )
+          , H.a_ [ P.id_ "btn-sample-lab", P.class_ "wizard-choice wizard-no sample-lab-home-action"
+                 , P.href_ "#/samples" ]
+              [ H.strong_ [] [ text (ms (iSampleLabTitle lang)) ]
+              , H.small_ [ P.class_ "primary-training-card" ] [ text (ms (iSampleLabCardSub lang)) ]
+              ]
           ]
+       , H.details_ [ P.id_ "sxc1-browse-library", P.class_ "home-disclosure sample-library-disclosure" ]
+            ( H.summary_ [] [ text (ms (iBrowseLibrary lang)) ]
+            : H.ul_ [ P.class_ "manual-list" ]
+                (trainingCard lang : weeklyCard lang : masteryCard lang : map (manualCard lang mn) (mnStats mn))
+            : Progress.progressHomeView ph pd
+            )
        ]
   )
 

@@ -56,7 +56,7 @@ module I18n
   , iLangSplitNotice, iLangSplitButton
   , iBreadcrumbAria, iTraining, iPageOf
   , iHomeBlurb, iTrainingCardSub, iPagesSections, iTocPageAbbrev
-  , iBrowseLibrary, iReviewProgress, iProgressData
+  , iBrowseLibrary, iSampleLabTitle, iSampleLabCardSub, iReviewProgress, iProgressData
   , iPhoneQrTitle, iPhoneQrHint, iPhoneQrAlt
   , iHideOriginal, iShowOriginal, iManualPagesAria, iPrevPage, iNextPage
   , iJaImageAlt, iJaImageCaption
@@ -286,8 +286,16 @@ iTrainingCardSub = t "Quizzes and hands-on device drills"
                      "\12463\12452\12474\12392\23455\27231\12489\12522\12523"
 
 iBrowseLibrary :: Lang -> Text
-iBrowseLibrary = t "No \8212 browse manuals and course"
-                   "\12356\12356\12360 \8212 \12510\12491\12517\12450\12523\12392\12467\12540\12473\12434\35211\12427"
+iBrowseLibrary = t "Manuals, course, and progress"
+                   "\12510\12491\12517\12450\12523\12289\12467\12540\12473\12289\36914\25431"
+
+iSampleLabTitle :: Lang -> Text
+iSampleLabTitle = t "Build a sample bank"
+                    "\12469\12531\12503\12523\12496\12531\12463\12434\20316\12427"
+
+iSampleLabCardSub :: Lang -> Text
+iSampleLabCardSub = t "Arrange audio on an SXC-1 pad mockup"
+                      "SXC-1\12398\12497\12483\12489\37197\32622\12391\38899\22768\12434\25972\29702"
 
 iReviewProgress :: Lang -> Text
 iReviewProgress = t "Review queue and progress"

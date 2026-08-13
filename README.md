@@ -92,6 +92,19 @@ The contract is in [`docs/FLASHCARD-FLOW.md`](docs/FLASHCARD-FLOW.md).
 This optimized M11 artifact is deployed at the Vercel mirror below and passed the
 complete 135/135 local gate plus 73/73 assertions against production.
 
+**M12 Sample Lab.** `#/samples` is a deferred, local-first 4×4 pad and bank
+planner for Audacity exports. It accepts the same WAV/MP3/FLAC/`.cswp` choices
+documented by CASIO, keeps audio in IndexedDB, previews playable files, and
+auto-saves pad names, source notes, tags, colour, playback intent, BPM, and mute
+group. One binary `.sxc1lab` file carries the plan and original audio to a phone
+without an account or upload; Phone handoff then presents one exact bank/pad
+destination at a time while CASIO Sampler App performs the hardware assignment.
+The module loads only after the trainer is interactive and adds nothing to
+the critical boot graph. The shipping artifact passed 136/136 checks with
+236/236 browser assertions at both root and nested paths, is deployed at the
+Vercel mirror, and passed 74/74 against production. See
+[`docs/SAMPLE-LAB.md`](docs/SAMPLE-LAB.md).
+
 **M10 Weekly Pulse.** `#/x/week` turns the learner's saved schedule
 and latest 200 coarse learning marks into a seven-day reflection: practice
 rhythm, exact upcoming review buckets, recently strengthened skills, repeated
@@ -1342,9 +1355,9 @@ measured at an earlier milestone's close say so):
 | Warm build, unoptimized (nothing changed) | <1s |
 | Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time; `-Oz --converge` iterates to a fixed point, so it costs more than M3's `-O2` ~5s: the `wasm-opt` pass alone measures ≈11s on this machine) | ~15s |
 | `app.wasm`, unoptimized default build (`build-site.sh`, no flags; measured at M3's close — M4 ships only the optimized flavour, and grew, so this is still *over* the ceiling) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
-| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**) | 2,378,088 bytes raw / **865,232 bytes gzipped** |
+| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**) | 2,380,170 bytes raw / **865,701 bytes gzipped** |
 | `app.wasm` at M6's close, for comparison (the pre-manual-externalization baseline `briefs/M7-budget.json` records as `m6_final`) | 2,439,911 bytes raw / 887,732 bytes gzipped |
-| Current gzip delta over the M6 close after manual externalization and subsequent UI revisions | **−22,500 bytes** — beyond the M11-rebaselined `M7_SHRINK_MIN` of 20,000 |
+| Current gzip delta over the M6 close after manual externalization and subsequent UI revisions | **−22,031 bytes** — beyond the M11-rebaselined `M7_SHRINK_MIN` of 20,000 |
 | `app.wasm` at M5's close, for comparison (the pre-externalization baseline `briefs/M6-budget.json` records as `m5_final`) | 2,662,016 bytes raw / 933,305 bytes gzipped |
 | M6 gzip delta over the M5 close: corpus externalization **−73,560**, then the JA UI string table **+19,416** | **−54,144 bytes** net — no new wasm ceiling was granted or needed |
 | `content/content.en.txt` (the EN exercise bundle the app fetches at boot) | 252,485 bytes raw / **68,189 bytes gzipped** |
@@ -1356,12 +1369,13 @@ measured at an earlier milestone's close say so):
 | **Everything the app fetches at boot**, against `M7_BUNDLE_TOTAL_CEILING` (= 300,000 + 250,000, asserted with its arithmetic in `check-site.sh`) | **267,214 / 550,000 bytes** — 282,786 of headroom |
 | M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json`; M4 closed at 927,008) | **+36,295 bytes** — inside M4's 42,000-byte budget |
 | M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
-| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 134,768 bytes of headroom remain |
+| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 134,299 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
+| Deferred `sample-lab.js` module | 47,693 bytes raw / **14,035 bytes gzipped** — loaded only after trainer interactivity |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,052,073 bytes (≈13.1 MB) |
-| `check-site.sh`, full run (**135** checks, both browser sweeps of 108 routes, **235** browser assertions per served stage incl. real offline boot, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and JA manuals) | ≈112s |
-| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **233** assertions per stage / **7** named `ja course:` (JAC1–JAC7, including mastery and Weekly Pulse) / **4** named `ja manual:` (JAM1–JAM4) per stage |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,121,269 bytes (≈13.1 MB) |
+| `check-site.sh`, full run (**136** checks, both browser sweeps of 108 routes, **236** browser assertions per served stage incl. real offline boot, Sample Lab project round-trip, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and JA manuals) | ≈2–3 min |
+| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **236** assertions per stage / **7** named `ja course:` (JAC1–JAC7, including mastery and Weekly Pulse) / **4** named `ja manual:` (JAM1–JAM4) per stage |
 | `exe:exercise-check --bundle-structural-diff` (EN/JA exercise corpus) / `--manual-structural-diff` (EN/JA manual documents, the reader's own parser) | **51/51** checks (1 + one per live deck) / **109/109** checks (1 + one per page), each with its own negative controls |
 | `node scripts/browser-check.mjs --self-test` / `--self-test-negative` | **198/198** assertions / **42/42** sabotage passes, each catching exactly its own mapped assertion(s) |
 | `exe:content-check --self-test` | **412/412** checks |
