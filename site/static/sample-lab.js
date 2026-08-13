@@ -19,6 +19,7 @@ const MAX_AUDIO_BYTES = 180 * 1024 * 1024;
 const MAX_BATCH_FILES = 64;
 const MAX_PROJECTS = 32;
 const MAX_LIBRARY_ITEMS = 2048;
+const MAX_INBOX_ITEMS = 256;
 const SLOT_NAMES = ["A", "B", "C", "D"];
 const SUPPORTED_EXTENSIONS = new Set(["wav", "mp3", "flac", "cswp"]);
 
@@ -45,6 +46,7 @@ const COPY = {
     deleteProjectConfirm: "Delete this project? Sounds remain safe in Sample Library.",
     projectDeleted: "Project deleted. Library sounds were kept.",
     projectLimit: "This device already has 32 projects.",
+    inboxLimit: "This project's Inbox already has 256 items.",
     sampleLibrary: "Sample Library",
     libraryHint: "One local catalog for every project. Search, audition, and reuse sounds without copying their audio.",
     libraryEmpty: "Add Audacity exports once, then send them into any project's Inbox.",
@@ -131,6 +133,8 @@ const COPY = {
     tools: "Project tools",
     importProject: "Import .sxc1lab project",
     usage: "Storage",
+    usageProjects: "{count} projects",
+    usageSounds: "{count} sounds",
     copyright: "Only use audio you have permission to sample. Sample Lab does not extract audio from games or video services.",
     saved: "Saved locally",
     exported: "Project ready",
@@ -195,6 +199,7 @@ const COPY = {
     deleteProjectConfirm: "このプロジェクトを削除しますか？ 音声はサンプルライブラリに残ります。",
     projectDeleted: "プロジェクトを削除しました。ライブラリの音声は保持されています。",
     projectLimit: "この端末にはすでに32件のプロジェクトがあります。",
+    inboxLimit: "このプロジェクトの受け皿にはすでに256件あります。",
     sampleLibrary: "サンプルライブラリ",
     libraryHint: "全プロジェクト共通のローカル音声カタログです。音声を複製せず検索・試聴・再利用できます。",
     libraryEmpty: "Audacityの書き出しを一度追加し、各プロジェクトの受け皿へ送ります。",
@@ -281,6 +286,8 @@ const COPY = {
     tools: "プロジェクトツール",
     importProject: ".sxc1labプロジェクトを読み込む",
     usage: "ストレージ",
+    usageProjects: "プロジェクト{count}件",
+    usageSounds: "音声{count}件",
     copyright: "使用許可のある音声だけを取り込んでください。Sample Labはゲームや動画サービスから音声を抽出しません。",
     saved: "端末内に保存しました",
     exported: "プロジェクトを準備しました",
@@ -344,6 +351,8 @@ let libraryEditing = false;
 let libraryQuery = "";
 let libraryStageFilter = "all";
 let creatingProject = false;
+let metadataPersistTimer = null;
+let libraryImportQueue = Promise.resolve();
 const memoryAudio = new Map();
 
 function uid(prefix = "id") {
@@ -452,7 +461,7 @@ function normalizeProject(raw) {
   });
   const inboxIds = new Set();
   if (Array.isArray(raw.inbox)) {
-    raw.inbox.slice(0, 256).forEach((candidate) => {
+    raw.inbox.slice(0, MAX_INBOX_ITEMS).forEach((candidate) => {
       const item = normalizeInboxItem(candidate);
       if (item && !inboxIds.has(item.id)) {
         inboxIds.add(item.id);
@@ -539,13 +548,15 @@ function seedLibraryFromProjects() {
 }
 
 function loadWorkspace() {
+  const readJson = (key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  };
   try {
-    const legacyRaw = localStorage.getItem(META_KEY);
-    const legacy = legacyRaw ? JSON.parse(legacyRaw) : null;
-    const workspaceRaw = localStorage.getItem(WORKSPACE_KEY);
-    workspace = normalizeWorkspace(workspaceRaw ? JSON.parse(workspaceRaw) : null, legacy);
-    const libraryRaw = localStorage.getItem(LIBRARY_KEY);
-    libraryState = normalizeLibrary(libraryRaw ? JSON.parse(libraryRaw) : null);
+    workspace = normalizeWorkspace(readJson(WORKSPACE_KEY), readJson(META_KEY));
+    libraryState = normalizeLibrary(readJson(LIBRARY_KEY));
     seedLibraryFromProjects();
     state = workspace.projects.find((project) => project.id === workspace.activeProjectId) || workspace.projects[0];
     workspace.activeProjectId = state.id;
@@ -559,6 +570,10 @@ function loadWorkspace() {
 }
 
 function persistProject() {
+  if (metadataPersistTimer !== null) {
+    clearTimeout(metadataPersistTimer);
+    metadataPersistTimer = null;
+  }
   state.updatedAt = new Date().toISOString();
   workspace.activeProjectId = state.id;
   const index = workspace.projects.findIndex((project) => project.id === state.id);
@@ -575,6 +590,14 @@ function persistProject() {
     persistentAudio = false;
   }
   publishDiagnostics();
+}
+
+function scheduleMetadataPersist() {
+  if (metadataPersistTimer !== null) clearTimeout(metadataPersistTimer);
+  metadataPersistTimer = setTimeout(() => {
+    metadataPersistTimer = null;
+    persistProject();
+  }, 180);
 }
 
 function switchProject(projectId) {
@@ -595,6 +618,7 @@ function createProject(name) {
     announce(strings.projectLimit, "warning");
     return false;
   }
+  stopPreview();
   const project = defaultProject();
   project.name = String(name || strings.newProject).trim().slice(0, 100) || strings.newProject;
   workspace.projects.push(project);
@@ -614,6 +638,7 @@ async function deleteCurrentProject() {
   if (workspace.projects.length <= 1 || !window.confirm(strings.deleteProjectConfirm)) return;
   const index = workspace.projects.findIndex((project) => project.id === state.id);
   if (index < 0) return;
+  stopPreview();
   workspace.projects.splice(index, 1);
   state = workspace.projects[Math.min(index, workspace.projects.length - 1)];
   workspace.activeProjectId = state.id;
@@ -792,19 +817,29 @@ function rememberFingerprint(blobId, fingerprint) {
 }
 
 function padFromLibraryAsset(asset, prior = null) {
+  const pick = (key) => prior?.[key] ?? asset[key];
   return normalizePad({
     ...asset,
-    name: prior?.name || asset.name,
-    source: prior?.source || asset.source,
-    tags: prior?.tags || asset.tags,
-    color: prior?.color || asset.color,
-    playMode: prior?.playMode || asset.playMode,
-    bpm: prior?.bpm || asset.bpm,
-    group: prior?.group || asset.group,
+    name: pick("name"),
+    source: pick("source"),
+    tags: pick("tags"),
+    color: pick("color"),
+    playMode: pick("playMode"),
+    bpm: pick("bpm"),
+    group: pick("group"),
   });
 }
 
-async function libraryAssetFromFile(file) {
+function libraryAssetFromFile(file) {
+  const run = libraryImportQueue.then(
+    () => libraryAssetFromFileUnsafe(file),
+    () => libraryAssetFromFileUnsafe(file),
+  );
+  libraryImportQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+async function libraryAssetFromFileUnsafe(file) {
   const fingerprint = await fingerprintFile(file);
   let existing = libraryState.items.find((item) => item.fingerprint === fingerprint && item.bytes === file.size);
   // M12/M13 projects did not persist fingerprints. Hash only same-size legacy
@@ -1141,7 +1176,11 @@ function hero() {
 }
 
 function projectPanel() {
-  const section = el("section", "sample-project-heading");
+  const section = el("section", "sample-panel sample-project-panel");
+  section.setAttribute("aria-labelledby", "sample-project-heading");
+  const heading = el("h2", "sample-panel-heading", strings.project);
+  heading.id = "sample-project-heading";
+  section.append(heading);
   if (creatingProject) {
     const name = textInput("sample-new-project-name", "", 100, strings.newProjectName);
     const actions = el("div", "sample-action-row");
@@ -1224,6 +1263,10 @@ function selectedLibraryAsset() {
 function addSelectedLibraryToInbox() {
   const asset = selectedLibraryAsset();
   if (!asset) return;
+  if (state.inbox.length >= MAX_INBOX_ITEMS) {
+    announce(strings.inboxLimit, "warning");
+    return;
+  }
   state.inbox.push({ ...padFromLibraryAsset(asset), id: uid("inbox") });
   persistProject();
   librarySelection = null;
@@ -1276,7 +1319,7 @@ function libraryEditor(section, asset) {
   bpm.value = asset.bpm;
   const bind = (control, key, map = (value) => value) => control.addEventListener("input", () => {
     asset[key] = map(control.value);
-    persistProject();
+    scheduleMetadataPersist();
   });
   bind(name, "name", (value) => value.slice(0, 80));
   bind(source, "source", (value) => value.slice(0, 240));
@@ -1300,6 +1343,7 @@ function libraryEditor(section, asset) {
   done.id = "btn-sample-library-done";
   done.type = "button";
   done.addEventListener("click", () => {
+    persistProject();
     libraryEditing = false;
     renderPlanner();
     announce(strings.libraryUpdated);
@@ -1347,10 +1391,11 @@ function libraryPanel() {
     libraryStageFilter = stage.value;
     const query = libraryQuery.trim().toLocaleLowerCase();
     let visible = 0;
-    tray.querySelectorAll(".sample-library-card").forEach((card) => {
+    tray.querySelectorAll(".sample-library-item").forEach((row) => {
+      const card = row.querySelector(".sample-library-card");
       const matches = (!query || card.dataset.search.includes(query))
         && (libraryStageFilter === "all" || card.dataset.stage === libraryStageFilter);
-      card.hidden = !matches;
+      row.hidden = !matches;
       if (matches) visible += 1;
     });
     empty.hidden = visible > 0;
@@ -1365,7 +1410,6 @@ function libraryPanel() {
     card.dataset.libraryId = item.id;
     card.dataset.stage = item.stage;
     card.dataset.search = librarySearchText(item);
-    card.setAttribute("role", "listitem");
     card.setAttribute("aria-pressed", String(selected));
     card.setAttribute("aria-label", `${item.name}, ${libraryStageLabel(item.stage)}, ${formatDuration(item.duration)}`);
     const mini = waveform(item);
@@ -1385,7 +1429,10 @@ function libraryPanel() {
       previewPad(current, item);
       announce(fill(strings.librarySelected, { name: item.name }));
     });
-    tray.append(card);
+    const row = el("div", "sample-library-item");
+    row.setAttribute("role", "listitem");
+    row.append(card);
+    tray.append(row);
   });
   section.append(tray, empty);
   applyFilters();
@@ -1545,7 +1592,6 @@ function inboxPanel() {
       card.type = "button";
       card.draggable = true;
       card.dataset.inboxId = item.id;
-      card.setAttribute("role", "listitem");
       card.setAttribute("aria-pressed", String(selected));
       card.setAttribute("aria-label", `${index + 1}. ${item.name}, ${formatDuration(item.duration)}`);
       const mini = waveform(item);
@@ -1566,7 +1612,10 @@ function inboxPanel() {
       card.addEventListener("dragend", () => {
         if (armedPlacement?.type === "inbox" && armedPlacement.id === item.id) cancelPlacement();
       });
-      tray.append(card);
+      const row = el("div", "sample-inbox-item");
+      row.setAttribute("role", "listitem");
+      row.append(card);
+      tray.append(row);
     });
     section.append(tray);
   }
@@ -1807,9 +1856,11 @@ function metadataEditor(section, pad) {
   const returnButton = el("button", "sample-button sample-button-secondary", strings.returnInbox);
   returnButton.id = "btn-sample-pad-return";
   returnButton.type = "button";
+  returnButton.disabled = state.inbox.length >= MAX_INBOX_ITEMS;
   returnButton.addEventListener("click", () => {
     const pad = selectedPad();
     if (!pad) return;
+    if (state.inbox.length >= MAX_INBOX_ITEMS) { announce(strings.inboxLimit, "warning"); return; }
     state.inbox.push(returnableInboxItem(pad));
     delete activeBank().pads[state.selectedPad];
     armedPlacement = null;
@@ -1857,7 +1908,7 @@ function projectTools() {
   remove.disabled = workspace.projects.length <= 1;
   remove.addEventListener("click", deleteCurrentProject);
   const uniqueBytes = libraryState.items.reduce((sum, item) => sum + item.bytes, 0);
-  const usage = el("p", "sample-storage-usage", `${strings.usage}: ${workspace.projects.length} projects · ${libraryState.items.length} sounds / ${formatBytes(uniqueBytes)}`);
+  const usage = el("p", "sample-storage-usage", `${strings.usage}: ${fill(strings.usageProjects, { count: workspace.projects.length })} · ${fill(strings.usageSounds, { count: libraryState.items.length })} / ${formatBytes(uniqueBytes)}`);
   const toolsActions = el("div", "sample-action-row sample-project-tool-actions");
   toolsActions.append(importLabel, remove);
   content.append(importInput, toolsActions, usage, el("p", "sample-copyright", strings.copyright));
@@ -1947,9 +1998,15 @@ async function importFilesToInbox(fileList) {
   const files = Array.from(fileList || []).slice(0, MAX_BATCH_FILES);
   let rejected = Math.max(0, Array.from(fileList || []).length - files.length);
   let added = 0;
+  let inboxFull = false;
   stopPreview();
   armedPlacement = null;
   for (let index = 0; index < files.length; index += 1) {
+    if (state.inbox.length >= MAX_INBOX_ITEMS) {
+      rejected += files.length - index;
+      inboxFull = true;
+      break;
+    }
     const file = files[index];
     const extension = extOf(file.name);
     if (!SUPPORTED_EXTENSIONS.has(extension) || file.size > MAX_AUDIO_BYTES) {
@@ -1966,7 +2023,8 @@ async function importFilesToInbox(fileList) {
   }
   if (added) persistProject();
   renderPlanner();
-  if (fileList.length > MAX_BATCH_FILES) announce(strings.batchLimit, "warning");
+  if (inboxFull) announce(strings.inboxLimit, "warning");
+  else if (fileList.length > MAX_BATCH_FILES) announce(strings.batchLimit, "warning");
   else if (!added) announce(strings.invalidFile, "warning");
   else announce(fill(strings.inboxImported, {
     added,
@@ -1978,6 +2036,7 @@ async function importSample(file) {
   const extension = extOf(file.name);
   if (!SUPPORTED_EXTENSIONS.has(extension)) { announce(strings.invalidFile, "warning"); return; }
   if (file.size > MAX_AUDIO_BYTES) { announce(strings.tooLarge, "warning"); return; }
+  if (selectedPad() && state.inbox.length >= MAX_INBOX_ITEMS) { announce(strings.inboxLimit, "warning"); return; }
   announce(strings.importing);
   try {
     const old = selectedPad();
@@ -2082,7 +2141,10 @@ async function importProjectFile(file) {
   try {
     const parsed = await readProjectManifest(file);
     const existing = workspace.projects.findIndex((project) => project.id === parsed.project.id);
-    if (existing < 0 && workspace.projects.length >= MAX_PROJECTS) throw new Error("Project limit");
+    if (existing < 0 && workspace.projects.length >= MAX_PROJECTS) {
+      announce(strings.projectLimit, "warning");
+      return false;
+    }
     const importedAssets = new Map();
     for (const entry of parsed.manifest.files) {
       const name = String(entry.name || "sample");

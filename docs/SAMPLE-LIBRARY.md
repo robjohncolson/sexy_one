@@ -49,12 +49,20 @@ still performs the final hardware assignment.
   startup. On a later import, only same-size legacy candidates are fingerprinted
   until an identical file is found. This keeps migration and mobile startup
   light while preventing duplicate audio storage.
+- Every import entry point uses one shared single-flight queue, so simultaneous
+  Library, Inbox, pad, and portable-project imports cannot pass the duplicate
+  check before either has committed its catalog record.
 - A blob is deleted only when neither the library nor any project's Inbox or
   assigned pad references it. Library removal and project deletion therefore
   preserve every still-referenced sound.
 - The previous `sxc1.sample-lab.v1` key remains a mirror of the active project.
   If the workspace/library keys do not exist, M14 migrates that M13 project and
   seeds one catalog item per unique referenced blob automatically.
+- The three localStorage records are parsed independently. A malformed Library
+  record can be repaired from project references without replacing a valid
+  multi-project workspace; a malformed workspace can still fall back to the
+  legacy active-project mirror. An Inbox is capped consistently at 256 items
+  both when adding and when normalizing, so reload never silently truncates it.
 
 ## Portability boundary
 
@@ -73,9 +81,11 @@ bundled into every phone handoff.
 The real-browser workflow removes only the M14 keys after completing M13, reloads
 from the mirrored legacy project, and proves automatic lossless migration. It
 then re-imports identical audio without growing the library, searches and edits
-provenance, reuses the sound in two named projects, switches back without state
-loss, deletes the temporary project without deleting catalog audio, searches by
-permission text, and checks the 320 px layout and 44 px controls.
+provenance, races two identical imports through different entry points, reuses
+the sound in two named projects, switches back without state loss, deletes the
+temporary project without deleting catalog audio, corrupts only the Library key
+and proves the workspace survives and repairs it, searches by permission text,
+and checks the 320 px layout and 44 px controls.
 
 The full Japanese course sweep independently pins Sample Library's catalog,
 filter, import, and project decisions as `JAC9`. The offline gate pins the

@@ -9059,6 +9059,10 @@ async function main() {
     })()`);
 
     const reloadPage = async (readySelector, timeoutMs = 15000) => {
+      // Invalidate the current document's settled marker before asking CDP to
+      // reload. Otherwise a fast first poll can accept the old document's
+      // __SXC1_BOOTED and ready selector before navigation has committed.
+      await evaluate('window.__SXC1_BOOTED = false; window.__SXC1_SAMPLE_LAB = null; true');
       await cdp.send('Page.reload', {}, sessionId);
       const bootDeadline = Date.now() + timeoutMs;
       let booted = false;
@@ -10041,10 +10045,33 @@ async function main() {
           status: document.querySelector('#sample-lab-status')?.textContent || null,
         };
 
+        // Start the Library and Inbox entry points in the same turn with the
+        // same new bytes. The shared import queue must commit one catalog blob,
+        // then let both callers reuse it.
+        const concurrentLibrary = document.querySelector('#sample-library-input');
+        const concurrentInbox = document.querySelector('#sample-inbox-input');
+        const libraryTransfer = new DataTransfer();
+        const inboxTransfer = new DataTransfer();
+        libraryTransfer.items.add(new File([makeWav(48000, 51)], 'concurrent-a.wav', { type: 'audio/wav' }));
+        inboxTransfer.items.add(new File([makeWav(48000, 51)], 'concurrent-b.wav', { type: 'audio/wav' }));
+        concurrentLibrary.files = libraryTransfer.files;
+        concurrentInbox.files = inboxTransfer.files;
+        concurrentLibrary.dispatchEvent(new Event('change', { bubbles: true }));
+        concurrentInbox.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.libraryItems.length === 7
+          && window.__SXC1_SAMPLE_LAB.inboxItems.length === 3);
+        const afterConcurrent = {
+          library: window.__SXC1_SAMPLE_LAB.libraryItems.length,
+          inbox: window.__SXC1_SAMPLE_LAB.inboxItems.length,
+          catalogMatches: window.__SXC1_SAMPLE_LAB.libraryItems.filter((item) => item.name === 'concurrent a').length,
+          inboxMatches: window.__SXC1_SAMPLE_LAB.inboxItems.filter((item) => item.name === 'concurrent a').length,
+        };
+
         const search = document.querySelector('#sample-library-search');
         search.value = 'spare';
         search.dispatchEvent(new Event('input', { bubbles: true }));
-        const visibleAfterNameSearch = Array.from(document.querySelectorAll('.sample-library-card')).filter((card) => !card.hidden);
+        const visibleAfterNameSearch = Array.from(document.querySelectorAll('.sample-library-card'))
+          .filter((card) => !card.closest('.sample-library-item')?.hidden);
         visibleAfterNameSearch[0]?.click();
         const selectedActions = Array.from(document.querySelectorAll('.sample-library-actions > button')).map((button) => button.id);
         document.querySelector('#btn-sample-library-edit')?.click();
@@ -10086,12 +10113,13 @@ async function main() {
         const newSearch = document.querySelector('#sample-library-search');
         newSearch.value = 'YouTube field session';
         newSearch.dispatchEvent(new Event('input', { bubbles: true }));
-        const sourceMatches = Array.from(document.querySelectorAll('.sample-library-card')).filter((card) => !card.hidden);
+        const sourceMatches = Array.from(document.querySelectorAll('.sample-library-card'))
+          .filter((card) => !card.closest('.sample-library-item')?.hidden);
         sourceMatches[0]?.click();
         document.querySelector('#btn-sample-library-inbox')?.click();
         const newInbox = window.__SXC1_SAMPLE_LAB.inboxItems.map((item) => item.name);
 
-        return { migrated, afterDuplicate, visibleName: visibleAfterNameSearch.length, selectedActions, editorActions,
+        return { migrated, afterDuplicate, afterConcurrent, visibleName: visibleAfterNameSearch.length, selectedActions, editorActions,
           originalAfterReuse, newProject, sourceMatches: sourceMatches.length, newInbox,
           edited: window.__SXC1_SAMPLE_LAB.libraryItems.find((item) => item.name === 'spare') || null,
           newProjectId: window.__SXC1_SAMPLE_LAB.projectId };
@@ -10127,11 +10155,22 @@ async function main() {
           finalProjectId: window.__SXC1_SAMPLE_LAB.projectId,
           projects: window.__SXC1_SAMPLE_LAB.projects.length,
           library: window.__SXC1_SAMPLE_LAB.libraryItems.length,
-          rightsMatches: Array.from(document.querySelectorAll('.sample-library-card')).filter((card) => !card.hidden).length,
+          rightsMatches: Array.from(document.querySelectorAll('.sample-library-card'))
+            .filter((card) => !card.closest('.sample-library-item')?.hidden).length,
           workspace: JSON.parse(localStorage.getItem('sxc1.sample-workspace.v1') || 'null'),
           mirror: JSON.parse(localStorage.getItem('sxc1.sample-lab.v1') || 'null'),
         };
       })()`);
+      await evaluate(`localStorage.setItem('sxc1.sample-library.v1', '{broken library json')`);
+      const corruptLibraryReloaded = await reloadPage('#sample-library-heading', 20000);
+      const corruptLibraryRecovery = await evaluate(`(() => ({
+        projectId: window.__SXC1_SAMPLE_LAB?.projectId || null,
+        projects: window.__SXC1_SAMPLE_LAB?.projects?.length ?? null,
+        library: window.__SXC1_SAMPLE_LAB?.libraryItems?.length ?? null,
+        storage: window.__SXC1_SAMPLE_LAB?.storage || null,
+        workspace: JSON.parse(localStorage.getItem('sxc1.sample-workspace.v1') || 'null'),
+        repairedLibrary: JSON.parse(localStorage.getItem('sxc1.sample-library.v1') || 'null'),
+      }))()`);
       await cdp.send('Emulation.setDeviceMetricsOverride', {
         width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
       }, sessionId);
@@ -10154,28 +10193,36 @@ async function main() {
           && sampleLibrary.afterDuplicate.library === 6
           && sampleLibrary.afterDuplicate.fingerprints >= 1
           && /reused 1 duplicate/.test(sampleLibrary.afterDuplicate.status || '')
+          && sampleLibrary.afterConcurrent.library === 7 && sampleLibrary.afterConcurrent.inbox === 3
+          && sampleLibrary.afterConcurrent.catalogMatches === 1 && sampleLibrary.afterConcurrent.inboxMatches === 1
           && sampleLibrary.visibleName === 1
           && sampleLibrary.selectedActions.join(',') === 'btn-sample-library-inbox,btn-sample-library-edit'
           && sampleLibrary.editorActions.join(',') === 'btn-sample-library-done,btn-sample-library-remove'
           && sampleLibrary.originalAfterReuse.id === legacyProjectId
-          && sampleLibrary.originalAfterReuse.inbox === 3
+          && sampleLibrary.originalAfterReuse.inbox === 4
           && sampleLibrary.originalAfterReuse.assigned === 4
           && sampleLibrary.newProject.projects === 2 && sampleLibrary.newProject.inbox === 0
-          && sampleLibrary.newProject.library === 6 && sampleLibrary.sourceMatches === 1
+          && sampleLibrary.newProject.library === 7 && sampleLibrary.sourceMatches === 1
           && sampleLibrary.newInbox.join(',') === 'spare'
           && sampleLibrary.edited?.stage === 'edited'
           && projectRoundtrip?.original?.id === legacyProjectId
-          && projectRoundtrip.original.inbox === 3 && projectRoundtrip.original.assigned === 4
+          && projectRoundtrip.original.inbox === 4 && projectRoundtrip.original.assigned === 4
           && projectRoundtrip.finalProjectId === legacyProjectId
-          && projectRoundtrip.projects === 1 && projectRoundtrip.library === 6
+          && projectRoundtrip.projects === 1 && projectRoundtrip.library === 7
           && projectRoundtrip.rightsMatches === 1
           && projectRoundtrip.workspace?.activeProjectId === legacyProjectId
           && projectRoundtrip.mirror?.id === legacyProjectId
+          && corruptLibraryReloaded && corruptLibraryRecovery?.projectId === legacyProjectId
+          && corruptLibraryRecovery.projects === 1 && corruptLibraryRecovery.library === 7
+          && corruptLibraryRecovery.storage === 'indexeddb'
+          && corruptLibraryRecovery.workspace?.activeProjectId === legacyProjectId
+          && corruptLibraryRecovery.repairedLibrary?.items?.length === 7
           && sampleLibraryMobile?.viewport === 320 && sampleLibraryMobile.scrollWidth <= 320
           && sampleLibraryMobile.libraryVisible && sampleLibraryMobile.projectSelectHeight >= 44
           && sampleLibraryMobile.libraryButtons.length === 1
           && sampleLibraryMobile.libraryButtons.every((height) => height >= 44)),
-        { legacyProjectId, libraryReloaded, sampleLibrary, projectRoundtrip, sampleLibraryMobile },
+        { legacyProjectId, libraryReloaded, sampleLibrary, projectRoundtrip, corruptLibraryReloaded,
+          corruptLibraryRecovery, sampleLibraryMobile },
       );
 
       // -- 3e. The focused coach is a deterministic, tab-scoped snapshot:
