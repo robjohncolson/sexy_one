@@ -181,6 +181,15 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   at both the origin root and nested-path deployment, then passed 74/74 against
   production. Contract:
   `docs/SAMPLE-LAB.md`.
+- **M13 — Sample Inbox.** Turn Sample Lab into a fluid bulk-organizing surface:
+  import an Audacity batch into an unassigned tray, preview and tap/drag sounds
+  onto pads, move or swap assignments across A-D banks without losing audio,
+  fill empty pads in import order, carry unassigned sounds inside the existing
+  portable project format, and review project readiness before phone handoff.
+  Old M12 browser state and `.sxc1lab` files migrate without conversion.
+  **IMPLEMENTATION COMPLETE 2026-08-13.** The optimized artifact passed the
+  full 136/136 release gate with 238/238 browser assertions at both the origin
+  root and nested-path deployment. Contract: `docs/SAMPLE-INBOX.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 

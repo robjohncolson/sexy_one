@@ -77,7 +77,7 @@ Start with [Prerequisites](#prerequisites) and [Build](#build) to build it yours
 
 ## Status
 
-**Current (M11 flashcard continuity).** All 128 quizzes that formerly revealed a
+**M11 flashcard continuity.** All 128 quizzes that formerly revealed a
 model answer and asked the learner whether they knew it are now real, authored
 two-option flashcards. A learner selects an answer, then the two `Check answer` /
 `I’m not sure` actions are replaced in place by `Good` / `Easy` after a correct
@@ -91,6 +91,18 @@ backup/reset follow-up actions replace the prior action rather than accumulating
 The contract is in [`docs/FLASHCARD-FLOW.md`](docs/FLASHCARD-FLOW.md).
 This optimized M11 artifact is deployed at the Vercel mirror below and passed the
 complete 135/135 local gate plus 73/73 assertions against production.
+
+**Current (M13 Sample Inbox).** Sample Lab now accepts an Audacity batch into
+an ordered, unassigned tray. Sounds can be auditioned and placed by tap or
+desktop drag, filled into empty pads in order, returned to the Inbox, or moved
+and swapped across A-D banks without discarding audio. Unassigned sounds travel
+inside the existing `.sxc1lab` project, while M12 browser state and project
+files migrate without conversion. A pre-handoff review blocks missing local
+audio and calls out duplicate destinations, unassigned sounds, duplicate names,
+and non-recommended formats. The optimized artifact passed the complete
+136/136 release gate with 238/238 browser assertions at both root and nested
+paths, including 320 px, keyboard, migration, offline-cache, and Japanese UI
+coverage. See [`docs/SAMPLE-INBOX.md`](docs/SAMPLE-INBOX.md).
 
 **M12 Sample Lab.** `#/samples` is a deferred, local-first 4×4 pad and bank
 planner for Audacity exports. It accepts the same WAV/MP3/FLAC/`.cswp` choices
@@ -1371,11 +1383,11 @@ measured at an earlier milestone's close say so):
 | M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
 | Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 134,299 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
-| Deferred `sample-lab.js` module | 47,693 bytes raw / **14,035 bytes gzipped** — loaded only after trainer interactivity |
+| Deferred `sample-lab.js` module | 70,808 bytes raw / **19,153 bytes gzipped** — loaded only after trainer interactivity |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,121,269 bytes (≈13.1 MB) |
-| `check-site.sh`, full run (**136** checks, both browser sweeps of 108 routes, **236** browser assertions per served stage incl. real offline boot, Sample Lab project round-trip, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and JA manuals) | ≈2–3 min |
-| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **236** assertions per stage / **7** named `ja course:` (JAC1–JAC7, including mastery and Weekly Pulse) / **4** named `ja manual:` (JAM1–JAM4) per stage |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,149,954 bytes (≈13.1 MB) |
+| `check-site.sh`, full run (**136** checks, both browser sweeps of 108 routes, **238** browser assertions per served stage incl. real offline boot, Sample Lab/Inbox migration and project round-trip, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and manuals) | ≈2–3 min |
+| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **238** assertions per stage / **8** named `ja course:` (JAC1–JAC8, including mastery, Weekly Pulse, and Sample Inbox) / **4** named `ja manual:` (JAM1–JAM4) per stage |
 | `exe:exercise-check --bundle-structural-diff` (EN/JA exercise corpus) / `--manual-structural-diff` (EN/JA manual documents, the reader's own parser) | **51/51** checks (1 + one per live deck) / **109/109** checks (1 + one per page), each with its own negative controls |
 | `node scripts/browser-check.mjs --self-test` / `--self-test-negative` | **198/198** assertions / **42/42** sabotage passes, each catching exactly its own mapped assertion(s) |
 | `exe:content-check --self-test` | **412/412** checks |

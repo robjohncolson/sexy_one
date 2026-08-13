@@ -2924,6 +2924,8 @@ const JA_COURSE_MASTERY_ASSERTION_NAME =
   'ja course: [JAC6] the mastery journey localizes its JS-owned priorities, evidence tiers, and fetched deck titles';
 const JA_COURSE_WEEKLY_ASSERTION_NAME =
   'ja course: [JAC7] the Weekly Pulse localizes its JS-owned rhythm, outlook, insight headings, and next-focus action';
+const JA_COURSE_SAMPLE_INBOX_ASSERTION_NAME =
+  'ja course: [JAC8] Sample Inbox localizes its JS-owned organizing, placement, and handoff decisions';
 
 // Trusted keyboard input for a session: returns pressKey(key) driving the
 // full keyDown/keyUp pair through CDP's Input domain. 'Tab'/'Enter' are
@@ -4137,6 +4139,26 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
         && typeof weeklyJa.focus === 'string' && weeklyJa.focus.length > 4
         && weeklyJa.bars === 7 && weeklyJa.state?.renderer === 'dom',
       weeklyJa,
+    );
+
+    await h.goto('#/samples', '#sample-inbox-heading');
+    const sampleInboxJa = await h.evaluate(`(() => ({
+      lang: document.querySelector('#sxc1-sample-lab')?.dataset.lang || null,
+      inbox: document.querySelector('#sample-inbox-heading')?.textContent.trim() || null,
+      padMap: document.querySelector('#sample-pad-heading')?.textContent.trim() || null,
+      add: document.querySelector('#btn-sample-inbox-add')?.textContent.trim() || null,
+      fill: document.querySelector('#btn-sample-inbox-fill')?.textContent.trim() || null,
+      handoff: document.querySelector('#btn-sample-handoff')?.textContent.trim() || null,
+    }))()`);
+    report(
+      JA_COURSE_SAMPLE_INBOX_ASSERTION_NAME,
+      Boolean(sampleInboxJa) && sampleInboxJa.lang === 'ja'
+        && typeof sampleInboxJa.inbox === 'string' && sampleInboxJa.inbox.startsWith('サンプル受け皿')
+        && sampleInboxJa.padMap === 'パッド配置'
+        && sampleInboxJa.add === 'サンプルを追加'
+        && sampleInboxJa.fill === '空きパッドへ配置'
+        && sampleInboxJa.handoff === 'スマートフォンへ',
+      sampleInboxJa,
     );
   }
 
@@ -9053,6 +9075,7 @@ async function main() {
         '#sxc1-content-stats matches expected stats',
         'home shows a centered QR and exactly two learn/build wizard choices',
         'Sample Lab assigns local audio, round-trips a portable project, and hands pads to the phone one at a time',
+        'Sample Inbox bulk-imports, places, swaps, auto-fills, migrates, and validates without losing audio',
         'progress passport saves the validated export as a file and loads a file without bypassing import preview',
         "today's session builds a stable five-card mobile plan and carries its coach into the runner",
         "today's session marks a finished card and advances to the next planned card",
@@ -9145,7 +9168,7 @@ async function main() {
         Boolean(pwaState
           && pwaState.state?.supported === true && pwaState.state.registered === true
           && pwaState.state.ready === true && pwaState.state.offlineCapable === true
-          && pwaState.state.cacheVersion === 'm12-v1' && pwaState.controlled === true
+          && pwaState.state.cacheVersion === 'm13-v1' && pwaState.controlled === true
           && pwaState.state.scope === expectedScope
           && pwaState.manifestStatus === 200
           && pwaState.manifest?.start_url === './#/x/today'
@@ -9606,6 +9629,17 @@ async function main() {
         const manifest = JSON.parse(await projectBlob.slice(12, 12 + manifestLength).text());
         const portable = new File([projectBlob], 'roundtrip.sxc1lab', { type: 'application/octet-stream' });
         const imported = await window.__SXC1_SAMPLE_LAB.importProjectFile(portable);
+        const legacyManifest = JSON.parse(JSON.stringify(manifest));
+        delete legacyManifest.project.inbox;
+        const legacyManifestBytes = new TextEncoder().encode(JSON.stringify(legacyManifest));
+        const legacyHeader = new Uint8Array(12);
+        legacyHeader.set(new TextEncoder().encode('SXC1LAB1'));
+        new DataView(legacyHeader.buffer).setUint32(8, legacyManifestBytes.length, true);
+        const legacyPayload = projectBlob.slice(12 + manifestLength);
+        const legacyImported = await window.__SXC1_SAMPLE_LAB.importProjectFile(
+          new File([legacyHeader, legacyManifestBytes, legacyPayload], 'm12-project.sxc1lab', { type: 'application/octet-stream' }),
+        );
+        const legacyInboxCount = window.__SXC1_SAMPLE_LAB.inboxItems?.length ?? null;
         const plannerButtons = Array.from(document.querySelectorAll('.sample-planner-footer > .sample-primary-actions > button'))
           .filter((button) => button.offsetParent !== null).map((button) => button.id);
         const padCount = document.querySelectorAll('.sample-pad').length;
@@ -9632,6 +9666,8 @@ async function main() {
           payloadBytes: manifest.files?.[0]?.length || 0,
           projectBytes: projectBlob.size,
           imported,
+          legacyImported,
+          legacyInboxCount,
           plannerButtons,
           handoffButtons,
           handoffView: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
@@ -9668,7 +9704,8 @@ async function main() {
           && sampleLab.magic === 'SXC1LAB1' && sampleLab.schema === 1
           && sampleLab.fileCount === 1 && sampleLab.payloadBytes === 9644
           && sampleLab.projectBytes > sampleLab.payloadBytes
-          && sampleLab.imported === true
+          && sampleLab.imported === true && sampleLab.legacyImported === true
+          && sampleLab.legacyInboxCount === 0
           && sampleLab.plannerButtons.join(',') === 'btn-sample-project-export,btn-sample-handoff'
           && sampleLab.handoffButtons.join(',') === 'btn-sample-share-file,btn-sample-next-pad'
           && sampleLab.handoffView === 'handoff'
@@ -9682,7 +9719,217 @@ async function main() {
       );
       await click('#btn-sample-next-pad');
 
-      // -- 3c. The focused coach is a deterministic, tab-scoped snapshot:
+      // -- 3c. M13 Sample Inbox. This drives both placement modes (desktop
+      // drag and touch/keyboard-friendly select-then-pad), a non-destructive
+      // occupied-pad replacement, pad swap + cross-bank move, ordered
+      // auto-fill, M12 migration, portable Inbox audio, Escape cancellation,
+      // and the pre-handoff review at a 320 px phone width.
+      const sampleInbox = await evaluate(`(async () => {
+        const waitFor = async (test, timeout = 8000) => {
+          const start = Date.now();
+          while (Date.now() - start < timeout) {
+            if (test()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          return Boolean(test());
+        };
+        await waitFor(() => document.querySelector('#sample-inbox-input'));
+        const makeWav = (sampleRate, seed) => {
+          const frames = 2400;
+          const bytes = new ArrayBuffer(44 + frames * 2);
+          const view = new DataView(bytes);
+          const ascii = (offset, text) => {
+            for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+          };
+          ascii(0, 'RIFF');
+          view.setUint32(4, 36 + frames * 2, true);
+          ascii(8, 'WAVE');
+          ascii(12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, 1, true);
+          view.setUint32(24, sampleRate, true);
+          view.setUint32(28, sampleRate * 2, true);
+          view.setUint16(32, 2, true);
+          view.setUint16(34, 16, true);
+          ascii(36, 'data');
+          view.setUint32(40, frames * 2, true);
+          for (let i = 0; i < frames; i += 1) {
+            view.setInt16(44 + i * 2, Math.round(Math.sin((i + seed) / (9 + seed)) * 9000), true);
+          }
+          return bytes;
+        };
+        const putFiles = async (files) => {
+          const input = document.querySelector('#sample-inbox-input');
+          const transfer = new DataTransfer();
+          files.forEach((file) => transfer.items.add(file));
+          input.files = transfer.files;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          await waitFor(() => !document.querySelector('#sample-lab-status')?.textContent.includes('Reading'));
+        };
+        const readyFile = (name, seed) => new File([makeWav(48000, seed)], name, { type: 'audio/wav' });
+        await putFiles([
+          readyFile('snare.wav', 1),
+          readyFile('hat.wav', 2),
+          readyFile('texture.wav', 3),
+        ]);
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.inboxItems.length === 3);
+        const bulk = {
+          multiple: document.querySelector('#sample-inbox-input')?.multiple === true,
+          cards: document.querySelectorAll('.sample-inbox-card').length,
+          actions: Array.from(document.querySelectorAll('.sample-inbox-actions > button')).map((button) => button.id),
+          assigned: window.__SXC1_SAMPLE_LAB.assignedPads.length,
+        };
+
+        // Real HTML drag accelerator: first Inbox item -> A/PAD 2.
+        const dragCard = document.querySelector('.sample-inbox-card');
+        const dragPad = document.querySelector('.sample-pad[data-pad="2"]');
+        const dragData = new DataTransfer();
+        dragCard.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dragData }));
+        dragPad.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dragData }));
+        dragPad.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dragData }));
+        dragCard.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dragData }));
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.inboxItems.length === 2);
+        const afterDrag = window.__SXC1_SAMPLE_LAB.assignedPads.map((item) => ({ pad: item.pad, name: item.name }));
+
+        // Arm A/PAD 1 and tap A/PAD 2: occupied destinations swap.
+        document.querySelector('.sample-pad[data-pad="1"]')?.click();
+        document.querySelector('#btn-sample-pad-move')?.click();
+        document.querySelector('.sample-pad[data-pad="2"]')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.placement === null);
+        const afterSwap = window.__SXC1_SAMPLE_LAB.assignedPads.map((item) => ({ slot: item.slot, pad: item.pad, name: item.name }));
+
+        document.querySelector('#btn-sample-inbox-fill')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.inboxItems.length === 0);
+        const afterFill = window.__SXC1_SAMPLE_LAB.assignedPads.map((item) => ({ slot: item.slot, pad: item.pad, name: item.name }));
+
+        // Return A/PAD 4 to the Inbox, then select it and use the alternate
+        // Assign-next-empty decision to restore the same destination.
+        document.querySelector('.sample-pad[data-pad="4"]')?.click();
+        document.querySelector('#btn-sample-pad-return')?.click();
+        const returned = {
+          assigned: window.__SXC1_SAMPLE_LAB.assignedPads.length,
+          inbox: window.__SXC1_SAMPLE_LAB.inboxItems.map((item) => item.name),
+        };
+        document.querySelector('.sample-inbox-card')?.click();
+        document.querySelector('#btn-sample-inbox-assign-next')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.inboxItems.length === 0);
+
+        // Move A/PAD 4 across banks to B/PAD 1, then deliberately reuse BANK
+        // 15 so readiness validation has a concrete destination warning.
+        document.querySelector('.sample-pad[data-pad="4"]')?.click();
+        document.querySelector('#btn-sample-pad-move')?.click();
+        document.querySelector('.sample-bank-tab[data-slot="B"]')?.click();
+        document.querySelector('.sample-pad[data-pad="1"]')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.activeSlot === 'B' && window.__SXC1_SAMPLE_LAB.placement === null);
+        const bankSelect = document.querySelector('#sample-bank-number');
+        bankSelect.value = '15';
+        bankSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        document.querySelector('.sample-bank-tab[data-slot="A"]')?.click();
+        const crossBank = window.__SXC1_SAMPLE_LAB.assignedPads.map((item) => ({ slot: item.slot, pad: item.pad, name: item.name }));
+
+        await putFiles([
+          new File([makeWav(44100, 4)], 'lo-fi.wav', { type: 'audio/wav' }),
+          readyFile('spare.wav', 5),
+        ]);
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.inboxItems.length === 2);
+        document.querySelector('.sample-inbox-card')?.click();
+        document.querySelector('.sample-pad[data-pad="1"]')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.assignedPads.some((item) => item.pad === 1 && item.name === 'lo fi'));
+        const afterReplace = {
+          assigned: window.__SXC1_SAMPLE_LAB.assignedPads.map((item) => ({ slot: item.slot, pad: item.pad, name: item.name })),
+          inbox: window.__SXC1_SAMPLE_LAB.inboxItems.map((item) => item.name),
+        };
+
+        // Select and Escape: pending placement is cancellable without mutation.
+        document.querySelector('.sample-inbox-card')?.click();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.placement === null);
+        const escaped = window.__SXC1_SAMPLE_LAB.placement === null;
+
+        const projectBlob = await window.__SXC1_SAMPLE_LAB.exportProjectBlob();
+        const header = await projectBlob.slice(0, 12).arrayBuffer();
+        const manifestLength = new DataView(header).getUint32(8, true);
+        const manifest = JSON.parse(await projectBlob.slice(12, 12 + manifestLength).text());
+        const imported = await window.__SXC1_SAMPLE_LAB.importProjectFile(
+          new File([projectBlob], 'm13-roundtrip.sxc1lab', { type: 'application/octet-stream' }),
+        );
+        const validation = await window.__SXC1_SAMPLE_LAB.validateProject();
+        document.querySelector('#btn-sample-handoff')?.click();
+        await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'validation');
+        const validationUi = {
+          view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+          kinds: Array.from(document.querySelectorAll('.sample-validation-list li')).map((item) => item.dataset.kind),
+          buttons: Array.from(document.querySelectorAll('.sample-validation-card .sample-primary-actions > button')).map((button) => button.id),
+        };
+        return {
+          bulk,
+          afterDrag,
+          afterSwap,
+          afterFill,
+          returned,
+          crossBank,
+          afterReplace,
+          escaped,
+          manifestSchema: manifest.schema,
+          manifestInbox: manifest.project?.inbox?.length ?? null,
+          manifestFiles: manifest.files?.length ?? null,
+          imported,
+          importedInbox: window.__SXC1_SAMPLE_LAB.inboxItems.map((item) => item.name),
+          persistedInbox: JSON.parse(localStorage.getItem('sxc1.sample-lab.v1') || 'null')?.inbox?.length ?? null,
+          validation: { blocking: validation.blocking, kinds: validation.issues.map((item) => item.kind) },
+          validationUi,
+        };
+      })()`);
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
+      }, sessionId);
+      const sampleInboxMobile = await evaluate(`(() => ({
+        viewport: innerWidth,
+        scrollWidth: document.scrollingElement?.scrollWidth || null,
+        view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+        visible: document.querySelector('.sample-validation-card')?.getBoundingClientRect().height > 0,
+        buttons: Array.from(document.querySelectorAll('.sample-validation-card .sample-primary-actions > button'))
+          .map((button) => button.getBoundingClientRect().height),
+      }))()`);
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      report(
+        'Sample Inbox bulk-imports, places, swaps, auto-fills, migrates, and validates without losing audio',
+        Boolean(sampleInbox?.bulk?.multiple
+          && sampleInbox.bulk.cards === 3
+          && sampleInbox.bulk.actions.join(',') === 'btn-sample-inbox-add,btn-sample-inbox-fill'
+          && sampleInbox.bulk.assigned === 1
+          && sampleInbox.afterDrag.some((item) => item.pad === 2 && item.name === 'snare')
+          && sampleInbox.afterSwap.some((item) => item.slot === 'A' && item.pad === 1 && item.name === 'snare')
+          && sampleInbox.afterSwap.some((item) => item.slot === 'A' && item.pad === 2 && item.name === 'Arcade kick')
+          && sampleInbox.afterFill.length === 4
+          && sampleInbox.afterFill.some((item) => item.pad === 3 && item.name === 'hat')
+          && sampleInbox.afterFill.some((item) => item.pad === 4 && item.name === 'texture')
+          && sampleInbox.returned.assigned === 3 && sampleInbox.returned.inbox.join(',') === 'texture'
+          && sampleInbox.crossBank.some((item) => item.slot === 'B' && item.pad === 1 && item.name === 'texture')
+          && !sampleInbox.crossBank.some((item) => item.slot === 'A' && item.pad === 4)
+          && sampleInbox.afterReplace.assigned.some((item) => item.slot === 'A' && item.pad === 1 && item.name === 'lo fi')
+          && sampleInbox.afterReplace.inbox.includes('spare') && sampleInbox.afterReplace.inbox.includes('snare')
+          && sampleInbox.afterReplace.inbox.length === 2 && sampleInbox.escaped
+          && sampleInbox.manifestSchema === 1 && sampleInbox.manifestInbox === 2
+          && sampleInbox.manifestFiles === 6 && sampleInbox.imported
+          && sampleInbox.importedInbox.includes('spare') && sampleInbox.importedInbox.includes('snare')
+          && sampleInbox.persistedInbox === 2
+          && sampleInbox.validation.blocking === false
+          && sampleInbox.validation.kinds.join(',') === 'banks,inbox,format'
+          && sampleInbox.validationUi.view === 'validation'
+          && sampleInbox.validationUi.kinds.join(',') === 'banks,inbox,format'
+          && sampleInbox.validationUi.buttons.join(',') === 'btn-sample-validation-back,btn-sample-validation-continue'
+          && sampleInboxMobile?.viewport === 320 && sampleInboxMobile.scrollWidth <= 320
+          && sampleInboxMobile.view === 'validation' && sampleInboxMobile.visible
+          && sampleInboxMobile.buttons.length === 2
+          && sampleInboxMobile.buttons.every((height) => height >= 44)),
+        { sampleInbox, sampleInboxMobile },
+      );
+      await click('#btn-sample-validation-back');
+
+      // -- 3d. The focused coach is a deterministic, tab-scoped snapshot:
       // route changes never reshuffle it, all five cards are unique links, and
       // opening one carries an out-of-tree session bar into the live runner.
       // A fresh profile has no due or partial work, so all five reasons must be

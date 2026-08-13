@@ -3718,6 +3718,161 @@
     text-transform: uppercase;
   }
 
+  .sample-inbox-panel {
+    border-color: rgba(113, 146, 255, 0.23);
+    background:
+      linear-gradient(145deg, rgba(30, 34, 48, 0.97), rgba(17, 20, 29, 0.98));
+  }
+
+  .sample-inbox-drop {
+    display: flex;
+    min-height: 6.5rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 1rem;
+    border: 1px dashed rgba(113, 146, 255, 0.5);
+    border-radius: 0.75rem;
+    background: rgba(113, 146, 255, 0.045);
+    color: #9ca7bd;
+    text-align: center;
+  }
+
+  .sample-inbox-drop.is-compact {
+    min-height: 3.5rem;
+  }
+
+  .sample-inbox-drop strong {
+    color: #e9edff;
+    font-size: 0.87rem;
+  }
+
+  .sample-inbox-drop span {
+    max-width: 38rem;
+    font-size: 0.72rem;
+    line-height: 1.45;
+  }
+
+  .sample-inbox-drop.is-dragging {
+    border-style: solid;
+    border-color: #7bf2ce;
+    background: rgba(70, 225, 183, 0.1);
+  }
+
+  .sample-inbox-tray {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+  }
+
+  .sample-inbox-card {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    min-height: 8.5rem;
+    align-content: start;
+    gap: 0.35rem;
+    overflow: hidden;
+    padding: 0.7rem 0.7rem 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 0.7rem;
+    background: #11141c;
+    color: #dfe4ef;
+    cursor: grab;
+    text-align: left;
+  }
+
+  .sample-inbox-card:active {
+    cursor: grabbing;
+  }
+
+  .sample-inbox-card::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 3px;
+    opacity: 0.9;
+  }
+
+  .sample-inbox-card.is-selected {
+    border-color: #7bf2ce;
+    outline: 2px solid rgba(123, 242, 206, 0.22);
+    outline-offset: 2px;
+  }
+
+  .sample-inbox-card.is-playing {
+    filter: brightness(1.24);
+  }
+
+  .sample-inbox-order {
+    color: #6f7990;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.62rem;
+    font-weight: 800;
+  }
+
+  .sample-inbox-name {
+    overflow: hidden;
+    color: #f8f9fd;
+    font-size: 0.82rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+  }
+
+  .sample-inbox-meta {
+    color: #8993a8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.55rem;
+    line-height: 1.3;
+  }
+
+  .sample-waveform.sample-waveform-mini {
+    height: 2.4rem;
+    margin: auto 0 0;
+    padding: 0.3rem;
+    pointer-events: none;
+  }
+
+  .sample-inbox-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-top: 0.75rem;
+  }
+
+  .sample-placement-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 1rem 0;
+    padding: 0.8rem 1rem;
+    border: 1px solid rgba(123, 242, 206, 0.35);
+    border-radius: 0.8rem;
+    background: rgba(70, 225, 183, 0.08);
+  }
+
+  .sample-placement-notice > div {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .sample-placement-notice strong {
+    color: #7bf2ce;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .sample-placement-notice span {
+    color: #bec7d8;
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+
   .sample-section-top {
     display: flex;
     align-items: baseline;
@@ -3892,6 +4047,22 @@
     animation: sample-pulse 0.75s ease-in-out infinite alternate;
   }
 
+  .sample-pad.is-placement-target {
+    border-style: dashed;
+    border-color: rgba(123, 242, 206, 0.52);
+  }
+
+  .sample-pad.is-placement-source {
+    opacity: 0.58;
+  }
+
+  .sample-pad.is-dragging-over {
+    border-style: solid;
+    border-color: #7bf2ce;
+    background: rgba(70, 225, 183, 0.16);
+    transform: translateY(-2px);
+  }
+
   .sample-pad-red::after { background: #ff6b73; box-shadow: 0 0 0.9rem #ff6b73; }
   .sample-pad-amber::after { background: #ffbe55; box-shadow: 0 0 0.9rem #ffbe55; }
   .sample-pad-green::after { background: #51e1b4; box-shadow: 0 0 0.9rem #51e1b4; }
@@ -3977,6 +4148,13 @@
   .sample-button:focus-visible {
     filter: brightness(1.12);
     transform: translateY(-1px);
+  }
+
+  .sample-button:disabled {
+    cursor: not-allowed;
+    filter: none;
+    opacity: 0.42;
+    transform: none;
   }
 
   .sample-waveform {
@@ -4072,6 +4250,73 @@
 
   .sample-handoff-shell {
     max-width: 48rem;
+  }
+
+  .sample-validation-shell {
+    max-width: 48rem;
+  }
+
+  .sample-validation-hero {
+    padding-bottom: 1.5rem;
+  }
+
+  .sample-validation-card {
+    padding: clamp(1rem, 4vw, 1.8rem);
+    border: 1px solid rgba(255, 190, 90, 0.28);
+    border-radius: 1rem;
+    background: linear-gradient(150deg, rgba(36, 32, 28, 0.98), rgba(18, 18, 22, 0.98));
+    box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.32);
+  }
+
+  .sample-validation-card.has-blocker {
+    border-color: rgba(255, 113, 121, 0.42);
+  }
+
+  .sample-validation-summary {
+    margin: 0;
+    color: #ffffff;
+    font-size: 1rem;
+  }
+
+  .sample-validation-list {
+    display: grid;
+    gap: 0.6rem;
+    margin: 1rem 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sample-validation-list li {
+    display: grid;
+    grid-template-columns: 1.6rem minmax(0, 1fr);
+    gap: 0.65rem;
+    align-items: start;
+    padding: 0.75rem;
+    border-radius: 0.6rem;
+    background: rgba(255, 190, 90, 0.07);
+    color: #d3d8e2;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .sample-validation-list li > strong {
+    display: grid;
+    width: 1.45rem;
+    height: 1.45rem;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255, 190, 90, 0.17);
+    color: #ffcb7c;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .sample-validation-list li.is-blocking {
+    background: rgba(255, 85, 95, 0.09);
+  }
+
+  .sample-validation-list li.is-blocking > strong {
+    background: rgba(255, 85, 95, 0.17);
+    color: #ff9ba1;
   }
 
   .sample-handoff-hero {
@@ -4228,6 +4473,24 @@
     .sample-bank-fields,
     .sample-metadata-grid {
       grid-template-columns: 1fr;
+    }
+
+    .sample-inbox-tray {
+      display: flex;
+      gap: 0.55rem;
+      overflow-x: auto;
+      padding: 0.2rem 0.15rem 0.5rem;
+      scroll-snap-type: x proximity;
+    }
+
+    .sample-inbox-card {
+      flex: 0 0 9.5rem;
+      scroll-snap-align: start;
+    }
+
+    .sample-placement-notice {
+      align-items: stretch;
+      flex-direction: column;
     }
 
     .sample-pad {
