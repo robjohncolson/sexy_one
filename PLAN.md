@@ -176,9 +176,10 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   as one portable `.sxc1lab` file, and walk the phone through one CASIO Sampler
   App assignment at a time. Audio never reaches a SEXY ONE server and the
   planner is deferred until after trainer interactivity, so it adds no weight to
-  the critical boot graph. **IMPLEMENTATION COMPLETE 2026-08-13.** The optimized
+  the critical boot graph. **COMPLETE AND DEPLOYED 2026-08-13.** The optimized
   artifact passed the full 136/136 release gate with 236/236 browser assertions
-  at both the origin root and nested-path deployment. Contract:
+  at both the origin root and nested-path deployment, then passed 74/74 against
+  production. Contract:
   `docs/SAMPLE-LAB.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
@@ -219,8 +220,8 @@ Vercel (2026-08-07, owner-requested): the same static build also deploys to
 sexy-one.vercel.app belongs to an unrelated third party — never share that
 one). Deploy: copy `site/public` to a scratch dir named `sexy-one`, run
 `vercel deploy --prod --yes` (CLI authenticated as the owner's account).
-Initially verified 70/70 by browser-check against production. The current M11 release
-(`dpl_9ehLGXHNWRcngmDe4xkbdjQeNudK`) was deployed 2026-08-11 and verified 73/73
+Initially verified 70/70 by browser-check against production. The current M12 release
+(`dpl_5WmJXaPkXZZqM3Nv54SMAbZsFD3Q`) was deployed 2026-08-13 and verified 74/74
 against the main alias, with the
 deployed files byte-identical to the locally gated artifact and the correct
 `application/wasm` content type. First-visit CDN cold-decode latency on the

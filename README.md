@@ -101,7 +101,8 @@ without an account or upload; Phone handoff then presents one exact bank/pad
 destination at a time while CASIO Sampler App performs the hardware assignment.
 The module loads only after the trainer is interactive and adds nothing to
 the critical boot graph. The shipping artifact passed 136/136 checks with
-236/236 browser assertions at both root and nested paths. See
+236/236 browser assertions at both root and nested paths, is deployed at the
+Vercel mirror, and passed 74/74 against production. See
 [`docs/SAMPLE-LAB.md`](docs/SAMPLE-LAB.md).
 
 **M10 Weekly Pulse.** `#/x/week` turns the learner's saved schedule
