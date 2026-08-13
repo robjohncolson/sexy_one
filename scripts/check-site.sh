@@ -742,8 +742,10 @@ info() {
 # five-card plan, cross-route coach, DOM-only renderer, and mobile-safe links.
 # M12 adds one required static module and one full-stage Sample Lab workflow
 # assertion. The module is separately cached but deferred out of first boot.
+# M13 adds one full-stage Sample Inbox assertion; check-site's own check count
+# is unchanged because the existing static-module/cache contracts cover it.
 M5_CHECK_TOTAL=136
-M5_BROWSER_ASSERT_FLOOR=236
+M5_BROWSER_ASSERT_FLOOR=238
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -979,7 +981,7 @@ assert any(icon.get("src") == "./app-icon.svg" and "maskable" in icon.get("purpo
 ET.parse(root / "app-icon.svg")
 
 worker = (root / "sw.js").read_text(encoding="utf-8")
-assert 'const CACHE_VERSION = "m12-v1"' in worker
+assert 'const CACHE_VERSION = "m13-v1"' in worker
 match = re.search(r"const CORE_RELATIVE_URLS = (\[.*?\]);", worker, re.S)
 assert match, "CORE_RELATIVE_URLS not found"
 urls = json.loads(match.group(1))
@@ -4893,9 +4895,10 @@ SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage repor
 # EN-fallback ja bundle red rather than self-consistent; the red-first
 # demonstration served a copy whose content.ja.txt was the EN emission
 # relabelled "ja" and all five failed (M6 W4 report); M8 adds JAC6 and
-# M10 adds JAC7 for the Weekly Pulse's JS-owned Japanese surface.
-JA_COURSE_ASSERT_COUNT=7
-JA_COURSE_LABEL="M6 W4 + M8/M10 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course plus the mastery journey and Weekly Pulse JS-owned JA surfaces) -- counted BY STABLE ID (JAC1..JAC7, allowlisted in this script), so unplugging, renaming or substituting one cannot hide under the N/N floor"
+# M10 adds JAC7 for the Weekly Pulse's JS-owned Japanese surface; M13 adds
+# JAC8 for Sample Inbox's independently rendered Japanese workflow.
+JA_COURSE_ASSERT_COUNT=8
+JA_COURSE_LABEL="M6 W4 + M8/M10/M13 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course plus the mastery journey, Weekly Pulse, and Sample Inbox JS-owned JA surfaces) -- counted BY STABLE ID (JAC1..JAC8, allowlisted in this script), so unplugging, renaming or substituting one cannot hide under the N/N floor"
 
 # Parse one stage's captured output for its final "browser-check: N/M
 # assertions passed" summary line and enforce the contract: the line must
@@ -4908,12 +4911,12 @@ JA_COURSE_LABEL="M6 W4 + M8/M10 JA course floor: BOTH full browser stages report
 # M6 gate-1 finding M6-R1-3: counting a PREFIX and a cardinality let a
 # required assertion be swapped for a trivial passing one named
 # "ja course: ..." while both the count and the stage floor stayed
-# green. The assertions therefore carry STABLE IDs (JAC1..JAC7,
+# green. The assertions therefore carry STABLE IDs (JAC1..JAC8,
 # declared in scripts/browser-check.mjs) and this script declares the
-# same six INDEPENDENTLY below: the check compares the captured ID SET
+# same set INDEPENDENTLY below: the check compares the captured ID SET
 # to that allowlist, exactly as V6 compares D1..D27 by number. An extra
 # "ja course:" assertion is not a substitute for a missing one.
-JA_COURSE_IDS="JAC1 JAC2 JAC3 JAC4 JAC5 JAC6 JAC7"
+JA_COURSE_IDS="JAC1 JAC2 JAC3 JAC4 JAC5 JAC6 JAC7 JAC8"
 
 # Echoes the JAC ids reported ok in one stage capture, sorted+unique. A
 # failed assertion prints "FAIL - ja course: [JACn] ..." instead, so it

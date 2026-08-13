@@ -14,6 +14,7 @@ const FORMAT_MAGIC = "SXC1LAB1";
 const FORMAT_SCHEMA = 1;
 const MAX_MANIFEST_BYTES = 5 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 180 * 1024 * 1024;
+const MAX_BATCH_FILES = 64;
 const SLOT_NAMES = ["A", "B", "C", "D"];
 const SUPPORTED_EXTENSIONS = new Set(["wav", "mp3", "flac", "cswp"]);
 
@@ -30,6 +31,32 @@ const COPY = {
     temporary: "Temporary mode — export before closing this tab",
     project: "Project",
     projectName: "Project name",
+    inbox: "Sample Inbox",
+    inboxHint: "Audition a sound, then press its destination pad. You can also drag it on desktop.",
+    inboxEmpty: "Drop an Audacity export batch here. Nothing is assigned until you place it.",
+    inboxDrop: "Drop WAV, MP3, FLAC, or .cswp files",
+    addSamples: "Add samples",
+    fillEmpty: "Fill empty pads",
+    assignNext: "Assign next empty",
+    removeInbox: "Remove from Inbox",
+    removeInboxConfirm: "Delete this unassigned sample from Sample Lab? The original file outside SEXY ONE is not affected.",
+    inboxSelected: "{name} selected — choose a destination pad.",
+    inboxImported: "Added {added} sample(s) to the Inbox{rejected}.",
+    inboxRejected: "; skipped {count}",
+    batchLimit: "Only the first 64 files in one batch are imported.",
+    noInbox: "The Inbox is empty.",
+    noEmptyPads: "This bank has no empty pads.",
+    autoFilled: "Placed {count} sample(s) on empty pads.",
+    assignedTo: "Assigned {name} to {slot} / BANK {bank} / PAD {pad}.",
+    replacedTo: "Assigned {name}; {old} returned to the Inbox.",
+    moveSwap: "Move / swap",
+    returnInbox: "Return to Inbox",
+    moveSelected: "{name} is ready to move — choose any destination pad or bank.",
+    movedTo: "Moved {name} to {slot} / BANK {bank} / PAD {pad}.",
+    swapped: "Swapped {first} and {second}.",
+    placement: "Placement ready",
+    cancel: "Cancel",
+    placementCancelled: "Placement cancelled.",
     bankSlots: "Four SXC-1 bank slots",
     bankNumber: "User bank",
     bankName: "Bank name",
@@ -41,8 +68,6 @@ const COPY = {
     dropHint: "or choose WAV, MP3, FLAC, or .cswp — up to 180 MB",
     choose: "Choose a sample",
     importing: "Reading sample…",
-    replace: "Replace file",
-    remove: "Remove",
     name: "Pad name",
     source: "Source note",
     sourcePlaceholder: "Game, recording, video, session…",
@@ -74,8 +99,20 @@ const COPY = {
     storageFailed: "Persistent audio storage is unavailable. This tab will keep the audio temporarily.",
     readFailed: "That file could not be read.",
     badProject: "That is not a valid Sample Lab project.",
-    removeConfirm: "Remove this pad assignment? The original file outside SEXY ONE is not affected.",
     noPads: "Assign at least one sample before starting phone handoff.",
+    checking: "Checking project…",
+    validationEyebrow: "HANDOFF CHECK",
+    validationTitle: "Review the project",
+    validationReady: "Everything is ready for phone handoff.",
+    validationIntro: "Resolve anything important now, or continue with the supported files as they are.",
+    validationBlocking: "Handoff is blocked until missing local audio is restored.",
+    validationInbox: "{count} sample(s) are still unassigned in the Inbox.",
+    validationBanks: "Bank {bank} is used by more than one A-D slot.",
+    validationFormat: "{count} assigned file(s) are supported by CASIO but are not 48 kHz / 16-bit WAV.",
+    validationNames: "{count} pad name(s) are duplicated within a bank.",
+    validationMissing: "{count} assigned audio file(s) are missing from local storage.",
+    fixProject: "Back to planner",
+    continueHandoff: "Continue to handoff",
     handoffEyebrow: "PHONE HANDOFF",
     handoffTitle: "Load one pad at a time",
     handoffIntro: "Open this project on your phone. SEXY ONE keeps the destination visible while CASIO Sampler App performs the actual assignment.",
@@ -107,6 +144,32 @@ const COPY = {
     temporary: "一時モード — タブを閉じる前に書き出してください",
     project: "プロジェクト",
     projectName: "プロジェクト名",
+    inbox: "サンプル受け皿",
+    inboxHint: "音を試聴してから割り当て先パッドを押します。パソコンではドラッグもできます。",
+    inboxEmpty: "Audacityの書き出しをまとめてドロップしてください。配置するまでパッドには割り当てません。",
+    inboxDrop: "WAV / MP3 / FLAC / .cswp をドロップ",
+    addSamples: "サンプルを追加",
+    fillEmpty: "空きパッドへ配置",
+    assignNext: "次の空きへ配置",
+    removeInbox: "受け皿から削除",
+    removeInboxConfirm: "この未割り当てサンプルをSample Labから削除しますか？ 外部の元ファイルには影響しません。",
+    inboxSelected: "{name}を選択中 — 割り当て先パッドを選んでください。",
+    inboxImported: "{added}件を受け皿へ追加しました{rejected}。",
+    inboxRejected: "（{count}件をスキップ）",
+    batchLimit: "一度に読み込むのは先頭64ファイルまでです。",
+    noInbox: "受け皿は空です。",
+    noEmptyPads: "このバンクに空きパッドはありません。",
+    autoFilled: "空きパッドへ{count}件を配置しました。",
+    assignedTo: "{name}を {slot} / BANK {bank} / PAD {pad} へ配置しました。",
+    replacedTo: "{name}を配置し、{old}を受け皿へ戻しました。",
+    moveSwap: "移動／入れ替え",
+    returnInbox: "受け皿へ戻す",
+    moveSelected: "{name}の移動先パッドまたはバンクを選んでください。",
+    movedTo: "{name}を {slot} / BANK {bank} / PAD {pad} へ移動しました。",
+    swapped: "{first}と{second}を入れ替えました。",
+    placement: "配置先を選択中",
+    cancel: "キャンセル",
+    placementCancelled: "配置をキャンセルしました。",
     bankSlots: "SXC-1 バンクスロット A〜D",
     bankNumber: "ユーザーバンク",
     bankName: "バンク名",
@@ -118,8 +181,6 @@ const COPY = {
     dropHint: "または WAV / MP3 / FLAC / .cswp を選択（最大180 MB）",
     choose: "サンプルを選ぶ",
     importing: "サンプルを読み込み中…",
-    replace: "ファイルを交換",
-    remove: "削除",
     name: "パッド名",
     source: "出典メモ",
     sourcePlaceholder: "ゲーム、録音、動画、セッション…",
@@ -151,8 +212,20 @@ const COPY = {
     storageFailed: "音声を永続保存できません。このタブ内で一時的に保持します。",
     readFailed: "このファイルを読み取れませんでした。",
     badProject: "有効なSample Labプロジェクトではありません。",
-    removeConfirm: "このパッド割り当てを削除しますか？ SEXY ONE外の元ファイルには影響しません。",
     noPads: "スマートフォンへ移す前に、1つ以上のサンプルを割り当ててください。",
+    checking: "プロジェクトを確認中…",
+    validationEyebrow: "引き渡し前の確認",
+    validationTitle: "プロジェクトを確認",
+    validationReady: "スマートフォンへの引き渡し準備ができました。",
+    validationIntro: "必要な項目を修正するか、対応形式のまま続行できます。",
+    validationBlocking: "ローカル音声の欠落を復元するまで引き渡しできません。",
+    validationInbox: "受け皿に未割り当てサンプルが{count}件あります。",
+    validationBanks: "BANK {bank}が複数のA〜Dスロットで使われています。",
+    validationFormat: "割り当て済みの{count}件はCASIO対応形式ですが、48 kHz / 16-bit WAVではありません。",
+    validationNames: "同じバンク内に重複したパッド名が{count}件あります。",
+    validationMissing: "ローカル保存から音声ファイルが{count}件見つかりません。",
+    fixProject: "配置画面へ戻る",
+    continueHandoff: "引き渡しを続ける",
     handoffEyebrow: "スマートフォンへの引き渡し",
     handoffTitle: "1パッドずつ読み込む",
     handoffIntro: "スマートフォンでこのプロジェクトを開きます。SEXY ONEが割り当て先を表示し、実際の転送はCASIO Sampler Appで行います。",
@@ -185,6 +258,7 @@ let currentAudio = null;
 let currentObjectUrl = null;
 let renderQueued = false;
 let handoffIndex = 0;
+let armedPlacement = null;
 const memoryAudio = new Map();
 
 function uid(prefix = "id") {
@@ -210,6 +284,7 @@ function defaultProject() {
     name: "My SXC-1 set",
     activeSlot: "A",
     selectedPad: 1,
+    inbox: [],
     slots: Object.fromEntries(SLOT_NAMES.map((slot, index) => [slot, defaultSlot(index)])),
     updatedAt: new Date().toISOString(),
   };
@@ -241,6 +316,15 @@ function normalizePad(raw) {
   };
 }
 
+function normalizeInboxItem(raw) {
+  const pad = normalizePad(raw);
+  if (!pad) return null;
+  return {
+    ...pad,
+    id: typeof raw.id === "string" && raw.id ? raw.id : uid("inbox"),
+  };
+}
+
 function normalizeProject(raw) {
   if (!raw || typeof raw !== "object") return defaultProject();
   const fallback = defaultProject();
@@ -250,6 +334,9 @@ function normalizeProject(raw) {
     name: String(raw.name || fallback.name).slice(0, 100),
     activeSlot: SLOT_NAMES.includes(raw.activeSlot) ? raw.activeSlot : "A",
     selectedPad: clampInt(raw.selectedPad, 1, 16, 1),
+    // M12 projects have no inbox property. Absence migrates to an empty tray
+    // while duplicate/malformed item ids are rejected locally.
+    inbox: [],
     slots: {},
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : fallback.updatedAt,
   };
@@ -269,6 +356,16 @@ function normalizeProject(raw) {
       pads,
     };
   });
+  const inboxIds = new Set();
+  if (Array.isArray(raw.inbox)) {
+    raw.inbox.slice(0, 256).forEach((candidate) => {
+      const item = normalizeInboxItem(candidate);
+      if (item && !inboxIds.has(item.id)) {
+        inboxIds.add(item.id);
+        result.inbox.push(item);
+      }
+    });
+  }
   return result;
 }
 
@@ -440,8 +537,102 @@ function allAssignedPads() {
   return rows;
 }
 
-function assignedBlobIds() {
-  return new Set(allAssignedPads().map((row) => row.data.blobId));
+function referencedBlobIds(project = state) {
+  const ids = new Set();
+  SLOT_NAMES.forEach((slot) => Object.values(project.slots[slot].pads).forEach((pad) => ids.add(pad.blobId)));
+  project.inbox.forEach((item) => ids.add(item.blobId));
+  return ids;
+}
+
+function firstEmptyPad(slot = state.activeSlot) {
+  for (let number = 1; number <= 16; number += 1) {
+    if (!state.slots[slot].pads[number]) return number;
+  }
+  return null;
+}
+
+function returnableInboxItem(pad) {
+  return { ...pad, id: uid("inbox") };
+}
+
+function cancelPlacement(shouldRender = true) {
+  armedPlacement = null;
+  if (shouldRender) {
+    renderPlanner();
+    announce(strings.placementCancelled);
+  }
+}
+
+function armInbox(item) {
+  armedPlacement = { type: "inbox", id: item.id };
+  renderPlanner();
+  const card = overlay.querySelector(`.sample-inbox-card[data-inbox-id="${item.id}"]`);
+  card?.focus();
+  previewPad(card, item);
+  announce(fill(strings.inboxSelected, { name: item.name }));
+}
+
+function armPad(slot, number) {
+  const pad = state.slots[slot]?.pads[number];
+  if (!pad) return;
+  armedPlacement = { type: "pad", slot, pad: number };
+  renderPlanner();
+  announce(fill(strings.moveSelected, { name: pad.name }));
+}
+
+function placeArmedOnPad(slot, number) {
+  if (!armedPlacement || !state.slots[slot]) return false;
+  stopPreview();
+  const destinationBank = state.slots[slot];
+  const destination = destinationBank.pads[number] || null;
+  if (armedPlacement.type === "inbox") {
+    const index = state.inbox.findIndex((item) => item.id === armedPlacement.id);
+    if (index < 0) { cancelPlacement(); return false; }
+    const [item] = state.inbox.splice(index, 1);
+    const { id: _itemId, ...pad } = item;
+    if (destination) state.inbox.push(returnableInboxItem(destination));
+    destinationBank.pads[number] = pad;
+    state.activeSlot = slot;
+    state.selectedPad = number;
+    armedPlacement = null;
+    persistProject();
+    renderPlanner();
+    announce(fill(destination ? strings.replacedTo : strings.assignedTo, {
+      name: pad.name,
+      old: destination?.name || "",
+      slot,
+      bank: destinationBank.bank,
+      pad: number,
+    }));
+    return true;
+  }
+  if (armedPlacement.type === "pad") {
+    const sourceBank = state.slots[armedPlacement.slot];
+    const source = sourceBank?.pads[armedPlacement.pad] || null;
+    if (!source) { cancelPlacement(); return false; }
+    if (armedPlacement.slot === slot && armedPlacement.pad === number) {
+      cancelPlacement();
+      return false;
+    }
+    if (destination) sourceBank.pads[armedPlacement.pad] = destination;
+    else delete sourceBank.pads[armedPlacement.pad];
+    destinationBank.pads[number] = source;
+    state.activeSlot = slot;
+    state.selectedPad = number;
+    armedPlacement = null;
+    persistProject();
+    renderPlanner();
+    announce(fill(destination ? strings.swapped : strings.movedTo, {
+      name: source.name,
+      first: source.name,
+      second: destination?.name || "",
+      slot,
+      bank: destinationBank.bank,
+      pad: number,
+    }));
+    return true;
+  }
+  return false;
 }
 
 function formatBytes(bytes) {
@@ -509,7 +700,8 @@ function stopPreview() {
     URL.revokeObjectURL(currentObjectUrl);
     currentObjectUrl = null;
   }
-  overlay?.querySelectorAll(".sample-pad.is-playing").forEach((pad) => pad.classList.remove("is-playing"));
+  overlay?.querySelectorAll(".sample-pad.is-playing, .sample-inbox-card.is-playing")
+    .forEach((control) => control.classList.remove("is-playing"));
 }
 
 async function previewPad(button, pad) {
@@ -544,6 +736,7 @@ function setRouteActive() {
     requestAnimationFrame(() => overlay.querySelector("h1")?.focus());
   } else {
     stopPreview();
+    armedPlacement = null;
     document.title = "SEXY ONE — SXC-1 Trainer";
   }
 }
@@ -645,6 +838,168 @@ function bankStrip() {
   return section;
 }
 
+function inboxFileInput() {
+  const input = document.createElement("input");
+  input.id = "sample-inbox-input";
+  input.type = "file";
+  input.multiple = true;
+  input.accept = ".wav,.mp3,.flac,.cswp,audio/wav,audio/mpeg,audio/flac";
+  input.hidden = true;
+  input.addEventListener("change", async () => {
+    const files = Array.from(input.files || []);
+    input.value = "";
+    if (files.length) await importFilesToInbox(files);
+  });
+  return input;
+}
+
+function assignSelectedInboxNext() {
+  if (armedPlacement?.type !== "inbox") return;
+  const number = firstEmptyPad();
+  if (number == null) { announce(strings.noEmptyPads, "warning"); return; }
+  placeArmedOnPad(state.activeSlot, number);
+  requestAnimationFrame(() => overlay.querySelector(`.sample-pad[data-pad="${number}"]`)?.focus());
+}
+
+async function removeSelectedInbox() {
+  if (armedPlacement?.type !== "inbox") return;
+  const index = state.inbox.findIndex((item) => item.id === armedPlacement.id);
+  if (index < 0 || !window.confirm(strings.removeInboxConfirm)) return;
+  const [removed] = state.inbox.splice(index, 1);
+  armedPlacement = null;
+  persistProject();
+  if (!referencedBlobIds().has(removed.blobId)) await deleteAudio(removed.blobId);
+  stopPreview();
+  renderPlanner();
+  announce(strings.saved);
+}
+
+function autoFillActiveBank() {
+  const empty = [];
+  for (let number = 1; number <= 16; number += 1) {
+    if (!activeBank().pads[number]) empty.push(number);
+  }
+  const count = Math.min(empty.length, state.inbox.length);
+  if (!state.inbox.length) { announce(strings.noInbox, "warning"); return; }
+  if (!count) { announce(strings.noEmptyPads, "warning"); return; }
+  for (let index = 0; index < count; index += 1) {
+    const item = state.inbox.shift();
+    const { id: _itemId, ...pad } = item;
+    activeBank().pads[empty[index]] = pad;
+  }
+  state.selectedPad = empty[count - 1];
+  armedPlacement = null;
+  persistProject();
+  renderPlanner();
+  announce(fill(strings.autoFilled, { count }));
+}
+
+function inboxPanel() {
+  const section = el("section", "sample-panel sample-inbox-panel");
+  section.setAttribute("aria-labelledby", "sample-inbox-heading");
+  const top = el("div", "sample-section-top");
+  const heading = el("h2", "sample-panel-heading", `${strings.inbox} · ${state.inbox.length}`);
+  heading.id = "sample-inbox-heading";
+  top.append(heading, el("p", "sample-help", strings.inboxHint));
+  section.append(top);
+
+  const drop = el("div", `sample-inbox-drop${state.inbox.length ? " is-compact" : ""}`);
+  drop.append(el("strong", "", strings.inboxDrop), el("span", "", state.inbox.length ? strings.inboxHint : strings.inboxEmpty));
+  const setDrag = (active) => drop.classList.toggle("is-dragging", active);
+  drop.addEventListener("dragenter", (event) => { event.preventDefault(); setDrag(true); });
+  drop.addEventListener("dragover", (event) => {
+    if (Array.from(event.dataTransfer?.types || []).includes("Files")) event.preventDefault();
+    setDrag(true);
+  });
+  drop.addEventListener("dragleave", () => setDrag(false));
+  drop.addEventListener("drop", async (event) => {
+    setDrag(false);
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (!files.length) return;
+    event.preventDefault();
+    await importFilesToInbox(files);
+  });
+  section.append(drop);
+
+  if (state.inbox.length) {
+    const tray = el("div", "sample-inbox-tray");
+    tray.setAttribute("role", "list");
+    state.inbox.forEach((item, index) => {
+      const selected = armedPlacement?.type === "inbox" && armedPlacement.id === item.id;
+      const card = el("button", `sample-inbox-card sample-pad-${item.color}${selected ? " is-selected" : ""}`);
+      card.type = "button";
+      card.draggable = true;
+      card.dataset.inboxId = item.id;
+      card.setAttribute("role", "listitem");
+      card.setAttribute("aria-pressed", String(selected));
+      card.setAttribute("aria-label", `${index + 1}. ${item.name}, ${formatDuration(item.duration)}`);
+      const mini = waveform(item);
+      mini.classList.add("sample-waveform-mini");
+      card.append(
+        el("span", "sample-inbox-order", String(index + 1).padStart(2, "0")),
+        el("strong", "sample-inbox-name", item.name),
+        el("span", "sample-inbox-meta", `${extOf(item.originalName).toUpperCase()} · ${formatDuration(item.duration)} · ${formatBytes(item.bytes)}`),
+        mini,
+      );
+      card.addEventListener("click", () => armInbox(item));
+      card.addEventListener("dragstart", (event) => {
+        armedPlacement = { type: "inbox", id: item.id };
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", `inbox:${item.id}`);
+        card.classList.add("is-selected");
+      });
+      card.addEventListener("dragend", () => {
+        if (armedPlacement?.type === "inbox" && armedPlacement.id === item.id) cancelPlacement();
+      });
+      tray.append(card);
+    });
+    section.append(tray);
+  }
+
+  const input = inboxFileInput();
+  const actions = el("div", "sample-inbox-actions");
+  if (armedPlacement?.type === "inbox") {
+    const assign = el("button", "sample-button sample-button-primary", strings.assignNext);
+    assign.id = "btn-sample-inbox-assign-next";
+    assign.type = "button";
+    assign.addEventListener("click", assignSelectedInboxNext);
+    const remove = el("button", "sample-button sample-button-danger", strings.removeInbox);
+    remove.id = "btn-sample-inbox-remove";
+    remove.type = "button";
+    remove.addEventListener("click", removeSelectedInbox);
+    actions.append(assign, remove);
+  } else {
+    const add = el("button", "sample-button sample-button-secondary", strings.addSamples);
+    add.id = "btn-sample-inbox-add";
+    add.type = "button";
+    add.addEventListener("click", () => input.click());
+    const fill = el("button", "sample-button sample-button-primary", strings.fillEmpty);
+    fill.id = "btn-sample-inbox-fill";
+    fill.type = "button";
+    fill.disabled = !state.inbox.length;
+    fill.addEventListener("click", autoFillActiveBank);
+    actions.append(add, fill);
+  }
+  section.append(input, actions);
+  return section;
+}
+
+function placementNotice() {
+  if (armedPlacement?.type !== "pad") return null;
+  const source = state.slots[armedPlacement.slot]?.pads[armedPlacement.pad];
+  if (!source) return null;
+  const aside = el("aside", "sample-placement-notice");
+  aside.setAttribute("role", "status");
+  const copy = el("div", "");
+  copy.append(el("strong", "", strings.placement), el("span", "", fill(strings.moveSelected, { name: source.name })));
+  const cancel = el("button", "sample-button sample-button-secondary", strings.cancel);
+  cancel.id = "btn-sample-placement-cancel";
+  cancel.type = "button";
+  cancel.addEventListener("click", () => cancelPlacement());
+  aside.append(copy, cancel);
+  return aside;
+}
+
 function padGrid() {
   const section = el("section", "sample-panel sample-pad-panel");
   section.setAttribute("aria-labelledby", "sample-pad-heading");
@@ -655,20 +1010,50 @@ function padGrid() {
   const grid = el("div", "sample-pad-grid");
   for (let number = 1; number <= 16; number += 1) {
     const pad = activeBank().pads[number] || null;
-    const button = el("button", `sample-pad sample-pad-${pad?.color || "empty"}${number === state.selectedPad ? " is-selected" : ""}`);
+    const isSource = armedPlacement?.type === "pad"
+      && armedPlacement.slot === state.activeSlot && armedPlacement.pad === number;
+    const button = el("button", `sample-pad sample-pad-${pad?.color || "empty"}${number === state.selectedPad ? " is-selected" : ""}${armedPlacement ? " is-placement-target" : ""}${isSource ? " is-placement-source" : ""}`);
     button.type = "button";
     button.dataset.pad = String(number);
+    button.draggable = Boolean(pad);
     button.setAttribute("aria-pressed", String(number === state.selectedPad));
     button.setAttribute("aria-label", pad ? `Pad ${number}: ${pad.name}` : `Pad ${number}: ${strings.empty}`);
     button.append(el("span", "sample-pad-number", String(number)), el("strong", "sample-pad-name", pad?.name || strings.empty));
     if (pad) button.append(el("span", "sample-pad-duration", formatDuration(pad.duration)));
     button.addEventListener("click", () => {
+      if (armedPlacement) {
+        placeArmedOnPad(state.activeSlot, number);
+        requestAnimationFrame(() => overlay.querySelector(`.sample-pad[data-pad="${number}"]`)?.focus());
+        return;
+      }
       state.selectedPad = number;
       persistProject();
       renderPlanner();
       const current = overlay.querySelector(`.sample-pad[data-pad="${number}"]`);
       current?.focus();
       if (pad) previewPad(current, pad);
+    });
+    button.addEventListener("dragstart", (event) => {
+      if (!pad) { event.preventDefault(); return; }
+      armedPlacement = { type: "pad", slot: state.activeSlot, pad: number };
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", `pad:${state.activeSlot}:${number}`);
+      button.classList.add("is-placement-source");
+    });
+    button.addEventListener("dragend", () => {
+      if (armedPlacement?.type === "pad" && armedPlacement.slot === state.activeSlot && armedPlacement.pad === number) cancelPlacement();
+    });
+    button.addEventListener("dragover", (event) => {
+      if (!armedPlacement) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      button.classList.add("is-dragging-over");
+    });
+    button.addEventListener("dragleave", () => button.classList.remove("is-dragging-over"));
+    button.addEventListener("drop", (event) => {
+      event.preventDefault();
+      button.classList.remove("is-dragging-over");
+      placeArmedOnPad(state.activeSlot, number);
     });
     grid.append(button);
   }
@@ -799,24 +1184,26 @@ function metadataEditor(section, pad) {
     labeledField(strings.group, group),
   );
   section.append(form);
-  const input = fileInput("sample-replace-input");
   const actions = el("div", "sample-action-row");
-  const replace = el("button", "sample-button sample-button-secondary", strings.replace);
-  replace.type = "button";
-  replace.addEventListener("click", () => input.click());
-  const remove = el("button", "sample-button sample-button-danger", strings.remove);
-  remove.type = "button";
-  remove.addEventListener("click", async () => {
-    if (!window.confirm(strings.removeConfirm)) return;
-    const old = selectedPad();
-    if (!old) return;
+  const move = el("button", "sample-button sample-button-secondary", strings.moveSwap);
+  move.id = "btn-sample-pad-move";
+  move.type = "button";
+  move.addEventListener("click", () => armPad(state.activeSlot, state.selectedPad));
+  const returnButton = el("button", "sample-button sample-button-secondary", strings.returnInbox);
+  returnButton.id = "btn-sample-pad-return";
+  returnButton.type = "button";
+  returnButton.addEventListener("click", () => {
+    const pad = selectedPad();
+    if (!pad) return;
+    state.inbox.push(returnableInboxItem(pad));
     delete activeBank().pads[state.selectedPad];
+    armedPlacement = null;
     persistProject();
     stopPreview();
-    if (!assignedBlobIds().has(old.blobId)) await deleteAudio(old.blobId);
     renderPlanner();
+    announce(strings.saved);
   });
-  actions.append(input, replace, remove);
+  actions.append(move, returnButton);
   section.append(actions);
 }
 
@@ -848,7 +1235,8 @@ function projectTools() {
   const importLabel = el("button", "sample-button sample-button-secondary", strings.importProject);
   importLabel.type = "button";
   importLabel.addEventListener("click", () => importInput.click());
-  const usage = el("p", "sample-storage-usage", `${strings.usage}: ${allAssignedPads().length} pads / ${formatBytes(allAssignedPads().reduce((sum, row) => sum + row.data.bytes, 0))}`);
+  const allItems = [...allAssignedPads().map((row) => row.data), ...state.inbox];
+  const usage = el("p", "sample-storage-usage", `${strings.usage}: ${allAssignedPads().length} pads + ${state.inbox.length} Inbox / ${formatBytes(allItems.reduce((sum, item) => sum + item.bytes, 0))}`);
   content.append(importInput, importLabel, usage, el("p", "sample-copyright", strings.copyright));
   details.append(summary, content);
   return details;
@@ -864,11 +1252,16 @@ function plannerFooter() {
   const handoff = el("button", "sample-button sample-button-primary", strings.handoff);
   handoff.id = "btn-sample-handoff";
   handoff.type = "button";
-  handoff.addEventListener("click", () => {
+  handoff.addEventListener("click", async () => {
     if (!allAssignedPads().length) { announce(strings.noPads, "warning"); return; }
-    handoffIndex = 0;
     stopPreview();
-    renderHandoff();
+    announce(strings.checking);
+    const report = await validateProject();
+    if (report.issues.length) renderValidation(report);
+    else {
+      handoffIndex = 0;
+      renderHandoff();
+    }
   });
   actions.append(save, handoff);
   footer.append(actions, projectTools());
@@ -883,9 +1276,66 @@ function renderPlanner() {
   const projectName = textInput("sample-project-name", state.name, 100);
   projectName.addEventListener("input", () => { state.name = projectName.value; persistProject(); });
   project.append(labeledField(strings.projectName, projectName));
-  content.append(projectHeader(), hero(), project, bankStrip(), padGrid(), padEditor(), plannerFooter());
+  const notice = placementNotice();
+  content.append(projectHeader(), hero(), project, bankStrip(), inboxPanel());
+  if (notice) content.append(notice);
+  content.append(padGrid());
+  if (armedPlacement?.type !== "pad") content.append(padEditor());
+  content.append(plannerFooter());
   overlay.replaceChildren(content);
   publishDiagnostics();
+}
+
+async function audioItemFromFile(file, prior = null) {
+  const analysis = await analyzeAudio(file);
+  const blobId = uid("audio");
+  const blob = file.slice(0, file.size, file.type || "application/octet-stream");
+  await putAudio({ id: blobId, blob, name: file.name, type: blob.type });
+  return normalizePad({
+    blobId,
+    originalName: file.name,
+    mime: blob.type,
+    bytes: file.size,
+    name: prior?.name || cleanName(file.name),
+    source: prior?.source || "",
+    tags: prior?.tags || "",
+    color: prior?.color || "green",
+    playMode: prior?.playMode || "one-shot",
+    bpm: prior?.bpm || "",
+    group: prior?.group || 0,
+    ...analysis,
+  });
+}
+
+async function importFilesToInbox(fileList) {
+  const files = Array.from(fileList || []).slice(0, MAX_BATCH_FILES);
+  let rejected = Math.max(0, Array.from(fileList || []).length - files.length);
+  let added = 0;
+  stopPreview();
+  armedPlacement = null;
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
+    const extension = extOf(file.name);
+    if (!SUPPORTED_EXTENSIONS.has(extension) || file.size > MAX_AUDIO_BYTES) {
+      rejected += 1;
+      continue;
+    }
+    announce(`${strings.importing} ${index + 1}/${files.length}`);
+    try {
+      const pad = await audioItemFromFile(file);
+      if (!pad) { rejected += 1; continue; }
+      state.inbox.push({ ...pad, id: uid("inbox") });
+      added += 1;
+    } catch (_) { rejected += 1; }
+  }
+  if (added) persistProject();
+  renderPlanner();
+  if (fileList.length > MAX_BATCH_FILES) announce(strings.batchLimit, "warning");
+  else if (!added) announce(strings.invalidFile, "warning");
+  else announce(fill(strings.inboxImported, {
+    added,
+    rejected: rejected ? fill(strings.inboxRejected, { count: rejected }) : "",
+  }), rejected ? "warning" : "ok");
 }
 
 async function importSample(file) {
@@ -894,27 +1344,11 @@ async function importSample(file) {
   if (file.size > MAX_AUDIO_BYTES) { announce(strings.tooLarge, "warning"); return; }
   announce(strings.importing);
   try {
-    const analysis = await analyzeAudio(file);
-    const blobId = uid("audio");
-    const blob = file.slice(0, file.size, file.type || "application/octet-stream");
-    await putAudio({ id: blobId, blob, name: file.name, type: blob.type });
     const old = selectedPad();
-    activeBank().pads[state.selectedPad] = normalizePad({
-      blobId,
-      originalName: file.name,
-      mime: blob.type,
-      bytes: file.size,
-      name: old?.name || cleanName(file.name),
-      source: old?.source || "",
-      tags: old?.tags || "",
-      color: old?.color || "green",
-      playMode: old?.playMode || "one-shot",
-      bpm: old?.bpm || "",
-      group: old?.group || 0,
-      ...analysis,
-    });
+    const pad = await audioItemFromFile(file, old);
+    activeBank().pads[state.selectedPad] = pad;
+    if (old) state.inbox.push(returnableInboxItem(old));
     persistProject();
-    if (old && !assignedBlobIds().has(old.blobId)) await deleteAudio(old.blobId);
     renderPlanner();
     announce(strings.saved);
   } catch (_) {
@@ -931,7 +1365,7 @@ async function exportProjectBlob() {
   const blobs = [];
   const files = [];
   let offset = 0;
-  for (const blobId of assignedBlobIds()) {
+  for (const blobId of referencedBlobIds()) {
     const record = await getAudio(blobId);
     if (!record?.blob) throw new Error(`Missing audio ${blobId}`);
     files.push({ id: blobId, name: record.name || "sample", type: record.type || record.blob.type || "application/octet-stream", offset, length: record.blob.size });
@@ -995,6 +1429,7 @@ async function readProjectManifest(file) {
   const project = normalizeProject(manifest.project);
   const referenced = new Set();
   SLOT_NAMES.forEach((slot) => Object.values(project.slots[slot].pads).forEach((pad) => referenced.add(pad.blobId)));
+  project.inbox.forEach((item) => referenced.add(item.blobId));
   const fileIds = new Set();
   for (const entry of manifest.files) {
     if (!entry || typeof entry.id !== "string" || fileIds.has(entry.id)) throw new Error("Bad file table");
@@ -1021,6 +1456,7 @@ async function importProjectFile(file) {
     }
     for (const record of nextRecords) await putAudio(record);
     state = parsed.project;
+    armedPlacement = null;
     persistProject();
     stopPreview();
     renderPlanner();
@@ -1030,6 +1466,93 @@ async function importProjectFile(file) {
     announce(strings.badProject, "warning");
     return false;
   }
+}
+
+async function validateProject() {
+  const rows = allAssignedPads();
+  const issues = [];
+  const bankCounts = new Map();
+  SLOT_NAMES.forEach((slot) => {
+    const bank = state.slots[slot].bank;
+    bankCounts.set(bank, (bankCounts.get(bank) || 0) + 1);
+  });
+  for (const [bank, count] of bankCounts) {
+    if (count > 1) issues.push({ kind: "banks", blocking: false, text: fill(strings.validationBanks, { bank }) });
+  }
+  if (state.inbox.length) {
+    issues.push({ kind: "inbox", blocking: false, text: fill(strings.validationInbox, { count: state.inbox.length }) });
+  }
+  const formatCount = rows.filter((row) => {
+    const extension = extOf(row.data.originalName);
+    return extension !== "cswp" && !(extension === "wav" && row.data.sampleRate === 48000 && row.data.bitDepth === 16);
+  }).length;
+  if (formatCount) issues.push({ kind: "format", blocking: false, text: fill(strings.validationFormat, { count: formatCount }) });
+
+  let duplicateNames = 0;
+  SLOT_NAMES.forEach((slot) => {
+    const names = new Map();
+    Object.values(state.slots[slot].pads).forEach((pad) => {
+      const key = pad.name.trim().toLocaleLowerCase();
+      if (key) names.set(key, (names.get(key) || 0) + 1);
+    });
+    for (const count of names.values()) if (count > 1) duplicateNames += count - 1;
+  });
+  if (duplicateNames) issues.push({ kind: "names", blocking: false, text: fill(strings.validationNames, { count: duplicateNames }) });
+
+  let missing = 0;
+  for (const blobId of new Set(rows.map((row) => row.data.blobId))) {
+    if (!await getAudio(blobId)) missing += 1;
+  }
+  if (missing) issues.unshift({ kind: "missing", blocking: true, text: fill(strings.validationMissing, { count: missing }) });
+  return { issues, blocking: issues.some((issue) => issue.blocking), assigned: rows.length, inbox: state.inbox.length };
+}
+
+function renderValidation(report) {
+  overlay.dataset.view = "validation";
+  const shell = el("div", "sample-lab-shell sample-validation-shell");
+  const section = el("section", "sample-hero sample-validation-hero");
+  section.append(el("p", "sample-eyebrow", strings.validationEyebrow));
+  const title = el("h1", "", strings.validationTitle);
+  title.tabIndex = -1;
+  section.append(title, el("p", "sample-lede", report.blocking ? strings.validationBlocking : strings.validationIntro));
+  const card = el("section", `sample-validation-card${report.blocking ? " has-blocker" : ""}`);
+  card.setAttribute("aria-labelledby", "sample-validation-summary");
+  const summary = el("h2", "sample-validation-summary", report.issues.length ? strings.validationTitle : strings.validationReady);
+  summary.id = "sample-validation-summary";
+  card.append(summary);
+  const list = el("ul", "sample-validation-list");
+  report.issues.forEach((issue) => {
+    const item = el("li", issue.blocking ? "is-blocking" : "");
+    item.dataset.kind = issue.kind;
+    item.append(el("strong", "", issue.blocking ? "!" : "i"), el("span", "", issue.text));
+    list.append(item);
+  });
+  card.append(list);
+  const status = el("p", "sample-status", "");
+  status.id = "sample-lab-status";
+  status.setAttribute("aria-live", "polite");
+  card.append(status);
+  const actions = el("div", "sample-primary-actions");
+  const back = el("button", "sample-button sample-button-secondary", strings.fixProject);
+  back.id = "btn-sample-validation-back";
+  back.type = "button";
+  back.addEventListener("click", renderPlanner);
+  actions.append(back);
+  if (!report.blocking) {
+    const proceed = el("button", "sample-button sample-button-primary", strings.continueHandoff);
+    proceed.id = "btn-sample-validation-continue";
+    proceed.type = "button";
+    proceed.addEventListener("click", () => {
+      handoffIndex = 0;
+      renderHandoff();
+    });
+    actions.append(proceed);
+  }
+  card.append(actions);
+  shell.append(projectHeader(), section, card);
+  overlay.replaceChildren(shell);
+  title.focus();
+  publishDiagnostics();
 }
 
 function renderHandoff() {
@@ -1099,9 +1622,12 @@ function publishDiagnostics() {
     projectId: state?.id || null,
     activeSlot: state?.activeSlot || null,
     selectedPad: state?.selectedPad || null,
+    inboxItems: state ? state.inbox.map((item) => ({ id: item.id, name: item.name, filename: item.originalName, bytes: item.bytes })) : [],
+    placement: armedPlacement ? { ...armedPlacement } : null,
     assignedPads: state ? allAssignedPads().map((row) => ({ slot: row.slot, bank: row.bank, pad: row.pad, name: row.data.name, filename: row.data.originalName })) : [],
     exportProjectBlob,
     importProjectFile,
+    validateProject,
   };
 }
 
@@ -1126,6 +1652,12 @@ export async function startSampleLab(options = {}) {
   enhanceHome();
   setRouteActive();
   window.addEventListener("hashchange", setRouteActive);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && armedPlacement && !overlay.hidden) {
+      event.preventDefault();
+      cancelPlacement();
+    }
+  });
   new MutationObserver(() => {
     enhanceHome();
     if (window.location.hash.startsWith(ROUTE)) setRouteActive();
