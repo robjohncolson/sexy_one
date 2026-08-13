@@ -17,9 +17,9 @@ described in [`SAMPLE-LAB.md`](SAMPLE-LAB.md).
 5. An assigned pad can be armed for move/swap and then placed on any pad in any
    A-D bank. An empty destination moves it; an occupied destination swaps the
    two assignments. Desktop drag performs the same operation.
-6. `Return to Inbox` removes an assignment without deleting its audio. Deleting
-   an unassigned Inbox item is the only destructive sample action and requires
-   confirmation.
+6. `Return to Inbox` removes an assignment without deleting its audio. Removing
+   an unassigned Inbox item requires confirmation; since M14, its shared Sample
+   Library sound remains available unless separately removed there.
 7. Phone handoff first checks the whole project. Missing audio blocks handoff;
    duplicate physical bank numbers, unassigned Inbox items, duplicate pad
    labels, and files that are supported but not 48 kHz / 16-bit WAV are clearly
@@ -57,6 +57,6 @@ pad references before replacing the current project.
 - Placement on an occupied pad never deletes the displaced sample.
 - Moving or swapping pads never duplicates a blob reference.
 - A blob is deleted from IndexedDB only when it is no longer referenced by any
-  bank pad or Inbox item.
+  library record, bank pad, or Inbox item in any project.
 - Project validation never changes the project.
 - Audio remains local and no new network path is introduced.

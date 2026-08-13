@@ -1,4 +1,4 @@
-// SEXY ONE Sample Lab -- a deferred, local-first pad-bank planner.
+// SEXY ONE Sample Lab -- a deferred, local-first sound library and pad planner.
 //
 // This module is intentionally absent from index.js's static import graph. The
 // trainer loads and becomes interactive first, then index.js imports this file.
@@ -7,6 +7,8 @@
 
 const ROUTE = "#/samples";
 const META_KEY = "sxc1.sample-lab.v1";
+const WORKSPACE_KEY = "sxc1.sample-workspace.v1";
+const LIBRARY_KEY = "sxc1.sample-library.v1";
 const DB_NAME = "sxc1-sample-lab";
 const DB_VERSION = 1;
 const DB_STORE = "audio";
@@ -15,13 +17,16 @@ const FORMAT_SCHEMA = 1;
 const MAX_MANIFEST_BYTES = 5 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 180 * 1024 * 1024;
 const MAX_BATCH_FILES = 64;
+const MAX_PROJECTS = 32;
+const MAX_LIBRARY_ITEMS = 2048;
+const MAX_INBOX_ITEMS = 256;
 const SLOT_NAMES = ["A", "B", "C", "D"];
 const SUPPORTED_EXTENSIONS = new Set(["wav", "mp3", "flac", "cswp"]);
 
 const COPY = {
   en: {
-    homeTitle: "Build a sample bank",
-    homeSub: "Arrange audio on an SXC-1 pad mockup",
+    homeTitle: "Build a sample library",
+    homeSub: "Catalog sounds and plan SXC-1 pad banks",
     library: "Manuals, course, and progress",
     back: "Back to SEXY ONE",
     eyebrow: "LOCAL SAMPLE WORKSPACE",
@@ -31,6 +36,44 @@ const COPY = {
     temporary: "Temporary mode — export before closing this tab",
     project: "Project",
     projectName: "Project name",
+    currentProject: "Current project",
+    newProject: "New project",
+    createProject: "Create project",
+    cancelProject: "Cancel",
+    newProjectName: "New project name",
+    projectCreated: "Project created.",
+    deleteProject: "Delete current project",
+    deleteProjectConfirm: "Delete this project? Sounds remain safe in Sample Library.",
+    projectDeleted: "Project deleted. Library sounds were kept.",
+    projectLimit: "This device already has 32 projects.",
+    inboxLimit: "This project's Inbox already has 256 items.",
+    sampleLibrary: "Sample Library",
+    libraryHint: "One local catalog for every project. Search, audition, and reuse sounds without copying their audio.",
+    libraryEmpty: "Add Audacity exports once, then send them into any project's Inbox.",
+    librarySearch: "Search sounds",
+    librarySearchPlaceholder: "Name, source, tag, BPM, duration, format…",
+    libraryStage: "Stage",
+    stageAll: "All stages",
+    stageRaw: "Raw",
+    stageEdited: "Edited",
+    stageReady: "Ready",
+    addLibrary: "Add to library",
+    addToInbox: "Add to Inbox",
+    editDetails: "Edit details",
+    doneEditing: "Done",
+    removeLibrary: "Remove from Library",
+    removeLibraryConfirm: "Remove this sound from Sample Library? Any project assignments remain safe.",
+    libraryNotes: "Notes",
+    libraryNotesPlaceholder: "Scene, take, edit decisions…",
+    libraryRights: "Permission / credit",
+    libraryRightsPlaceholder: "Owned recording, licensed source, attribution…",
+    libraryAdded: "Added {added} new sound(s) to the Library{duplicates}{rejected}.",
+    libraryDuplicates: "; reused {count} duplicate(s)",
+    librarySelected: "{name} selected.",
+    libraryInboxAdded: "Added {name} to {project}'s Inbox.",
+    libraryUpdated: "Library details saved.",
+    libraryRemoved: "Removed from Sample Library. Project copies remain safe.",
+    noLibraryMatch: "No sounds match these filters.",
     inbox: "Sample Inbox",
     inboxHint: "Audition a sound, then press its destination pad. You can also drag it on desktop.",
     inboxEmpty: "Drop an Audacity export batch here. Nothing is assigned until you place it.",
@@ -39,7 +82,7 @@ const COPY = {
     fillEmpty: "Fill empty pads",
     assignNext: "Assign next empty",
     removeInbox: "Remove from Inbox",
-    removeInboxConfirm: "Delete this unassigned sample from Sample Lab? The original file outside SEXY ONE is not affected.",
+    removeInboxConfirm: "Remove this item from the current project's Inbox? Its Library sound remains available.",
     inboxSelected: "{name} selected — choose a destination pad.",
     inboxImported: "Added {added} sample(s) to the Inbox{rejected}.",
     inboxRejected: "; skipped {count}",
@@ -90,6 +133,8 @@ const COPY = {
     tools: "Project tools",
     importProject: "Import .sxc1lab project",
     usage: "Storage",
+    usageProjects: "{count} projects",
+    usageSounds: "{count} sounds",
     copyright: "Only use audio you have permission to sample. Sample Lab does not extract audio from games or video services.",
     saved: "Saved locally",
     exported: "Project ready",
@@ -133,8 +178,8 @@ const COPY = {
     downloadReady: "Downloaded {name}",
   },
   ja: {
-    homeTitle: "サンプルバンクを作る",
-    homeSub: "SXC-1のパッド配置で音声を整理",
+    homeTitle: "サンプルライブラリを作る",
+    homeSub: "音声を整理してSXC-1のパッドを計画",
     library: "マニュアル、コース、進捗",
     back: "SEXY ONEへ戻る",
     eyebrow: "ローカル・サンプル・ワークスペース",
@@ -144,6 +189,44 @@ const COPY = {
     temporary: "一時モード — タブを閉じる前に書き出してください",
     project: "プロジェクト",
     projectName: "プロジェクト名",
+    currentProject: "現在のプロジェクト",
+    newProject: "新規プロジェクト",
+    createProject: "プロジェクトを作成",
+    cancelProject: "キャンセル",
+    newProjectName: "新しいプロジェクト名",
+    projectCreated: "プロジェクトを作成しました。",
+    deleteProject: "現在のプロジェクトを削除",
+    deleteProjectConfirm: "このプロジェクトを削除しますか？ 音声はサンプルライブラリに残ります。",
+    projectDeleted: "プロジェクトを削除しました。ライブラリの音声は保持されています。",
+    projectLimit: "この端末にはすでに32件のプロジェクトがあります。",
+    inboxLimit: "このプロジェクトの受け皿にはすでに256件あります。",
+    sampleLibrary: "サンプルライブラリ",
+    libraryHint: "全プロジェクト共通のローカル音声カタログです。音声を複製せず検索・試聴・再利用できます。",
+    libraryEmpty: "Audacityの書き出しを一度追加し、各プロジェクトの受け皿へ送ります。",
+    librarySearch: "音声を検索",
+    librarySearchPlaceholder: "名前、出典、タグ、BPM、長さ、形式…",
+    libraryStage: "進行段階",
+    stageAll: "すべての段階",
+    stageRaw: "未編集",
+    stageEdited: "編集済み",
+    stageReady: "使用準備完了",
+    addLibrary: "ライブラリへ追加",
+    addToInbox: "受け皿へ追加",
+    editDetails: "詳細を編集",
+    doneEditing: "完了",
+    removeLibrary: "ライブラリから削除",
+    removeLibraryConfirm: "この音声をサンプルライブラリから削除しますか？ プロジェクト内の割り当ては残ります。",
+    libraryNotes: "メモ",
+    libraryNotesPlaceholder: "場面、テイク、編集内容…",
+    libraryRights: "使用許可／クレジット",
+    libraryRightsPlaceholder: "自分の録音、許諾済み素材、出典表記…",
+    libraryAdded: "新しい音声を{added}件ライブラリへ追加しました{duplicates}{rejected}。",
+    libraryDuplicates: "（重複{count}件は既存音声を再利用）",
+    librarySelected: "{name}を選択しました。",
+    libraryInboxAdded: "{name}を「{project}」の受け皿へ追加しました。",
+    libraryUpdated: "ライブラリ情報を保存しました。",
+    libraryRemoved: "ライブラリから削除しました。プロジェクト内の音声は保持されています。",
+    noLibraryMatch: "条件に一致する音声はありません。",
     inbox: "サンプル受け皿",
     inboxHint: "音を試聴してから割り当て先パッドを押します。パソコンではドラッグもできます。",
     inboxEmpty: "Audacityの書き出しをまとめてドロップしてください。配置するまでパッドには割り当てません。",
@@ -152,7 +235,7 @@ const COPY = {
     fillEmpty: "空きパッドへ配置",
     assignNext: "次の空きへ配置",
     removeInbox: "受け皿から削除",
-    removeInboxConfirm: "この未割り当てサンプルをSample Labから削除しますか？ 外部の元ファイルには影響しません。",
+    removeInboxConfirm: "現在のプロジェクトの受け皿からこの項目を外しますか？ ライブラリの音声は残ります。",
     inboxSelected: "{name}を選択中 — 割り当て先パッドを選んでください。",
     inboxImported: "{added}件を受け皿へ追加しました{rejected}。",
     inboxRejected: "（{count}件をスキップ）",
@@ -203,6 +286,8 @@ const COPY = {
     tools: "プロジェクトツール",
     importProject: ".sxc1labプロジェクトを読み込む",
     usage: "ストレージ",
+    usageProjects: "プロジェクト{count}件",
+    usageSounds: "音声{count}件",
     copyright: "使用許可のある音声だけを取り込んでください。Sample Labはゲームや動画サービスから音声を抽出しません。",
     saved: "端末内に保存しました",
     exported: "プロジェクトを準備しました",
@@ -251,6 +336,8 @@ let started = false;
 let lang = "en";
 let strings = COPY.en;
 let state = null;
+let workspace = null;
+let libraryState = null;
 let overlay = null;
 let db = null;
 let persistentAudio = true;
@@ -259,6 +346,13 @@ let currentObjectUrl = null;
 let renderQueued = false;
 let handoffIndex = 0;
 let armedPlacement = null;
+let librarySelection = null;
+let libraryEditing = false;
+let libraryQuery = "";
+let libraryStageFilter = "all";
+let creatingProject = false;
+let metadataPersistTimer = null;
+let libraryImportQueue = Promise.resolve();
 const memoryAudio = new Map();
 
 function uid(prefix = "id") {
@@ -290,6 +384,14 @@ function defaultProject() {
   };
 }
 
+function defaultWorkspace(project = defaultProject()) {
+  return { schema: 1, activeProjectId: project.id, projects: [project] };
+}
+
+function defaultLibrary() {
+  return { schema: 1, items: [], updatedAt: new Date().toISOString() };
+}
+
 function normalizePad(raw) {
   if (!raw || typeof raw !== "object" || typeof raw.blobId !== "string" || !raw.blobId) return null;
   const playMode = raw.playMode === "loop" ? "loop" : "one-shot";
@@ -313,6 +415,7 @@ function normalizePad(raw) {
       ? raw.waveform.slice(0, 64).map((value) => Math.min(1, Math.max(0, Number(value) || 0)))
       : [],
     previewable: raw.previewable !== false,
+    fingerprint: typeof raw.fingerprint === "string" ? raw.fingerprint.slice(0, 128) : "",
   };
 }
 
@@ -358,7 +461,7 @@ function normalizeProject(raw) {
   });
   const inboxIds = new Set();
   if (Array.isArray(raw.inbox)) {
-    raw.inbox.slice(0, 256).forEach((candidate) => {
+    raw.inbox.slice(0, MAX_INBOX_ITEMS).forEach((candidate) => {
       const item = normalizeInboxItem(candidate);
       if (item && !inboxIds.has(item.id)) {
         inboxIds.add(item.id);
@@ -369,24 +472,182 @@ function normalizeProject(raw) {
   return result;
 }
 
-function loadProject() {
+function normalizeWorkspace(raw, legacyProject = null) {
+  const projects = [];
+  const ids = new Set();
+  if (raw && typeof raw === "object" && Array.isArray(raw.projects)) {
+    raw.projects.slice(0, MAX_PROJECTS).forEach((candidate) => {
+      const project = normalizeProject(candidate);
+      if (!ids.has(project.id)) {
+        ids.add(project.id);
+        projects.push(project);
+      }
+    });
+  }
+  if (!projects.length) {
+    const project = legacyProject ? normalizeProject(legacyProject) : defaultProject();
+    projects.push(project);
+    ids.add(project.id);
+  }
+  const activeProjectId = ids.has(raw?.activeProjectId) ? raw.activeProjectId : projects[0].id;
+  return { schema: 1, activeProjectId, projects };
+}
+
+function normalizeLibraryItem(raw) {
+  const pad = normalizePad(raw);
+  if (!pad) return null;
+  return {
+    ...pad,
+    id: typeof raw.id === "string" && raw.id ? raw.id : uid("asset"),
+    stage: ["raw", "edited", "ready"].includes(raw.stage) ? raw.stage : "raw",
+    notes: String(raw.notes || "").slice(0, 500),
+    rights: String(raw.rights || "").slice(0, 300),
+    addedAt: typeof raw.addedAt === "string" ? raw.addedAt : new Date().toISOString(),
+  };
+}
+
+function normalizeLibrary(raw) {
+  const result = defaultLibrary();
+  const ids = new Set();
+  const blobs = new Set();
+  if (raw && typeof raw === "object" && Array.isArray(raw.items)) {
+    raw.items.slice(0, MAX_LIBRARY_ITEMS).forEach((candidate) => {
+      const item = normalizeLibraryItem(candidate);
+      if (item && !ids.has(item.id) && !blobs.has(item.blobId)) {
+        ids.add(item.id);
+        blobs.add(item.blobId);
+        result.items.push(item);
+      }
+    });
+  }
+  if (raw && typeof raw.updatedAt === "string") result.updatedAt = raw.updatedAt;
+  return result;
+}
+
+function librarySeedFromPad(pad) {
+  return normalizeLibraryItem({
+    ...pad,
+    id: uid("asset"),
+    stage: extOf(pad.originalName) === "wav" && pad.sampleRate === 48000 && pad.bitDepth === 16 ? "ready" : "edited",
+  });
+}
+
+function seedLibraryFromProjects() {
+  const knownBlobs = new Set(libraryState.items.map((item) => item.blobId));
+  workspace.projects.forEach((project) => {
+    const items = [...Object.values(project.slots).flatMap((slot) => Object.values(slot.pads)), ...project.inbox];
+    items.forEach((pad) => {
+      if (knownBlobs.has(pad.blobId)) return;
+      const item = librarySeedFromPad(pad);
+      if (item && libraryState.items.length < MAX_LIBRARY_ITEMS) {
+        knownBlobs.add(item.blobId);
+        libraryState.items.push(item);
+      }
+    });
+  });
+}
+
+function loadWorkspace() {
+  const readJson = (key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  };
   try {
-    const raw = localStorage.getItem(META_KEY);
-    return raw ? normalizeProject(JSON.parse(raw)) : defaultProject();
+    workspace = normalizeWorkspace(readJson(WORKSPACE_KEY), readJson(META_KEY));
+    libraryState = normalizeLibrary(readJson(LIBRARY_KEY));
+    seedLibraryFromProjects();
+    state = workspace.projects.find((project) => project.id === workspace.activeProjectId) || workspace.projects[0];
+    workspace.activeProjectId = state.id;
   } catch (_) {
     persistentAudio = false;
-    return defaultProject();
+    state = defaultProject();
+    workspace = defaultWorkspace(state);
+    libraryState = defaultLibrary();
   }
+  return state;
 }
 
 function persistProject() {
+  if (metadataPersistTimer !== null) {
+    clearTimeout(metadataPersistTimer);
+    metadataPersistTimer = null;
+  }
   state.updatedAt = new Date().toISOString();
+  workspace.activeProjectId = state.id;
+  const index = workspace.projects.findIndex((project) => project.id === state.id);
+  if (index >= 0) workspace.projects[index] = state;
+  else workspace.projects.push(state);
+  libraryState.updatedAt = new Date().toISOString();
   try {
+    localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
+    localStorage.setItem(LIBRARY_KEY, JSON.stringify(libraryState));
+    // Keep the M12/M13 key as a mirror of the active project. This makes the
+    // migration reversible and preserves older builds' last-project behavior.
     localStorage.setItem(META_KEY, JSON.stringify(state));
   } catch (_) {
     persistentAudio = false;
   }
   publishDiagnostics();
+}
+
+function scheduleMetadataPersist() {
+  if (metadataPersistTimer !== null) clearTimeout(metadataPersistTimer);
+  metadataPersistTimer = setTimeout(() => {
+    metadataPersistTimer = null;
+    persistProject();
+  }, 180);
+}
+
+function switchProject(projectId) {
+  const next = workspace.projects.find((project) => project.id === projectId);
+  if (!next || next === state) return;
+  stopPreview();
+  armedPlacement = null;
+  librarySelection = null;
+  libraryEditing = false;
+  state = next;
+  workspace.activeProjectId = next.id;
+  persistProject();
+  renderPlanner();
+}
+
+function createProject(name) {
+  if (workspace.projects.length >= MAX_PROJECTS) {
+    announce(strings.projectLimit, "warning");
+    return false;
+  }
+  stopPreview();
+  const project = defaultProject();
+  project.name = String(name || strings.newProject).trim().slice(0, 100) || strings.newProject;
+  workspace.projects.push(project);
+  state = project;
+  workspace.activeProjectId = project.id;
+  creatingProject = false;
+  armedPlacement = null;
+  librarySelection = null;
+  libraryEditing = false;
+  persistProject();
+  renderPlanner();
+  announce(strings.projectCreated);
+  return true;
+}
+
+async function deleteCurrentProject() {
+  if (workspace.projects.length <= 1 || !window.confirm(strings.deleteProjectConfirm)) return;
+  const index = workspace.projects.findIndex((project) => project.id === state.id);
+  if (index < 0) return;
+  stopPreview();
+  workspace.projects.splice(index, 1);
+  state = workspace.projects[Math.min(index, workspace.projects.length - 1)];
+  workspace.activeProjectId = state.id;
+  armedPlacement = null;
+  librarySelection = null;
+  libraryEditing = false;
+  persistProject();
+  renderPlanner();
+  announce(strings.projectDeleted);
 }
 
 function openDatabase() {
@@ -523,6 +784,106 @@ async function analyzeAudio(file) {
   return result;
 }
 
+async function fingerprintFile(file) {
+  const bytes = await file.arrayBuffer();
+  if (globalThis.crypto?.subtle?.digest) {
+    const digest = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes));
+    return `sha256:${Array.from(digest, (value) => value.toString(16).padStart(2, "0")).join("")}`;
+  }
+  // A deterministic fallback for older local WebViews. It is not a security
+  // primitive; equality is additionally guarded by size before reuse.
+  let hash = 2166136261;
+  const view = new Uint8Array(bytes);
+  for (let index = 0; index < view.length; index += 1) {
+    hash ^= view[index];
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return `fnv1a:${view.length}:${hash.toString(16).padStart(8, "0")}`;
+}
+
+function rememberFingerprint(blobId, fingerprint) {
+  const asset = libraryState.items.find((item) => item.blobId === blobId);
+  if (asset) asset.fingerprint = fingerprint;
+  workspace.projects.forEach((project) => {
+    Object.values(project.slots).forEach((slot) => {
+      Object.values(slot.pads).forEach((pad) => {
+        if (pad.blobId === blobId) pad.fingerprint = fingerprint;
+      });
+    });
+    project.inbox.forEach((item) => {
+      if (item.blobId === blobId) item.fingerprint = fingerprint;
+    });
+  });
+}
+
+function padFromLibraryAsset(asset, prior = null) {
+  const pick = (key) => prior?.[key] ?? asset[key];
+  return normalizePad({
+    ...asset,
+    name: pick("name"),
+    source: pick("source"),
+    tags: pick("tags"),
+    color: pick("color"),
+    playMode: pick("playMode"),
+    bpm: pick("bpm"),
+    group: pick("group"),
+  });
+}
+
+function libraryAssetFromFile(file) {
+  const run = libraryImportQueue.then(
+    () => libraryAssetFromFileUnsafe(file),
+    () => libraryAssetFromFileUnsafe(file),
+  );
+  libraryImportQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+async function libraryAssetFromFileUnsafe(file) {
+  const fingerprint = await fingerprintFile(file);
+  let existing = libraryState.items.find((item) => item.fingerprint === fingerprint && item.bytes === file.size);
+  // M12/M13 projects did not persist fingerprints. Hash only same-size legacy
+  // candidates when a new file arrives, so migration remains instant while an
+  // identical re-import still reuses the original IndexedDB blob.
+  if (!existing) {
+    const candidates = libraryState.items.filter((item) => !item.fingerprint && item.bytes === file.size);
+    for (const candidate of candidates) {
+      const record = await getAudio(candidate.blobId);
+      if (!record?.blob) continue;
+      const candidateFingerprint = await fingerprintFile(record.blob);
+      rememberFingerprint(candidate.blobId, candidateFingerprint);
+      if (candidateFingerprint === fingerprint) {
+        existing = candidate;
+        break;
+      }
+    }
+  }
+  if (existing) return { asset: existing, reused: true };
+  if (libraryState.items.length >= MAX_LIBRARY_ITEMS) throw new Error("Library full");
+  const analysis = await analyzeAudio(file);
+  const blobId = uid("audio");
+  const blob = file.slice(0, file.size, file.type || "application/octet-stream");
+  await putAudio({ id: blobId, blob, name: file.name, type: blob.type });
+  const asset = normalizeLibraryItem({
+    blobId,
+    originalName: file.name,
+    mime: blob.type,
+    bytes: file.size,
+    name: cleanName(file.name),
+    source: "",
+    tags: "",
+    color: "green",
+    playMode: "one-shot",
+    bpm: "",
+    group: 0,
+    fingerprint,
+    stage: extOf(file.name) === "wav" && analysis.sampleRate === 48000 && analysis.bitDepth === 16 ? "ready" : "raw",
+    ...analysis,
+  });
+  libraryState.items.push(asset);
+  return { asset, reused: false };
+}
+
 function activeBank() { return state.slots[state.activeSlot]; }
 function selectedPad() { return activeBank().pads[state.selectedPad] || null; }
 
@@ -541,6 +902,22 @@ function referencedBlobIds(project = state) {
   const ids = new Set();
   SLOT_NAMES.forEach((slot) => Object.values(project.slots[slot].pads).forEach((pad) => ids.add(pad.blobId)));
   project.inbox.forEach((item) => ids.add(item.blobId));
+  return ids;
+}
+
+function assignedPadCount(project = state) {
+  return SLOT_NAMES.reduce((count, slot) => count + Object.keys(project.slots[slot].pads).length, 0);
+}
+
+function projectReferencedBlobIds() {
+  const ids = new Set();
+  workspace.projects.forEach((project) => referencedBlobIds(project).forEach((id) => ids.add(id)));
+  return ids;
+}
+
+function allStoredBlobIds() {
+  const ids = projectReferencedBlobIds();
+  libraryState.items.forEach((item) => ids.add(item.blobId));
   return ids;
 }
 
@@ -700,7 +1077,7 @@ function stopPreview() {
     URL.revokeObjectURL(currentObjectUrl);
     currentObjectUrl = null;
   }
-  overlay?.querySelectorAll(".sample-pad.is-playing, .sample-inbox-card.is-playing")
+  overlay?.querySelectorAll(".sample-pad.is-playing, .sample-inbox-card.is-playing, .sample-library-card.is-playing")
     .forEach((control) => control.classList.remove("is-playing"));
 }
 
@@ -798,6 +1175,291 @@ function hero() {
   return section;
 }
 
+function projectPanel() {
+  const section = el("section", "sample-panel sample-project-panel");
+  section.setAttribute("aria-labelledby", "sample-project-heading");
+  const heading = el("h2", "sample-panel-heading", strings.project);
+  heading.id = "sample-project-heading";
+  section.append(heading);
+  if (creatingProject) {
+    const name = textInput("sample-new-project-name", "", 100, strings.newProjectName);
+    const actions = el("div", "sample-action-row");
+    const create = el("button", "sample-button sample-button-primary", strings.createProject);
+    create.id = "btn-sample-project-create";
+    create.type = "button";
+    create.addEventListener("click", () => createProject(name.value));
+    const cancel = el("button", "sample-button sample-button-secondary", strings.cancelProject);
+    cancel.id = "btn-sample-project-create-cancel";
+    cancel.type = "button";
+    cancel.addEventListener("click", () => { creatingProject = false; renderPlanner(); });
+    name.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); createProject(name.value); }
+    });
+    actions.append(create, cancel);
+    section.append(labeledField(strings.newProjectName, name), actions);
+    requestAnimationFrame(() => name.focus());
+    return section;
+  }
+
+  const controls = el("div", "sample-project-controls");
+  const chooser = document.createElement("select");
+  chooser.id = "sample-project-select";
+  workspace.projects.forEach((project) => chooser.append(option(project.id, project.name, project.id === state.id)));
+  chooser.addEventListener("change", () => switchProject(chooser.value));
+  const projectName = textInput("sample-project-name", state.name, 100);
+  projectName.addEventListener("input", () => {
+    state.name = projectName.value;
+    const selected = Array.from(chooser.options).find((item) => item.value === state.id);
+    if (selected) selected.textContent = state.name || strings.newProject;
+    persistProject();
+  });
+  const add = el("button", "sample-button sample-button-secondary", strings.newProject);
+  add.id = "btn-sample-project-new";
+  add.type = "button";
+  add.disabled = workspace.projects.length >= MAX_PROJECTS;
+  add.addEventListener("click", () => { creatingProject = true; renderPlanner(); });
+  controls.append(
+    labeledField(strings.currentProject, chooser),
+    labeledField(strings.projectName, projectName),
+    add,
+  );
+  section.append(controls);
+  return section;
+}
+
+function libraryStageLabel(stage) {
+  if (stage === "ready") return strings.stageReady;
+  if (stage === "edited") return strings.stageEdited;
+  return strings.stageRaw;
+}
+
+function librarySearchText(item) {
+  return [
+    item.name, item.originalName, item.source, item.tags, item.notes, item.rights,
+    item.stage, libraryStageLabel(item.stage), extOf(item.originalName), item.bpm,
+    formatDuration(item.duration), Math.round(item.duration || 0), item.sampleRate, item.bitDepth,
+  ].join(" ").toLocaleLowerCase();
+}
+
+function libraryFileInput() {
+  const input = document.createElement("input");
+  input.id = "sample-library-input";
+  input.type = "file";
+  input.multiple = true;
+  input.accept = ".wav,.mp3,.flac,.cswp,audio/wav,audio/mpeg,audio/flac";
+  input.hidden = true;
+  input.addEventListener("change", async () => {
+    const files = Array.from(input.files || []);
+    input.value = "";
+    if (files.length) await importFilesToLibrary(files);
+  });
+  return input;
+}
+
+function selectedLibraryAsset() {
+  return libraryState.items.find((item) => item.id === librarySelection) || null;
+}
+
+function addSelectedLibraryToInbox() {
+  const asset = selectedLibraryAsset();
+  if (!asset) return;
+  if (state.inbox.length >= MAX_INBOX_ITEMS) {
+    announce(strings.inboxLimit, "warning");
+    return;
+  }
+  state.inbox.push({ ...padFromLibraryAsset(asset), id: uid("inbox") });
+  persistProject();
+  librarySelection = null;
+  libraryEditing = false;
+  renderPlanner();
+  announce(fill(strings.libraryInboxAdded, { name: asset.name, project: state.name }));
+}
+
+async function removeSelectedLibrary() {
+  const asset = selectedLibraryAsset();
+  if (!asset || !window.confirm(strings.removeLibraryConfirm)) return;
+  libraryState.items = libraryState.items.filter((item) => item.id !== asset.id);
+  librarySelection = null;
+  libraryEditing = false;
+  persistProject();
+  if (!projectReferencedBlobIds().has(asset.blobId)) await deleteAudio(asset.blobId);
+  stopPreview();
+  renderPlanner();
+  announce(strings.libraryRemoved);
+}
+
+function libraryEditor(section, asset) {
+  const editor = el("div", "sample-library-editor");
+  editor.append(waveform(asset));
+  const facts = el("div", "sample-file-facts");
+  [asset.originalName, formatBytes(asset.bytes), formatDuration(asset.duration), extOf(asset.originalName).toUpperCase()]
+    .filter(Boolean).forEach((value) => facts.append(el("span", "", value)));
+  editor.append(facts);
+
+  const form = el("div", "sample-library-fields");
+  const name = textInput("sample-library-name", asset.name, 80);
+  const source = textInput("sample-library-source", asset.source, 240, strings.sourcePlaceholder);
+  const tags = textInput("sample-library-tags", asset.tags, 240, strings.tagsPlaceholder);
+  const notes = document.createElement("textarea");
+  notes.id = "sample-library-notes";
+  notes.value = asset.notes;
+  notes.maxLength = 500;
+  notes.rows = 3;
+  notes.placeholder = strings.libraryNotesPlaceholder;
+  const rights = textInput("sample-library-rights", asset.rights, 300, strings.libraryRightsPlaceholder);
+  const stage = document.createElement("select");
+  stage.id = "sample-library-stage";
+  ["raw", "edited", "ready"].forEach((value) => stage.append(option(value, libraryStageLabel(value), value === asset.stage)));
+  const bpm = document.createElement("input");
+  bpm.id = "sample-library-bpm";
+  bpm.type = "number";
+  bpm.min = "20";
+  bpm.max = "300";
+  bpm.inputMode = "numeric";
+  bpm.value = asset.bpm;
+  const bind = (control, key, map = (value) => value) => control.addEventListener("input", () => {
+    asset[key] = map(control.value);
+    scheduleMetadataPersist();
+  });
+  bind(name, "name", (value) => value.slice(0, 80));
+  bind(source, "source", (value) => value.slice(0, 240));
+  bind(tags, "tags", (value) => value.slice(0, 240));
+  bind(notes, "notes", (value) => value.slice(0, 500));
+  bind(rights, "rights", (value) => value.slice(0, 300));
+  bind(stage, "stage");
+  bind(bpm, "bpm", (value) => value === "" ? "" : clampInt(value, 20, 300, ""));
+  form.append(
+    labeledField(strings.name, name),
+    labeledField(strings.source, source),
+    labeledField(strings.tags, tags),
+    labeledField(strings.libraryStage, stage),
+    labeledField(strings.bpm, bpm),
+    labeledField(strings.libraryRights, rights),
+    labeledField(strings.libraryNotes, notes),
+  );
+  editor.append(form);
+  const actions = el("div", "sample-action-row sample-library-actions");
+  const done = el("button", "sample-button sample-button-primary", strings.doneEditing);
+  done.id = "btn-sample-library-done";
+  done.type = "button";
+  done.addEventListener("click", () => {
+    persistProject();
+    libraryEditing = false;
+    renderPlanner();
+    announce(strings.libraryUpdated);
+  });
+  const remove = el("button", "sample-button sample-button-danger", strings.removeLibrary);
+  remove.id = "btn-sample-library-remove";
+  remove.type = "button";
+  remove.addEventListener("click", removeSelectedLibrary);
+  actions.append(done, remove);
+  editor.append(actions);
+  section.append(editor);
+}
+
+function libraryPanel() {
+  const section = el("section", "sample-panel sample-library-panel");
+  section.setAttribute("aria-labelledby", "sample-library-heading");
+  const top = el("div", "sample-section-top");
+  const heading = el("h2", "sample-panel-heading", `${strings.sampleLibrary} · ${libraryState.items.length}`);
+  heading.id = "sample-library-heading";
+  top.append(heading, el("p", "sample-help", strings.libraryHint));
+  section.append(top);
+
+  const asset = selectedLibraryAsset();
+  if (asset && libraryEditing) {
+    libraryEditor(section, asset);
+    return section;
+  }
+
+  const filters = el("div", "sample-library-filters");
+  const search = textInput("sample-library-search", libraryQuery, 120, strings.librarySearchPlaceholder);
+  search.setAttribute("aria-label", strings.librarySearch);
+  const stage = document.createElement("select");
+  stage.id = "sample-library-filter-stage";
+  stage.setAttribute("aria-label", strings.libraryStage);
+  stage.append(option("all", strings.stageAll, libraryStageFilter === "all"));
+  ["raw", "edited", "ready"].forEach((value) => stage.append(option(value, libraryStageLabel(value), value === libraryStageFilter)));
+  filters.append(search, stage);
+  section.append(filters);
+
+  const empty = el("p", "sample-library-empty", libraryState.items.length ? strings.noLibraryMatch : strings.libraryEmpty);
+  const tray = el("div", "sample-library-tray");
+  tray.setAttribute("role", "list");
+  const applyFilters = () => {
+    libraryQuery = search.value;
+    libraryStageFilter = stage.value;
+    const query = libraryQuery.trim().toLocaleLowerCase();
+    let visible = 0;
+    tray.querySelectorAll(".sample-library-item").forEach((row) => {
+      const card = row.querySelector(".sample-library-card");
+      const matches = (!query || card.dataset.search.includes(query))
+        && (libraryStageFilter === "all" || card.dataset.stage === libraryStageFilter);
+      row.hidden = !matches;
+      if (matches) visible += 1;
+    });
+    empty.hidden = visible > 0;
+  };
+  search.addEventListener("input", applyFilters);
+  stage.addEventListener("change", applyFilters);
+
+  libraryState.items.forEach((item) => {
+    const selected = item.id === librarySelection;
+    const card = el("button", `sample-library-card sample-pad-${item.color}${selected ? " is-selected" : ""}`);
+    card.type = "button";
+    card.dataset.libraryId = item.id;
+    card.dataset.stage = item.stage;
+    card.dataset.search = librarySearchText(item);
+    card.setAttribute("aria-pressed", String(selected));
+    card.setAttribute("aria-label", `${item.name}, ${libraryStageLabel(item.stage)}, ${formatDuration(item.duration)}`);
+    const mini = waveform(item);
+    mini.classList.add("sample-waveform-mini");
+    card.append(
+      el("span", "sample-library-stage", libraryStageLabel(item.stage)),
+      el("strong", "sample-library-name", item.name),
+      el("span", "sample-library-meta", `${extOf(item.originalName).toUpperCase()} · ${formatDuration(item.duration)}${item.bpm ? ` · ${item.bpm} BPM` : ""}`),
+      mini,
+    );
+    card.addEventListener("click", () => {
+      librarySelection = item.id;
+      libraryEditing = false;
+      renderPlanner();
+      const current = overlay.querySelector(`.sample-library-card[data-library-id="${item.id}"]`);
+      current?.focus();
+      previewPad(current, item);
+      announce(fill(strings.librarySelected, { name: item.name }));
+    });
+    const row = el("div", "sample-library-item");
+    row.setAttribute("role", "listitem");
+    row.append(card);
+    tray.append(row);
+  });
+  section.append(tray, empty);
+  applyFilters();
+
+  const input = libraryFileInput();
+  const actions = el("div", "sample-action-row sample-library-actions");
+  if (asset) {
+    const add = el("button", "sample-button sample-button-primary", strings.addToInbox);
+    add.id = "btn-sample-library-inbox";
+    add.type = "button";
+    add.addEventListener("click", addSelectedLibraryToInbox);
+    const edit = el("button", "sample-button sample-button-secondary", strings.editDetails);
+    edit.id = "btn-sample-library-edit";
+    edit.type = "button";
+    edit.addEventListener("click", () => { libraryEditing = true; renderPlanner(); });
+    actions.append(add, edit);
+  } else {
+    const add = el("button", "sample-button sample-button-secondary", strings.addLibrary);
+    add.id = "btn-sample-library-add";
+    add.type = "button";
+    add.addEventListener("click", () => input.click());
+    actions.append(add);
+  }
+  section.append(input, actions);
+  return section;
+}
+
 function bankStrip() {
   const section = el("section", "sample-panel sample-bank-panel");
   section.setAttribute("aria-labelledby", "sample-bank-heading");
@@ -868,7 +1530,7 @@ async function removeSelectedInbox() {
   const [removed] = state.inbox.splice(index, 1);
   armedPlacement = null;
   persistProject();
-  if (!referencedBlobIds().has(removed.blobId)) await deleteAudio(removed.blobId);
+  if (!allStoredBlobIds().has(removed.blobId)) await deleteAudio(removed.blobId);
   stopPreview();
   renderPlanner();
   announce(strings.saved);
@@ -930,7 +1592,6 @@ function inboxPanel() {
       card.type = "button";
       card.draggable = true;
       card.dataset.inboxId = item.id;
-      card.setAttribute("role", "listitem");
       card.setAttribute("aria-pressed", String(selected));
       card.setAttribute("aria-label", `${index + 1}. ${item.name}, ${formatDuration(item.duration)}`);
       const mini = waveform(item);
@@ -951,7 +1612,10 @@ function inboxPanel() {
       card.addEventListener("dragend", () => {
         if (armedPlacement?.type === "inbox" && armedPlacement.id === item.id) cancelPlacement();
       });
-      tray.append(card);
+      const row = el("div", "sample-inbox-item");
+      row.setAttribute("role", "listitem");
+      row.append(card);
+      tray.append(row);
     });
     section.append(tray);
   }
@@ -1192,9 +1856,11 @@ function metadataEditor(section, pad) {
   const returnButton = el("button", "sample-button sample-button-secondary", strings.returnInbox);
   returnButton.id = "btn-sample-pad-return";
   returnButton.type = "button";
+  returnButton.disabled = state.inbox.length >= MAX_INBOX_ITEMS;
   returnButton.addEventListener("click", () => {
     const pad = selectedPad();
     if (!pad) return;
+    if (state.inbox.length >= MAX_INBOX_ITEMS) { announce(strings.inboxLimit, "warning"); return; }
     state.inbox.push(returnableInboxItem(pad));
     delete activeBank().pads[state.selectedPad];
     armedPlacement = null;
@@ -1233,11 +1899,19 @@ function projectTools() {
     importInput.value = "";
   });
   const importLabel = el("button", "sample-button sample-button-secondary", strings.importProject);
+  importLabel.id = "btn-sample-project-import";
   importLabel.type = "button";
   importLabel.addEventListener("click", () => importInput.click());
-  const allItems = [...allAssignedPads().map((row) => row.data), ...state.inbox];
-  const usage = el("p", "sample-storage-usage", `${strings.usage}: ${allAssignedPads().length} pads + ${state.inbox.length} Inbox / ${formatBytes(allItems.reduce((sum, item) => sum + item.bytes, 0))}`);
-  content.append(importInput, importLabel, usage, el("p", "sample-copyright", strings.copyright));
+  const remove = el("button", "sample-button sample-button-danger", strings.deleteProject);
+  remove.id = "btn-sample-project-delete";
+  remove.type = "button";
+  remove.disabled = workspace.projects.length <= 1;
+  remove.addEventListener("click", deleteCurrentProject);
+  const uniqueBytes = libraryState.items.reduce((sum, item) => sum + item.bytes, 0);
+  const usage = el("p", "sample-storage-usage", `${strings.usage}: ${fill(strings.usageProjects, { count: workspace.projects.length })} · ${fill(strings.usageSounds, { count: libraryState.items.length })} / ${formatBytes(uniqueBytes)}`);
+  const toolsActions = el("div", "sample-action-row sample-project-tool-actions");
+  toolsActions.append(importLabel, remove);
+  content.append(importInput, toolsActions, usage, el("p", "sample-copyright", strings.copyright));
   details.append(summary, content);
   return details;
 }
@@ -1272,12 +1946,8 @@ function renderPlanner() {
   if (!overlay || overlay.hidden) return;
   overlay.dataset.view = "planner";
   const content = el("div", "sample-lab-shell");
-  const project = el("section", "sample-project-heading");
-  const projectName = textInput("sample-project-name", state.name, 100);
-  projectName.addEventListener("input", () => { state.name = projectName.value; persistProject(); });
-  project.append(labeledField(strings.projectName, projectName));
   const notice = placementNotice();
-  content.append(projectHeader(), hero(), project, bankStrip(), inboxPanel());
+  content.append(projectHeader(), hero(), projectPanel(), bankStrip(), libraryPanel(), inboxPanel());
   if (notice) content.append(notice);
   content.append(padGrid());
   if (armedPlacement?.type !== "pad") content.append(padEditor());
@@ -1287,33 +1957,56 @@ function renderPlanner() {
 }
 
 async function audioItemFromFile(file, prior = null) {
-  const analysis = await analyzeAudio(file);
-  const blobId = uid("audio");
-  const blob = file.slice(0, file.size, file.type || "application/octet-stream");
-  await putAudio({ id: blobId, blob, name: file.name, type: blob.type });
-  return normalizePad({
-    blobId,
-    originalName: file.name,
-    mime: blob.type,
-    bytes: file.size,
-    name: prior?.name || cleanName(file.name),
-    source: prior?.source || "",
-    tags: prior?.tags || "",
-    color: prior?.color || "green",
-    playMode: prior?.playMode || "one-shot",
-    bpm: prior?.bpm || "",
-    group: prior?.group || 0,
-    ...analysis,
-  });
+  const { asset } = await libraryAssetFromFile(file);
+  return padFromLibraryAsset(asset, prior);
+}
+
+async function importFilesToLibrary(fileList) {
+  const files = Array.from(fileList || []).slice(0, MAX_BATCH_FILES);
+  let rejected = Math.max(0, Array.from(fileList || []).length - files.length);
+  let added = 0;
+  let duplicates = 0;
+  stopPreview();
+  librarySelection = null;
+  libraryEditing = false;
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
+    const extension = extOf(file.name);
+    if (!SUPPORTED_EXTENSIONS.has(extension) || file.size > MAX_AUDIO_BYTES) {
+      rejected += 1;
+      continue;
+    }
+    announce(`${strings.importing} ${index + 1}/${files.length}`);
+    try {
+      const result = await libraryAssetFromFile(file);
+      if (result.reused) duplicates += 1;
+      else added += 1;
+    } catch (_) { rejected += 1; }
+  }
+  if (added || duplicates) persistProject();
+  renderPlanner();
+  if (fileList.length > MAX_BATCH_FILES) announce(strings.batchLimit, "warning");
+  else if (!added && !duplicates) announce(strings.invalidFile, "warning");
+  else announce(fill(strings.libraryAdded, {
+    added,
+    duplicates: duplicates ? fill(strings.libraryDuplicates, { count: duplicates }) : "",
+    rejected: rejected ? fill(strings.inboxRejected, { count: rejected }) : "",
+  }), rejected ? "warning" : "ok");
 }
 
 async function importFilesToInbox(fileList) {
   const files = Array.from(fileList || []).slice(0, MAX_BATCH_FILES);
   let rejected = Math.max(0, Array.from(fileList || []).length - files.length);
   let added = 0;
+  let inboxFull = false;
   stopPreview();
   armedPlacement = null;
   for (let index = 0; index < files.length; index += 1) {
+    if (state.inbox.length >= MAX_INBOX_ITEMS) {
+      rejected += files.length - index;
+      inboxFull = true;
+      break;
+    }
     const file = files[index];
     const extension = extOf(file.name);
     if (!SUPPORTED_EXTENSIONS.has(extension) || file.size > MAX_AUDIO_BYTES) {
@@ -1330,7 +2023,8 @@ async function importFilesToInbox(fileList) {
   }
   if (added) persistProject();
   renderPlanner();
-  if (fileList.length > MAX_BATCH_FILES) announce(strings.batchLimit, "warning");
+  if (inboxFull) announce(strings.inboxLimit, "warning");
+  else if (fileList.length > MAX_BATCH_FILES) announce(strings.batchLimit, "warning");
   else if (!added) announce(strings.invalidFile, "warning");
   else announce(fill(strings.inboxImported, {
     added,
@@ -1342,6 +2036,7 @@ async function importSample(file) {
   const extension = extOf(file.name);
   if (!SUPPORTED_EXTENSIONS.has(extension)) { announce(strings.invalidFile, "warning"); return; }
   if (file.size > MAX_AUDIO_BYTES) { announce(strings.tooLarge, "warning"); return; }
+  if (selectedPad() && state.inbox.length >= MAX_INBOX_ITEMS) { announce(strings.inboxLimit, "warning"); return; }
   announce(strings.importing);
   try {
     const old = selectedPad();
@@ -1445,18 +2140,36 @@ async function readProjectManifest(file) {
 async function importProjectFile(file) {
   try {
     const parsed = await readProjectManifest(file);
-    const nextRecords = [];
-    for (const entry of parsed.manifest.files) {
-      nextRecords.push({
-        id: entry.id,
-        name: String(entry.name || "sample"),
-        type: String(entry.type || "application/octet-stream"),
-        blob: file.slice(parsed.payloadOffset + entry.offset, parsed.payloadOffset + entry.offset + entry.length, entry.type || "application/octet-stream"),
-      });
+    const existing = workspace.projects.findIndex((project) => project.id === parsed.project.id);
+    if (existing < 0 && workspace.projects.length >= MAX_PROJECTS) {
+      announce(strings.projectLimit, "warning");
+      return false;
     }
-    for (const record of nextRecords) await putAudio(record);
+    const importedAssets = new Map();
+    for (const entry of parsed.manifest.files) {
+      const name = String(entry.name || "sample");
+      const type = String(entry.type || "application/octet-stream");
+      const blob = file.slice(parsed.payloadOffset + entry.offset, parsed.payloadOffset + entry.offset + entry.length, type);
+      const portableFile = new File([blob], name, { type, lastModified: file.lastModified || Date.now() });
+      const { asset } = await libraryAssetFromFile(portableFile);
+      importedAssets.set(entry.id, asset);
+    }
+    const reconnect = (pad) => {
+      const asset = importedAssets.get(pad.blobId);
+      if (!asset) return;
+      pad.blobId = asset.blobId;
+      pad.fingerprint = asset.fingerprint;
+    };
+    SLOT_NAMES.forEach((slot) => Object.values(parsed.project.slots[slot].pads).forEach(reconnect));
+    parsed.project.inbox.forEach(reconnect);
+    if (existing >= 0) workspace.projects[existing] = parsed.project;
+    else workspace.projects.push(parsed.project);
     state = parsed.project;
+    workspace.activeProjectId = state.id;
+    seedLibraryFromProjects();
     armedPlacement = null;
+    librarySelection = null;
+    libraryEditing = false;
     persistProject();
     stopPreview();
     renderPlanner();
@@ -1620,6 +2333,10 @@ function publishDiagnostics() {
     schema: FORMAT_SCHEMA,
     storage: persistentAudio ? "indexeddb" : "temporary",
     projectId: state?.id || null,
+    projectName: state?.name || null,
+    projects: workspace ? workspace.projects.map((project) => ({ id: project.id, name: project.name, inbox: project.inbox.length, assigned: assignedPadCount(project) })) : [],
+    libraryItems: libraryState ? libraryState.items.map((item) => ({ id: item.id, blobId: item.blobId, name: item.name, filename: item.originalName, stage: item.stage, fingerprint: item.fingerprint })) : [],
+    librarySelection,
     activeSlot: state?.activeSlot || null,
     selectedPad: state?.selectedPad || null,
     inboxItems: state ? state.inbox.map((item) => ({ id: item.id, name: item.name, filename: item.originalName, bytes: item.bytes })) : [],
@@ -1645,17 +2362,24 @@ export async function startSampleLab(options = {}) {
   started = true;
   lang = options.lang === "ja" ? "ja" : "en";
   strings = COPY[lang];
-  state = loadProject();
+  state = loadWorkspace();
   overlay = createOverlay();
   try { db = await openDatabase(); }
   catch (_) { persistentAudio = false; }
+  persistProject();
   enhanceHome();
   setRouteActive();
   window.addEventListener("hashchange", setRouteActive);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && armedPlacement && !overlay.hidden) {
+    if (event.key !== "Escape" || overlay.hidden) return;
+    if (armedPlacement) { event.preventDefault(); cancelPlacement(); return; }
+    if (libraryEditing || librarySelection || creatingProject) {
       event.preventDefault();
-      cancelPlacement();
+      libraryEditing = false;
+      librarySelection = null;
+      creatingProject = false;
+      renderPlanner();
+      requestAnimationFrame(() => overlay.querySelector("#sample-library-search, #btn-sample-project-new")?.focus());
     }
   });
   new MutationObserver(() => {

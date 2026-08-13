@@ -1,4 +1,4 @@
-/* SEXY ONE M11 offline shell.
+/* SEXY ONE offline shell.
  *
  * The cache is intentionally small: it contains the executable shell and both
  * text languages, but not the 108 manual scans. Seen scans enter the runtime
@@ -6,7 +6,7 @@
  * cannot combine an old worker's app.wasm with a new deployment's bundles;
  * the cache is strictly the connection-failure fallback.
  */
-const CACHE_VERSION = "m13-v1";
+const CACHE_VERSION = "m14-v2";
 const CORE_CACHE = `sxc1-core-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `sxc1-runtime-${CACHE_VERSION}`;
 const CORE_RELATIVE_URLS = [

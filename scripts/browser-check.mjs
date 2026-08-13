@@ -2926,6 +2926,8 @@ const JA_COURSE_WEEKLY_ASSERTION_NAME =
   'ja course: [JAC7] the Weekly Pulse localizes its JS-owned rhythm, outlook, insight headings, and next-focus action';
 const JA_COURSE_SAMPLE_INBOX_ASSERTION_NAME =
   'ja course: [JAC8] Sample Inbox localizes its JS-owned organizing, placement, and handoff decisions';
+const JA_COURSE_SAMPLE_LIBRARY_ASSERTION_NAME =
+  'ja course: [JAC9] Sample Library localizes its JS-owned catalog, filter, and project decisions';
 
 // Trusted keyboard input for a session: returns pressKey(key) driving the
 // full keyDown/keyUp pair through CDP's Input domain. 'Tab'/'Enter' are
@@ -4159,6 +4161,24 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
         && sampleInboxJa.fill === '空きパッドへ配置'
         && sampleInboxJa.handoff === 'スマートフォンへ',
       sampleInboxJa,
+    );
+
+    const sampleLibraryJa = await h.evaluate(`(() => ({
+      library: document.querySelector('#sample-library-heading')?.textContent.trim() || null,
+      search: document.querySelector('#sample-library-search')?.getAttribute('aria-label') || null,
+      stage: document.querySelector('#sample-library-filter-stage option')?.textContent.trim() || null,
+      add: document.querySelector('#btn-sample-library-add')?.textContent.trim() || null,
+      project: document.querySelector('#btn-sample-project-new')?.textContent.trim() || null,
+    }))()`);
+    report(
+      JA_COURSE_SAMPLE_LIBRARY_ASSERTION_NAME,
+      Boolean(sampleLibraryJa)
+        && typeof sampleLibraryJa.library === 'string' && sampleLibraryJa.library.startsWith('サンプルライブラリ')
+        && sampleLibraryJa.search === '音声を検索'
+        && sampleLibraryJa.stage === 'すべての段階'
+        && sampleLibraryJa.add === 'ライブラリへ追加'
+        && sampleLibraryJa.project === '新規プロジェクト',
+      sampleLibraryJa,
     );
   }
 
@@ -9038,6 +9058,34 @@ async function main() {
       return document.querySelector(${JSON.stringify(readySelector)}) !== null;
     })()`);
 
+    const reloadPage = async (readySelector, timeoutMs = 15000) => {
+      // Invalidate the current document's settled marker before asking CDP to
+      // reload. Otherwise a fast first poll can accept the old document's
+      // __SXC1_BOOTED and ready selector before navigation has committed.
+      await evaluate('window.__SXC1_BOOTED = false; window.__SXC1_SAMPLE_LAB = null; true');
+      await cdp.send('Page.reload', {}, sessionId);
+      const bootDeadline = Date.now() + timeoutMs;
+      let booted = false;
+      while (Date.now() < bootDeadline) {
+        const state = await evaluate(`(() => {
+          if (typeof window.__SXC1_BOOT_ERROR === 'string') return { error: window.__SXC1_BOOT_ERROR };
+          if (window.__SXC1_BOOTED === true) return { booted: true };
+          return { pending: true };
+        })()`);
+        if (state?.error) throw new Error(`boot error after reload: ${state.error}`);
+        if (state?.booted) { booted = true; break; }
+        await sleep(60);
+      }
+      if (!booted) throw new Error(`app did not report __SXC1_BOOTED within ${timeoutMs}ms after reload`);
+      if (!readySelector) return true;
+      const readyDeadline = Date.now() + timeoutMs;
+      while (Date.now() < readyDeadline) {
+        if (await elementExists(readySelector)) return true;
+        await sleep(30);
+      }
+      return false;
+    };
+
     const click = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
     const clickAssert = async (selector, label) => {
       const present = await assertElement(selector, `${selector} is present before clicking it`);
@@ -9168,7 +9216,7 @@ async function main() {
         Boolean(pwaState
           && pwaState.state?.supported === true && pwaState.state.registered === true
           && pwaState.state.ready === true && pwaState.state.offlineCapable === true
-          && pwaState.state.cacheVersion === 'm13-v1' && pwaState.controlled === true
+          && pwaState.state.cacheVersion === 'm14-v2' && pwaState.controlled === true
           && pwaState.state.scope === expectedScope
           && pwaState.manifestStatus === 200
           && pwaState.manifest?.start_url === './#/x/today'
@@ -9929,7 +9977,255 @@ async function main() {
       );
       await click('#btn-sample-validation-back');
 
-      // -- 3d. The focused coach is a deterministic, tab-scoped snapshot:
+      // -- 3d. M14 Sample Library + projects. Remove only M14's keys and
+      // reload from the still-mirrored M13 active project: this proves the
+      // one-way-looking upgrade is actually an automatic, lossless migration.
+      // The seeded library must deduplicate an identical re-import, retain
+      // searchable provenance, feed two different named projects without
+      // duplicating audio, and survive deletion of the temporary project.
+      const legacyProjectId = await evaluate(`(() => {
+        const active = JSON.parse(localStorage.getItem('sxc1.sample-lab.v1') || 'null');
+        localStorage.removeItem('sxc1.sample-workspace.v1');
+        localStorage.removeItem('sxc1.sample-library.v1');
+        return active?.id || null;
+      })()`);
+      const libraryReloaded = await reloadPage('#sample-library-heading', 20000);
+      const sampleLibrary = await evaluate(`(async () => {
+        const waitFor = async (test, timeout = 8000) => {
+          const start = Date.now();
+          while (Date.now() - start < timeout) {
+            if (test()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          return Boolean(test());
+        };
+        await waitFor(() => window.__SXC1_SAMPLE_LAB?.libraryItems?.length === 6);
+        const migrated = {
+          projectId: window.__SXC1_SAMPLE_LAB?.projectId || null,
+          projects: window.__SXC1_SAMPLE_LAB?.projects?.length ?? null,
+          library: window.__SXC1_SAMPLE_LAB?.libraryItems?.length ?? null,
+          cards: document.querySelectorAll('.sample-library-card').length,
+          actions: Array.from(document.querySelectorAll('.sample-library-actions > button')).map((button) => button.id),
+          workspace: JSON.parse(localStorage.getItem('sxc1.sample-workspace.v1') || 'null'),
+        };
+        const makeWav = (sampleRate, seed) => {
+          const frames = 2400;
+          const bytes = new ArrayBuffer(44 + frames * 2);
+          const view = new DataView(bytes);
+          const ascii = (offset, text) => {
+            for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+          };
+          ascii(0, 'RIFF');
+          view.setUint32(4, 36 + frames * 2, true);
+          ascii(8, 'WAVE');
+          ascii(12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, 1, true);
+          view.setUint32(24, sampleRate, true);
+          view.setUint32(28, sampleRate * 2, true);
+          view.setUint16(32, 2, true);
+          view.setUint16(34, 16, true);
+          ascii(36, 'data');
+          view.setUint32(40, frames * 2, true);
+          for (let i = 0; i < frames; i += 1) {
+            view.setInt16(44 + i * 2, Math.round(Math.sin((i + seed) / (9 + seed)) * 9000), true);
+          }
+          return bytes;
+        };
+        const input = document.querySelector('#sample-library-input');
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([makeWav(48000, 5)], 'spare-again.wav', { type: 'audio/wav' }));
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitFor(() => !document.querySelector('#sample-lab-status')?.textContent.includes('Reading'));
+        const afterDuplicate = {
+          library: window.__SXC1_SAMPLE_LAB.libraryItems.length,
+          fingerprints: window.__SXC1_SAMPLE_LAB.libraryItems.filter((item) => item.fingerprint).length,
+          status: document.querySelector('#sample-lab-status')?.textContent || null,
+        };
+
+        // Start the Library and Inbox entry points in the same turn with the
+        // same new bytes. The shared import queue must commit one catalog blob,
+        // then let both callers reuse it.
+        const concurrentLibrary = document.querySelector('#sample-library-input');
+        const concurrentInbox = document.querySelector('#sample-inbox-input');
+        const libraryTransfer = new DataTransfer();
+        const inboxTransfer = new DataTransfer();
+        libraryTransfer.items.add(new File([makeWav(48000, 51)], 'concurrent-a.wav', { type: 'audio/wav' }));
+        inboxTransfer.items.add(new File([makeWav(48000, 51)], 'concurrent-b.wav', { type: 'audio/wav' }));
+        concurrentLibrary.files = libraryTransfer.files;
+        concurrentInbox.files = inboxTransfer.files;
+        concurrentLibrary.dispatchEvent(new Event('change', { bubbles: true }));
+        concurrentInbox.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.libraryItems.length === 7
+          && window.__SXC1_SAMPLE_LAB.inboxItems.length === 3);
+        const afterConcurrent = {
+          library: window.__SXC1_SAMPLE_LAB.libraryItems.length,
+          inbox: window.__SXC1_SAMPLE_LAB.inboxItems.length,
+          catalogMatches: window.__SXC1_SAMPLE_LAB.libraryItems.filter((item) => item.name === 'concurrent a').length,
+          inboxMatches: window.__SXC1_SAMPLE_LAB.inboxItems.filter((item) => item.name === 'concurrent a').length,
+        };
+
+        const search = document.querySelector('#sample-library-search');
+        search.value = 'spare';
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        const visibleAfterNameSearch = Array.from(document.querySelectorAll('.sample-library-card'))
+          .filter((card) => !card.closest('.sample-library-item')?.hidden);
+        visibleAfterNameSearch[0]?.click();
+        const selectedActions = Array.from(document.querySelectorAll('.sample-library-actions > button')).map((button) => button.id);
+        document.querySelector('#btn-sample-library-edit')?.click();
+        const editValues = {
+          '#sample-library-source': 'YouTube field session',
+          '#sample-library-tags': 'arcade ambience',
+          '#sample-library-notes': 'Trimmed in Audacity',
+          '#sample-library-rights': 'Licensed capture',
+          '#sample-library-bpm': '96',
+          '#sample-library-stage': 'edited',
+        };
+        Object.entries(editValues).forEach(([selector, value]) => {
+          const control = document.querySelector(selector);
+          if (!control) return;
+          control.value = value;
+          control.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        const editorActions = Array.from(document.querySelectorAll('.sample-library-actions > button')).map((button) => button.id);
+        document.querySelector('#btn-sample-library-done')?.click();
+        document.querySelector('#btn-sample-library-inbox')?.click();
+        const originalAfterReuse = {
+          id: window.__SXC1_SAMPLE_LAB.projectId,
+          inbox: window.__SXC1_SAMPLE_LAB.inboxItems.length,
+          assigned: window.__SXC1_SAMPLE_LAB.assignedPads.length,
+        };
+
+        document.querySelector('#btn-sample-project-new')?.click();
+        const newName = document.querySelector('#sample-new-project-name');
+        newName.value = 'Night Drive';
+        newName.dispatchEvent(new Event('input', { bubbles: true }));
+        document.querySelector('#btn-sample-project-create')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.projectName === 'Night Drive');
+        const newProject = {
+          id: window.__SXC1_SAMPLE_LAB.projectId,
+          projects: window.__SXC1_SAMPLE_LAB.projects.length,
+          inbox: window.__SXC1_SAMPLE_LAB.inboxItems.length,
+          library: window.__SXC1_SAMPLE_LAB.libraryItems.length,
+        };
+        const newSearch = document.querySelector('#sample-library-search');
+        newSearch.value = 'YouTube field session';
+        newSearch.dispatchEvent(new Event('input', { bubbles: true }));
+        const sourceMatches = Array.from(document.querySelectorAll('.sample-library-card'))
+          .filter((card) => !card.closest('.sample-library-item')?.hidden);
+        sourceMatches[0]?.click();
+        document.querySelector('#btn-sample-library-inbox')?.click();
+        const newInbox = window.__SXC1_SAMPLE_LAB.inboxItems.map((item) => item.name);
+
+        return { migrated, afterDuplicate, afterConcurrent, visibleName: visibleAfterNameSearch.length, selectedActions, editorActions,
+          originalAfterReuse, newProject, sourceMatches: sourceMatches.length, newInbox,
+          edited: window.__SXC1_SAMPLE_LAB.libraryItems.find((item) => item.name === 'spare') || null,
+          newProjectId: window.__SXC1_SAMPLE_LAB.projectId };
+      })()`);
+
+      const projectRoundtrip = await evaluate(`(async () => {
+        const wait = () => new Promise((resolve) => setTimeout(resolve, 30));
+        const chooser = document.querySelector('#sample-project-select');
+        chooser.value = ${JSON.stringify(legacyProjectId)};
+        chooser.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait();
+        const original = {
+          id: window.__SXC1_SAMPLE_LAB.projectId,
+          inbox: window.__SXC1_SAMPLE_LAB.inboxItems.length,
+          assigned: window.__SXC1_SAMPLE_LAB.assignedPads.length,
+        };
+        const chooserBack = document.querySelector('#sample-project-select');
+        const temporary = Array.from(chooserBack.options).find((option) => option.value !== ${JSON.stringify(legacyProjectId)});
+        chooserBack.value = temporary.value;
+        chooserBack.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait();
+        document.querySelector('.sample-project-tools').open = true;
+        const oldConfirm = window.confirm;
+        window.confirm = () => true;
+        document.querySelector('#btn-sample-project-delete')?.click();
+        window.confirm = oldConfirm;
+        await wait();
+        const search = document.querySelector('#sample-library-search');
+        search.value = 'Licensed capture';
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        return {
+          original,
+          finalProjectId: window.__SXC1_SAMPLE_LAB.projectId,
+          projects: window.__SXC1_SAMPLE_LAB.projects.length,
+          library: window.__SXC1_SAMPLE_LAB.libraryItems.length,
+          rightsMatches: Array.from(document.querySelectorAll('.sample-library-card'))
+            .filter((card) => !card.closest('.sample-library-item')?.hidden).length,
+          workspace: JSON.parse(localStorage.getItem('sxc1.sample-workspace.v1') || 'null'),
+          mirror: JSON.parse(localStorage.getItem('sxc1.sample-lab.v1') || 'null'),
+        };
+      })()`);
+      await evaluate(`localStorage.setItem('sxc1.sample-library.v1', '{broken library json')`);
+      const corruptLibraryReloaded = await reloadPage('#sample-library-heading', 20000);
+      const corruptLibraryRecovery = await evaluate(`(() => ({
+        projectId: window.__SXC1_SAMPLE_LAB?.projectId || null,
+        projects: window.__SXC1_SAMPLE_LAB?.projects?.length ?? null,
+        library: window.__SXC1_SAMPLE_LAB?.libraryItems?.length ?? null,
+        storage: window.__SXC1_SAMPLE_LAB?.storage || null,
+        workspace: JSON.parse(localStorage.getItem('sxc1.sample-workspace.v1') || 'null'),
+        repairedLibrary: JSON.parse(localStorage.getItem('sxc1.sample-library.v1') || 'null'),
+      }))()`);
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
+      }, sessionId);
+      const sampleLibraryMobile = await evaluate(`(() => ({
+        viewport: innerWidth,
+        scrollWidth: document.scrollingElement?.scrollWidth || null,
+        libraryVisible: document.querySelector('.sample-library-panel')?.getBoundingClientRect().height > 0,
+        projectSelectHeight: document.querySelector('#sample-project-select')?.getBoundingClientRect().height || 0,
+        libraryButtons: Array.from(document.querySelectorAll('.sample-library-actions > button')).map((button) => button.getBoundingClientRect().height),
+      }))()`);
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      report(
+        'Sample Library deduplicates, searches provenance, reuses audio across named projects, and migrates M13 state',
+        Boolean(libraryReloaded && legacyProjectId
+          && sampleLibrary?.migrated?.projectId === legacyProjectId
+          && sampleLibrary.migrated.projects === 1 && sampleLibrary.migrated.library === 6
+          && sampleLibrary.migrated.cards === 6
+          && sampleLibrary.migrated.actions.join(',') === 'btn-sample-library-add'
+          && sampleLibrary.migrated.workspace?.activeProjectId === legacyProjectId
+          && sampleLibrary.afterDuplicate.library === 6
+          && sampleLibrary.afterDuplicate.fingerprints >= 1
+          && /reused 1 duplicate/.test(sampleLibrary.afterDuplicate.status || '')
+          && sampleLibrary.afterConcurrent.library === 7 && sampleLibrary.afterConcurrent.inbox === 3
+          && sampleLibrary.afterConcurrent.catalogMatches === 1 && sampleLibrary.afterConcurrent.inboxMatches === 1
+          && sampleLibrary.visibleName === 1
+          && sampleLibrary.selectedActions.join(',') === 'btn-sample-library-inbox,btn-sample-library-edit'
+          && sampleLibrary.editorActions.join(',') === 'btn-sample-library-done,btn-sample-library-remove'
+          && sampleLibrary.originalAfterReuse.id === legacyProjectId
+          && sampleLibrary.originalAfterReuse.inbox === 4
+          && sampleLibrary.originalAfterReuse.assigned === 4
+          && sampleLibrary.newProject.projects === 2 && sampleLibrary.newProject.inbox === 0
+          && sampleLibrary.newProject.library === 7 && sampleLibrary.sourceMatches === 1
+          && sampleLibrary.newInbox.join(',') === 'spare'
+          && sampleLibrary.edited?.stage === 'edited'
+          && projectRoundtrip?.original?.id === legacyProjectId
+          && projectRoundtrip.original.inbox === 4 && projectRoundtrip.original.assigned === 4
+          && projectRoundtrip.finalProjectId === legacyProjectId
+          && projectRoundtrip.projects === 1 && projectRoundtrip.library === 7
+          && projectRoundtrip.rightsMatches === 1
+          && projectRoundtrip.workspace?.activeProjectId === legacyProjectId
+          && projectRoundtrip.mirror?.id === legacyProjectId
+          && corruptLibraryReloaded && corruptLibraryRecovery?.projectId === legacyProjectId
+          && corruptLibraryRecovery.projects === 1 && corruptLibraryRecovery.library === 7
+          && corruptLibraryRecovery.storage === 'indexeddb'
+          && corruptLibraryRecovery.workspace?.activeProjectId === legacyProjectId
+          && corruptLibraryRecovery.repairedLibrary?.items?.length === 7
+          && sampleLibraryMobile?.viewport === 320 && sampleLibraryMobile.scrollWidth <= 320
+          && sampleLibraryMobile.libraryVisible && sampleLibraryMobile.projectSelectHeight >= 44
+          && sampleLibraryMobile.libraryButtons.length === 1
+          && sampleLibraryMobile.libraryButtons.every((height) => height >= 44)),
+        { legacyProjectId, libraryReloaded, sampleLibrary, projectRoundtrip, corruptLibraryReloaded,
+          corruptLibraryRecovery, sampleLibraryMobile },
+      );
+
+      // -- 3e. The focused coach is a deterministic, tab-scoped snapshot:
       // route changes never reshuffle it, all five cards are unique links, and
       // opening one carries an out-of-tree session bar into the live runner.
       // A fresh profile has no due or partial work, so all five reasons must be
