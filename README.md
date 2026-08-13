@@ -102,7 +102,9 @@ audio and calls out duplicate destinations, unassigned sounds, duplicate names,
 and non-recommended formats. The optimized artifact passed the complete
 136/136 release gate with 238/238 browser assertions at both root and nested
 paths, including 320 px, keyboard, migration, offline-cache, and Japanese UI
-coverage. See [`docs/SAMPLE-INBOX.md`](docs/SAMPLE-INBOX.md).
+coverage. The byte-identical artifact is deployed at the Vercel mirror and
+passed 75/75 assertions against production. See
+[`docs/SAMPLE-INBOX.md`](docs/SAMPLE-INBOX.md).
 
 **M12 Sample Lab.** `#/samples` is a deferred, local-first 4×4 pad and bank
 planner for Audacity exports. It accepts the same WAV/MP3/FLAC/`.cswp` choices
