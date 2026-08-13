@@ -241,7 +241,7 @@ sexy-one.vercel.app belongs to an unrelated third party — never share that
 one). Deploy: copy `site/public` to a scratch dir named `sexy-one`, run
 `vercel deploy --prod --yes` (CLI authenticated as the owner's account).
 Initially verified 70/70 by browser-check against production. The current M14 release
-(`dpl_29VThHSMWYUMdZ9TB4hicDhUZ2Ey`) was deployed 2026-08-14 and verified 76/76
+(`dpl_CririMi6Sih9mjsaSpxVzvEJeizk`) was deployed 2026-08-14 and verified 76/76
 against the main alias, with the
 deployed files byte-identical to the locally gated artifact and the correct
 `application/wasm` content type. First-visit CDN cold-decode latency on the
