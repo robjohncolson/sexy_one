@@ -7,12 +7,12 @@ round of work.
 ## Current production state
 
 - Production: <https://sexy-one-gray.vercel.app/>
-- Vercel deployment: `dpl_66kAbncHPkcb6wsMRoUK38yygVfq`
-- Immutable deployment URL: <https://sexy-e3rn2q3ns-roberts-projects-19fe2013.vercel.app/>
+- Vercel deployment: `dpl_29VThHSMWYUMdZ9TB4hicDhUZ2Ey`
+- Immutable deployment URL: <https://sexy-m4i8ge617-roberts-projects-19fe2013.vercel.app/>
 - Course: 50 decks, 352 exercises, 467 prompts; no page-lookup exercises.
 - Last complete local gate: 136/136 checks, with 240/240 browser assertions at
   both the origin root and a nested deployment path.
-- Last production quick gate: 75/75 assertions.
+- Last production quick gate: 76/76 assertions.
 
 ## Product decisions to preserve
 

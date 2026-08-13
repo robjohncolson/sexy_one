@@ -197,9 +197,9 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   format facts; and reuse one stored sound in multiple named project Inboxes.
   Existing M12/M13 state migrates automatically, the active project remains
   mirrored for rollback, and `.sxc1lab` stays a bounded one-project phone
-  transfer. **IMPLEMENTATION AND RELEASE GATE COMPLETE 2026-08-14; production
-  deployment pending.** The optimized artifact passed 136/136 checks with
-  240/240 browser assertions at both root and nested deployment paths.
+  transfer. **COMPLETE AND DEPLOYED 2026-08-14.** The optimized artifact passed
+  136/136 checks with 240/240 browser assertions at both root and nested
+  deployment paths, then passed 76/76 against production.
   Contract: `docs/SAMPLE-LIBRARY.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
@@ -240,8 +240,8 @@ Vercel (2026-08-07, owner-requested): the same static build also deploys to
 sexy-one.vercel.app belongs to an unrelated third party — never share that
 one). Deploy: copy `site/public` to a scratch dir named `sexy-one`, run
 `vercel deploy --prod --yes` (CLI authenticated as the owner's account).
-Initially verified 70/70 by browser-check against production. The current M13 release
-(`dpl_66kAbncHPkcb6wsMRoUK38yygVfq`) was deployed 2026-08-13 and verified 75/75
+Initially verified 70/70 by browser-check against production. The current M14 release
+(`dpl_29VThHSMWYUMdZ9TB4hicDhUZ2Ey`) was deployed 2026-08-14 and verified 76/76
 against the main alias, with the
 deployed files byte-identical to the locally gated artifact and the correct
 `application/wasm` content type. First-visit CDN cold-decode latency on the

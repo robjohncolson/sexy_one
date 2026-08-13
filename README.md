@@ -106,7 +106,8 @@ state migrates automatically and remains mirrored for rollback. The optimized
 artifact passed the complete 136/136 release gate with 240/240 browser
 assertions at both root and nested paths, including 320 px, keyboard,
 migration, deduplication, project reuse, offline-cache, and Japanese UI
-coverage. Production deployment is pending. See
+coverage. The byte-identical artifact is deployed at the Vercel mirror and
+passed 76/76 assertions against production. See
 [`docs/SAMPLE-LIBRARY.md`](docs/SAMPLE-LIBRARY.md).
 
 **M13 Sample Inbox.** Sample Lab accepts an Audacity batch into
