@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | The pure progress model: the spaced-repetition record shape, the
--- day-granularity clock projection, and the ONE place an 'Outcome' is
--- ever interpreted into a spaced-repetition 'Grade'.
+-- day-granularity clock projection, and the two explicit mappings into a
+-- spaced-repetition 'Grade': legacy outcome inference and M11 review input.
 --
 -- PURITY (briefs\/M3-manifest.json, task \"progress-core\"): this module,
 -- and every other module under "SXC1.Progress", performs NO IO, imports
@@ -30,25 +30,26 @@ module SXC1.Progress.Types
   , dayCap
   , addDays
   , Rec (..)
+  , PulseEntry (..)
+  , pulseHistoryCap
   , SchemaVersion (..)
   , ProgressState (..)
   , emptyProgress
   , dayOf
   , gradeOfOutcome
+  , gradeOfReview
   ) where
 
 import           Data.Map.Strict    (Map)
 import qualified Data.Map.Strict    as Map
 import           Data.Text          (Text)
 
-import           SXC1.Exercise.Engine (Outcome (..))
+import           SXC1.Exercise.Engine (Outcome (..), ReviewGrade (..))
 
 --------------------------------------------------------------------------
--- Grade -- the spaced-repetition input alphabet. 'gradeOfOutcome' below
--- is the ONLY function in the whole SXC1.Progress.* tree allowed to
--- pattern-match an 'Outcome' to decide one of these four values; every
--- other module (in particular "SXC1.Progress.Scheduler") receives a
--- 'Grade' already decided and never re-derives one from an 'Outcome'.
+-- Grade -- the spaced-repetition input alphabet. 'gradeOfOutcome' owns
+-- legacy event inference; 'gradeOfReview' preserves an explicit M11 learner
+-- rating. Every other module receives a 'Grade' already decided.
 --------------------------------------------------------------------------
 
 data Grade = GAgain | GHard | GGood | GEasy
@@ -77,6 +78,24 @@ data Rec = Rec
   , rcLastSeen :: !DayNum
   , rcSeen     :: !Int
   } deriving Eq
+
+-- | One deliberately small, local-only learning mark for the Weekly Pulse.
+-- The folded scheduler record remains the authority for review dates; this
+-- bounded ledger exists only to explain recent momentum without retaining the
+-- full exercise event (elapsed time, hint text, device state, and so on).
+-- A 'Nothing' prompt is an exercise-completion mark.
+data PulseEntry = PulseEntry
+  { plDay      :: !DayNum
+  , plDeck     :: !Text
+  , plExercise :: !Text
+  , plPrompt   :: !(Maybe Text)
+  , plGrade    :: !Grade
+  } deriving Eq
+
+-- | Hard privacy/size bound shared by the scheduler and codec. At most the
+-- latest 200 marks survive in memory, local storage, and a progress passport.
+pulseHistoryCap :: Int
+pulseHistoryCap = 200
 
 -- | The wire schema version a 'ProgressState' was decoded as (post any
 -- migration -- see "SXC1.Progress.Codec".'SXC1.Progress.Codec.migrateWith'
@@ -110,10 +129,14 @@ data ProgressState = ProgressState
     -- can. v1 blobs migrate with it empty (the UI falls back to the
     -- day heuristic once, then the first graded event fills it).
   , psLastPrompt :: !Text
+    -- | Schema v3 (M10): a bounded, coarse recent-history ledger used by
+    -- the local-only Weekly Pulse. It is never uploaded and is carried by
+    -- the same export/import passport as the scheduler state.
+  , psPulse      :: ![PulseEntry]
   } deriving Eq
 
 -- | A learner who has never done anything. NOTE: 'psVersion' is
--- hardcoded to @SchemaVersion 2@ here rather than referencing
+-- hardcoded to @SchemaVersion 3@ here rather than referencing
 -- "SXC1.Progress.Codec".'SXC1.Progress.Codec.currentSchema' -- 'Codec'
 -- imports 'Types', so the reverse import would be a cycle. The two
 -- literals (this one, and 'SXC1.Progress.Codec.currentSchema') must be
@@ -123,13 +146,14 @@ data ProgressState = ProgressState
 -- 'SXC1.Progress.Codec.currentSchema'.
 emptyProgress :: ProgressState
 emptyProgress = ProgressState
-  { psVersion   = SchemaVersion 2
+  { psVersion   = SchemaVersion 3
   , psRecs      = Map.empty
   , psDone      = Map.empty
   , psStreakDay = DayNum 0
   , psStreakLen = 0
   , psFirstDay  = DayNum 0
   , psLastPrompt = ""
+  , psPulse      = []
   }
 
 msPerDay :: Integer
@@ -177,13 +201,14 @@ dayOf ms
       | n > toInteger dayCap = dayCap
       | otherwise            = fromInteger n
 
--- | THE ONLY PLACE an 'Outcome' is interpreted into a spaced-repetition
--- 'Grade' -- see the module Haddock. Order matters: within 'Correct',
+-- | The only place a LEGACY event's 'Outcome' is interpreted into a
+-- spaced-repetition 'Grade'. Explicit M11 reviews use 'gradeOfReview'
+-- instead. Order matters: within 'Correct',
 -- the rules are checked top-to-bottom, so a revealed-AND-multi-attempt
 -- correct answer reports 'GHard' (the 'revealed' check alone already
 -- decides it) rather than falling through to a hints check.
 --
---   * 'Incorrect' or 'Skipped'        -> 'GAgain' (start the item over)
+--   * 'Incorrect' or 'Skipped'        -> 'GAgain' (due again today)
 --   * 'Completed' (an exercise-level, promptless marker)  -> 'GGood'
 --     (present for TOTALITY -- see "SXC1.Progress.Scheduler"'s Haddock
 --     on why a promptless 'Completed' event never actually reaches this
@@ -202,3 +227,11 @@ gradeOfOutcome outcome attempt revealed hints = case outcome of
     | attempt >= 2     -> GHard
     | hints > 0         -> GGood
     | otherwise          -> GEasy
+
+-- | Preserve the learner's explicit four-way review decision verbatim.
+gradeOfReview :: ReviewGrade -> Grade
+gradeOfReview review = case review of
+  ReviewAgain -> GAgain
+  ReviewHard  -> GHard
+  ReviewGood  -> GGood
+  ReviewEasy  -> GEasy

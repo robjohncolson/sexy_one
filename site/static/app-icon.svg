@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">SEXY ONE</title>
+  <rect width="512" height="512" rx="112" fill="#14161b"/>
+  <rect x="76" y="76" width="360" height="360" rx="72" fill="#18794e"/>
+  <path d="M153 183c0-42 34-76 76-76h130v62H229c-8 0-14 6-14 14s6 14 14 14h54c42 0 76 34 76 76v56c0 42-34 76-76 76H153v-62h130c8 0 14-6 14-14v-56c0-8-6-14-14-14h-54c-42 0-76-34-76-76Z" fill="#fff"/>
+  <circle cx="359" cy="359" r="46" fill="#ff7b72"/>
+</svg>

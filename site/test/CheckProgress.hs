@@ -38,7 +38,7 @@ import           System.Exit            (exitFailure)
 import           System.IO              (hPutStrLn, stderr)
 
 import           SXC1.Content.Stats     (jsonEscape)
-import           SXC1.Exercise.Engine   (Outcome (..), ProgressEvent (..))
+import           SXC1.Exercise.Engine   (Outcome (..), ProgressEvent (..), ReviewGrade (..))
 import           SXC1.Exercise.Types    (DeckId (..), ExId (..), Kind (..), PromptId (..))
 import           SXC1.Progress.Codec
 import           SXC1.Progress.Scheduler
@@ -57,7 +57,7 @@ record cl g name ok detail = do
             ++ (if ok then "" else " (observed: " ++ take 300 detail ++ ")"))
 
 groupRange :: [Int]
-groupRange = [1 .. 12]
+groupRange = [1 .. 13]
 
 assertionLabel :: Int -> String
 assertionLabel g = case g of
@@ -73,6 +73,7 @@ assertionLabel g = case g of
   10 -> "prefs codec + default-OFF safety"
   11 -> "purity guard (source inspection)"
   12 -> "applyEvent full-transition pins"
+  13 -> "M10 bounded Weekly Pulse history"
   _  -> "?"
 
 --------------------------------------------------------------------------
@@ -84,6 +85,7 @@ mkEv mPid outcome attempt revealed hints atMs = ProgressEvent
   { peDeck = DeckId "test-deck", peExercise = ExId "q-9-99"
   , pePrompt = PromptId <$> mPid, peKind = KQuiz, peOutcome = outcome
   , peAttempt = attempt, peRevealed = revealed, peHints = hints
+  , peReview = Nothing
   , peElapsed = 1000, peAt = atMs
   }
 
@@ -157,9 +159,19 @@ group2 cl = do
         , ("Correct attempt2 clean -> GHard",  gradeOfOutcome Correct 2 False 0,   GHard)
         , ("Correct attempt1 hints -> GGood",  gradeOfOutcome Correct 1 False 2,   GGood)
         , ("Correct first-try clean -> GEasy", gradeOfOutcome Correct 1 False 0,   GEasy)
+        , ("explicit Again -> GAgain", gradeOfReview ReviewAgain, GAgain)
+        , ("explicit Hard -> GHard",   gradeOfReview ReviewHard,  GHard)
+        , ("explicit Good -> GGood",   gradeOfReview ReviewGood,  GGood)
+        , ("explicit Easy -> GEasy",   gradeOfReview ReviewEasy,  GEasy)
         ]
   forM_ cases $ \(nm, got, want) ->
     record cl 2 nm (got == want) ("got " ++ show got ++ " want " ++ show want)
+  let explicitAgain = (mkEv (Just "explicit#1") Correct 1 False 0 (day 2))
+        { peReview = Just ReviewAgain }
+      explicitRec = Map.lookup "explicit#1" (psRecs (applyEvent explicitAgain emptyProgress))
+  record cl 2 "explicit review overrides inferred correctness"
+    (case explicitRec of { Just rec -> rcInterval rec == 0 && rcEase rec == 2180; _ -> False })
+    "a Correct outcome rated Again must save the Again schedule"
 
 fixedHistory :: [ProgressEvent]
 fixedHistory =
@@ -281,10 +293,11 @@ group8 cl = do
       testSteps n
         | n == 0    = Just (\st -> st { psStreakLen = psStreakLen st + 100 })
         | n == 1    = Just (\st -> st { psStreakLen = psStreakLen st + 1000 })
+        | n == 2    = Just (\st -> st { psStreakLen = psStreakLen st + 10000 })
         | otherwise = Nothing
   case migrateWith testSteps 0 base of
     DecodeOk st -> do
-      record cl 8 "migrateWith applies the FULL step chain (0->1->2)" (psStreakLen st == 1107) ("streakLen " ++ show (psStreakLen st))
+      record cl 8 "migrateWith applies the FULL step chain (0->1->2->3)" (psStreakLen st == 11107) ("streakLen " ++ show (psStreakLen st))
       record cl 8 "migration normalises psVersion to currentSchema"
         (psVersion st == SchemaVersion currentSchema) "version not normalised"
     other -> record cl 8 "migrateWith applies the step chain" False (resultTag other)
@@ -295,16 +308,16 @@ group8 cl = do
   case migrate 0 base of
     DecodeCorrupt _ -> record cl 8 "productionSteps has no v0 step (schema-0 blob is corrupt today)" True ""
     other           -> record cl 8 "productionSteps has no v0 step (schema-0 blob is corrupt today)" False (resultTag other)
-  -- The REAL v1->v2 production migration (M3 gate NEW12's schema bump):
-  -- a v1 blob (3-field M line, no lastPrompt) decodes as current-schema
-  -- state with psLastPrompt defaulted "" -- the mechanism's first
-  -- genuine production use.
+  -- The real v1->v2->v3 production chain: a v1 blob (3-field M line,
+  -- no lastPrompt or pulse ledger) reaches current schema with both
+  -- additions safely defaulted.
   let v1blob = "SXC1PROGRESS\t1\nM\t3\t2\t1\nR\tq-1-01#1\t1\t0\t2500\t1\t3\t2\t1\n"
   case decodeState v1blob of
-    DecodeOk st -> record cl 8 "a real v1 blob migrates to v2 (lastPrompt defaults empty, records intact)"
-      (psVersion st == SchemaVersion currentSchema && psLastPrompt st == "" && Map.member "q-1-01#1" (psRecs st))
+    DecodeOk st -> record cl 8 "a real v1 blob migrates through v2 to v3 (new fields default, records intact)"
+      (psVersion st == SchemaVersion currentSchema && psLastPrompt st == ""
+        && psPulse st == [] && Map.member "q-1-01#1" (psRecs st))
       ("version/lastPrompt/recs: " ++ show (psLastPrompt st))
-    other -> record cl 8 "a real v1 blob migrates to v2 (lastPrompt defaults empty, records intact)" False (resultTag other)
+    other -> record cl 8 "a real v1 blob migrates through v2 to v3 (new fields default, records intact)" False (resultTag other)
 
 group9 :: CheckLog -> IO ()
 group9 cl = do
@@ -382,14 +395,11 @@ group10 cl = do
   record cl 10 "encodePrefs normalizes a hand-built garbage uiLang on the way out"
     (prfUiLang (decodePrefs (encodePrefs (defaultPrefs { prfUiLang = "xx" }))) == "en")
     "garbage uiLang escaped onto the wire"
-  -- THE FROZEN-PROGRESS PIN (M6 W2 brief: "the progress codec
-  -- untouched -- pin that"): the prefs schema bump must not have moved
-  -- the PROGRESS codec's schema or wire bytes. currentSchema stays 2,
-  -- and a canonical one-record state encodes byte-identically to this
-  -- golden literal (any field/format/ordering drift in encodeState
-  -- turns this red).
-  record cl 10 "progress codec untouched: currentSchema is still 2"
-    (currentSchema == 2) ("currentSchema = " ++ show currentSchema)
+  -- M6's frozen-progress pin did its job for that release. M10 now advances
+  -- the progress schema deliberately: the same v2 bytes remain importable,
+  -- while v3 adds only bounded W records after the existing state lines.
+  record cl 10 "M10 progress codec intentionally advances to schema 3"
+    (currentSchema == 3) ("currentSchema = " ++ show currentSchema)
   let goldenSt = emptyProgress
         { psStreakDay = DayNum 3, psStreakLen = 2, psFirstDay = DayNum 1
         , psLastPrompt = "q-1-01#1"
@@ -397,10 +407,20 @@ group10 cl = do
             [ ("q-1-01#1", Rec { rcReps = 1, rcLapses = 0, rcEase = 2600, rcInterval = 2
                                , rcDue = DayNum 5, rcLastSeen = DayNum 3, rcSeen = 1 }) ]
         , psDone = Map.fromList [("q-1-01", 1)]
+        , psPulse =
+            [ PulseEntry (DayNum 3) "foundation" "q-1-01" (Just "q-1-01#1") GEasy ]
         }
-      goldenWire = "SXC1PROGRESS\t2\nM\t3\t2\t1\tq-1-01#1\nR\tq-1-01#1\t1\t0\t2600\t2\t5\t3\t1\nD\tq-1-01\t1\n"
-  record cl 10 "progress codec untouched: canonical state encodes byte-identically to the golden wire literal"
+      goldenWire = "SXC1PROGRESS\t3\nM\t3\t2\t1\tq-1-01#1\nR\tq-1-01#1\t1\t0\t2600\t2\t5\t3\t1\nD\tq-1-01\t1\nW\t3\tfoundation\tq-1-01\tq-1-01#1\t3\n"
+      legacyV2 = "SXC1PROGRESS\t2\nM\t3\t2\t1\tq-1-01#1\nR\tq-1-01#1\t1\t0\t2600\t2\t5\t3\t1\nD\tq-1-01\t1\n"
+  record cl 10 "schema-3 canonical state encodes byte-identically to the golden wire literal"
     (encodeState goldenSt == goldenWire) (T.unpack (encodeState goldenSt))
+  case decodeState legacyV2 of
+    DecodeOk st -> record cl 10 "schema-2 progress migrates without losing scheduler state"
+      (psVersion st == SchemaVersion 3 && psPulse st == []
+        && Map.lookup "q-1-01" (psDone st) == Just 1
+        && Map.member "q-1-01#1" (psRecs st))
+      "legacy v2 fields did not survive migration"
+    other -> record cl 10 "schema-2 progress migrates without losing scheduler state" False (resultTag other)
 
 group11 :: CheckLog -> IO ()
 group11 cl = do
@@ -460,13 +480,15 @@ group12 cl = do
   record cl 12 "psLastPrompt tracks the last graded prompt" (psLastPrompt st2 == "t#1")
     (T.unpack (psLastPrompt st2))
   let st3 = applyEvent (mkEv Nothing Completed 0 False 0 (day 11)) st2
-  -- M3 re-gate NEW2 residual: TOTAL isolation -- st3 with psDone rolled
-  -- back must equal st2 exactly, so a Completed touching ANY other
-  -- field (version, streak, firstDay, lastPrompt, recs...) fails.
-  record cl 12 "a promptless Completed changes psDone and NOTHING else (total-state check)"
+  -- M10 adds one coarse completion mark to the bounded pulse ledger. Roll
+  -- both intentional fields back; every scheduler field must still be
+  -- byte-for-byte equal to st2.
+  record cl 12 "a promptless Completed changes only psDone and the pulse ledger (total-state check)"
     (psDone st3 == Map.insertWith (+) "q-9-99" 1 (psDone st2)
-      && st3 { psDone = psDone st2 } == st2)
-    "Completed touched a field other than psDone"
+      && psPulse st3 == psPulse st2 ++
+           [PulseEntry (dayOf (day 11)) "test-deck" "q-9-99" Nothing GGood]
+      && st3 { psDone = psDone st2, psPulse = psPulse st2 } == st2)
+    "Completed touched a field other than psDone/psPulse"
   -- M3 re-gate NEW1 residual (extended round-3): an imported blob
   -- carrying absurd (but Int-parseable) values is clamped into semantic
   -- domains on decode -- EVERY numeric field is pinned exactly (R's
@@ -499,7 +521,7 @@ group12 cl = do
     DecodeOk st -> record cl 12 hostileV1Name
       (unDayNum (psStreakDay st) == dayCap && psStreakLen st == 1000000
         && unDayNum (psFirstDay st) == dayCap && psLastPrompt st == ""
-        && psVersion st == SchemaVersion 2)
+        && psVersion st == SchemaVersion currentSchema)
       ("streakDay=" ++ show (unDayNum (psStreakDay st)) ++ " len=" ++ show (psStreakLen st)
         ++ " first=" ++ show (unDayNum (psFirstDay st)))
     other -> record cl 12 hostileV1Name False (resultTag other)
@@ -512,6 +534,46 @@ group12 cl = do
       && addDays (DayNum maxBound) maxBound == DayNum dayCap
       && addDays (DayNum (-5)) 3 == DayNum 3)
     (show (unDayNum (addDays (DayNum maxBound) 1)))
+
+-- | M10: the pulse ledger is useful only if it is truthful, bounded, and
+-- moves through the same codec/passport as the scheduler state.
+group13 :: CheckLog -> IO ()
+group13 cl = do
+  let st = applyEvents fixedHistory emptyProgress
+      entries = psPulse st
+  record cl 13 "every fixed-history event produces one ordered coarse pulse mark"
+    (length entries == length fixedHistory
+      && map plGrade entries == [GEasy, GAgain, GHard, GGood, GHard, GHard]
+      && map plDeck entries == replicate (length fixedHistory) "test-deck")
+    ("entries=" ++ show (length entries))
+  record cl 13 "promptless completion is distinguishable from graded answers"
+    (case drop 3 entries of
+       (entry : _) -> plExercise entry == "q-9-99" && plPrompt entry == Nothing && plGrade entry == GGood
+       _           -> False)
+    "completion pulse mark missing or malformed"
+  case decodeState (encodeState st) of
+    DecodeOk restored -> record cl 13 "pulse history round-trips through the progress codec"
+      (psPulse restored == entries) "pulse history changed on round trip"
+    other -> record cl 13 "pulse history round-trips through the progress codec" False (resultTag other)
+  let many = [ mkEv (Just ("cap#" <> T.pack (show i))) Correct 1 False 0 (day i)
+             | i <- [1 .. pulseHistoryCap + 7] ]
+      capped = psPulse (applyEvents many emptyProgress)
+  record cl 13 "pulse history retains exactly the latest 200 marks"
+    (length capped == pulseHistoryCap
+      && fmap plPrompt (safeHead capped) == Just (Just "cap#8")
+      && fmap plPrompt (safeLast capped) == Just (Just "cap#207"))
+    ("length=" ++ show (length capped))
+  let withBadW = "SXC1PROGRESS\t3\nM\t0\t0\t0\t\nW\t4\tdeck\texercise\tp#1\t99\nW\t5\tdeck\texercise\tp#1\t3\n"
+  case decodeState withBadW of
+    DecodeOk restored -> record cl 13 "malformed W rows are skipped without losing valid siblings"
+      (psPulse restored == [PulseEntry (DayNum 5) "deck" "exercise" (Just "p#1") GEasy])
+      "valid sibling missing or malformed row accepted"
+    other -> record cl 13 "malformed W rows are skipped without losing valid siblings" False (resultTag other)
+  where
+    safeHead []      = Nothing
+    safeHead (x : _) = Just x
+    safeLast []      = Nothing
+    safeLast xs      = Just (last xs)
 
 walkHs :: FilePath -> IO [FilePath]
 walkHs dir = do
@@ -591,6 +653,12 @@ objToEvent o = ProgressEvent
   , peAttempt  = fromInteger (jsonInt "attempt" o)
   , peRevealed = jsonField "revealed" o == Just "true"
   , peHints    = fromInteger (jsonInt "hints" o)
+  , peReview   = case jsonStr "review" o of
+      Just "again" -> Just ReviewAgain
+      Just "hard"  -> Just ReviewHard
+      Just "good"  -> Just ReviewGood
+      Just "easy"  -> Just ReviewEasy
+      _            -> Nothing
   , peElapsed  = fromInteger (jsonInt "elapsedMs" o)
   , peAt       = jsonInt "at" o
   }
@@ -607,7 +675,7 @@ main = do
     _ -> do
       cl <- CheckLog <$> newIORef []
       group1 cl; group2 cl; group3 cl; group4 cl; group5 cl; group6 cl
-      group7 cl; group8 cl; group9 cl; group10 cl; group11 cl; group12 cl
+      group7 cl; group8 cl; group9 cl; group10 cl; group11 cl; group12 cl; group13 cl
       checks <- readIORef (clChecks cl)
       let totalOk = length [ () | (_, _, True, _) <- checks ]
           total   = length checks

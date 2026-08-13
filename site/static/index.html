@@ -3,7 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#18794e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SEXY ONE">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./app-icon.svg" type="image/svg+xml">
 <title>SEXY ONE — SXC-1 Trainer</title>
+<!-- Module scripts defer execution until parsing completes. Keeping the loader
+     in <head> lets phones discover its module graph while the inline styles are
+     still being parsed, instead of beginning that network work at </body>. -->
+<script type="module" src="./index.js"></script>
 <style>
   /*
    * All visual styling for the SXC-1 Trainer lives here. The Haskell/Miso
@@ -76,6 +87,11 @@
     --accent: #2f6fed;
     --accent-contrast: #ffffff;
     --danger: #c94b4b;
+    --danger-bg: rgba(201, 75, 75, 0.12);
+    --wizard-yes: #18794e;
+    --wizard-yes-contrast: #ffffff;
+    --wizard-no: #b42318;
+    --wizard-no-contrast: #ffffff;
     --border: #d9dce2;
     --shadow: 0 10px 30px rgba(20, 24, 34, 0.08);
 
@@ -99,6 +115,11 @@
       --accent: #6f9bff;
       --accent-contrast: #0c0f14;
       --danger: #ff8383;
+      --danger-bg: rgba(255, 131, 131, 0.14);
+      --wizard-yes: #4fd1a0;
+      --wizard-yes-contrast: #07130e;
+      --wizard-no: #ff7b72;
+      --wizard-no-contrast: #1a0807;
       --border: #30343d;
       --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 
@@ -141,6 +162,8 @@
   }
 
   #boot-status {
+    display: grid;
+    gap: 0.35rem;
     max-width: 32rem;
     margin: 3rem auto;
     text-align: center;
@@ -152,12 +175,47 @@
     box-shadow: var(--shadow);
   }
 
+  #boot-status strong {
+    color: var(--text);
+    font-size: 1.15rem;
+    letter-spacing: 0.04em;
+  }
+
+  #boot-status-hint {
+    font-size: 0.78rem;
+  }
+
   #boot-status.boot-error {
     color: var(--danger);
     border-color: var(--danger);
     text-align: left;
     white-space: pre-wrap;
     word-break: break-word;
+  }
+
+  #boot-status[hidden] {
+    display: none;
+  }
+
+  #sxc1-network-status {
+    position: fixed;
+    z-index: 60;
+    top: calc(3.25rem + env(safe-area-inset-top, 0px));
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    max-width: min(22rem, calc(100vw - 1.5rem));
+    margin: 0;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card-bg);
+    color: var(--muted);
+    box-shadow: var(--shadow);
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  #sxc1-network-status[hidden] {
+    display: none;
   }
 
   noscript {
@@ -284,7 +342,8 @@
   }
 
   /* -------------------------------------------------------------------
-     Home: blurb, laptop->phone QR, manual list cards.
+     Home: visible QR, then one green recommended path and one red
+     alternate path. Browsing/progress details stay inside the red path.
      ------------------------------------------------------------------- */
 
   #sxc1-home > p {
@@ -292,7 +351,155 @@
     margin: 0 0 1.5rem;
   }
 
-  /* QR handoff: useful when the site is open on a laptop screen. The
+  #sxc1-primary-training {
+    margin: 0;
+  }
+
+  .wizard-actions {
+    display: grid;
+    gap: 0.85rem;
+    margin-top: 1rem;
+  }
+
+  .primary-training-action {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3rem;
+    min-height: 4.5rem;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.8rem;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    box-shadow: var(--shadow);
+    text-decoration: none;
+  }
+
+  .wizard-choice {
+    min-height: 4.5rem;
+    border-radius: 0.8rem;
+    box-shadow: var(--shadow);
+    font-weight: 700;
+  }
+
+  .wizard-yes {
+    border-color: var(--wizard-yes) !important;
+    background: var(--wizard-yes) !important;
+    color: var(--wizard-yes-contrast) !important;
+  }
+
+  a.wizard-no,
+  button.wizard-no,
+  details.wizard-no > summary {
+    border-color: var(--wizard-no) !important;
+    background: var(--wizard-no) !important;
+    color: var(--wizard-no-contrast) !important;
+  }
+
+  a.wizard-no {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 1.2rem;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .wizard-choice:hover,
+  .wizard-choice:focus-visible,
+  details.wizard-choice > summary:hover,
+  details.wizard-choice > summary:focus-visible {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
+  .primary-training-action:hover,
+  .primary-training-action:focus-visible {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
+  .primary-training-action strong {
+    font-size: 1.05rem;
+  }
+
+  .primary-training-card {
+    font-size: 0.85rem;
+    opacity: 0.88;
+  }
+
+  .home-disclosure {
+    margin: 0.85rem 0 0;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+  }
+
+  .home-disclosure > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 44px;
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    list-style: none;
+    font-weight: 700;
+  }
+
+  #sxc1-browse-library > summary {
+    min-height: 4.5rem;
+    border-radius: 0.8rem;
+  }
+
+  #sxc1-browse-library[open] {
+    background: var(--card-bg);
+  }
+
+  #sxc1-browse-library[open] > summary {
+    border-radius: 0.8rem 0.8rem 0 0;
+  }
+
+  .home-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .home-disclosure > summary::before {
+    content: "\25B8";
+    color: var(--muted);
+    transition: transform 0.12s ease;
+  }
+
+  .home-disclosure[open] > summary::before {
+    transform: rotate(90deg);
+  }
+
+  .home-disclosure > summary:hover,
+  .home-disclosure > summary:focus-visible {
+    color: var(--accent);
+  }
+
+  .home-disclosure[open] > summary {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .home-disclosure > :not(summary) {
+    margin-right: 1rem;
+    margin-left: 1rem;
+  }
+
+  /* Author rules such as #sxc1-phone-qr { display:flex } can otherwise
+     outrank Chromium's user-agent rule for closed details content. */
+  .home-disclosure:not([open]) > :not(summary) {
+    display: none !important;
+  }
+
+  .home-disclosure > .manual-list {
+    margin-top: 1rem;
+  }
+
+  /* QR handoff: front and center when the site is open on a laptop. The
      modules stay pure black on white (forced below) so a phone camera
      can read them under dark mode or a dim room. Keep the handoff visible
      at every viewport width: phones and narrow browser windows are also
@@ -302,8 +509,9 @@
     flex-direction: column;
     align-items: center;
     gap: 0.35rem;
-    margin: 0 0 1.75rem;
-    padding: 1.1rem 1rem 1.15rem;
+    margin-top: 0.5rem;
+    margin-bottom: 1.25rem;
+    padding: 1.25rem 1rem 1.35rem;
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--card-bg);
@@ -337,8 +545,8 @@
 
   #sxc1-phone-qr-img {
     display: block;
-    width: 11.25rem;
-    height: 11.25rem;
+    width: 14rem;
+    height: 14rem;
     max-width: 100%;
   }
 
@@ -911,12 +1119,20 @@
 
        "#/x/<deck>/<ex>"  article#sxc1-exercise.exercise.kind-<kind>
                              h1#ex-title, p#ex-progress ("N / M"), #ex-stem
-                             quiz choice: ul#ex-options > li > button.ex-option
-                                          (id="opt-a"/"opt-b"/... positional,
-                                          aria-pressed) + button#btn-ex-submit
-                             quiz recall: button#btn-ex-reveal, #ex-answer,
-                                          button#btn-ex-got,
-                                          button#btn-ex-missed
+                             quiz choice: fieldset#ex-options containing
+                                          label.ex-option + positional
+                                          input#opt-a/#opt-b/...; then the
+                                          two-action #ex-choice-actions,
+                                          replaced after checking by
+                                          #ex-grade-actions (Again/Hard or
+                                          Good/Easy)
+                             legacy recall (fixtures/back-compat only):
+                                          #ex-recall-flow with stable
+                                          #ex-recall-answer-region,
+                                          #ex-recall-feedback-region and
+                                          #ex-recall-actions containing
+                                          button#btn-ex-recall-yes +
+                                          button#btn-ex-recall-no
                              drill:       ol#ex-steps > li.ex-step
                                             div.ex-step-instruction
                                             p.ex-step-check
@@ -1192,6 +1408,51 @@
     color: var(--text);
   }
 
+  /* Visual-source cards: the cited manual scan is part of the question,
+     not an answer hidden in a separate reader route. Page 10 is cropped
+     to the numbered five-view panel diagram; page 11 keeps the taller
+     mode map. Clicking either opens the complete source page. */
+  #ex-source-figure {
+    margin: 0 0 1rem;
+  }
+
+  .exercise-source-frame {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: #ffffff;
+    box-shadow: var(--shadow);
+    line-height: 0;
+  }
+
+  .figure-guide-book-10 .exercise-source-frame {
+    aspect-ratio: 1.4;
+  }
+
+  .figure-guide-book-11 .exercise-source-frame {
+    aspect-ratio: 1.03;
+  }
+
+  #ex-source-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+  }
+
+  #ex-source-figure figcaption {
+    margin-top: 0.45rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    text-align: center;
+  }
+
+  .exercise-source-caption {
+    color: inherit;
+  }
+
   #ex-stem > *:first-child {
     margin-top: 0;
   }
@@ -1200,18 +1461,54 @@
     margin-bottom: 0;
   }
 
-  /* Quiz choice mode: full-width tappable options. */
+  /* Legacy open-recall fixtures/backwards compatibility. Live M11 course
+     content has zero Recall prompts; authored flashcards use Choice. */
+  .mode-recall #ex-stem {
+    min-height: 8rem;
+    padding: 1.35rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 0.8rem;
+    background: var(--card-bg);
+    box-shadow: inset 0 0.3rem var(--accent), var(--shadow);
+    font-size: 1.08rem;
+    line-height: 1.55;
+  }
+
+  .mode-recall #ex-recall-answer-region:not(:empty) {
+    margin-top: 1rem;
+  }
+
+  .mode-recall #ex-answer {
+    border-left: 0.3rem solid var(--wizard-yes);
+    box-shadow: var(--shadow);
+  }
+
+  .mode-recall #ex-recall-feedback-region:not(:empty) {
+    margin-top: 1rem;
+  }
+
+  /* Quiz choice mode: compact selectable cards. They are native radio/
+     checkbox controls, not a wall of action buttons; the only buttons in
+     the decision surface are the current pair below the fieldset. */
 
   #ex-options {
-    list-style: none;
+    margin: 1rem 0;
     padding: 0;
+    border: 0;
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
   }
 
+  #ex-options > legend {
+    padding: 0;
+    margin-bottom: 0.55rem;
+    color: var(--muted);
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
   .ex-option {
-    appearance: none;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -1233,15 +1530,35 @@
     background: var(--hover-bg);
   }
 
+  #ex-options.is-evaluated .ex-option {
+    cursor: default;
+  }
+
+  #ex-options.is-evaluated .ex-option:hover {
+    background: var(--card-bg);
+  }
+
+  .ex-option > input {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0;
+    flex: 0 0 auto;
+    accent-color: var(--accent);
+  }
+
+  .ex-option > span {
+    min-width: 0;
+  }
+
   /* Selection is never colour-only: the border switches to the accent
      colour AND a check mark appears, on top of the colour change. */
-  .ex-option[aria-pressed="true"] {
+  .ex-option.is-selected {
     border-color: var(--accent);
     background: var(--hover-bg);
     font-weight: 700;
   }
 
-  .ex-option[aria-pressed="true"]::after {
+  .ex-option.is-selected::after {
     content: "\2713";
     margin-left: auto;
     flex: 0 0 auto;
@@ -1249,13 +1566,39 @@
     font-weight: 700;
   }
 
+  .ex-option.is-correct {
+    border-color: var(--success);
+    background: var(--success-bg);
+  }
+
+  .ex-option.is-correct::after {
+    content: "\2713";
+    margin-left: auto;
+    color: var(--success);
+    font-weight: 800;
+  }
+
+  .ex-option.is-wrong {
+    border-color: var(--danger);
+    background: var(--danger-bg);
+  }
+
+  #ex-choice-actions,
+  #ex-grade-actions {
+    margin-top: 1rem;
+  }
+
   /* Shared action buttons. Primary (filled) by default; the quieter
      follow-up actions (hint, missed, restart) are outlined so they never
      compete with the one action that moves the learner forward. */
   #btn-ex-submit,
-  #btn-ex-reveal,
-  #btn-ex-got,
-  #btn-ex-missed,
+  #btn-ex-unsure,
+  #btn-ex-grade-again,
+  #btn-ex-grade-hard,
+  #btn-ex-grade-good,
+  #btn-ex-grade-easy,
+  #btn-ex-recall-yes,
+  #btn-ex-recall-no,
   #btn-ex-next,
   #btn-ex-restart,
   #btn-ex-hint,
@@ -1278,21 +1621,32 @@
   }
 
   #btn-ex-submit:hover,
-  #btn-ex-reveal:hover,
-  #btn-ex-got:hover,
+  #btn-ex-grade-hard:hover,
+  #btn-ex-grade-easy:hover,
+  #btn-ex-recall-yes:hover,
   #btn-ex-next:hover,
   #btn-ex-find-submit:hover,
   .btn-ex-confirm:hover {
     filter: brightness(1.08);
   }
 
+  #btn-ex-submit:disabled {
+    cursor: not-allowed;
+    filter: none;
+    opacity: 0.5;
+  }
+
   /* These are each the one standalone call to action on their own line,
      so (unlike #btn-ex-find-submit, which sits beside #ex-find-input)
      they run the full measure for an easy, unambiguous tap target. */
   #btn-ex-submit,
-  #btn-ex-reveal,
-  #btn-ex-got,
-  #btn-ex-missed,
+  #btn-ex-unsure,
+  #btn-ex-grade-again,
+  #btn-ex-grade-hard,
+  #btn-ex-grade-good,
+  #btn-ex-grade-easy,
+  #btn-ex-recall-yes,
+  #btn-ex-recall-no,
   #btn-ex-next,
   #btn-ex-restart,
   #btn-ex-hint,
@@ -1301,14 +1655,17 @@
     width: 100%;
   }
 
-  #btn-ex-missed,
+  #btn-ex-recall-no,
   #btn-ex-restart,
   #btn-ex-hint {
     background: transparent;
     color: var(--accent);
   }
 
-  #btn-ex-missed:hover,
+  #btn-ex-recall-no:hover,
+  #btn-ex-unsure:hover,
+  #btn-ex-grade-again:hover,
+  #btn-ex-grade-good:hover,
   #btn-ex-restart:hover,
   #btn-ex-hint:hover {
     background: var(--hover-bg);
@@ -1416,9 +1773,30 @@
 
   /* Hints: de-emphasised, progressively revealed. */
 
+  #ex-hints-disclosure {
+    margin-top: 0.9rem;
+    border: 1px dashed var(--border);
+    border-radius: 0.6rem;
+    background: var(--note-bg);
+  }
+
+  #btn-ex-hint {
+    width: 100%;
+    padding: 0.65rem 1rem;
+    color: var(--accent);
+    font-weight: 700;
+    cursor: pointer;
+    list-style-position: inside;
+  }
+
+  #ex-hints-disclosure[open] #btn-ex-hint {
+    border-bottom: 1px dashed var(--border);
+  }
+
   #ex-hints {
+    margin: 0;
     list-style: none;
-    padding: 0;
+    padding: 0.75rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -1522,6 +1900,10 @@
     color: var(--text);
   }
 
+  #ex-summary .wizard-actions {
+    margin-bottom: 0;
+  }
+
   #ex-summary > *:first-child {
     margin-top: 0;
   }
@@ -1541,7 +1923,14 @@
                                            UI-language toggle -- same
                                            .nav-toggle pill system)
 
-       "#/" (home), appended after .manual-list:
+       "#/" (home):
+         aside#sxc1-phone-qr (always visible)
+         #sxc1-wizard-actions (exactly two primary choices)
+           #sxc1-primary-training > a#btn-primary-training.wizard-yes
+           details#sxc1-browse-library.wizard-no
+             (course outline, manuals, and the two disclosures below)
+             details#sxc1-study-details (review, continue, streak)
+             details#sxc1-progress-data (export/import/wipe)
          #sxc1-corrupt-banner.progress-banner?  (state == "corrupt")
            #sxc1-corrupt-raw (readonly textarea)
          #sxc1-review-queue > ol.queue-list > li.queue-item > a
@@ -1551,17 +1940,22 @@
          #sxc1-streak
          #sxc1-retired-note?                    (retired > 0)
          #sxc1-progress-tools
-           button#btn-progress-export, textarea#sxc1-export-blob
-           form#sxc1-import-form > textarea#sxc1-import-input,
-             p#sxc1-import-preview, button#btn-progress-import[type=submit],
-             p#sxc1-import-error?
-           button#btn-progress-wipe, button#btn-progress-wipe-confirm[hidden]
-             (two-step confirm -- see index.js, not this file)
+           details#sxc1-progress-backup.progress-flow
+             button#btn-progress-export -> replaced after export by
+             #sxc1-progress-passport > .progress-file-actions >
+               button#btn-progress-download, button#btn-progress-share
+           details#sxc1-progress-restore.progress-flow
+             #sxc1-import-file-shell > input#sxc1-import-file
+             form#sxc1-import-form > textarea#sxc1-import-input,
+               p#sxc1-import-preview, button#btn-progress-import[type=submit]
+           details#sxc1-progress-reset.progress-flow
+             button#btn-progress-wipe -> replaced by
+             button#btn-progress-wipe-confirm[hidden]
 
        "#/x" deck cards and each deck page's own info block both carry
        .deck-card[data-tier] > span.tier-badge.tier-<tier>,
                                 span.deck-progress, span.deck-requires?
-       "#/x" chapters are now <details class="ex-chapter"> so 52 decks
+       "#/x" chapters are <details class="ex-chapter"> so the course
        does not become a flat wall on a phone; <summary class=
        "ex-chapter-title"> carries a span.chapter-progress.
      ===================================================================== */
@@ -1709,8 +2103,8 @@
      corrupt banner, export/import/wipe.
      ------------------------------------------------------------------- */
 
-  #sxc1-home > section {
-    margin: 1.75rem 0 0;
+  #sxc1-home > section:not(#sxc1-primary-training) {
+    margin: 1.25rem 0 0;
   }
 
   #sxc1-review-queue,
@@ -1803,7 +2197,32 @@
     font-size: 1.05rem;
   }
 
-  #sxc1-progress-tools > button,
+  .progress-flow {
+    margin-top: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--bg);
+  }
+
+  .progress-flow > summary {
+    min-height: 44px;
+    padding: 0.7rem 0.9rem;
+    color: var(--text);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .progress-flow[open] > summary {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .progress-flow > :not(summary) {
+    margin-left: 0.9rem;
+    margin-right: 0.9rem;
+  }
+
+  #sxc1-progress-tools button,
+  .progress-file-actions > button,
   #btn-progress-import {
     display: inline-flex;
     align-items: center;
@@ -1819,13 +2238,47 @@
     cursor: pointer;
   }
 
-  #sxc1-progress-tools > #btn-progress-wipe {
+  .progress-backup-hint,
+  #sxc1-backup-status {
+    margin: 0 0 0.75rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .progress-file-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .progress-file-actions > button {
+    margin: 0;
+  }
+
+  .progress-file-actions > button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  #sxc1-import-file {
+    display: block;
+    width: 100%;
+    margin: 0 0 0.9rem;
+    padding: 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  #sxc1-progress-tools #btn-progress-wipe {
     background: transparent;
     color: var(--danger);
     border-color: var(--danger);
   }
 
-  #sxc1-progress-tools > #btn-progress-wipe-confirm {
+  #sxc1-progress-tools #btn-progress-wipe-confirm {
     background: var(--danger);
     color: var(--accent-contrast);
     border-color: var(--danger);
@@ -1986,6 +2439,1063 @@
     color: var(--muted);
   }
 
+  /* =====================================================================
+     Today's session ("#/x/today"). Five adaptive DOM cards plus a small
+     body-level coach bar while a planned exercise is open. The bar lives
+     outside Miso's managed tree, so engine renders cannot disturb it.
+     ===================================================================== */
+
+  #sxc1-session {
+    max-width: 54rem;
+    margin: 0 auto;
+    padding: 1.5rem clamp(0.75rem, 3vw, 2rem) 3.5rem;
+  }
+
+  .session-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
+    gap: 0.35rem 2rem;
+    align-items: end;
+    margin-bottom: 1rem;
+  }
+
+  .session-kicker,
+  .session-intro,
+  .session-meter {
+    margin: 0;
+  }
+
+  .session-kicker {
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .session-hero h1 {
+    grid-column: 1;
+    margin: 0;
+    font-size: clamp(1.85rem, 6vw, 3.2rem);
+    line-height: 1.05;
+    letter-spacing: -0.045em;
+  }
+
+  .session-intro {
+    grid-column: 1;
+    max-width: 39rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .session-meter {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+  }
+
+  .session-meter span {
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  .session-progress {
+    width: 100%;
+    height: 0.6rem;
+    border: 0;
+    accent-color: var(--success);
+  }
+
+  .session-list {
+    display: grid;
+    gap: 0.55rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .session-card {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+    gap: 0.8rem;
+    align-items: center;
+    min-height: 76px;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    background: var(--card-bg);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    text-decoration: none;
+  }
+
+  .session-card:hover,
+  .session-card:focus-visible {
+    border-color: var(--accent);
+  }
+
+  .session-number {
+    display: grid;
+    width: 2.15rem;
+    height: 2.15rem;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--note-bg);
+    color: var(--accent);
+    font-weight: 850;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .session-copy {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  .session-reason {
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 850;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+  }
+
+  .session-title {
+    overflow: hidden;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .session-context,
+  .session-status {
+    color: var(--muted);
+    font-size: 0.74rem;
+  }
+
+  .session-status {
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .session-item.is-done .session-card {
+    box-shadow: none;
+    opacity: 0.75;
+  }
+
+  .session-item.is-done .session-number {
+    background: var(--success-bg);
+    color: var(--success);
+  }
+
+  .session-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.65rem;
+    align-items: stretch;
+    margin-top: 1rem;
+  }
+
+  .session-actions .primary-training-action {
+    display: grid;
+    place-items: center;
+    min-height: 52px;
+    padding: 0.65rem 1rem;
+  }
+
+  .session-reset {
+    min-height: 48px;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    background: var(--card-bg);
+    color: var(--text);
+    font: inherit;
+    font-weight: 750;
+    cursor: pointer;
+  }
+
+  .session-index-card {
+    margin: 0 0 0.65rem;
+    border-color: var(--success);
+    background: var(--success-bg);
+  }
+
+  .weekly-index-card {
+    margin: 0 0 0.65rem;
+    border-color: #7d5bd6;
+    background: color-mix(in srgb, #7d5bd6 9%, var(--card-bg));
+  }
+
+  body.session-coach-active {
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .session-coach {
+    position: fixed;
+    right: max(0.65rem, env(safe-area-inset-right, 0px));
+    bottom: max(0.65rem, env(safe-area-inset-bottom, 0px));
+    left: max(0.65rem, env(safe-area-inset-left, 0px));
+    z-index: 100;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    gap: 0.65rem 1rem;
+    align-items: center;
+    max-width: 58rem;
+    min-height: 58px;
+    margin: 0 auto;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, var(--card-bg) 94%, transparent);
+    box-shadow: 0 12px 36px rgb(0 0 0 / 22%);
+    backdrop-filter: blur(12px);
+  }
+
+  .session-coach a {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    color: var(--text);
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .session-coach-position {
+    white-space: nowrap;
+  }
+
+  .session-coach-live {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .session-coach-next {
+    justify-content: center;
+    padding: 0 0.8rem;
+    border-radius: 0.6rem;
+    background: var(--accent);
+    color: #fff !important;
+  }
+
+  .session-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    color: var(--text);
+    font-weight: 750;
+    text-decoration: none;
+  }
+
+  @media (max-width: 42rem) {
+    .session-hero {
+      display: block;
+    }
+
+    .session-hero > * + * {
+      margin-top: 0.5rem;
+    }
+
+    .session-meter {
+      margin-top: 0.9rem !important;
+    }
+
+    .session-card {
+      grid-template-columns: 2.25rem minmax(0, 1fr);
+    }
+
+    .session-status {
+      grid-column: 2;
+      justify-self: start;
+    }
+
+    .session-actions {
+      grid-template-columns: 1fr;
+    }
+
+    body.session-coach-active {
+      padding-bottom: calc(7.2rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .session-coach {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.15rem 0.7rem;
+    }
+
+    .session-coach-back {
+      grid-column: 1;
+    }
+
+    .session-coach-position {
+      grid-column: 1;
+      grid-row: 2;
+      font-size: 0.78rem;
+    }
+
+    .session-coach-live {
+      display: none;
+    }
+
+    .session-coach-next {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+    }
+  }
+
+  /* =====================================================================
+     Weekly Pulse ("#/x/week"). A bounded progress projection rendered as
+     ordinary semantic DOM: seven small forecast bars, two insight lists,
+     and one next-focus action. No graph/GPU runtime.
+     ===================================================================== */
+
+  #sxc1-weekly {
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 1.5rem clamp(0.75rem, 3vw, 2rem) 3.5rem;
+  }
+
+  .weekly-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(13rem, 18rem);
+    gap: 0.35rem 2rem;
+    align-items: end;
+  }
+
+  .weekly-kicker,
+  .weekly-intro,
+  .weekly-hero h1,
+  .weekly-rhythm,
+  .weekly-section-heading h2,
+  .weekly-section-heading p,
+  .weekly-notes p {
+    margin: 0;
+  }
+
+  .weekly-kicker {
+    color: #7d5bd6;
+    font-size: 0.75rem;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .weekly-hero h1 {
+    grid-column: 1;
+    font-size: clamp(1.85rem, 6vw, 3.15rem);
+    line-height: 1.05;
+    letter-spacing: -0.045em;
+  }
+
+  .weekly-intro {
+    grid-column: 1;
+    max-width: 42rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .weekly-rhythm {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    display: grid;
+    gap: 0.35rem;
+    padding: 1rem;
+    border: 1px solid #7d5bd6;
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, #7d5bd6 8%, var(--card-bg));
+    box-shadow: var(--shadow);
+  }
+
+  .weekly-rhythm strong {
+    font-size: 1.1rem;
+  }
+
+  .weekly-rhythm span {
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  .weekly-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.55rem;
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+  }
+
+  .weekly-stats li {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+  }
+
+  .weekly-stats strong {
+    font-size: 1.2rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .weekly-stats span {
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+
+  .weekly-section {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.95rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+  }
+
+  .weekly-forecast-section {
+    margin-top: 1rem;
+  }
+
+  .weekly-section-heading h2 {
+    font-size: clamp(1.15rem, 3vw, 1.45rem);
+  }
+
+  .weekly-section-heading p {
+    margin-top: 0.2rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .weekly-forecast {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: clamp(0.25rem, 2vw, 0.7rem);
+    height: 11.5rem;
+    list-style: none;
+    margin: 0.9rem 0 0;
+    padding: 0;
+  }
+
+  .weekly-forecast li {
+    display: grid;
+    grid-template-rows: 1.2rem minmax(0, 1fr) 1.2rem;
+    gap: 0.25rem;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .weekly-bar-count,
+  .weekly-bar-day {
+    overflow: hidden;
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .weekly-bar-day {
+    color: var(--muted);
+  }
+
+  .weekly-bar-track {
+    position: relative;
+    display: block;
+    width: min(1.7rem, 70%);
+    height: 100%;
+    justify-self: center;
+    overflow: hidden;
+    border-radius: 0.45rem 0.45rem 0.2rem 0.2rem;
+    background: var(--note-bg);
+  }
+
+  .weekly-bar-fill {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: block;
+    min-height: 2px;
+    border-radius: inherit;
+    background: linear-gradient(180deg, #9b7de0, #6f4bc7);
+  }
+
+  .weekly-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+
+  .weekly-insight-list {
+    display: grid;
+    gap: 0.45rem;
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+  }
+
+  .weekly-insight-link {
+    display: grid;
+    gap: 0.15rem;
+    min-height: 58px;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 0.65rem;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .weekly-insight-link:hover,
+  .weekly-insight-link:focus-visible {
+    border-color: #7d5bd6;
+    background: color-mix(in srgb, #7d5bd6 6%, var(--card-bg));
+  }
+
+  .weekly-insight-link span,
+  .weekly-empty {
+    color: var(--muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .weekly-empty {
+    margin: 0.75rem 0 0;
+  }
+
+  .weekly-focus {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(11rem, 16rem);
+    gap: 0.75rem 1.25rem;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--success);
+    border-radius: 0.95rem;
+    background: var(--success-bg);
+  }
+
+  .weekly-focus-copy {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .weekly-focus-label {
+    color: var(--success);
+    font-size: 0.72rem;
+    font-weight: 850;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .weekly-focus .primary-training-action {
+    display: grid;
+    min-height: 48px;
+    place-items: center;
+    padding: 0.6rem 0.8rem;
+    text-align: center;
+  }
+
+  .weekly-notes {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+    color: var(--muted);
+    font-size: 0.73rem;
+    line-height: 1.45;
+  }
+
+  .weekly-tracking-note {
+    padding: 0.65rem 0.75rem;
+    border-left: 3px solid #7d5bd6;
+    background: color-mix(in srgb, #7d5bd6 6%, var(--card-bg));
+  }
+
+  .mastery-weekly-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--accent);
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
+
+  @media (max-width: 42rem) {
+    .weekly-hero {
+      display: block;
+    }
+
+    .weekly-hero > * + * {
+      margin-top: 0.5rem;
+    }
+
+    .weekly-rhythm {
+      margin-top: 0.9rem !important;
+    }
+
+    .weekly-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .weekly-forecast {
+      gap: 0.2rem;
+      height: 10rem;
+    }
+
+    .weekly-section {
+      padding: 0.85rem;
+    }
+
+    .weekly-insight-grid,
+    .weekly-focus {
+      grid-template-columns: 1fr;
+    }
+
+    .weekly-focus .primary-training-action {
+      width: 100%;
+    }
+  }
+
+  /* =====================================================================
+     Mastery journey ("#/x/map"). A DOM-only action queue and progressively
+     disclosed chapter trail; no canvas or GPU context is created.
+     ===================================================================== */
+
+  #sxc1-mastery {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 1.5rem clamp(0.75rem, 3vw, 2rem) 3.5rem;
+  }
+
+  .mastery-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
+    gap: 0.35rem 2rem;
+    align-items: end;
+    margin-bottom: 1.25rem;
+  }
+
+  .mastery-kicker,
+  .mastery-intro,
+  .mastery-summary {
+    margin: 0;
+  }
+
+  .mastery-kicker {
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .mastery-hero h1 {
+    grid-column: 1;
+    margin: 0;
+    font-size: clamp(1.75rem, 5vw, 3rem);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+
+  .mastery-intro {
+    grid-column: 1;
+    max-width: 50rem;
+    color: var(--muted);
+  }
+
+  .mastery-summary {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    display: grid;
+    gap: 0.6rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.8rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+  }
+
+  .mastery-summary strong {
+    line-height: 1.35;
+  }
+
+  .mastery-overall-progress,
+  .mastery-chapter-progress {
+    width: 100%;
+    height: 0.55rem;
+    border: 0;
+    accent-color: var(--success);
+  }
+
+  .mastery-legend {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    list-style: none;
+    margin: 0.8rem 0 0;
+    padding: 0;
+  }
+
+  .mastery-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 30px;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card-bg);
+    color: var(--muted);
+    font-size: 0.73rem;
+  }
+
+  .mastery-legend-count {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    font-weight: 850;
+  }
+
+  .mastery-section-heading h2,
+  .mastery-section-heading p,
+  .mastery-chapter-heading h3,
+  .mastery-chapter-heading p {
+    margin: 0;
+  }
+
+  .mastery-section-heading h2 {
+    font-size: clamp(1.25rem, 3vw, 1.65rem);
+  }
+
+  .mastery-section-heading p,
+  .mastery-chapter-heading p {
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .mastery-next,
+  .mastery-route {
+    margin-top: 1.25rem;
+  }
+
+  .mastery-queue {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem;
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+  }
+
+  .mastery-queue-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.45rem 0.75rem;
+    align-items: center;
+    min-height: 8.2rem;
+    padding: 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    background: var(--card-bg);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    text-decoration: none;
+  }
+
+  .mastery-queue .is-primary .mastery-queue-card {
+    border-color: var(--accent);
+    background: var(--note-bg);
+  }
+
+  .mastery-queue-card:hover,
+  .mastery-queue-card:focus-visible,
+  .mastery-trail-link:hover,
+  .mastery-trail-link:focus-visible {
+    border-color: var(--accent);
+  }
+
+  .mastery-queue-reason {
+    grid-column: 1 / -1;
+    color: var(--accent);
+    font-size: 0.73rem;
+    font-weight: 850;
+    letter-spacing: 0.02em;
+  }
+
+  .mastery-deck-copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .mastery-deck-title {
+    line-height: 1.3;
+  }
+
+  .mastery-deck-evidence {
+    color: var(--muted);
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  .mastery-band {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    color: #6b7280;
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .mastery-band-learning { color: #2f6fed; }
+  .mastery-band-practiced { color: #7d5bd6; }
+  .mastery-band-consolidating { color: #b85f00; }
+  .mastery-band-strong { color: var(--success); }
+
+  .mastery-route {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+  }
+
+  .mastery-chapter-tabs {
+    display: flex;
+    gap: 0.45rem;
+    margin: 0.85rem -0.2rem 0;
+    padding: 0.2rem 0.2rem 0.6rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  .mastery-chapter-tab {
+    flex: 0 0 min(13.5rem, 72vw);
+    min-height: 54px;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 0.65rem;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mastery-chapter-tab strong,
+  .mastery-chapter-tab span {
+    display: block;
+  }
+
+  .mastery-chapter-tab span {
+    color: var(--muted);
+    font-size: 0.7rem;
+  }
+
+  .mastery-chapter-tab[aria-selected="true"] {
+    border-color: var(--accent);
+    background: var(--note-bg);
+    box-shadow: inset 0 -3px 0 var(--accent);
+  }
+
+  .mastery-chapter-panel {
+    margin-top: 0.75rem;
+  }
+
+  .mastery-chapter-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(8rem, 15rem);
+    gap: 0.2rem 1rem;
+    align-items: center;
+    padding: 0.2rem 0 0.75rem;
+  }
+
+  .mastery-chapter-heading h3 {
+    font-size: 1.15rem;
+  }
+
+  .mastery-chapter-progress {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .mastery-trail {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .mastery-trail-item {
+    position: relative;
+    padding: 0 0 0.8rem 1.45rem;
+  }
+
+  .mastery-trail-item::before {
+    content: "";
+    position: absolute;
+    left: 0.2rem;
+    top: 1.15rem;
+    z-index: 1;
+    width: 0.7rem;
+    height: 0.7rem;
+    border: 3px solid var(--card-bg);
+    border-radius: 50%;
+    background: #7b8494;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+
+  .mastery-trail-item:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 0.53rem;
+    top: 1.55rem;
+    bottom: -0.1rem;
+    width: 2px;
+    background: var(--border);
+  }
+
+  .mastery-trail-learning::before { background: #2f6fed; }
+  .mastery-trail-practiced::before { background: #7d5bd6; }
+  .mastery-trail-consolidating::before { background: #d97706; }
+  .mastery-trail-strong::before { background: var(--success); }
+
+  .mastery-trail-item.is-recommended::before {
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+
+  .mastery-trail-link {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    align-items: center;
+    min-height: 64px;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .mastery-trail-item.is-recommended .mastery-trail-link {
+    border-color: var(--accent);
+    background: var(--note-bg);
+  }
+
+  .mastery-trail-context {
+    margin: 0.3rem 0 0 0.15rem;
+    color: var(--muted);
+    font-size: 0.73rem;
+  }
+
+  .mastery-full-list {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+  }
+
+  .mastery-full-list > summary {
+    min-height: 44px;
+    padding: 0.4rem 0;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .mastery-full-list ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem 1.25rem;
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+  }
+
+  .mastery-full-list li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mastery-full-list a {
+    min-width: 0;
+    color: var(--text);
+  }
+
+  .mastery-index-card {
+    margin: 0 0 1.5rem;
+    border-color: var(--accent);
+    background: var(--note-bg);
+  }
+
+  @media (max-width: 48rem) {
+    .mastery-hero {
+      display: block;
+    }
+
+    .mastery-hero > * + * {
+      margin-top: 0.5rem;
+    }
+
+    .mastery-summary {
+      margin-top: 0.9rem !important;
+    }
+
+    .mastery-queue {
+      display: flex;
+      gap: 0.65rem;
+      margin-inline: -0.2rem;
+      padding: 0.2rem 0.2rem 0.6rem;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scroll-snap-type: x proximity;
+    }
+
+    .mastery-queue li {
+      flex: 0 0 min(18rem, 84vw);
+      scroll-snap-align: start;
+    }
+
+    .mastery-queue-card {
+      min-height: 7.6rem;
+    }
+
+    .mastery-chapter-heading {
+      display: block;
+    }
+
+    .mastery-chapter-heading > * + * {
+      margin-top: 0.35rem;
+    }
+
+    .mastery-full-list ul {
+      grid-template-columns: 1fr;
+    }
+  }
   /* -------------------------------------------------------------------
      The three verify-line states. Never colour-only (WCAG 1.4.1): idle
      stays italic with no glyph, waiting turns upright and gains a
@@ -2055,9 +3565,13 @@
     .ex-chapter-title::before,
     #btn-ja-toggle,
     #btn-ex-submit,
-    #btn-ex-reveal,
-    #btn-ex-got,
-    #btn-ex-missed,
+    #btn-ex-unsure,
+    #btn-ex-grade-again,
+    #btn-ex-grade-hard,
+    #btn-ex-grade-good,
+    #btn-ex-grade-easy,
+    #btn-ex-recall-yes,
+    #btn-ex-recall-no,
     #btn-ex-next,
     #btn-ex-restart,
     #btn-ex-hint,
@@ -2077,13 +3591,18 @@
 </style>
 </head>
 <body>
-  <div id="boot-status">Loading the WebAssembly application...</div>
+  <div id="boot-status" role="status" aria-live="polite">
+    <strong>SEXY ONE</strong>
+    <span id="boot-status-text">Loading the trainer…</span>
+    <span id="boot-status-hint">The first visit may take a moment; later visits reuse the download.</span>
+  </div>
 
   <noscript>
     This application requires JavaScript to run (it boots a WebAssembly
     module compiled from Haskell). Please enable JavaScript and reload.
   </noscript>
 
-  <script type="module" src="./index.js"></script>
+  <p id="sxc1-network-status" role="status" aria-live="polite" hidden></p>
+
 </body>
 </html>

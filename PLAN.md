@@ -141,6 +141,35 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   **42/42** sabotage passes, `content-check` 412/412, `progress-check` 91/91,
   `registry-check` 8/8 + 16/16. Remaining: Codex adversarial review, tag `m7`, deploy
   both hosts, live-verify the Japanese manual text.
+- **M8 — Mastery guidance + mobile boot.** Replace the experimental GPU DAG
+  with a DOM-only, dependency-aware action queue and chapter trail; add a stable
+  five-card Today's Session coach; start the dominant WASM request earlier,
+  reduce the suggested heap to 16 MiB, and fail unsupported mobile engines
+  before the WASM download. **IMPLEMENTATION COMPLETE 2026-08-10.** Contracts:
+  `docs/MASTERY-MAP.md` and `docs/TODAYS-SESSION.md`.
+- **M9 — Phone-ready release.** Make the trainer installable and available after
+  a connection disappears, preserve coherent updates at both root and nested
+  paths, expose local field-performance evidence, and wrap the existing
+  validated progress envelope in file save/share/load controls. **IMPLEMENTATION
+  COMPLETE 2026-08-11; physical-device acceptance pending.** Contract:
+  `docs/PHONE-READY.md`.
+- **M10 — Weekly Pulse.** Turn recent practice and the saved review schedule into
+  a calm seven-day reflection: rhythm, review outlook, skills in motion,
+  difficulty signals, and one next focus. Progress schema v3 retains only the
+  latest 200 coarse local learning marks and carries them through the existing
+  passport; v1/v2 files migrate without scheduler loss. The route stays DOM-only,
+  bilingual, offline, and phone-safe. **IMPLEMENTATION COMPLETE 2026-08-11.**
+  Contract: `docs/WEEKLY-PULSE.md`.
+- **M11 — Flashcard continuity + two-action UX.** Replace all 128 live
+  self-assessed recall prompts with authored bilingual binary flashcards; separate
+  evaluation from an explicit `Again` / `Hard` / `Good` / `Easy` scheduler grade;
+  make every rating continue while its interval determines when the prompt returns;
+  give hands-on drills a schedule-preserving Skip action; and apply the same
+  replace-don't-append discipline to hints, progress backup/reset, and device
+  mismatch repair. Session completion reconciles from persisted progress.
+  **COMPLETE AND DEPLOYED 2026-08-11.** The optimized artifact passed the full
+  135/135 release gate (235/235 browser assertions at both root and nested paths),
+  then passed 73/73 against production. Contract: `docs/FLASHCARD-FLOW.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 
@@ -180,8 +209,11 @@ Vercel (2026-08-07, owner-requested): the same static build also deploys to
 sexy-one.vercel.app belongs to an unrelated third party — never share that
 one). Deploy: copy `site/public` to a scratch dir named `sexy-one`, run
 `vercel deploy --prod --yes` (CLI authenticated as the owner's account).
-Verified 70/70 by browser-check against production; correct
-`application/wasm` content type; first-visit CDN cold-decode latency on the
+Initially verified 70/70 by browser-check against production. The current M11 release
+(`dpl_9ehLGXHNWRcngmDe4xkbdjQeNudK`) was deployed 2026-08-11 and verified 73/73
+against the main alias, with the
+deployed files byte-identical to the locally gated artifact and the correct
+`application/wasm` content type. First-visit CDN cold-decode latency on the
 108-image sweep warms after one pass. Audience note: the site will be shared
 with a Japanese speaker — M3 adds a persistent JA-first reading mode.
 

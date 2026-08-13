@@ -34,6 +34,8 @@
 module View.Progress
   ( ProgHandlers (..)
   , ProgData (..)
+  , primaryTrainingView
+  , progressHomeNotices
   , progressHomeView
   , jaFirstHeaderEls
   , uiLangHeaderEls
@@ -64,7 +66,7 @@ import           SXC1.Exercise.Types    (Deck (..), DeckId (..), ExId (..), Exer
 import           SXC1.Progress.Codec    (DecodeResult (..))
 import           SXC1.Progress.Scheduler (reviewQueue)
 import           SXC1.Progress.Types    (DayNum (..), ProgressState (..), Rec (..))
-import           SXC1.Route             (Route (RDeck, RExercise, RExercises, RHome, RManual, RPage),
+import           SXC1.Route             (Route (RDeck, RExercise, RExercises, RHome, RManual, RPage, RSession),
                                          renderRoute)
 
 --------------------------------------------------------------------------
@@ -289,14 +291,39 @@ jaFirstHeaderEls ph pd route
 -- wrapper id the manifest never asked for.
 --------------------------------------------------------------------------
 
-progressHomeView :: ProgHandlers action -> ProgData -> [View model action]
-progressHomeView ph pd =
+-- | One dominant home-page action. The coach owns the due/continue/new
+-- decision now, so Home stays calm and always opens the same short plan.
+primaryTrainingView :: ProgData -> View model action
+primaryTrainingView pd = H.section_ [ P.id_ "sxc1-primary-training" ]
+  [ H.a_ [ P.id_ "btn-primary-training", P.class_ "primary-training-action wizard-choice wizard-yes"
+         , P.href_ (ms (renderRoute RSession))
+         ]
+      [ H.strong_ [] [ text (ms (iTodaySessionTitle lang)) ]
+      , H.span_ [ P.class_ "primary-training-card" ]
+          [ text (ms (iTodaySessionSub lang)) ]
+      ]
+  ]
+  where
+    lang = pdLang pd
+
+-- | Important persistence/corruption notices stay visible even though the
+-- detailed progress controls live behind Home's red alternate-path choice.
+progressHomeNotices :: ProgData -> [View model action]
+progressHomeNotices pd =
   storageNoteEls (pdLang pd) (pdStorageOk pd)
   ++ corruptBannerEls (pdLang pd) (pdLoad pd) (pdRawCorrupt pd)
-  ++ precedenceOrdered
-  ++ streakEls
-  ++ retiredEls
-  ++ exportImportEls ph pd
+
+progressHomeView :: ProgHandlers action -> ProgData -> [View model action]
+progressHomeView ph pd =
+  [ H.details_ [ P.id_ "sxc1-study-details", P.class_ "home-disclosure" ]
+         ( H.summary_ [] [ text (ms (iReviewProgress (pdLang pd))) ]
+         : precedenceOrdered ++ streakEls ++ retiredEls
+         )
+     , H.details_ [ P.id_ "sxc1-progress-data", P.class_ "home-disclosure" ]
+         ( H.summary_ [] [ text (ms (iProgressData (pdLang pd))) ]
+         : exportImportEls ph pd
+         )
+     ]
   where
     dueItems = liveReviewQueue pd
     precedenceOrdered
@@ -420,11 +447,22 @@ exportImportEls :: ProgHandlers action -> ProgData -> [View model action]
 exportImportEls ph pd =
   [ H.section_ [ P.id_ "sxc1-progress-tools" ]
       ( [ H.h2_ [] [ text (ms (iYourProgress lang)) ]
-        , H.button_ [ P.id_ "btn-progress-export", P.type_ "button", E.onClick (phExport ph) ] [ text (ms (iExport lang)) ]
+        , H.details_ [ P.id_ "sxc1-progress-backup", P.class_ "progress-flow" ]
+            [ H.summary_ [] [ text (ms (iExport lang)) ]
+            , H.button_ [ P.id_ "btn-progress-export", P.type_ "button", E.onClick (phExport ph) ] [ text (ms (iExport lang)) ]
           -- M5 a11y: like #sxc1-corrupt-raw, no <label> element exists,
           -- so aria-label carries the accessible name (localized).
         , H.textarea_ [ P.id_ "sxc1-export-blob", P.readonly_ True, textProp "aria-label" (ms (iExportAria lang)), P.value_ (ms (fromMaybe "" (pdExportBlob pd))) ]
-        , H.form_ [ P.id_ "sxc1-import-form", onImportSubmit (phImport ph) ]
+        -- M9: a deliberately empty DOM-owned shell. The file/share controls
+        -- live in index.js so they add no second progress wire format and no
+        -- translated string table to app.wasm; the Haskell codec still owns
+        -- export generation and import commit.
+            , H.div_ [ P.id_ "sxc1-progress-passport" ] []
+            ]
+        , H.details_ [ P.id_ "sxc1-progress-restore", P.class_ "progress-flow" ]
+            [ H.summary_ [] [ text (ms (iImport lang)) ]
+            , H.div_ [ P.id_ "sxc1-import-file-shell" ] []
+            , H.form_ [ P.id_ "sxc1-import-form", onImportSubmit (phImport ph) ]
             ( H.label_ [ P.for_ "sxc1-import-input" ] [ text (ms (iImportLabel lang)) ]
             : H.textarea_ [ P.id_ "sxc1-import-input", P.name_ "sxc1-import-input" ]
             : H.p_ [ P.id_ "sxc1-import-preview" ]
@@ -432,10 +470,14 @@ exportImportEls ph pd =
             : H.button_ [ P.id_ "btn-progress-import", P.type_ "submit" ] [ text (ms (iImport lang)) ]
             : importMsgEls
             )
-        , H.button_ [ P.id_ "btn-progress-wipe", P.type_ "button" ] [ text (ms (iWipe lang)) ]
+            ]
+        , H.details_ [ P.id_ "sxc1-progress-reset", P.class_ "progress-flow" ]
+            [ H.summary_ [] [ text (ms (iWipe lang)) ]
+            , H.button_ [ P.id_ "btn-progress-wipe", P.type_ "button" ] [ text (ms (iWipe lang)) ]
         , H.button_
             [ P.id_ "btn-progress-wipe-confirm", P.type_ "button", P.hidden_ True, E.onClick (phWipe ph) ]
             [ text (ms (iWipeConfirm lang)) ]
+            ]
         ]
       )
   ]

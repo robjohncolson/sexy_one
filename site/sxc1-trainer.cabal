@@ -36,6 +36,7 @@ library
                     SXC1.Progress.Types
                     SXC1.Progress.Scheduler
                     SXC1.Progress.Codec
+                    SXC1.Mastery
   hs-source-dirs:   src
   build-depends:    base < 5, text, containers, bytestring, template-haskell
   default-language: Haskell2010

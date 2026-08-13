@@ -1,12 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | M6 W2 (briefs\/M6-plan.md, ruling 3): THE UI STRING TABLE. Every
--- learner-visible literal that "View.Pages"\/"View.Exercise"\/
--- "View.Progress"\/"Main" used to type inline lives HERE, as one named
+-- | M6 W2 (briefs\/M6-plan.md, ruling 3): THE WASM UI STRING TABLE. Every
+-- learner-visible literal owned by "View.Pages"\/"View.Exercise"\/
+-- "View.Progress"\/"Main" lives HERE, as one named
 -- entry per string, indexed by 'Lang' -- so the whole learner-visible
 -- surface of the app is greppable, auditable and translated in exactly
 -- one place. The table is tiny and stays embedded in app.wasm (the
 -- corpus, by contrast, ships as external per-language bundles -- W1).
+-- JS-owned DOM text is the narrow exception: import-preview/progress-passport
+-- strings and the progressively hydrated mastery journey live beside their
+-- behavior in site/static/index.js, with complete EN/JA records and browser
+-- coverage.
 --
 -- WHAT LOCALIZES AND WHAT NEVER DOES (rulings 3\/5):
 --
@@ -52,14 +56,17 @@ module I18n
   , iLangSplitNotice, iLangSplitButton
   , iBreadcrumbAria, iTraining, iPageOf
   , iHomeBlurb, iTrainingCardSub, iPagesSections, iTocPageAbbrev
+  , iBrowseLibrary, iReviewProgress, iProgressData
   , iPhoneQrTitle, iPhoneQrHint, iPhoneQrAlt
   , iHideOriginal, iShowOriginal, iManualPagesAria, iPrevPage, iNextPage
   , iJaImageAlt, iJaImageCaption
   , iNotFoundTitle, iNoPageMatches, iDisclaimer
   , iKindLabel, iExNotFoundTitle, iNoExerciseMatches, iBackToTraining
-  , iNExercises, iRestart, iSubmit, iRevealAnswer, iGotIt, iMissedIt
-  , iPageNumberLabel, iNextButton, iCorrectFeedback, iIncorrectFeedback
-  , iShowHint, iExerciseCompleted, iConfirm, iCitePage
+  , iNExercises, iRestart, iSubmit
+  , iCheckAnswer, iNotSure, iAgain, iHard, iGood, iEasy
+  , iPageNumberLabel, iNextButton, iNextCard, iCorrectFeedback, iIncorrectFeedback
+  , iShowHint, iExerciseCompleted, iConfirm, iSkipCard, iCitePage
+  , iExerciseFigureAlt, iExerciseFigureCaption
   , iVerifyConfirmed, iVerifyWaiting, iVerifyIdleWatching, iVerifyIdleOn, iVerifyIdleOff
   , iDevEnable, iDevDisable, iDevRequesting, iDevRetryAccess
   , iDevStatusOff, iDevStatusPending, iDevStatusDenied, iDevStatusUnsupported
@@ -69,11 +76,15 @@ module I18n
   , iStudyStreak, iRetiredNote
   , iNothingDue, iStartNextDeck, iDueToday, iDaysOverdue
   , iContinueLabel, iGetStarted, iBrowseDecks
+  , iStartTraining, iContinueTraining, iReviewNext, iCourseComplete
   , iStorageNoteStrong, iStorageNoteBody
   , iCorruptBanner, iCorruptCopyHint, iCorruptNoRaw, iCorruptRawAria
   , iYourProgress, iExport, iExportAria, iImportLabel, iImportPreviewInit
   , iImport, iImportError, iWipe, iWipeConfirm
   , iDeckDone, iRequiresLabel
+  , iMasteryTitle, iMasteryCardSub
+  , iTodaySessionTitle, iTodaySessionSub
+  , iWeeklyTitle, iWeeklyCardSub
   , iImportEmptyReason
   ) where
 
@@ -253,8 +264,8 @@ iPageOf En n total = "page " <> tshow n <> " of " <> tshow total
 iPageOf Ja n total = tshow total <> "\12506\12540\12472\20013" <> tshow n <> "\12506\12540\12472\30446"
 
 iHomeBlurb :: Lang -> Text
-iHomeBlurb En = "An interactive reader for the SXC-1 manuals: browse each translated document page by page, with the original Japanese page a tap away."
-iHomeBlurb Ja = "SXC-1\12510\12491\12517\12450\12523\12398\12452\12531\12479\12521\12463\12486\12451\12502\12522\12540\12480\12540\12290\32763\35379\28168\12415\12398\21508\12489\12461\12517\12513\12531\12488\12434\12506\12540\12472\12372\12392\12395\38322\35239\12391\12365\12289\26085\26412\35486\12398\21407\26412\12506\12540\12472\12418\12377\12368\12395\34920\31034\12391\12365\12414\12377\12290"
+iHomeBlurb En = "Learn the controls, practise on the SXC-1, and review what matters. Start with the next card when you are ready."
+iHomeBlurb Ja = "\25805\20316\12434\23398\12403\12289\32244\32722\12375\12289\24489\32722\12375\12414\12377\12290\28310\20633\12364\12391\12365\12383\12425\12289\27425\12398\12459\12540\12489\12363\12425\22987\12417\12414\12375\12423\12358\12290"
 
 -- | Home-page QR block: title above the code (laptop -> phone handoff).
 iPhoneQrTitle :: Lang -> Text
@@ -271,8 +282,20 @@ iPhoneQrAlt = t "QR code linking to this site on your phone"
                 "\12371\12398\12469\12452\12488\12434\12473\12510\12507\12391\38283\12367QR\12467\12540\12489"
 
 iTrainingCardSub :: Lang -> Text
-iTrainingCardSub = t "Quizzes, drills and lookups from the manuals"
-                     "\12510\12491\12517\12450\12523\12395\12418\12392\12389\12367\12463\12452\12474\12539\12489\12522\12523\12539\12523\12483\12463\12450\12483\12503"
+iTrainingCardSub = t "Quizzes and hands-on device drills"
+                     "\12463\12452\12474\12392\23455\27231\12489\12522\12523"
+
+iBrowseLibrary :: Lang -> Text
+iBrowseLibrary = t "No \8212 browse manuals and course"
+                   "\12356\12356\12360 \8212 \12510\12491\12517\12450\12523\12392\12467\12540\12473\12434\35211\12427"
+
+iReviewProgress :: Lang -> Text
+iReviewProgress = t "Review queue and progress"
+                    "\24489\32722\12461\12517\12540\12392\36914\25431"
+
+iProgressData :: Lang -> Text
+iProgressData = t "Progress data and settings"
+                  "\36914\25431\12487\12540\12479\12392\35373\23450"
 
 iPagesSections :: Lang -> Int -> Int -> Text
 iPagesSections En p s = tshow p <> " pages, " <> tshow s <> " sections"
@@ -350,41 +373,64 @@ iNExercises En n = tshow n <> " exercises"
 iNExercises Ja n = tshow n <> "\20214\12398\28436\32722"
 
 iRestart :: Lang -> Text
-iRestart = t "Restart" "\12420\12426\30452\12377"
+iRestart = t "Repeat card" "\12459\12540\12489\12434\12418\12358\19968\24230"
 
 iSubmit :: Lang -> Text
 iSubmit = t "Submit" "\36865\20449"
 
-iRevealAnswer :: Lang -> Text
-iRevealAnswer = t "Reveal answer" "\31572\12360\12434\34920\31034"
+iCheckAnswer :: Lang -> Text
+iCheckAnswer = t "Check answer" "\31572\12360\12434\30906\35469"
 
-iGotIt :: Lang -> Text
-iGotIt = t "I got it" "\12391\12365\12383"
+iNotSure :: Lang -> Text
+iNotSure = t "I\8217m not sure" "\12431\12363\12425\12394\12356"
 
-iMissedIt :: Lang -> Text
-iMissedIt = t "I missed it" "\12391\12365\12394\12363\12387\12383"
+iAgain :: Lang -> Text
+iAgain = t "Again" "\12418\12358\19968\24230"
+
+iHard :: Lang -> Text
+iHard = t "Hard" "\38627\12375\12356"
+
+iGood :: Lang -> Text
+iGood = t "Good" "\33391\12356"
+
+iEasy :: Lang -> Text
+iEasy = t "Easy" "\31777\21336"
 
 iPageNumberLabel :: Lang -> Text
 iPageNumberLabel = t "Page number:" "\12506\12540\12472\30058\21495:"
 
 iNextButton :: Lang -> Text
-iNextButton = t "Next" "\27425\12408"
+iNextButton = t "Next card" "\27425\12398\12459\12540\12489"
+
+iNextCard :: Lang -> Text
+iNextCard = t "Next card" "\27425\12398\12459\12540\12489"
 
 iCorrectFeedback :: Lang -> Text
 iCorrectFeedback = t "Correct." "\27491\35299\12290"
 
 iIncorrectFeedback :: Lang -> Text
-iIncorrectFeedback = t "Not quite. Try again." "\19981\27491\35299\12290\12418\12358\19968\24230\12290"
+iIncorrectFeedback = t "Not quite." "\19981\27491\35299\12290"
 
 iShowHint :: Lang -> Text
-iShowHint = t "Show a hint" "\12498\12531\12488\12434\34920\31034"
+iShowHint = t "No \8212 show a hint" "\12356\12356\12360 \8212 \12498\12531\12488\12434\34920\31034"
 
 iExerciseCompleted :: Lang -> Text
 iExerciseCompleted = t "You've completed this exercise."
                        "\12371\12398\28436\32722\12434\23436\20102\12375\12414\12375\12383\12290"
 
 iConfirm :: Lang -> Text
-iConfirm = t "Confirm" "\30906\35469"
+iConfirm = t "Yes \8212 done" "\12399\12356 \8212 \23436\20102"
+
+iSkipCard :: Lang -> Text
+iSkipCard = t "Skip for now" "\20170\12399\12473\12461\12483\12503"
+
+iExerciseFigureAlt :: Lang -> Text -> Text
+iExerciseFigureAlt En title = "Reference diagram for " <> title
+iExerciseFigureAlt Ja title = title <> "\12398\21442\29031\22259"
+
+iExerciseFigureCaption :: Lang -> Text -> Int -> Text
+iExerciseFigureCaption En slug page = "Reference diagram \8212 open " <> slug <> " p. " <> tshow page
+iExerciseFigureCaption Ja slug page = "\21442\29031\22259 \8212 " <> slug <> " p. " <> tshow page <> " \12434\38283\12367"
 
 -- | A citation link's text: slug + page. Identical shape in both
 -- languages on purpose (slugs are wire ids; the manuals cite p.NN).
@@ -534,6 +580,22 @@ iBrowseDecks :: Lang -> Text
 iBrowseDecks = t "Browse the training decks"
                  "\12488\12524\12540\12491\12531\12464\12487\12483\12461\12434\35211\12427"
 
+iStartTraining :: Lang -> Text
+iStartTraining = t "Yes \8212 start training"
+                   "\12399\12356 \8212 \12488\12524\12540\12491\12531\12464\12434\22987\12417\12427"
+
+iContinueTraining :: Lang -> Text
+iContinueTraining = t "Yes \8212 continue training"
+                      "\12399\12356 \8212 \12488\12524\12540\12491\12531\12464\12434\32154\12369\12427"
+
+iReviewNext :: Lang -> Text
+iReviewNext = t "Yes \8212 review next card"
+                "\12399\12356 \8212 \27425\12398\12459\12540\12489\12434\24489\32722"
+
+iCourseComplete :: Lang -> Text
+iCourseComplete = t "Course complete \8212 browse the course"
+                    "\12467\12540\12473\23436\20102 \8212 \12467\12540\12473\12434\35211\12427"
+
 iStorageNoteStrong :: Lang -> Text
 iStorageNoteStrong = t "Progress is not being saved. "
                        "\36914\25431\12399\20445\23384\12373\12428\12390\12356\12414\12379\12435\12290"
@@ -598,6 +660,31 @@ iDeckDone Ja done total = tshow done <> "/" <> tshow total <> " \23436\20102"
 
 iRequiresLabel :: Lang -> Text
 iRequiresLabel = t "Requires: " "\21069\25552: "
+
+--------------------------------------------------------------------------
+-- Mastery journey: the prerequisite-aware action queue and chapter trail.
+--------------------------------------------------------------------------
+
+iMasteryTitle :: Lang -> Text
+iMasteryTitle = t "Mastery journey" "習熟の道筋"
+
+iMasteryCardSub :: Lang -> Text
+iMasteryCardSub = t "See what to review, continue, and learn next"
+                    "復習・継続・次の学習を一目で確認する"
+
+iTodaySessionTitle :: Lang -> Text
+iTodaySessionTitle = t "Today's session" "今日のセッション"
+
+iTodaySessionSub :: Lang -> Text
+iTodaySessionSub = t "A focused 5–10 minute plan"
+                     "5〜10分の集中プラン"
+
+iWeeklyTitle :: Lang -> Text
+iWeeklyTitle = t "Weekly pulse" "週間パルス"
+
+iWeeklyCardSub :: Lang -> Text
+iWeeklyCardSub = t "See your rhythm, review load, and next focus"
+                   "学習リズム・復習量・次の重点を確認する"
 
 --------------------------------------------------------------------------
 -- Main.hs: the one learner-visible literal it owns.

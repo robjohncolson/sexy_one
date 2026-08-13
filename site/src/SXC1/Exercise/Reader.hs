@@ -90,7 +90,7 @@ import           Data.Text              (Text)
 import qualified Data.Text              as T
 
 import           SXC1.Content.Markdown  (bulletItemOf, headingLineOf, parseBlocksEngine, parseInline)
-import           SXC1.Content.Types     (Block, Inline)
+import           SXC1.Content.Types     (Block (..), Inline)
 import           SXC1.Exercise.Types
 import           SXC1.Route              (parseDigits)
 
@@ -421,7 +421,9 @@ data ExSyn = ExSyn
   , synExWhyBlocks       :: [Block]
   , synExHintBlocksList  :: [[Block]]
   , synExAnswerBlocks    :: [Block]
+  , synExDistractorField :: Maybe FieldLine
   , synExChoicePrompt    :: Maybe PromptBody
+  , synExFlashPrompt     :: Maybe PromptBody
   , synExRecallPrompt    :: Maybe PromptBody
   , synExLookupPrompt    :: Maybe PromptBody
   , synExSteps           :: [StepSyn]
@@ -555,7 +557,9 @@ readExSyn _fp deckId (headLn, exTitleTxt, chunkLines) = ExSyn
   , synExWhyBlocks      = whyBlocks
   , synExHintBlocksList = hintBlocksList
   , synExAnswerBlocks   = answerBlocks
+  , synExDistractorField = distractorFieldM
   , synExChoicePrompt   = mChoicePrompt
+  , synExFlashPrompt    = mFlashPrompt
   , synExRecallPrompt   = mRecallPrompt
   , synExLookupPrompt   = mLookupPrompt
   , synExSteps          = stepSyns
@@ -611,9 +615,11 @@ readExSyn _fp deckId (headLn, exTitleTxt, chunkLines) = ExSyn
       []                    -> []
     hintBlocksList = [ fst (parseBlocksEngine 0 False [] (map snd (snd (scanFieldBlock rlines))))
                       | (_, _, rlines) <- take 3 hintChunks ]
-    answerBlocks = case answerChunks of
-      ((_, _, rlines) : _) -> fst (parseBlocksEngine 0 False [] (map snd (snd (scanFieldBlock rlines))))
-      []                    -> []
+    (answerFields, answerBodyLines) = case answerChunks of
+      ((_, _, rlines) : _) -> scanFieldBlock rlines
+      []                    -> ([], [])
+    distractorFieldM = firstField "distractor" answerFields
+    answerBlocks = fst (parseBlocksEngine 0 False [] (map snd answerBodyLines))
 
     hasChoiceList = case mChoiceRaw of { Just _ -> True; Nothing -> False }
 
@@ -625,7 +631,26 @@ readExSyn _fp deckId (headLn, exTitleTxt, chunkLines) = ExSyn
             optIdFor i = T.singleton (toEnum (fromEnum 'a' + i))
         in Just (Choice opts)
 
-    recallRequired = mKind == Just KQuiz && not hasChoiceList
+    -- A recall card with an authored distractor becomes a genuine binary
+    -- multiple-choice flashcard. The model answer remains the source of
+    -- truth and must be one paragraph so it can be rendered as a compact
+    -- option; the full prose is still available to the validator and the
+    -- post-answer explanation. Correct-side placement is stable per id,
+    -- rather than training the learner to tap the same side every time.
+    mFlashPrompt = case (mKind, hasChoiceList, distractorFieldM, answerBlocks) of
+      (Just KQuiz, False, Just f, [Para answerInlines])
+        | not (T.null (T.strip (flValue f))) ->
+            let distractorInlines = parseInline 0 (flValue f)
+                answerFirst = T.foldl' (\n c -> n + fromEnum c) 0 (case exid of ExId t -> t) `mod` 2 == 0
+                ordered = if answerFirst
+                  then [(answerInlines, True), (distractorInlines, False)]
+                  else [(distractorInlines, False), (answerInlines, True)]
+                opts = [ Option (T.singleton (toEnum (fromEnum 'a' + i))) label correct
+                       | (i, (label, correct)) <- zip [0 :: Int ..] ordered ]
+            in Just (Choice opts)
+      _ -> Nothing
+
+    recallRequired = mKind == Just KQuiz && not hasChoiceList && isNothing mFlashPrompt
     mRecallPrompt = if recallRequired && not (null answerChunks) then Just (Recall answerBlocks) else Nothing
 
     stepSyns = zipWith (readStepSyn deckId exid) [1 :: Int ..] stepChunks
@@ -635,9 +660,10 @@ readExSyn _fp deckId (headLn, exTitleTxt, chunkLines) = ExSyn
       _                           -> Nothing
 
     prompts = case mKind of
-      Just KQuiz -> case (mChoicePrompt, mRecallPrompt) of
-        (Just body, _) -> [ Prompt (promptIdFor exid 1) exIntroBlocks theExCites body ]
-        (_, Just body) -> [ Prompt (promptIdFor exid 1) exIntroBlocks theExCites body ]
+      Just KQuiz -> case (mChoicePrompt, mFlashPrompt, mRecallPrompt) of
+        (Just body, _, _) -> [ Prompt (promptIdFor exid 1) exIntroBlocks theExCites body ]
+        (_, Just body, _) -> [ Prompt (promptIdFor exid 1) exIntroBlocks theExCites body ]
+        (_, _, Just body) -> [ Prompt (promptIdFor exid 1) exIntroBlocks theExCites body ]
         _              -> []
       Just KDrill -> [ p | Just p <- map synStPrompt stepSyns ]
       Just KLookup -> case mLookupPrompt of

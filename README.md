@@ -4,21 +4,26 @@
 translation of the manuals for the [Casio SXC-1](https://www.casio.com/), a portable
 standalone sampler Casio sells only in Japan. Everything runs in your browser — the site is static files
 with no server, no account and no analytics, and nothing you do in it ever leaves
-your machine.
+your machine. After one successful visit, the executable course can also relaunch
+offline and can be installed from a supporting phone or desktop browser.
 
 **Use it now:**
 
 - <https://robjohncolson.github.io/sexy_one/> (GitHub Pages)
 - <https://sexy-one-gray.vercel.app/> (Vercel mirror — the same bundle)
 
-In your first minute you can read any page of the four manuals in English with the
-original Japanese page right beside it, start the guided course of quizzes, drills
-and lookups (every one cites the manual page it teaches), or — in desktop Chrome or
+In your first minute you can open **Today's session**, a stable five-card mix of due,
+in-progress, and useful next work from the guided course (every card cites the manual page it teaches),
+open the **Weekly pulse** for a calm view of your recent rhythm, the next seven days
+of review load, skills in motion, and one recommended focus,
+open the **Mastery journey** for a focused review/continue/learn-next route through all 50 skills,
+browse any page of the four manuals in English with the original Japanese page right
+beside it, or — in desktop Chrome or
 Edge — connect an SXC-1 over USB, click **Enable device verification** on a drill,
 and watch steps confirm themselves as you perform them on the real hardware.
 
 **日本語でも使えます — the whole thing runs in Japanese too.** Click **日本語** in the
-site header and the interface, all **435 exercises across 52 decks**, the device
+site header and the interface, all **352 exercises across 50 decks**, the device
 messages **and the manuals themselves** switch to Japanese (**English** in the same
 place switches back). M6 made the *course* Japanese; **M7 makes the manual pages
 Japanese TEXT** — all **108 pages of all four documents**, transcribed from Casio's
@@ -41,8 +46,9 @@ the aid rather than the text. If you would rather work entirely in Japanese, the
 **日本語** button in the header switches the interface *and the whole course*; every
 on-device label (`BANK`, `EDIT`, `SELECT BANK 1`, …) stays in Latin caps inside the
 Japanese text, exactly as the hardware prints it. Your course progress lives only in your own browser;
-**Export/Import** on the progress panel produces a small text blob you can copy by
-hand to move your history to another device, and that blob is the *only* way
+**Export/Import** on the progress panel produces a small validated backup you can
+save, share, paste, or load from a file to move your history to another device,
+and that backup is the *only* way
 progress ever travels anywhere. Device verification — the trainer confirming drill
 steps by watching your real SXC-1 over USB-MIDI — is optional and off until you
 click **Enable device verification** on a drill page; it needs a Chromium browser
@@ -70,6 +76,65 @@ Start with [Prerequisites](#prerequisites) and [Build](#build) to build it yours
 [Measured figures](#measured-figures) for current sizes, counts and timings.
 
 ## Status
+
+**Current (M11 flashcard continuity).** All 128 quizzes that formerly revealed a
+model answer and asked the learner whether they knew it are now real, authored
+two-option flashcards. A learner selects an answer, then the two `Check answer` /
+`I’m not sure` actions are replaced in place by `Good` / `Easy` after a correct
+answer or `Again` / `Hard` after a miss. The chosen grade is the scheduler input;
+checking alone writes no progress, and every grade opens the next session/course
+card without a second repeat decision. `Again` schedules an earlier return instead
+of looping immediately. Hands-on cards expose `Skip for now` / `Yes — done`; Skip
+records unfinished steps as due work and continues. Native radio/checkbox cards keep answer options from
+becoming a button wall. Hints and progress-data operations use disclosures, and
+backup/reset follow-up actions replace the prior action rather than accumulating.
+The contract is in [`docs/FLASHCARD-FLOW.md`](docs/FLASHCARD-FLOW.md).
+This optimized M11 artifact is deployed at the Vercel mirror below and passed the
+complete 135/135 local gate plus 73/73 assertions against production.
+
+**M10 Weekly Pulse.** `#/x/week` turns the learner's saved schedule
+and latest 200 coarse learning marks into a seven-day reflection: practice
+rhythm, exact upcoming review buckets, recently strengthened skills, repeated
+difficulty, and one due-first next focus. The ledger is local-only, travels in
+the existing progress passport, and deliberately excludes answer content,
+elapsed time, hints, and MIDI/device data. Existing schema-v1/v2 histories
+migrate without scheduler loss; detailed weekly history starts with the next
+answer. The surface is bilingual semantic DOM with no canvas or graph runtime,
+and is covered at 360 px and 320 px. See
+[`docs/WEEKLY-PULSE.md`](docs/WEEKLY-PULSE.md).
+
+**M9 phone-ready release.** A subpath-safe web-app manifest and
+versioned service worker make the executable shell, WASM runtime, and both text
+languages installable and available after the connection disappears. Worker
+registration waits until first interactivity; core requests stay network-first
+to prevent mixed-version deployments, while manual scans cache only after they
+are opened. The existing validated progress envelope now has phone-native file
+save/share and file-load controls without an account, backend, or second codec.
+Boot diagnostics also record transfer size, connection class, and data-saver
+state locally. The product and cache contracts are in
+[`docs/PHONE-READY.md`](docs/PHONE-READY.md). Automated real-offline boots pass at
+both root and nested paths; physical iPhone/Android acceptance remains the final
+field check.
+
+**Today's session coach.** `#/x/today` is now the dominant green path
+from Home: a stable, tab-scoped five-card plan balancing due review, unfinished
+work, and a prerequisite-aware next step. The plan prefers a mix of quizzes and
+drills, stays fixed while the learner works through it, marks real engine
+completions, and carries a mobile-safe next-card coach into each planned
+exercise. It is another DOM-only projection over the already accepted course
+bundle and progress payload, so it adds no graph or rendering dependency to
+`app.wasm`. The product and regression contracts are recorded in
+[`docs/TODAYS-SESSION.md`](docs/TODAYS-SESSION.md).
+
+**M8 (mastery journey + mobile boot).** `#/x/map` turns the course’s authored
+50-deck/49-prerequisite model into a due-first three-action queue and one
+progressively disclosed chapter trail. Exercise completion, review durability, due
+work, and advisory prerequisites still drive every recommendation, but the route no
+longer creates a canvas, WebGL context, camera, or 50-node scene. The same revision
+cuts measured startup WASM memory from about 65 MiB to about 20 MiB, begins the WASM
+request earlier on supported browsers, and rejects older mobile engines with useful
+recovery guidance before downloading `app.wasm`. The implementation and invariants
+are recorded in [`docs/MASTERY-MAP.md`](docs/MASTERY-MAP.md).
 
 **M7 (Japanese manual text).** The manuals are now first-class in both languages.
 Before this milestone, `uiLang=ja` gave a Japanese *interface* around an English
@@ -109,8 +174,9 @@ manual-language-of-record stage requires every `!SXC1-DOC` record in the served
 `ja manual:` assertions in **both** full browser stages read real Japanese sentences
 off real reading routes with the original page image still reachable on `/ja`.
 
-The gate is now **129 checks** with **242 assertions per browser stage**. The figures
-below are the M7 ship state; the milestone entries that follow are historical.
+The gate is now **131 checks** with **227 assertions per live browser stage** (plus
+lookup behavior in the 198-assertion synthetic self-test). The figures below identify
+historical milestone values where relevant.
 
 **M6 (Japanese).** The course itself is now bilingual. The interface, every
 learner-visible string in all **435 exercises across 52 decks**, the device
@@ -186,11 +252,12 @@ milestone roadmap, [`briefs/M3-plan.md`](briefs/M3-plan.md) for the design this
 milestone implements, and [`briefs/M3-manifest.json`](briefs/M3-manifest.json) for the
 task-by-task breakdown a Sonnet swarm built it from.
 
-**Course content.** The full **52-deck, 435-exercise** course is authored, embedded and
-shipping — up from M2's 4-deck/16-exercise seed. Decks are grouped into **six chapters**
+**Course content.** M3 originally expanded the seed to 52 decks / 435 exercises; the
+current operation-first course ships **50 decks / 352 exercises** after retiring 81
+printed-manual lookups and two guide-context trivia cards. Decks are grouped into **six chapters**
 (chapter 0, `Front matter`, plus five numbered `Part: …` chapters mirroring the guide
 book's own progression — Preparation, Pad play, Sampling, Sequencer, Leveling up) and
-tagged `tier: intro | core | stretch` (14 / 32 / 6 decks respectively) for course-map
+tagged `tier: intro | core | stretch` (14 / 30 / 6 decks respectively) for course-map
 navigation; 36 decks also carry an optional `requires:` list of deck-slug prerequisites.
 Decks were embedded into the wasm at compile time through M5 — `INDEX`-driven, one
 Template Haskell splice for the whole directory rather than one per file — so an author
@@ -198,6 +265,20 @@ adding deck 53 only had to add it to `INDEX`. **M6 moved them out of the wasm
 entirely** (see the M6 entry above): `INDEX` is still the single list an author edits,
 but it is now read at *build* time by `scripts/emit-content-bundles.py`, which writes
 the two fetched bundles.
+
+**Guided interface.** Home keeps the phone QR visible, then presents two large
+choices: a green recommended path directly to the next due or incomplete card, and a
+red alternate path that reveals the course outline, manuals and progress utilities.
+Completed cards repeat the same two-way pattern with green **next card** and red
+**repeat card** actions. Every quiz now requires an actual answer. The 128 compact
+flashcards synthesize a stable two-option choice from their authored correct answer and
+plausible distractor; larger multiple-choice questions keep their full option sets as
+native radio/checkbox cards. The active decision surface is always a pair: **Check
+answer / I’m not sure**, replaced after feedback by **Good / Easy** or **Again /
+Hard**, with the selected grade driving spaced repetition and continuing immediately.
+
+The rationale and regression anchors for this UX are recorded in
+[`docs/UX-HANDOFF-2026-08-10.md`](docs/UX-HANDOFF-2026-08-10.md).
 
 **Progress and spaced repetition.** Every graded prompt now feeds an integer SM-2
 scheduler (see [Progress, spaced repetition and the id registry](#progress-spaced-repetition-and-the-id-registry)
@@ -446,9 +527,12 @@ across the whole corpus for unknown slugs (`E-DECK-REQUIRES-UNKNOWN`) and cycles
 [`content/EXERCISE-FORMAT.md`](content/EXERCISE-FORMAT.md) for the full field reference
 and worked examples.
 
-The shipped course is **52 decks / 435 exercises**: 8 `Front matter`, 4 `Preparation`, 9
-`Pad play`, 7 `Sampling`, 9 `Sequencer`, 15 `Leveling up`; 14 decks `tier: intro`, 32
-`core`, 6 `stretch`; 36 decks declare at least one `requires:` prerequisite.
+The shipped operation-first course is **50 decks / 352 exercises**: 6 `Front matter`,
+4 `Preparation`, 9 `Pad play`, 7 `Sampling`, 9 `Sequencer`, 15 `Leveling up`; 14 decks
+`tier: intro`, 30 `core`, 6 `stretch`; 36 decks declare at least one `requires:`
+prerequisite. All 81 manual-navigation lookups and two remaining guide-context trivia
+questions are retired with permanent ID tombstones: the app links sources directly,
+so the learner is tested on the SXC-1 rather than on remembering the printed book.
 
 ## Validating exercise content
 
@@ -473,8 +557,8 @@ wasm-run.mjs "$BIN" --list-codes       # every issue code the validator can rais
 ```
 
 Every one of those has been run, in this order, from this repository's root, on this
-machine, against the full 52-deck/435-exercise course: the real-content run reports `0
-issue(s)`, `--self-test` passes `454/454` checks, `--fixtures` reports `56/56 fixtures
+machine, against the full 50-deck/352-exercise course: the real-content run reports `0
+issue(s)`, `--self-test` passes `465/465` checks, `--fixtures` reports `56/56 fixtures
 passed`, and `--list-codes` prints 53 codes (up from M2's 48 — M3 added
 `E-DECK-TIER-UNKNOWN`, `E-DECK-REQUIRES-UNKNOWN`, `E-DECK-REQUIRES-CYCLE` and one more
 for id-registry/inventory cross-checking, and M6 added `E-JA-MISSING`; run
@@ -521,7 +605,7 @@ be a `ja:` line), implemented independently in the checker, so "the check is gre
 exclusions are structural and exhaustive — the `### Why`-style role headings (the UI
 localizes those labels) and the language-invariant fields (`cite:`, `find:`, `verify:`,
 `type:`, `id:`, `deck:`, `chapter:`, `tier:`, `tags:`, `requires:`, `limit:`) — with no
-per-file opt-out anywhere. `--self-test` group 22 both sweeps all 52 live decks and
+per-file opt-out anywhere. `--self-test` group 22 both sweeps all 50 live decks and
 carries one negative control per learner-visible kind (delete that kind's `ja:` line and
 exactly one `E-JA-MISSING` must fire, on the right line, naming the right kind), and
 `content/fixtures/dirs/E-JA-MISSING--untranslated-option/` is the standing falsifying
@@ -615,8 +699,8 @@ flow in a target with *no* fake injected at all, and requires it to land in "den
 and never confirm — because real headless Chrome denies the permission, a positive
 result anywhere else in the suite can only have come from the fake's scripted
 messages, never from the real API by accident. All of this sits inside
-`check-site.sh`'s ordinary gate (**129 checks** as of M7): the browser driver asserts
-**242 assertions per served stage** (**198** in `node scripts/browser-check.mjs
+`check-site.sh`'s ordinary gate (**131 checks**): the browser driver asserts
+**227 assertions per served stage** (**198** in `node scripts/browser-check.mjs
 --self-test`), and a named check-site check independently counts the 27 distinct
 `ok - D<n>` lines in the root stage's captured output — so silently unplugging the
 device suite from the driver turns check-site red even while the browser stages
@@ -643,8 +727,8 @@ the same as the Japanese course working, so the gate checks the course, not the 
   then Japanese header, the one-time "Japanese first" suggestion, a Japanese device
   flow, and back to English.
 * **The course, from the shipped bundle.** Five assertions in both full stages open the
-  Japanese course the site actually ships: `#sxc1-exercise-stats` must report 52 decks
-  and 435 exercises *and* the pinned deck's **Japanese** title; the deck index card,
+  Japanese course the site actually ships: `#sxc1-exercise-stats` must report 50 decks
+  and 352 exercises *and* the pinned deck's **Japanese** title; the deck index card,
   deck page title and deck `summary:` must be the corpus Japanese; a real corpus quiz
   must render its Japanese title, question and both pinned option labels, and — clicked
   **by its Japanese label** — grade to the Japanese "correct" feedback with the Japanese
@@ -722,10 +806,11 @@ the content-stats blobs above and no JSON *decoder*, and every field here is an 
 an already-slug-shaped id, so there is nothing to quote or escape):
 
 ```
-SXC1PROGRESS <TAB> <schemaVersion>          (currently 2)
+SXC1PROGRESS <TAB> <schemaVersion>          (currently 3)
 M <TAB> streakDay <TAB> streakLen <TAB> firstDay <TAB> lastPrompt
 R <TAB> promptId <TAB> reps <TAB> lapses <TAB> ease <TAB> interval <TAB> due <TAB> lastSeen <TAB> seen
 D <TAB> exerciseId <TAB> completions
+W <TAB> day <TAB> deckId <TAB> exerciseId <TAB> promptId-or-- <TAB> grade
 ```
 
 The schema version lives **inside the first line of the payload itself**, not in the
@@ -739,14 +824,16 @@ declares a version newer than the build's `currentSchema` is `DecodeCorrupt` out
 (fail-closed, see below), never partially read via tag-skipping.
 
 **The migration story.** `SXC1.Progress.Codec.migrateWith` walks a decoded version `v`
-forward, `v -> v+1 -> ... -> currentSchema` (currently `2`; the v1 -> v2 step added the M line's `lastPrompt` column for "continue where you left off"), applying one step per hop
+forward, `v -> v+1 -> ... -> currentSchema` (currently `3`; v1 -> v2 added
+the M line's `lastPrompt` column and v2 -> v3 added the bounded Weekly Pulse
+ledger), applying one step per hop
 from a step table; a hop with no registered step is `DecodeCorrupt`, never a silently
 dropped history. Migration is forward-only by construction — there is no downgrade path,
 by design: an older build encountering a newer schema version fails closed
 (`DecodeCorrupt`, the header rule above), it does not attempt a partial read.
-`productionSteps` carries its first real production step: v1 → v2 is the identity
+`productionSteps` carries both production steps: v1 → v2 and v2 → v3 are identities
 (the body parser already defaults `lastPrompt` to empty for a three-field v1 M line),
-registered as `productionSteps 1 = Just id`. The mechanism itself was exercised by
+with the pulse ledger likewise defaulting to empty. The mechanism itself was exercised by
 `exe:progress-check`'s self-test (synthetic schema-0 blob, test-only step table) since
 before v2 existed, which is why the first real migration needed no new machinery.
 
@@ -779,12 +866,13 @@ bit-identical records forever on any target; a `Double` anywhere in that path ri
 platform-dependent rounding difference an `Int` computation cannot have. The ease factor
 is therefore carried as **milli-units in a plain `Int`** (`2500` means ease factor
 `2.5`), bounded `[1300, 3000]`, defaulted to `2500`. Every graded prompt is first reduced
-to one of four grades — `gradeOfOutcome` is the *only* place an `Outcome` is ever
-interpreted this way:
+to one of four grades. M11 events preserve the learner's explicit Again/Hard/Good/Easy
+choice through `gradeOfReview`; older events without that field retain the following
+`gradeOfOutcome` inference for backwards-compatible replay:
 
 | Outcome | Condition | Grade |
 |---|---|---|
-| `Incorrect` or `Skipped` | — | `GAgain` (start the item over) |
+| `Incorrect` or `Skipped` | — | `GAgain` (due again today) |
 | `Correct` | answer was revealed first | `GHard` |
 | `Correct` | took a 2nd+ attempt | `GHard` |
 | `Correct` | first try, but a hint was used | `GGood` |
@@ -818,7 +906,7 @@ hand. Clicking Export (`#btn-progress-export`) fills a read-only textarea
 (`#sxc1-export-blob`) with a small JSON envelope:
 
 ```json
-{"format":"sxc1-progress","schema":2,"exportedAt":"<stamp>","payload":"<wire text>"}
+{"format":"sxc1-progress","schema":3,"exportedAt":"<stamp>","payload":"<wire text>"}
 ```
 
 `payload` is exactly the same tab-separated wire text `encodeState` produces internally —
@@ -1244,9 +1332,9 @@ above. The same built `site/public/` bundle is also deployed to Vercel (project
 
 <a id="measured-figures"></a>
 
-Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), at M7's close,
-against the full 52-deck/435-exercise course **and all 108 manual pages** in **both
-languages** (rows measured at an earlier milestone's close say so):
+Measured on this machine (Linux x86\_64, 4 cores, 7.6 GiB RAM), against the current
+50-deck/352-exercise course **and all 108 manual pages** in **both languages** (rows
+measured at an earlier milestone's close say so):
 
 | Metric | Value |
 |---|---|
@@ -1254,32 +1342,32 @@ languages** (rows measured at an earlier milestone's close say so):
 | Warm build, unoptimized (nothing changed) | <1s |
 | Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time; `-Oz --converge` iterates to a fixed point, so it costs more than M3's `-O2` ~5s: the `wasm-opt` pass alone measures ≈11s on this machine) | ~15s |
 | `app.wasm`, unoptimized default build (`build-site.sh`, no flags; measured at M3's close — M4 ships only the optimized flavour, and grew, so this is still *over* the ceiling) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
-| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**; M7 final build, measured with `gzip -c site/public/app.wasm \| wc -c`, which prints `838748`) | 2,299,098 bytes raw / **838,748 bytes gzipped** |
+| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**) | 2,378,088 bytes raw / **865,232 bytes gzipped** |
 | `app.wasm` at M6's close, for comparison (the pre-manual-externalization baseline `briefs/M7-budget.json` records as `m6_final`) | 2,439,911 bytes raw / 887,732 bytes gzipped |
-| M7 gzip delta over the M6 close: the manual text left the wasm (`SXC1.Content.Corpus` retired, 193,460 raw bytes of embedded translations) | **−48,984 bytes** — against a pinned `M7_SHRINK_MIN` of 30,000; waves 2/3 added 108 pages of Japanese and **zero** wasm bytes |
+| Current gzip delta over the M6 close after manual externalization and subsequent UI revisions | **−22,500 bytes** — beyond the M11-rebaselined `M7_SHRINK_MIN` of 20,000 |
 | `app.wasm` at M5's close, for comparison (the pre-externalization baseline `briefs/M6-budget.json` records as `m5_final`) | 2,662,016 bytes raw / 933,305 bytes gzipped |
 | M6 gzip delta over the M5 close: corpus externalization **−73,560**, then the JA UI string table **+19,416** | **−54,144 bytes** net — no new wasm ceiling was granted or needed |
-| `content/content.en.txt` (the EN exercise bundle the app fetches at boot) | 284,108 bytes raw / **76,602 bytes gzipped** |
-| `content/content.ja.txt` (the JA bundle — real Japanese for all 52 decks, not an EN fallback) | 358,497 bytes raw / **91,130 bytes gzipped** |
-| Combined exercise-bundle gzip against `M6_BUNDLE_CEILING` (pinned in `check-site.sh`, recorded in `briefs/M6-budget.json`, logged to `state/bundle-ledger.tsv` every run) | **167,732 / 300,000 bytes** — 132,268 of headroom |
+| `content/content.en.txt` (the EN exercise bundle the app fetches at boot) | 252,485 bytes raw / **68,189 bytes gzipped** |
+| `content/content.ja.txt` (the JA bundle — real Japanese for all 50 live decks, not an EN fallback) | 316,964 bytes raw / **81,002 bytes gzipped** |
+| Combined exercise-bundle gzip against `M6_BUNDLE_CEILING` (pinned in `check-site.sh`, recorded in `briefs/M6-budget.json`, logged to `state/bundle-ledger.tsv` every run) | **149,191 / 300,000 bytes** — 150,809 of headroom |
 | `content/manuals.en.txt` (the EN manual bundle — all four documents, 108 pages) | 193,578 bytes raw / **57,818 bytes gzipped** |
-| `content/manuals.ja.txt` (the JA manual bundle — real Japanese for all 108 pages, all four `!SXC1-DOC` records `ja`, not an EN fallback) | 217,070 bytes raw / **60,215 bytes gzipped** |
-| Combined manual-bundle gzip against `M7_MANUAL_BUNDLE_CEILING` (pinned in `check-site.sh`, recorded in `briefs/M7-budget.json`, logged to `state/manual-bundle-ledger.tsv` every run) | **118,033 / 250,000 bytes** — 131,967 of headroom |
-| **Everything the app fetches at boot**, against `M7_BUNDLE_TOTAL_CEILING` (= 300,000 + 250,000, asserted with its arithmetic in `check-site.sh`) | **285,765 / 550,000 bytes** — 264,235 of headroom |
+| `content/manuals.ja.txt` (the JA manual bundle — real Japanese for all 108 pages, all four `!SXC1-DOC` records `ja`, not an EN fallback) | 217,067 bytes raw / **60,205 bytes gzipped** |
+| Combined manual-bundle gzip against `M7_MANUAL_BUNDLE_CEILING` (pinned in `check-site.sh`, recorded in `briefs/M7-budget.json`, logged to `state/manual-bundle-ledger.tsv` every run) | **118,023 / 250,000 bytes** — 131,977 of headroom |
+| **Everything the app fetches at boot**, against `M7_BUNDLE_TOTAL_CEILING` (= 300,000 + 250,000, asserted with its arithmetic in `check-site.sh`) | **267,214 / 550,000 bytes** — 282,786 of headroom |
 | M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json`; M4 closed at 927,008) | **+36,295 bytes** — inside M4's 42,000-byte budget |
 | M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
-| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 161,252 bytes of headroom remain |
+| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 134,768 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 12,938,967 bytes (≈12.9 MB) |
-| `check-site.sh`, full run (**129** checks, both browser sweeps of 108 routes, **242** browser assertions per served stage incl. the D1–D27 device suite, the JA course and the JA manuals) | ≈109s |
-| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **242** assertions per stage / **5** named `ja course:` (JAC1–JAC5) / **4** named `ja manual:` (JAM1–JAM4) per stage |
-| `exe:exercise-check --bundle-structural-diff` (EN/JA exercise corpus) / `--manual-structural-diff` (EN/JA manual documents, the reader's own parser) | **53/53** checks (1 + one per deck) / **109/109** checks (1 + one per page), each with its own negative controls |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,052,073 bytes (≈13.1 MB) |
+| `check-site.sh`, full run (**135** checks, both browser sweeps of 108 routes, **235** browser assertions per served stage incl. real offline boot, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and JA manuals) | ≈112s |
+| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **233** assertions per stage / **7** named `ja course:` (JAC1–JAC7, including mastery and Weekly Pulse) / **4** named `ja manual:` (JAM1–JAM4) per stage |
+| `exe:exercise-check --bundle-structural-diff` (EN/JA exercise corpus) / `--manual-structural-diff` (EN/JA manual documents, the reader's own parser) | **51/51** checks (1 + one per live deck) / **109/109** checks (1 + one per page), each with its own negative controls |
 | `node scripts/browser-check.mjs --self-test` / `--self-test-negative` | **198/198** assertions / **42/42** sabotage passes, each catching exactly its own mapped assertion(s) |
 | `exe:content-check --self-test` | **412/412** checks |
-| `exe:progress-check --self-test` | **91/91** checks |
-| `exe:registry-check` (real tree) / `--self-test` | **8/8** (435 corpus / 440 registry) / **16/16** |
-| `exe:exercise-check` real-content / `--self-test` / `--fixtures` / `--list-codes` | 0 issues / **454/454** (incl. the **110**-assertion M4 group grounding `SXC1.Midi.Spec` against `translations/midi.md` and the **64**-check M6 JA-completeness group) / **56/56** fixtures / 53 codes |
+| `exe:progress-check --self-test` | **102/102** checks |
+| `exe:registry-check` (real tree) / `--self-test` | **8/8** (352 live corpus / 440 permanent registry entries) / **16/16** |
+| `exe:exercise-check` real-content / `--self-test` / `--fixtures` / `--list-codes` | 0 issues / **477/477** (incl. the **110**-assertion M4 group grounding `SXC1.Midi.Spec`, the live-deck M6 JA-completeness group, the M8 mastery projection group, the Today's Session/Weekly Pulse route contracts, and the 128-card authored-distractor invariant) / **56/56** fixtures / 53 codes |
 
 The *unoptimized* `app.wasm` gzip figure above is a range, not a single number,
 deliberately: this project observed a few hundred bytes of run-to-run jitter across
@@ -1296,7 +1384,7 @@ exactly. The table therefore reports the shipping artifact's own measured
 number — the bytes actually sitting at `site/public/app.wasm` are what `check-site.sh`
 measures and what deploys. `app.wasm` grew from M2's 978,969-byte
 gzipped baseline mainly for two reasons: the course grew from 4 decks/16 exercises to
-52 decks/435 exercises (embedded content costs ≈0.3456 gzip bytes per raw byte of
+52 decks/435 exercises before the operation-first retirement (embedded content costs ≈0.3456 gzip bytes per raw byte of
 `.ex.md`), and the M3 progress engine (`SXC1.Progress.*`, `Progress/Store.hs`,
 `View/Progress.hs`) added roughly another 34 KB gzipped; M4's device layer
 (`site/app/Device/Midi.hs`, `SXC1.Midi.Spec`, the device panel) added the **+36,295**

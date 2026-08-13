@@ -28,6 +28,7 @@
 module SXC1.Exercise.Engine
   ( Response (..)
   , SelfGrade (..)
+  , ReviewGrade (..)
   , ConfirmSource (..)
   , Outcome (..)
   , MonoMs (..)
@@ -38,6 +39,7 @@ module SXC1.Exercise.Engine
   , ProgressSink (..)
   , initialState
   , step
+  , stepLive
   ) where
 
 import qualified Data.IntMap.Strict as IntMap
@@ -63,6 +65,13 @@ data Response
 
 data SelfGrade = Got | Missed
   deriving (Eq, Show)
+
+-- | The learner-facing spaced-repetition alphabet. Choice cards are
+-- evaluated first, then committed with one of these four ratings. Keeping
+-- the enum here lets 'ProgressEvent' carry the explicit decision without
+-- making the exercise engine depend on the progress package.
+data ReviewGrade = ReviewAgain | ReviewHard | ReviewGood | ReviewEasy
+  deriving (Eq, Show, Enum, Bounded)
 
 -- | Who confirmed a drill step -- the learner, by button, or (M4) the
 -- device itself via a WebMIDI @verify:@ hook.
@@ -101,6 +110,8 @@ data ExerciseState = ExerciseState
   , esAttempts  :: IntMap Int
   , esHints     :: IntMap Int
   , esRevealed  :: IntSet
+  , esEvaluated :: IntMap Outcome
+  , esRated     :: IntSet
   , esStartedAt :: !MonoMs  -- ^ monotonic ms this attempt began (H1: seeded from the MONOTONIC clock, never the wall one)
   , esPromptAt  :: !MonoMs  -- ^ monotonic ms the CURRENT prompt was (re)shown -- what 'gradeStep' subtracts against
   , esDone      :: !Bool
@@ -121,6 +132,8 @@ data ExerciseAction
   = Begin MonoMs WallMs
   | Toggle Int Text
   | Submit Int MonoMs WallMs
+  | Check Int Bool             -- ^ evaluate Choice; True means "not sure"
+  | Rate Int ReviewGrade MonoMs WallMs
   | Reveal Int
   | SelfGrade_ Int SelfGrade MonoMs WallMs
   | ConfirmStep Int ConfirmSource MonoMs WallMs
@@ -144,6 +157,7 @@ data ProgressEvent = ProgressEvent
   , peAttempt  :: !Int
   , peRevealed :: !Bool
   , peHints    :: !Int
+  , peReview   :: Maybe ReviewGrade
   , peElapsed  :: !Int      -- ^ ms on this prompt, monotonic
   , peAt       :: !Integer  -- ^ wall-clock epoch ms; M3 schedules on dates
   } deriving (Eq, Show)
@@ -168,6 +182,8 @@ initialState exid t = ExerciseState
   , esAttempts  = IntMap.empty
   , esHints     = IntMap.empty
   , esRevealed  = IntSet.empty
+  , esEvaluated = IntMap.empty
+  , esRated     = IntSet.empty
   , esStartedAt = t
   , esPromptAt  = t
   , esDone      = False
@@ -193,8 +209,8 @@ isUnanswered :: Response -> Bool
 isUnanswered RUnanswered = True
 isUnanswered _            = False
 
-mkEvent :: Exercise -> Maybe PromptId -> Outcome -> Int -> Bool -> Int -> Int -> Integer -> ProgressEvent
-mkEvent ex mPid outcome attempt revealed hints elapsedMs wallMs = ProgressEvent
+mkEvent :: Exercise -> Maybe PromptId -> Outcome -> Int -> Bool -> Int -> Maybe ReviewGrade -> Int -> Integer -> ProgressEvent
+mkEvent ex mPid outcome attempt revealed hints review elapsedMs wallMs = ProgressEvent
   { peDeck     = exDeck ex
   , peExercise = exId ex
   , pePrompt   = mPid
@@ -203,6 +219,7 @@ mkEvent ex mPid outcome attempt revealed hints elapsedMs wallMs = ProgressEvent
   , peAttempt  = attempt
   , peRevealed = revealed
   , peHints    = hints
+  , peReview   = review
   , peElapsed  = elapsedMs
   , peAt       = wallMs
   }
@@ -238,11 +255,31 @@ gradeStep ex st i monoMs wallMs grader = case safeIndex (exPrompts ex) i of
             , esAttempts  = attempts'
             , esPromptAt  = monoMs
             }
-          event = mkEvent ex (Just (prId prompt)) outcome attemptN revealed hints elapsedMs (unWallMs wallMs)
+          event = mkEvent ex (Just (prId prompt)) outcome attemptN revealed hints Nothing elapsedMs (unWallMs wallMs)
       in (st', [event])
 
+-- | Full backwards-compatible interpreter used by the checkers. The live
+-- bundle cannot contain bare Recall cards and the app never constructs the
+-- retired Submit/Reveal/SelfGrade actions, so those three cases stay outside
+-- 'stepLive' and can be removed from the optimized browser link.
 step :: Exercise -> ExerciseAction -> ExerciseState -> (ExerciseState, [ProgressEvent])
 step ex action st = case action of
+  Submit i monoMs wallMs -> gradeStep ex st i monoMs wallMs $ \prompt -> case prBody prompt of
+    Choice opts ->
+      let selected   = case IntMap.lookup i (esResponses st) of { Just (RChosen sel) -> sel; _ -> [] }
+          correctIds = [ optId o | o <- opts, optCorrect o ]
+      in Just (Set.fromList selected == Set.fromList correctIds, RChosen selected)
+    _ -> Nothing
+  Reveal i -> (st { esRevealed = IntSet.insert i (esRevealed st) }, [])
+  SelfGrade_ i grade monoMs wallMs -> gradeStep ex st i monoMs wallMs $ \prompt -> case prBody prompt of
+    Recall _ -> Just (grade == Got, RRevealed grade)
+    _        -> Nothing
+  _ -> stepLive ex action st
+
+-- | Shipping interpreter. It remains total over the public action type, but
+-- legacy-only constructors are inert and carry no retired grading/UI code.
+stepLive :: Exercise -> ExerciseAction -> ExerciseState -> (ExerciseState, [ProgressEvent])
+stepLive ex action st = case action of
   -- H1/H6: both clocks are taken, but only the MONOTONIC one seeds the
   -- new attempt's 'esStartedAt'/'esPromptAt' -- see the module Haddock.
   -- The 'WallMs' reading is still required at the call site (so every
@@ -280,18 +317,47 @@ step ex action st = case action of
           | otherwise           = cur ++ [optIdent]
     in (st { esResponses = IntMap.insert i (RChosen sel') (esResponses st) }, [])
 
-  Submit i monoMs wallMs -> gradeStep ex st i monoMs wallMs $ \prompt -> case prBody prompt of
-    Choice opts ->
-      let selected   = case IntMap.lookup i (esResponses st) of { Just (RChosen sel) -> sel; _ -> [] }
-          correctIds = [ optId o | o <- opts, optCorrect o ]
-      in Just (Set.fromList selected == Set.fromList correctIds, RChosen selected)
-    _ -> Nothing
+  Submit _ _ _ -> (st, [])
 
-  Reveal i -> (st { esRevealed = IntSet.insert i (esRevealed st) }, [])
+  -- UI choice flow: evaluation and scheduling are deliberately separate.
+  -- The learner first gets honest correctness feedback, then chooses the
+  -- appropriate Again/Hard or Good/Easy pair. No ProgressEvent is emitted
+  -- until that second decision, so the visible rating is the rating saved.
+  Check i unsure
+    | IntMap.member i (esEvaluated st) -> (st, [])
+    | otherwise -> case safeIndex (exPrompts ex) i of
+        Just prompt -> case prBody prompt of
+          Choice opts ->
+            let selected = case IntMap.lookup i (esResponses st) of
+                  Just (RChosen xs) -> xs
+                  _                 -> []
+                correctIds = [ optId o | o <- opts, optCorrect o ]
+                correct = not unsure && Set.fromList selected == Set.fromList correctIds
+                attempts' = IntMap.insertWith (+) i 1 (esAttempts st)
+                response' = if unsure then RChosen [] else RChosen selected
+            in ( st { esResponses = IntMap.insert i response' (esResponses st)
+                    , esAttempts = attempts'
+                    , esEvaluated = IntMap.insert i (if correct then Correct else Incorrect) (esEvaluated st)
+                    }
+               , [] )
+          _ -> (st, [])
+        Nothing -> (st, [])
 
-  SelfGrade_ i grade monoMs wallMs -> gradeStep ex st i monoMs wallMs $ \prompt -> case prBody prompt of
-    Recall _ -> Just (grade == Got, RRevealed grade)
-    _        -> Nothing
+  Rate i review monoMs wallMs
+    | IntSet.member i (esRated st) -> (st, [])
+    | otherwise -> case (safeIndex (exPrompts ex) i, IntMap.lookup i (esEvaluated st)) of
+        (Just prompt, Just outcome) ->
+          let attemptN = IntMap.findWithDefault 1 i (esAttempts st)
+              revealed = IntSet.member i (esRevealed st)
+              hints = IntMap.findWithDefault 0 i (esHints st)
+              elapsedMs = clampToInt (unMonoMs monoMs - unMonoMs (esPromptAt st))
+              event = mkEvent ex (Just (prId prompt)) outcome attemptN revealed hints
+                        (Just review) elapsedMs (unWallMs wallMs)
+          in (st { esRated = IntSet.insert i (esRated st), esPromptAt = monoMs }, [event])
+        _ -> (st, [])
+
+  Reveal _ -> (st, [])
+  SelfGrade_ _ _ _ _ -> (st, [])
 
   ConfirmStep i src monoMs wallMs -> gradeStep ex st i monoMs wallMs $ \prompt -> case prBody prompt of
     Confirm _ _ -> Just (True, RConfirmed src)
@@ -319,11 +385,11 @@ step ex action st = case action of
         skipEvent
           | i >= 0 && i < n && isUnanswered curResp =
               [ mkEvent ex (fmap prId (safeIndex (exPrompts ex) i)) Skipped 0 False
-                  (IntMap.findWithDefault 0 i (esHints st)) 0 wallInt ]
+                  (IntMap.findWithDefault 0 i (esHints st)) Nothing 0 wallInt ]
           | otherwise = []
         nextCursor = i + 1
         st' = st { esPromptAt = monoMs }
     in if nextCursor >= n
          then ( st' { esCursor = nextCursor, esDone = True }
-              , skipEvent ++ [ mkEvent ex Nothing Completed 0 False 0 0 wallInt ] )
+              , skipEvent ++ [ mkEvent ex Nothing Completed 0 False 0 Nothing 0 wallInt ] )
          else (st' { esCursor = nextCursor }, skipEvent)

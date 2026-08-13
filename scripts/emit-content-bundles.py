@@ -90,7 +90,7 @@ content/EXERCISE-FORMAT.md sec. 12):
         exactly SXC1.Exercise.Reader.scanFieldBlock's rule): segment =
         the owning field line plus its continuation lines; the payload
         must be exactly one field line with the SAME key, and only the
-        learner-visible field keys {summary, check} may carry variants
+        learner-visible field keys {summary, check, distractor} may carry variants
         (cite:/find:/verify:/type:/id:/deck:/chapter:/tier:/tags:/
         requires:/limit: are language-invariant -- ruling 2);
       - otherwise (body prose): segment = the maximal run of contiguous
@@ -120,7 +120,7 @@ DELIM_PREFIX = "!SXC1-"
 HEADING_RE = re.compile(r"^(#{1,3}) \S")          # structural headings only (col 0, levels 1-3)
 OPTION_RE = re.compile(r"^- \[( |x|X)\] \S")      # col-0 GFM task-list option
 FIELD_RE = re.compile(r"^([a-z][a-z0-9-]*):")     # SXC1.Exercise.Reader.fieldKeyValueOf's key shape
-ALLOWED_FIELD_KEYS = {"summary", "check"}          # the only field VALUES that are learner-visible
+ALLOWED_FIELD_KEYS = {"summary", "check", "distractor"}  # learner-visible field values
 
 FNV_OFFSET = 2166136261
 FNV_PRIME = 16777619

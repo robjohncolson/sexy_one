@@ -5,9 +5,9 @@
   "m6_final_gzip_bytes": 887732,
   "ceiling_bytes": 1000000,
   "shrink_bytes": 73560,
-  "bundle_en_gzip_bytes": 76602,
-  "bundle_ja_gzip_bytes": 91130,
-  "bundle_combined_gzip_bytes": 167732,
+  "bundle_en_gzip_bytes": 68189,
+  "bundle_ja_gzip_bytes": 81002,
+  "bundle_combined_gzip_bytes": 149191,
   "bundle_ceiling_bytes": 300000,
   "ruling": "Coordinator, 2026-08-08 (briefs/M6-plan.md rulings 1/6): the exercise corpus moved OUT of app.wasm into per-language content bundles (site/public/content/content.{en,ja}.txt, emitted by scripts/emit-content-bundles.py, loaded at boot via the JS-side-guarded window.__sxc1Content bridge). m5_final is the M5-tagged shipping artifact's gzip (933,305 -- the pre-externalization baseline); m6_entry is the post-externalization optimized artifact at W1 (859,745; -73,560 -- ruling 1 expected roughly -100K, the corpus's 284,107 raw bytes compressed better inside the wasm than the linear 0.3456 coefficient predicted); m6_final is the SHIPPING artifact (887,732 -- W2's JA UI string table lawfully added 19,416 bytes back to reach 879,161 at the W4 close, and gate round 1's bundle-integrity repairs added a further 8,571: the wasm-embedded Exercises.Manifest expectation plus the all-or-nothing acceptance path; both under the frozen ceiling, exactly as ruling 6 anticipated). The frozen WASM_GZIP_CEILING_BYTES=1000000 is untouched and remains the only wasm ceiling for M6 (no new task-local wasm ceiling was granted): headroom at ship is 112,268 bytes. Content bundles have their own ledger and a 300,000-byte combined-gzip ceiling, asserted by check-site: at ship en=76,602 + ja=91,130 = 167,732, headroom 132,268 (the ja bundle is now REAL Japanese for all 52 decks -- W3 -- not the W1/W2 EN fallback, which is why it grew from 76,603). check-site pins M6_M5_FINAL=933305, M6_SHRINK_MIN=50000 and M6_BUNDLE_CEILING=300000 as literals (the M5-R1-2 pattern) and asserts this file MATCHES them -- including bundle_ceiling_bytes, so raising a ceiling stays a visible check-site.sh edit and can never be authorized by this mutable file; the m6_final and bundle figures are additionally held to a 3,000-byte window around the live measurement (gzip's exact output is a property of the local gzip build). briefs/M4-budget.json and briefs/M5-budget.json are preserved unchanged as historical records.",
   "evidence": [

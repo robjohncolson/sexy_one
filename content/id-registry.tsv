@@ -107,87 +107,87 @@ d-5-16	3	live	m3	lvl-13
 d-5-17	3	live	m3	lvl-13
 d-5-18	3	live	m3	lvl-14
 d-5-19	3	live	m3	lvl-11
-l-0-01	1	live	m3	ch0-01
-l-0-02	1	live	m3	ch0-01
-l-0-03	1	live	m3	ch0-01
-l-0-04	1	live	m3	ch0-01
-l-0-05	1	live	m3	ch0-02
-l-0-06	1	live	m3	ch0-02
-l-0-07	1	live	m3	ch0-02
-l-0-08	1	live	m3	ch0-02
-l-0-09	1	live	m3	ch0-03
-l-0-10	1	live	m3	ch0-03
-l-0-11	1	live	m3	ch0-03
-l-0-12	1	live	m3	ch0-03
-l-0-13	1	live	m3	ch0-04
-l-0-14	1	live	m3	ch0-04
-l-0-15	1	live	m3	ch0-04
-l-0-16	1	live	m3	ch0-04
-l-0-17	1	live	m3	ch0-05
-l-0-18	1	live	m3	ch0-05
-l-0-19	1	live	m3	ch0-05
-l-0-20	1	live	m3	ch0-05
-l-0-21	1	live	m3	ch0-06
-l-0-22	1	live	m3	ch0-06
-l-0-23	1	live	m3	ch0-06
-l-0-24	1	live	m3	ch0-06
-l-0-25	1	live	m3	ch0-08
-l-1-01	1	live	m3	prep-04
-l-1-02	1	live	m3	prep-02
-l-1-03	1	live	m3	prep-02
-l-1-04	1	live	m2	prep-03
-l-1-05	1	live	m2	prep-04
-l-1-06	1	live	m3	prep-04
-l-1-07	1	live	m3	prep-01
-l-1-08	1	live	m3	prep-01
-l-2-01	1	live	m2	pad-05
-l-2-02	1	live	m3	pad-03
-l-2-03	1	live	m2	pad-07
-l-2-04	1	live	m3	pad-08
-l-2-05	1	live	m2	pad-02
-l-2-06	1	live	m3	pad-02
-l-2-07	1	live	m3	pad-09
-l-2-08	1	live	m3	pad-08
-l-2-09	1	live	m3	pad-09
-l-2-10	1	live	m3	pad-02
-l-2-11	1	live	m3	pad-06
-l-2-12	1	live	m3	pad-04
-l-3-01	1	live	m3	smp-02
-l-3-02	1	live	m3	smp-01
-l-3-03	1	live	m3	smp-03
-l-3-04	1	live	m3	smp-07
-l-3-05	1	live	m3	smp-06
-l-3-06	1	live	m3	smp-07
-l-4-01	1	live	m3	seq-02
-l-4-02	1	live	m3	seq-02
-l-4-03	1	live	m3	seq-03
-l-4-04	1	live	m3	seq-09
-l-4-05	1	live	m3	seq-04
-l-4-06	1	live	m3	seq-05
-l-4-07	1	live	m3	seq-06
-l-4-08	1	live	m3	seq-06
-l-4-09	1	live	m3	seq-09
-l-4-10	1	live	m3	seq-09
-l-4-11	1	live	m3	seq-09
-l-4-12	1	live	m3	seq-07
-l-4-13	1	live	m3	seq-02
-l-5-01	1	live	m3	lvl-05
-l-5-02	1	live	m3	lvl-10
-l-5-03	1	live	m3	lvl-10
-l-5-04	1	live	m3	lvl-02
-l-5-05	1	live	m3	lvl-02
-l-5-06	1	live	m3	lvl-10
-l-5-07	1	live	m3	lvl-12
-l-5-08	1	live	m3	lvl-12
-l-5-09	1	live	m3	lvl-13
-l-5-10	1	live	m3	lvl-14
-l-5-11	1	live	m3	lvl-15
-l-5-12	1	live	m3	lvl-15
-l-5-13	1	live	m3	lvl-01
-l-5-14	1	live	m3	lvl-02
-l-5-15	1	live	m3	lvl-01
-l-5-16	1	live	m3	lvl-02
-l-5-17	1	live	m3	lvl-01
+l-0-01	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-02	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-03	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-04	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-05	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-06	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-07	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-08	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-09	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-10	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-11	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-12	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-13	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-14	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-15	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-16	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-17	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-18	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-19	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-20	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-21	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-22	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-23	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-24	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-0-25	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-1-01	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-1-02	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-1-03	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-1-04	0	tombstone	m2	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-1-05	0	tombstone	m2	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-1-06	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-1-07	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-1-08	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-01	0	tombstone	m2	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-02	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-03	0	tombstone	m2	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-04	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-05	0	tombstone	m2	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-06	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-07	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-08	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-09	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-10	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-11	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-2-12	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-3-01	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-3-02	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-3-03	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-3-04	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-3-05	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-3-06	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-01	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-02	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-03	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-04	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-05	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-06	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-07	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-08	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-09	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-10	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-11	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-12	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-4-13	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-01	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-02	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-03	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-04	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-05	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-06	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-07	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-08	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-09	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-10	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-11	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-12	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-13	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-14	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-15	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-16	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
+l-5-17	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
 q-0-01	1	live	m3	ch0-01
 q-0-02	1	live	m3	ch0-01
 q-0-03	1	live	m3	ch0-01
@@ -274,7 +274,7 @@ q-2-25	1	live	m3	pad-03
 q-2-26	1	live	m3	pad-03
 q-2-27	1	live	m3	pad-04
 q-2-28	1	live	m3	pad-04
-q-2-29	1	live	m3	pad-04
+q-2-29	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
 q-2-30	1	live	m3	pad-05
 q-2-31	1	live	m3	pad-05
 q-2-32	1	live	m3	pad-05
@@ -314,7 +314,7 @@ q-3-08	1	live	m3	smp-01
 q-3-09	1	live	m3	smp-01
 q-3-10	1	live	m3	smp-01
 q-3-11	1	live	m3	smp-01
-q-3-12	1	live	m3	smp-01
+q-3-12	0	tombstone	m3	retired: manual-navigation/reference trivia removed; the digital reader links the source directly
 q-3-13	1	live	m3	smp-02
 q-3-14	1	live	m3	smp-02
 q-3-15	1	live	m3	smp-02

@@ -25,9 +25,9 @@ module View.Exercise
 
 import           Data.List              (find)
 import qualified Data.IntMap.Strict     as IntMap
-import qualified Data.IntSet            as IntSet
 import qualified Data.Text              as T
 import           Data.Text              (Text)
+import           Data.Maybe             (listToMaybe)
 
 import           Miso
 import           Miso.Html.Element      as H
@@ -36,7 +36,7 @@ import           Miso.Html.Property     as P
 
 import           Device.Midi            (DeviceStatus (..), HubSnapshot (..))
 import           I18n
-import           SXC1.Exercise.Engine   (ConfirmSource (..), ExerciseState (..), Outcome (..), Response (..))
+import           SXC1.Exercise.Engine   (ConfirmSource (..), ExerciseState (..), Outcome (..), Response (..), ReviewGrade (..))
 import           SXC1.Exercise.Types
 import           SXC1.Progress.Types    (ProgressState)
 import           SXC1.Route             (Route (..), parseDigits, renderRoute)
@@ -53,11 +53,10 @@ import qualified View.Progress          as Progress
 
 data ExHandlers action = ExHandlers
   { exOnToggle     :: Int -> Text -> action
-  , exOnSubmit     :: Int -> action
-  , exOnReveal     :: Int -> action
-  , exOnGot        :: Int -> action
-  , exOnMissed     :: Int -> action
+  , exOnCheck      :: Int -> Bool -> action
+  , exOnRate       :: Int -> ReviewGrade -> action
   , exOnConfirm    :: Int -> action
+  , exOnSkip       :: Int -> action
   , exOnFindInput  :: Int -> MisoString -> action
   , exOnFindSubmit :: Int -> action
   , exOnShowHint   :: Int -> action
@@ -101,6 +100,53 @@ findDeckBySlug decks slug = find ((== slug) . unDeckId . dkId) decks
 
 findExerciseBySlug :: Deck -> Text -> Maybe Exercise
 findExerciseBySlug d slug = find ((== slug) . unExId . exId) (dkExercises d)
+
+-- | The next card in the authored course order, crossing deck boundaries
+-- transparently. The learner should not have to return to a deck index
+-- after every completed exercise.
+nextExerciseAfter :: [Deck] -> ExId -> Maybe (Deck, Exercise)
+nextExerciseAfter decks current = case dropWhile ((/= current) . exId . snd) ordered of
+  _current : next : _ -> Just next
+  _                   -> Nothing
+  where ordered = [ (d, ex) | d <- decks, ex <- dkExercises d ]
+
+-- | Cards tagged @visual-source@ carry the first cited manual page directly
+-- beside the prompt. This is for questions whose callout number, physical
+-- location or screen wording is meaningless without its source diagram.
+sourceFigureEls :: Lang -> Deck -> Exercise -> [View model action]
+sourceFigureEls lang d ex
+  | "visual-source" `notElem` (dkTags d ++ exTags ex) = []
+  | otherwise = case listToMaybe (exCites ex ++ dkCites d) of
+      Nothing -> []
+      Just c  ->
+        [ H.figure_
+            [ P.id_ "ex-source-figure"
+            , P.class_ (ms ("exercise-source-figure figure-" <> citSlug c <> "-" <> tshow (citPage c)))
+            ]
+            [ H.a_
+                [ P.class_ "exercise-source-frame"
+                , P.href_ (ms (renderRoute (RPage (citSlug c) (citPage c) False)))
+                ]
+                [ H.img_
+                    [ P.id_ "ex-source-image"
+                    , P.src_ (ms ("./pages/" <> citSlug c <> "/page-" <> zeroPad2 (citPage c) <> ".webp"))
+                    , P.alt_ (ms (iExerciseFigureAlt lang (exTitle ex)))
+                    , textProp "decoding" "async"
+                    , textProp "loading" "eager"
+                    ]
+                ]
+            , H.figcaption_ []
+                [ H.a_
+                    [ P.class_ "exercise-source-caption"
+                    , P.href_ (ms (renderRoute (RPage (citSlug c) (citPage c) False)))
+                    ]
+                    [ text (ms (iExerciseFigureCaption lang (citSlug c) (citPage c))) ]
+                ]
+            ]
+        ]
+  where
+    zeroPad2 n | n < 10    = "0" <> tshow n
+               | otherwise = tshow n
 
 safeIndex :: [a] -> Int -> Maybe a
 safeIndex xs i
@@ -156,7 +202,7 @@ exerciseNotFound lang label = H.section_ [ P.id_ "sxc1-not-found" ]
 -- function's Haddock), so the M2 DOM contract (@.ex-deck-card@) and the
 -- M3 one (@.deck-card@) are the same element, not a duplicated list.
 viewExerciseIndex :: Lang -> ProgressState -> [Deck] -> View model action
-viewExerciseIndex lang prog decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (map renderChapter chapters)
+viewExerciseIndex lang prog decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (sessionLink : weeklyLink : masteryLink : map renderChapter chapters)
   where
     chapterOrder = uniqueInOrder (map dkChapter decks)
     chapters = [ (ch, [ d | d <- decks, dkChapter d == ch ]) | ch <- chapterOrder ]
@@ -166,6 +212,27 @@ viewExerciseIndex lang prog decks = H.section_ [ P.id_ "sxc1-exercise-index" ] (
     -- the corpus grows toward the full 52 this flips to closed
     -- automatically, no per-task change needed.
     startOpen = length decks <= 8
+
+    sessionLink = H.a_
+      [ P.id_ "exercise-session-link", P.class_ "ex-deck-card session-index-card"
+      , P.href_ (ms (renderRoute RSession)) ]
+      [ H.span_ [ P.class_ "ex-deck-title" ] [ text (ms (iTodaySessionTitle lang)) ]
+      , H.span_ [ P.class_ "ex-deck-count" ] [ text (ms (iTodaySessionSub lang)) ]
+      ]
+
+    masteryLink = H.a_
+      [ P.id_ "exercise-mastery-link", P.class_ "ex-deck-card mastery-index-card"
+      , P.href_ (ms (renderRoute RMastery)) ]
+      [ H.span_ [ P.class_ "ex-deck-title" ] [ text (ms (iMasteryTitle lang)) ]
+      , H.span_ [ P.class_ "ex-deck-count" ] [ text (ms (iMasteryCardSub lang)) ]
+      ]
+
+    weeklyLink = H.a_
+      [ P.id_ "exercise-weekly-link", P.class_ "ex-deck-card weekly-index-card"
+      , P.href_ (ms (renderRoute RWeekly)) ]
+      [ H.span_ [ P.class_ "ex-deck-title" ] [ text (ms (iWeeklyTitle lang)) ]
+      , H.span_ [ P.class_ "ex-deck-count" ] [ text (ms (iWeeklyCardSub lang)) ]
+      ]
 
     renderChapter (chTitle, ds) = H.details_ [ P.class_ "ex-chapter", P.open_ startOpen ]
       [ H.summary_ [ P.class_ "ex-chapter-title" ]
@@ -230,10 +297,13 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
     Nothing -> exerciseNotFound lang (deckSlug <> "/" <> exSlug)
     Just d -> case findExerciseBySlug d exSlug of
       Nothing -> exerciseNotFound lang (deckSlug <> "/" <> exSlug)
-      Just ex -> renderRunner ex
+      Just ex -> renderRunner d ex
 
   where
-    renderRunner ex = H.article_ [ P.id_ "sxc1-exercise", P.class_ (ms ("exercise kind-" <> kindClass (exKind ex))) ]
+    renderRunner d ex = H.article_
+      [ P.id_ "sxc1-exercise"
+      , P.class_ (ms ("exercise kind-" <> kindClass (exKind ex)))
+      ]
       -- M5 a11y: @tabindex="-1"@ makes the title a programmatic focus
       -- target -- Main.hs's advance-focus wiring lands here when a
       -- quiz\/lookup prompt advances (see Main.advanceFocusTarget), so
@@ -241,12 +311,16 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
       -- that had focus (e.g. #btn-ex-next) disappears with the old prompt.
       ( [ H.h1_ [ P.id_ "ex-title", textProp "tabindex" "-1" ] [ text (ms (exTitle ex)) ]
         , H.p_ [ P.id_ "ex-progress" ] [ text (ms progressText) ]
-        , H.div_ [ P.id_ "ex-stem" ] (Blocks.renderBlocks "" (exIntro ex))
         ]
+        ++ sourceFigureEls lang d ex
+        ++ [ H.div_ [ P.id_ "ex-stem" ] (Blocks.renderBlocks "" (exIntro ex)) ]
         ++ devicePanelEl ex
         ++ bodyEls ex
         ++ hintsEl ex
-        ++ [ H.button_ [ P.id_ "btn-ex-restart", E.onClick (exOnRestart h) ] [ text (ms (iRestart lang)) ] ]
+        ++ [ H.button_ [ P.id_ "btn-ex-restart", P.class_ "wizard-no", E.onClick (exOnRestart h) ]
+               [ text (ms (iRestart lang)) ]
+           | showRunnerRestart ex
+           ]
         ++ summaryEl
       )
       where
@@ -255,7 +329,22 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
         displayedCursor = min (cursor + 1) (max n 1)
         progressText = T.pack (show displayedCursor) <> " / " <> T.pack (show n)
 
-        mAttempted = case mResult of { Just _ -> True; Nothing -> False }
+        mEvaluation = IntMap.lookup cursor (esEvaluated st)
+        renderedResult = case mEvaluation of
+          Just outcome -> Just (outcome, 0)
+          Nothing      -> mResult
+        mAttempted = case renderedResult of { Just _ -> True; Nothing -> False }
+
+        -- Legacy Recall owns one persistent two-button control below. Live
+        -- M11 content has zero Recall prompts, but old fixtures remain
+        -- readable. Rendering another runner-level Restart would both make
+        -- a third choice and force a second button pair after grading.
+        showRunnerRestart ex' = not (esDone st) && case safeIndex (exPrompts ex') cursor of
+          Just prompt -> case prBody prompt of
+            Recall _ -> False
+            Choice _ -> False
+            _        -> True
+          Nothing -> True
 
         -- H8: a drill's step list (with each confirmed step's own
         -- citations -- see 'drillStepsEl') stays visible even once the
@@ -270,20 +359,38 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
           | esDone st            = []
           | otherwise            = case safeIndex (exPrompts ex') cursor of
               Nothing -> []
-              Just prompt -> kindBodyEl cursor prompt ++ sharedFeedbackEls
+              Just prompt -> case prBody prompt of
+                Recall _ -> kindBodyEl cursor prompt
+                Choice _ -> kindBodyEl cursor prompt
+                _        -> kindBodyEl cursor prompt ++ sharedFeedbackEls True
 
         kindBodyEl i prompt = case prBody prompt of
           Choice opts ->
-            [ H.ul_ [ P.id_ "ex-options" ] (map (renderOption i) opts)
-            , H.button_ [ P.id_ "btn-ex-submit", E.onClick (exOnSubmit h i) ] [ text (ms (iSubmit lang)) ]
+            [ H.fieldset_ [ P.id_ "ex-options", P.class_ (if evaluated then "is-evaluated" else "") ]
+                (H.legend_ [] [ text (ms (iCheckAnswer lang)) ] : map (renderOption i opts evaluated) opts)
             ]
-          Recall answerBlocks ->
-            if IntSet.member i (esRevealed st)
-              then [ H.div_ [ P.id_ "ex-answer" ] (Blocks.renderBlocks "" answerBlocks)
-                   , H.button_ [ P.id_ "btn-ex-got", E.onClick (exOnGot h i) ] [ text (ms (iGotIt lang)) ]
-                   , H.button_ [ P.id_ "btn-ex-missed", E.onClick (exOnMissed h i) ] [ text (ms (iMissedIt lang)) ]
+            ++ if evaluated
+                 then sharedFeedbackEls False ++ gradeActions i evaluation
+                 else
+                   [ H.div_ [ P.id_ "ex-choice-actions", P.class_ "wizard-actions" ]
+                       [ H.button_ ([ P.id_ "btn-ex-submit", P.class_ "wizard-choice wizard-yes"
+                                    , E.onClick (exOnCheck h i False)
+                                    ] ++ [P.disabled_ | null selected])
+                           [ text (ms (iCheckAnswer lang)) ]
+                       , H.button_ [ P.id_ "btn-ex-unsure", P.class_ "wizard-choice wizard-no"
+                                   , E.onClick (exOnCheck h i True)
+                                   ] [ text (ms (iNotSure lang)) ]
+                       ]
                    ]
-              else [ H.button_ [ P.id_ "btn-ex-reveal", E.onClick (exOnReveal h i) ] [ text (ms (iRevealAnswer lang)) ] ]
+            where
+              evaluation = IntMap.lookup i (esEvaluated st)
+              evaluated = case evaluation of { Just _ -> True; Nothing -> False }
+              selected = case IntMap.lookup i (esResponses st) of { Just (RChosen sel) -> sel; _ -> [] }
+          -- A current bundle can never reach this branch: all 128 Answer
+          -- cards carry distractors and the bundle fingerprint is checked
+          -- before parsing. Keep the constructor total for old checker
+          -- fixtures without linking the retired self-grade UI into app.wasm.
+          Recall _ -> []
           -- M6: 'prStem' here is LITERALLY 'exIntro' (both are the same
           -- 'exIntroBlocks' value out of "SXC1.Exercise.Parse" -- a
           -- lookup has exactly one 'Prompt' and no separate task text of
@@ -307,16 +414,53 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
           Confirm _ _ -> []  -- drills never reach here; see drillStepsEl
 
           where
-            selected = case IntMap.lookup i (esResponses st) of { Just (RChosen sel) -> sel; _ -> [] }
-            renderOption idx o = H.li_ []
-              [ H.button_
-                  [ P.id_ (ms ("opt-" <> optId o))
-                  , P.class_ "ex-option"
-                  , textProp "aria-pressed" (if optId o `elem` selected then "true" else "false")
-                  , E.onClick (exOnToggle h idx (optId o))
-                  ]
-                  (Blocks.renderInlines "" (optLabel o))
+            renderOption idx allOpts evaluated o =
+              let selected = case IntMap.lookup idx (esResponses st) of { Just (RChosen sel) -> sel; _ -> [] }
+                  isSelected = optId o `elem` selected
+                  isMulti = length (filter optCorrect allOpts) > 1
+                  stateClass :: Text
+                  stateClass
+                    | not evaluated = if isSelected then " is-selected" else ""
+                    | optCorrect o = " is-correct"
+                    | isSelected = " is-wrong"
+                    | otherwise = ""
+              in H.label_
+                [ P.class_ (ms ("ex-option" <> stateClass))
+                , textProp "for" (ms ("opt-" <> optId o))
+                ]
+                [ H.input_
+                    ([ P.id_ (ms ("opt-" <> optId o))
+                     , P.type_ (if isMulti then "checkbox" else "radio")
+                     , P.name_ (ms ("answer-" <> tshow idx))
+                     , P.checked_ isSelected
+                     , textProp "aria-pressed" (if isSelected then "true" else "false")
+                     , E.onClick (exOnToggle h idx (optId o))
+                     ] ++ [P.disabled_ | evaluated])
+                , H.span_ [] (Blocks.renderInlines "" (optLabel o))
+                ]
+
+            gradeActions _ Nothing = []
+            gradeActions idx (Just outcome) =
+              [ H.div_ [ P.id_ "ex-grade-actions", P.class_ "wizard-actions review-grade-actions" ]
+                  (case outcome of
+                    Correct ->
+                      [ gradeButton ("btn-ex-grade-good" :: Text) ("wizard-no" :: Text) (iGood lang) ReviewGood
+                      , gradeButton "btn-ex-grade-easy" "wizard-yes" (iEasy lang) ReviewEasy
+                      ]
+                    _ ->
+                      [ gradeButton "btn-ex-grade-again" "wizard-no" (iAgain lang) ReviewAgain
+                      , gradeButton "btn-ex-grade-hard" "wizard-yes" (iHard lang) ReviewHard
+                      ])
               ]
+              where
+                gradeButton ident klass label grade =
+                  let identT = ident :: Text
+                      klassT = klass :: Text
+                      labelT = label :: Text
+                  in H.button_
+                  [ P.id_ (ms identT), P.class_ (ms ("wizard-choice " <> klassT))
+                  , E.onClick (exOnRate h idx grade)
+                  ] [ text (ms labelT) ]
             elapsedEl = case mResult of
               Just (_, elapsedMs) -> [ H.p_ [ P.id_ "ex-elapsed" ] [ text (ms (formatElapsed elapsedMs)) ] ]
               Nothing              -> []
@@ -334,13 +478,17 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
         citesForFeedback = exCites ex ++
           [ t | Just p <- [safeIndex (exPrompts ex) cursor], FindPage t _ <- [prBody p] ]
 
-        sharedFeedbackEls =
+        sharedFeedbackEls includeNext =
           feedbackEl
             ++ [ H.div_ [ P.id_ "ex-note" ] (Blocks.renderBlocks "" (exNote ex)) | mAttempted, not (null (exNote ex)) ]
             ++ [ H.ul_ [ P.id_ "ex-cites" ] (map renderCite citesForFeedback) | mAttempted, not (null citesForFeedback) ]
-            ++ [ H.button_ [ P.id_ "btn-ex-next", E.onClick (exOnNext h) ] [ text (ms (iNextButton lang)) ] | mAttempted ]
+            ++ [ H.button_ [ P.id_ "btn-ex-next", P.class_ "wizard-choice wizard-yes"
+                           , E.onClick (exOnNext h)
+                           ] [ text (ms (iNextButton lang)) ]
+               | mAttempted, includeNext
+               ]
 
-        feedbackEl = case mResult of
+        feedbackEl = case renderedResult of
           Nothing -> []
           Just (outcome, _) ->
             let isCorrect = outcome == Correct
@@ -453,30 +601,62 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
 
             confirmEl idx0
               | idx0 == esCursor st =
-                  [ H.button_
-                      [ P.class_ "btn-ex-confirm", P.id_ (ms ("btn-ex-confirm-" <> T.pack (show (idx0 + 1))))
-                      , E.onClick (exOnConfirm h idx0)
+                  [ H.div_ [ P.class_ "wizard-actions drill-step-actions" ]
+                      [ H.button_
+                          [ P.id_ "btn-ex-skip", P.class_ "wizard-choice wizard-no"
+                          , E.onClick (exOnSkip h (length (exPrompts ex) - idx0))
+                          ]
+                          [ text (ms (iSkipCard lang)) ]
+                      , H.button_
+                          [ P.class_ "btn-ex-confirm wizard-choice wizard-yes"
+                          , P.id_ (ms ("btn-ex-confirm-" <> T.pack (show (idx0 + 1))))
+                          , E.onClick (exOnConfirm h idx0)
+                          ]
+                          [ text (ms (iConfirm lang)) ]
                       ]
-                      [ text (ms (iConfirm lang)) ]
                   ]
               | otherwise = []
 
         hintsEl ex'
-          | null (exHints ex') = []
+          | null (exHints ex') || mAttempted = []
           | otherwise =
-              [ H.button_ [ P.id_ "btn-ex-hint", E.onClick (exOnShowHint h cursor) ] [ text (ms (iShowHint lang)) ]
-              | shownCount < length (exHints ex')
+              [ H.details_ [ P.id_ "ex-hints-disclosure" ]
+                  [ H.summary_ [ P.id_ "btn-ex-hint", E.onClick (exOnShowHint h cursor) ]
+                      [ text (ms (iShowHint lang)) ]
+                  , H.ul_ [ P.id_ "ex-hints" ]
+                      [ H.li_ [ P.class_ "ex-hint" ] (Blocks.renderBlocks "" hb) | hb <- exHints ex' ]
+                  ]
               ]
-              ++ [ H.ul_ [ P.id_ "ex-hints" ]
-                     [ H.li_ [ P.class_ "ex-hint" ] (Blocks.renderBlocks "" hb) | hb <- take shownCount (exHints ex') ]
-                 | shownCount > 0
-                 ]
-          where shownCount = IntMap.findWithDefault 0 cursor (esHints st)
 
         -- M5 a11y: the summary is the focus target for the FINAL advance
         -- (the whole exercise completing) -- see #ex-title's comment.
         summaryEl
-          | esDone st = [ H.section_ [ P.id_ "ex-summary", textProp "tabindex" "-1" ] [ H.p_ [] [ text (ms (iExerciseCompleted lang)) ] ] ]
+          | esDone st =
+              [ H.section_ [ P.id_ "ex-summary", textProp "tabindex" "-1" ]
+                  [ H.p_ [] [ text (ms (iExerciseCompleted lang)) ]
+                  , H.div_ [ P.class_ "wizard-actions" ]
+                      [ case nextExerciseAfter decks (exId ex) of
+                      Just (nextDeck, nextEx) ->
+                        H.a_ [ P.id_ "btn-ex-next-card", P.class_ "primary-training-action wizard-choice wizard-yes"
+                             , P.href_ (ms (renderRoute (RExercise
+                                 (unDeckId (dkId nextDeck)) (unExId (exId nextEx)))))
+                             ]
+                          [ H.strong_ [] [ text (ms (iNextCard lang)) ]
+                          , H.span_ [ P.class_ "primary-training-card" ]
+                              [ text (ms (dkTitle nextDeck <> " \8212 " <> exTitle nextEx)) ]
+                          ]
+                      Nothing ->
+                        H.a_ [ P.id_ "btn-ex-next-card", P.class_ "primary-training-action wizard-choice wizard-yes"
+                             , P.href_ (ms (renderRoute RExercises))
+                             ]
+                          [ H.strong_ [] [ text (ms (iCourseComplete lang)) ] ]
+                      , H.button_ [ P.id_ "btn-ex-restart", P.class_ "wizard-choice wizard-no"
+                                  , E.onClick (exOnRestart h)
+                                  ]
+                          [ H.strong_ [] [ text (ms (iRestart lang)) ] ]
+                      ]
+                  ]
+              ]
           | otherwise = []
 
         -- M4 (briefs/M4-plan.md section 3.8): the device panel --
@@ -490,14 +670,15 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
         devicePanelEl ex'
           | dvwSupported dv && hasVerifyHook ex' =
               [ H.section_ [ P.id_ "ex-device" ]
-                  ( [ H.button_ [ P.id_ "btn-device-enable", E.onClick (exOnDevEnable h) ]
-                        [ text (ms enableLabel) ]
+                  ( deviceActionEl
+                    ++
+                    [
                     -- M5 a11y: status changes (grant/deny/mismatch/confirm
                     -- teardown) happen without a focus change, so the
                     -- sentence is a polite live region; the bare <select>
                     -- has no <label> element, so aria-label carries its
                     -- accessible name.
-                    , H.p_ [ P.id_ "device-status", textProp "aria-live" "polite" ] [ text (ms statusSentence) ]
+                    H.p_ [ P.id_ "device-status", textProp "aria-live" "polite" ] [ text (ms statusSentence) ]
                     , H.select_
                         [ P.id_ "sel-device-channel"
                         , textProp "aria-label" (ms (iChannelAria lang))
@@ -511,7 +692,6 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
                         ]
                     , H.p_ [ P.id_ "device-ports" ] [ text (ms portsText) ]
                     ]
-                    ++ useChannelEl
                   )
               ]
           | otherwise = []
@@ -554,8 +734,15 @@ viewExerciseRunner lang h dv decks deckSlug exSlug st mResult =
                 | otherwise -> iDevBoundInput lang (T.intercalate ", " (snapPorts snap))
               _ -> iDevNoneBound lang
 
-            useChannelEl = case mismatch of
-              Nothing -> []
+            -- The device panel and the active drill step share one
+            -- decision surface.  A mismatch therefore REPLACES the
+            -- enable/disable action with its one-click repair instead of
+            -- appending a third button beside the manual Confirm action.
+            deviceActionEl = case mismatch of
+              Nothing ->
+                [ H.button_ [ P.id_ "btn-device-enable", E.onClick (exOnDevEnable h) ]
+                    [ text (ms enableLabel) ]
+                ]
               Just c  ->
                 [ H.button_ [ P.id_ "btn-device-use-channel", E.onClick (exOnDevChannel h c) ]
                     [ text (ms (iUseChannel lang c)) ]

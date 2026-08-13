@@ -361,7 +361,7 @@ Checks performed, in order:
      back restores EN. The pinned title is grep-confirmed present in
      the served copy's ja bundle AND absent from its en bundle before
      the browser ever runs. Skipped via skip() under --skip-browser.
-  23. M6 W4 JA COURSE FLOOR (browser axis): the five "ja course:"
+  23. M6 W4 + M8 JA COURSE FLOOR (browser axis): the six "ja course:"
      assertions scripts/browser-check.mjs runs inside BOTH full stages
      (checks 7/8, within the UI-language JA flow) must each be reported
      ok, counted BY NAME in each stage's own capture -- the D-suite's
@@ -369,12 +369,13 @@ Checks performed, in order:
      catches assertions being REMOVED, not replaced. What those five
      prove is the milestone claim itself: the ja bundle the site SHIPS
      renders the real Japanese course -- #sxc1-exercise-stats reports
-     52 decks / 435 exercises and the pinned deck's JAPANESE title; the
+     50 decks / 352 exercises and the pinned deck's JAPANESE title; the
      deck index card, deck page title and deck summary: are the
      corpus's Japanese; a real corpus quiz renders its JA title,
      question and both option labels and, clicked BY ITS JAPANESE
      LABEL, grades to the JA "Correct" feedback with the JA rationale;
-     and a real corpus drill step shows its JA check: sentence. Every
+     a real corpus drill step shows its JA check: sentence, and the M8
+     mastery surface renders Japanese controls, tiers and deck text. Every
      expectation is a LITERAL pinned in browser-check.mjs
      (JA_COURSE_PINS), never derived from the bundle under test, so an
      EN-fallback ja bundle (the emitter's documented degenerate case,
@@ -390,12 +391,12 @@ Checks performed, in order:
      syntactically perfect zero-deck bundle; one whole deck removed with
      the header count adjusted to match) and one untouched. Each
      sabotage is verified structurally before the browser runs (the
-     truncated case is checked to KEEP all 52 delimiters -- the exact
+     truncated case is checked to KEEP all 50 delimiters -- the exact
      shape the pre-fix runtime accepted as a healthy, slightly smaller
      course), and browser-check --check-bad-bundle must report exactly
      12/12: every sabotaged copy shows the visible #sxc1-content-error
      alert AND reports zero decks with the degraded #/x notice, while
-     the control shows no banner and the whole 52-deck/435-exercise
+     the control shows no banner and the whole 50-deck/352-exercise
      course. Skipped via skip() under --skip-browser.
   25. M6 GATE-1 STALLED-FETCH DEADLINE (browser axis): a threaded server
      answers the en content bundle with 200 + headers + a few bytes and
@@ -456,7 +457,7 @@ Checks performed, in order:
      --check-bad-manual-bundle must report exactly 14/14: every broken
      copy shows the visible #sxc1-content-error alert AND renders the
      named #sxc1-manual-degraded body with #btn-content-retry on a real
-     manual route WHILE THE EXERCISE COURSE STAYS WHOLE (52 decks --
+     manual route WHILE THE EXERCISE COURSE STAYS WHOLE (50 decks --
      the two bundles fail independently, which is the claim), while the
      control shows no banner, a readable manual page and the whole
      course. Skipped via skip() under --skip-browser.
@@ -728,20 +729,19 @@ info() {
 # full stages -- the manual reader's own assertions there already cover
 # the fetched text, because they are the SAME assertions that covered
 # the embedded text and they never knew the difference.
-# M7 W3 pin raise (the SAME documented procedure -- ADDING A CHECK
-# REQUIRES A VISIBLE EDIT TO THIS PIN; RAISING THE FLOOR IS PART OF
-# ADDING ASSERTIONS): 127 -> 129 (+1 EN/JA MANUAL structural identity
-# with its three negative controls, check 30; +1 the JA MANUAL floor
-# across both full stages, check 31) and 238 -> 242 (+4: the JA manual
-# assertions inside runUiLangJaAssertions -- real Japanese manual text on
-# a real reading route, a second document, the original page image still
-# reachable on /ja beside that text, and the Japanese manual TOC --
-# measured 242/242 on both full stages at this raise). Check 29 keeps its
-# own 5/5 cardinality: W3 FLIPPED what those five assert (the EN-fallback
-# note is now correct only by its absence) without changing how many
-# there are.
-M5_CHECK_TOTAL=129
-M5_BROWSER_ASSERT_FLOOR=242
+# Operation-first course revision: the two QR integrity checks raised the
+# shell total from 129 to 131. Retiring all live lookup exercises removes
+# the lookup-only browser paths from each EN/JA sweep while their parser
+# and UI behavior remains covered by the synthetic self-test fixture;
+# the live-stage floor therefore moves from 242 to the newly measured 221.
+# M8 mastery journey adds the EN action-queue/chapter-trail assertion and
+# the JS-owned JA locale surface. The mobile hardening pass adds one more
+# negative-path assertion: an unsupported SIMD engine must fail before it
+# requests app.wasm and must show actionable recovery guidance.
+# Today's Session adds one full-stage assertion covering the stable adaptive
+# five-card plan, cross-route coach, DOM-only renderer, and mobile-safe links.
+M5_CHECK_TOTAL=135
+M5_BROWSER_ASSERT_FLOOR=233
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -924,6 +924,10 @@ REQUIRED_FILES=(
   "index.js"
   "app.wasm"
   "ghc_wasm_jsffi.js"
+  "qr-phone.svg"
+  "manifest.webmanifest"
+  "app-icon.svg"
+  "sw.js"
   ".nojekyll"
   "vendor/browser_wasi_shim/index.js"
   # M6 W1 (briefs/M6-plan.md, ruling 1): the per-language exercise
@@ -948,6 +952,83 @@ for rel in "${REQUIRED_FILES[@]}"; do
     fail "required file present: $rel (observed: missing)"
   fi
 done
+
+# M11 phone-ready shell: validate the manifest and service-worker cache as one
+# deployment contract. Every precached URL must be relative to the worker's
+# scope and must exist in the built artifact; manual scans stay on-demand so a
+# first install cannot silently become a 13 MB image download.
+PWA_CONTRACT_OUT=""
+if command -v python3 >/dev/null 2>&1; then
+  PWA_CONTRACT_OUT="$(python3 - "$DIR" <<'PY' 2>&1
+import json
+import pathlib
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+root = pathlib.Path(sys.argv[1])
+manifest = json.loads((root / "manifest.webmanifest").read_text(encoding="utf-8"))
+assert manifest["start_url"] == "./#/x/today", manifest.get("start_url")
+assert manifest["scope"] == "./", manifest.get("scope")
+assert manifest["display"] == "standalone", manifest.get("display")
+icons = manifest.get("icons", [])
+assert any(icon.get("src") == "./app-icon.svg" and "maskable" in icon.get("purpose", "") for icon in icons), icons
+ET.parse(root / "app-icon.svg")
+
+worker = (root / "sw.js").read_text(encoding="utf-8")
+assert 'const CACHE_VERSION = "m11-v3"' in worker
+match = re.search(r"const CORE_RELATIVE_URLS = (\[.*?\]);", worker, re.S)
+assert match, "CORE_RELATIVE_URLS not found"
+urls = json.loads(match.group(1))
+assert len(urls) == len(set(urls)), "duplicate core URL"
+assert all(url.startswith("./") and not url.startswith("./pages/") for url in urls), urls
+for url in urls:
+    rel = url[2:]
+    target = root if rel == "" else root / rel
+    assert target.exists(), f"missing precache target: {url}"
+assert "request.mode === \"navigate\"" in worker
+assert "networkFirst(request, CORE_CACHE" in worker
+assert "/\\/pages\\/[^/]+\\/page-\\d+\\.webp$/" in worker
+PY
+)" || true
+else
+  PWA_CONTRACT_OUT="python3 missing"
+fi
+if [ -z "$PWA_CONTRACT_OUT" ]; then
+  ok "phone-ready manifest/service-worker contract is subpath-safe, versioned, complete, and excludes manual scans from precache"
+else
+  fail "phone-ready manifest/service-worker contract is subpath-safe, versioned, complete, and excludes manual scans from precache (observed: $PWA_CONTRACT_OUT)"
+fi
+
+# A browser may fetch a malformed SVG successfully (HTTP 200) but refuse to
+# decode it. Parse the QR as XML here so duplicate attributes and broken
+# numeric output such as viewBox="0 0 NaN NaN" fail before deployment.
+QR_FILE="$DIR/qr-phone.svg"
+QR_XML_OUT=""
+if [ -f "$QR_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  QR_XML_OUT="$(python3 -c '
+import math
+import pathlib
+import sys
+import xml.etree.ElementTree as ET
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+root = ET.fromstring(text)
+assert root.tag.endswith("svg"), "root element is not svg"
+view_box = [float(value) for value in root.attrib["viewBox"].split()]
+assert len(view_box) == 4 and all(math.isfinite(value) for value in view_box), "viewBox is not finite"
+assert view_box[2] > 0 and view_box[3] > 0, "viewBox has no area"
+assert "nan" not in text.lower(), "SVG contains NaN"
+' "$QR_FILE" 2>&1)" || true
+  if [ -z "$QR_XML_OUT" ]; then
+    ok "qr-phone.svg is well-formed XML with a finite, non-empty viewBox"
+  else
+    fail "qr-phone.svg is well-formed XML with a finite, non-empty viewBox (observed: $QR_XML_OUT)"
+  fi
+else
+  fail "qr-phone.svg is well-formed XML with a finite, non-empty viewBox (observed: qr-phone.svg or python3 missing)"
+fi
 
 # ===========================================================================
 # Check 2: app.wasm begins with the 8-byte \0asm + version-1 magic.
@@ -2022,7 +2103,11 @@ fi
 M7_MANUAL_BUNDLE_CEILING=250000
 M7_BUNDLE_TOTAL_CEILING=550000
 M7_M6_FINAL=887732
-M7_SHRINK_MIN=30000
+# M11 rebaseline: the manual-externalization architecture still keeps the
+# browser binary smaller than the M6 pre-manual baseline, while the explicit
+# flashcard/review engine lawfully spends part of the old 30K task-local margin.
+# The frozen 1,000,000-byte shipping ceiling is unchanged.
+M7_SHRINK_MIN=20000
 M7_BUDGET_JSON="$REPO_ROOT/briefs/M7-budget.json"
 
 # --- M7-a: the two ceiling CONSTANTS themselves (the V1 pattern) ----------
@@ -3592,8 +3677,8 @@ else:
         JADIFF_TOTAL="$(printf '%s' "$JADIFF_N" | cut -d' ' -f2)"
         # The total is 1 (deck-name/order) + one per deck, so it also
         # pins that every deck was really compared.
-        if [ "$JADIFF_PASSED" != "$JADIFF_TOTAL" ] || [ "$JADIFF_TOTAL" -lt 53 ]; then
-          JADIFF_PROBLEMS="the positive run reported $JADIFF_PASSED/$JADIFF_TOTAL (expected N/N with N >= 53: one name/order check plus one per deck)"
+        if [ "$JADIFF_PASSED" != "$JADIFF_TOTAL" ] || [ "$JADIFF_TOTAL" -lt 51 ]; then
+          JADIFF_PROBLEMS="the positive run reported $JADIFF_PASSED/$JADIFF_TOTAL (expected N/N with N >= 51: one name/order check plus one per live deck)"
         fi
       fi
       if [ -z "$JADIFF_PROBLEMS" ]; then
@@ -4780,7 +4865,7 @@ DEVICE_SUITE_LABEL="device assertions D1..D27 ran and passed inside check 7's ro
 CONTENT_MISSING_LABEL="fetch-failure degradation: served without the exercise content bundles the app still boots, names the failure, keeps manuals readable, and offers a retry (browser-check --check-content-missing, 4/4)"
 # M6 gate round 1 (briefs/M6-codex-gate1.json, findings M6-R1-1 and
 # M6-R1-5) -- see usage() checks 24 and 25 and each stage's own comment.
-BAD_BUNDLE_LABEL="bad-bundle rejection: five 200-response bundles (wrong language, stale text, delimiter-complete truncation, zero decks, one deck missing) each produce the VISIBLE #sxc1-content-error alert with ZERO decks rendered, while an unsabotaged control served beside them renders the whole 52-deck course (browser-check --check-bad-bundle, 12/12)"
+BAD_BUNDLE_LABEL="bad-bundle rejection: five 200-response bundles (wrong language, stale text, delimiter-complete truncation, zero decks, one deck missing) each produce the VISIBLE #sxc1-content-error alert with ZERO decks rendered, while an unsabotaged control served beside them renders the whole 50-deck course (browser-check --check-bad-bundle, 12/12)"
 STALLED_LABEL="stalled-fetch deadline: with the content bundle answered 200-then-never-finished, the app still boots inside the fetch deadline, names the TIMEOUT in the visible #sxc1-content-error banner, keeps the manuals readable and offers #btn-content-retry (browser-check --check-content-stalled, 4/4)"
 HINT_SPLIT_LABEL="ui/content language split: with ONLY the sxc1.uilang key's writes failing, the UI-language toggle does NOT reload onto the stale hint -- it switches in memory, degrades storage honestly (uiLang=ja, contentLang=en, available=false), renders the VISIBLE #sxc1-lang-split alert with #btn-lang-resync, and moves document lang (browser-check --check-hint-write-failure, 4/4)"
 # M6 W2: the ui-language toggle roundtrip stage -- see usage() check 22.
@@ -4792,20 +4877,21 @@ MANUAL_FALLBACK_LABEL="manual language-of-record (ruling 4, FLIPPED in W3 now th
 ROOT_CARDINALITY_LABEL="M5 cardinality contract: root browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage reports N/N assertions passed with N >= $M5_BROWSER_ASSERT_FLOOR (floor, never an equality -- raising the floor is part of adding assertions)"
 # M6 W4 (check 23): THE JA COURSE FLOOR -- V6's naming discipline
-# applied to the five "ja course:" assertions runUiLangJaAssertions runs
+# applied to the seven "ja course:" assertions runUiLangJaAssertions runs
 # inside BOTH full stages. The N/N cardinality floor above is a FLOOR:
-# it catches five assertions being deleted, but not five being deleted
-# while five others are added. These five are the entire proof that the
+# it catches assertions being deleted, but not deleted assertions being
+# replaced by unrelated ones. These six are the entire proof that the
 # JAPANESE COURSE (not merely the JA UI, and not merely a bundle file on
 # disk) renders end to end from the bundle the site ships, so -- exactly
 # like D1..D27 -- they are counted BY NAME, in each stage's own capture.
-# Their expectations are LITERAL corpus strings inside
+# Their expectations are literal corpus/UI strings inside
 # scripts/browser-check.mjs (JA_COURSE_PINS), which is what makes an
 # EN-fallback ja bundle red rather than self-consistent; the red-first
 # demonstration served a copy whose content.ja.txt was the EN emission
-# relabelled "ja" and all five failed (M6 W4 report).
-JA_COURSE_ASSERT_COUNT=5
-JA_COURSE_LABEL="M6 W4 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course: 52 decks/435 exercises + a JA deck title from #sxc1-exercise-stats, the deck card/page/summary, a JA quiz COMPLETED, a JA drill check: sentence) -- counted BY STABLE ID (JAC1..JAC5, allowlisted in this script), so unplugging, renaming or substituting one cannot hide under the N/N floor"
+# relabelled "ja" and all five failed (M6 W4 report); M8 adds JAC6 and
+# M10 adds JAC7 for the Weekly Pulse's JS-owned Japanese surface.
+JA_COURSE_ASSERT_COUNT=7
+JA_COURSE_LABEL="M6 W4 + M8/M10 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course plus the mastery journey and Weekly Pulse JS-owned JA surfaces) -- counted BY STABLE ID (JAC1..JAC7, allowlisted in this script), so unplugging, renaming or substituting one cannot hide under the N/N floor"
 
 # Parse one stage's captured output for its final "browser-check: N/M
 # assertions passed" summary line and enforce the contract: the line must
@@ -4817,13 +4903,13 @@ JA_COURSE_LABEL="M6 W4 JA course floor: BOTH full browser stages reported all $J
 # when the suite is unplugged and when any member fails.
 # M6 gate-1 finding M6-R1-3: counting a PREFIX and a cardinality let a
 # required assertion be swapped for a trivial passing one named
-# "ja course: ..." while both the 5/5 count and the stage floor stayed
-# green. The five assertions therefore carry STABLE IDs (JAC1..JAC5,
+# "ja course: ..." while both the count and the stage floor stayed
+# green. The assertions therefore carry STABLE IDs (JAC1..JAC7,
 # declared in scripts/browser-check.mjs) and this script declares the
-# same five INDEPENDENTLY below: the check compares the captured ID SET
+# same six INDEPENDENTLY below: the check compares the captured ID SET
 # to that allowlist, exactly as V6 compares D1..D27 by number. An extra
 # "ja course:" assertion is not a substitute for a missing one.
-JA_COURSE_IDS="JAC1 JAC2 JAC3 JAC4 JAC5"
+JA_COURSE_IDS="JAC1 JAC2 JAC3 JAC4 JAC5 JAC6 JAC7"
 
 # Echoes the JAC ids reported ok in one stage capture, sorted+unique. A
 # failed assertion prints "FAIL - ja course: [JACn] ..." instead, so it
@@ -5814,7 +5900,7 @@ PYEOF
 
     # Check 23 (M6 W4): the JA course floor -- see JA_COURSE_LABEL's
     # comment above. Scoped exactly like the cardinality floors: the
-    # UI-language JA flow (and therefore these five assertions) only
+    # UI-language JA flow (and therefore these seven assertions) only
     # runs when the stages got --exercise-fixture, so --skip-content
     # skips it conspicuously via skip() with TOTAL unchanged.
     if [ "$SKIP_CONTENT" -eq 1 ]; then
