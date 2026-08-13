@@ -9051,7 +9051,8 @@ async function main() {
         'a fresh page boots the real WASM app from the offline cache and explains its network state',
         '#sxc1-content-stats is valid JSON',
         '#sxc1-content-stats matches expected stats',
-        'home shows a centered QR and exactly two green/red wizard choices',
+        'home shows a centered QR and exactly two learn/build wizard choices',
+        'Sample Lab assigns local audio, round-trips a portable project, and hands pads to the phone one at a time',
         'progress passport saves the validated export as a file and loads a file without bypassing import preview',
         "today's session builds a stable five-card mobile plan and carries its coach into the runner",
         "today's session marks a finished card and advances to the next planned card",
@@ -9144,7 +9145,7 @@ async function main() {
         Boolean(pwaState
           && pwaState.state?.supported === true && pwaState.state.registered === true
           && pwaState.state.ready === true && pwaState.state.offlineCapable === true
-          && pwaState.state.cacheVersion === 'm11-v3' && pwaState.controlled === true
+          && pwaState.state.cacheVersion === 'm12-v1' && pwaState.controlled === true
           && pwaState.state.scope === expectedScope
           && pwaState.manifestStatus === 200
           && pwaState.manifest?.start_url === './#/x/today'
@@ -9272,13 +9273,14 @@ async function main() {
 
       // -- 3. Home starts as a two-choice wizard with the QR already visible.
       // The green choice opens the focused daily plan; the red choice opens
-      // the course/manual/progress library. The SVG loads at both desktop and
-      // mobile widths. The fetched SVG bytes plus a non-zero rendered box are
-      // authoritative here: valid SVGs may intentionally omit intrinsic width
-      // and height, so naturalWidth must remain diagnostic rather than a gate.
+      // the deferred local Sample Lab. Course/manual/progress tools live in a
+      // quieter disclosure outside those two primary directions. The fetched
+      // SVG bytes plus a non-zero rendered box are authoritative here: valid
+      // SVGs may omit intrinsic width/height, so naturalWidth stays diagnostic.
       await goto('#/', '#btn-primary-training');
       const initialHome = await evaluate(`(() => {
         const primary = document.querySelector('#btn-primary-training');
+        const sample = document.querySelector('#btn-sample-lab');
         const browse = document.querySelector('#sxc1-browse-library');
         const study = document.querySelector('#sxc1-study-details');
         const data = document.querySelector('#sxc1-progress-data');
@@ -9289,11 +9291,17 @@ async function main() {
           primaryHref: primary ? primary.hash : null,
           primaryText: primary ? primary.textContent.trim() : null,
           primaryGreen: Boolean(primary && primary.classList.contains('wizard-yes')),
+          sampleHref: sample ? sample.hash : null,
+          sampleText: sample ? sample.textContent.trim() : null,
+          sampleRed: Boolean(sample && sample.classList.contains('wizard-no')),
           browseOpen: browse ? browse.open : null,
           browseText: browse && browse.querySelector(':scope > summary')
             ? browse.querySelector(':scope > summary').textContent.trim() : null,
-          browseRed: Boolean(browse && browse.classList.contains('wizard-no')),
+          browseQuiet: Boolean(browse && browse.classList.contains('home-disclosure')
+            && !browse.classList.contains('wizard-no')),
           wizardChoiceCount: wizard ? wizard.children.length : null,
+          sampleInsideWizard: Boolean(sample && wizard && wizard.contains(sample)),
+          browseOutsideWizard: Boolean(browse && wizard && !wizard.contains(browse)),
           studyOpen: study ? study.open : null,
           dataOpen: data ? data.open : null,
           toolsNested: Boolean(browse && study && data && browse.contains(study) && browse.contains(data)),
@@ -9365,15 +9373,20 @@ async function main() {
       })()`);
       await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
       report(
-        'home shows a centered QR and exactly two green/red wizard choices',
+        'home shows a centered QR and exactly two learn/build wizard choices',
         Boolean(initialHome
           && initialHome.primaryHref === '#/x/today'
           && (initialHome.primaryText || '').startsWith("Today's session")
           && initialHome.primaryGreen === true
+          && initialHome.sampleHref === '#/samples'
+          && /^Build a sample bank/.test(initialHome.sampleText || '')
+          && initialHome.sampleRed === true
           && initialHome.browseOpen === false
-          && /^No\b/.test(initialHome.browseText || '')
-          && initialHome.browseRed === true
+          && initialHome.browseText === 'Manuals, course, and progress'
+          && initialHome.browseQuiet === true
           && initialHome.wizardChoiceCount === 2
+          && initialHome.sampleInsideWizard === true
+          && initialHome.browseOutsideWizard === true
           && initialHome.studyOpen === false
           && initialHome.dataOpen === false
           && initialHome.toolsNested === true
@@ -9531,7 +9544,145 @@ async function main() {
         { backupBefore, passport, passportMobile },
       );
 
-      // -- 3b. The focused coach is a deterministic, tab-scoped snapshot:
+      // -- 3b. Sample Lab is deferred out of the trainer's critical graph, but
+      // once opened it must be a complete local workflow: original WAV bytes
+      // enter IndexedDB, metadata auto-saves, the binary project envelope
+      // round-trips, and phone handoff replaces the planner with two actions.
+      await goto('#/samples', '#sxc1-sample-lab:not([hidden]) .sample-pad-grid', 8000);
+      const sampleLab = await evaluate(`(async () => {
+        const start = Date.now();
+        while (Date.now() - start < 5000 && !window.__SXC1_SAMPLE_LAB?.ready) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        const makeWav = () => {
+          const frames = 4800;
+          const bytes = new ArrayBuffer(44 + frames * 2);
+          const view = new DataView(bytes);
+          const ascii = (offset, text) => {
+            for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+          };
+          ascii(0, 'RIFF');
+          view.setUint32(4, 36 + frames * 2, true);
+          ascii(8, 'WAVE');
+          ascii(12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, 1, true);
+          view.setUint32(24, 48000, true);
+          view.setUint32(28, 96000, true);
+          view.setUint16(32, 2, true);
+          view.setUint16(34, 16, true);
+          ascii(36, 'data');
+          view.setUint32(40, frames * 2, true);
+          for (let i = 0; i < frames; i += 1) {
+            view.setInt16(44 + i * 2, Math.round(Math.sin(i / 14) * 12000), true);
+          }
+          return bytes;
+        };
+        const input = document.querySelector('#sample-file-input');
+        const transfer = new DataTransfer();
+        const wav = makeWav();
+        transfer.items.add(new File([wav], 'audacity-kick.wav', { type: 'audio/wav' }));
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        while (Date.now() - start < 8000 && window.__SXC1_SAMPLE_LAB?.assignedPads?.length !== 1) {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        const name = document.querySelector('#sample-pad-name');
+        if (name) {
+          name.value = 'Arcade kick';
+          name.dispatchEvent(new Event('input', { bubbles: true }));
+          await new Promise((resolve) => setTimeout(resolve, 40));
+        }
+        const source = document.querySelector('#sample-pad-source');
+        if (source) {
+          source.value = 'Licensed field recording';
+          source.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        const projectBlob = await window.__SXC1_SAMPLE_LAB.exportProjectBlob();
+        const header = await projectBlob.slice(0, 12).arrayBuffer();
+        const magic = new TextDecoder().decode(new Uint8Array(header, 0, 8));
+        const manifestLength = new DataView(header).getUint32(8, true);
+        const manifest = JSON.parse(await projectBlob.slice(12, 12 + manifestLength).text());
+        const portable = new File([projectBlob], 'roundtrip.sxc1lab', { type: 'application/octet-stream' });
+        const imported = await window.__SXC1_SAMPLE_LAB.importProjectFile(portable);
+        const plannerButtons = Array.from(document.querySelectorAll('.sample-planner-footer > .sample-primary-actions > button'))
+          .filter((button) => button.offsetParent !== null).map((button) => button.id);
+        const padCount = document.querySelectorAll('.sample-pad').length;
+        const bankTabs = document.querySelectorAll('.sample-bank-tab').length;
+        const bankRange = Array.from(document.querySelector('#sample-bank-number')?.options || []).map((item) => Number(item.value));
+        const facts = document.querySelector('.sample-file-facts')?.textContent || null;
+        document.querySelector('#btn-sample-handoff')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        const handoffButtons = Array.from(document.querySelectorAll('.sample-handoff-card .sample-primary-actions > button'))
+          .filter((button) => button.offsetParent !== null).map((button) => button.id);
+        return {
+          ready: window.__SXC1_SAMPLE_LAB?.ready === true,
+          storage: window.__SXC1_SAMPLE_LAB?.storage || null,
+          assigned: window.__SXC1_SAMPLE_LAB?.assignedPads || [],
+          padCount,
+          bankTabs,
+          bankRange,
+          localText: document.querySelector('.sample-local-badge')?.textContent.trim() || null,
+          metadataSaved: JSON.parse(localStorage.getItem('sxc1.sample-lab.v1') || 'null')?.slots?.A?.pads?.['1']?.source || null,
+          facts,
+          magic,
+          schema: manifest.schema,
+          fileCount: manifest.files?.length || 0,
+          payloadBytes: manifest.files?.[0]?.length || 0,
+          projectBytes: projectBlob.size,
+          imported,
+          plannerButtons,
+          handoffButtons,
+          handoffView: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+          destination: document.querySelector('.sample-handoff-destination')?.textContent.trim() || null,
+          progress: document.querySelector('.sample-handoff-progress')?.textContent.trim() || null,
+        };
+      })()`);
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
+      }, sessionId);
+      const sampleLabMobile = await evaluate(`(() => {
+        const buttons = Array.from(document.querySelectorAll('.sample-handoff-card .sample-primary-actions > button'));
+        return {
+          viewport: innerWidth,
+          scrollWidth: document.scrollingElement?.scrollWidth || null,
+          buttonHeights: buttons.map((button) => button.getBoundingClientRect().height),
+          appHidden: getComputedStyle(document.querySelector('#app')).display === 'none',
+          labVisible: document.querySelector('#sxc1-sample-lab')?.getBoundingClientRect().height > 0,
+        };
+      })()`);
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      report(
+        'Sample Lab assigns local audio, round-trips a portable project, and hands pads to the phone one at a time',
+        Boolean(sampleLab?.ready && sampleLab.storage === 'indexeddb'
+          && sampleLab.assigned?.length === 1
+          && sampleLab.assigned[0]?.name === 'Arcade kick'
+          && sampleLab.padCount === 16
+          && sampleLab.bankTabs === 4
+          && sampleLab.bankRange.length === 66
+          && sampleLab.bankRange[0] === 15 && sampleLab.bankRange[65] === 80
+          && sampleLab.localText === 'Audio stays on this device'
+          && sampleLab.metadataSaved === 'Licensed field recording'
+          && /48\.0 kHz/.test(sampleLab.facts || '') && /16-bit/.test(sampleLab.facts || '')
+          && sampleLab.magic === 'SXC1LAB1' && sampleLab.schema === 1
+          && sampleLab.fileCount === 1 && sampleLab.payloadBytes === 9644
+          && sampleLab.projectBytes > sampleLab.payloadBytes
+          && sampleLab.imported === true
+          && sampleLab.plannerButtons.join(',') === 'btn-sample-project-export,btn-sample-handoff'
+          && sampleLab.handoffButtons.join(',') === 'btn-sample-share-file,btn-sample-next-pad'
+          && sampleLab.handoffView === 'handoff'
+          && sampleLab.destination === 'A / BANK 15 / PAD 1'
+          && /1.*1/.test(sampleLab.progress || '')
+          && sampleLabMobile?.viewport === 320 && sampleLabMobile.scrollWidth <= 320
+          && sampleLabMobile.appHidden && sampleLabMobile.labVisible
+          && sampleLabMobile.buttonHeights.length === 2
+          && sampleLabMobile.buttonHeights.every((height) => height >= 44)),
+        { sampleLab, sampleLabMobile },
+      );
+      await click('#btn-sample-next-pad');
+
+      // -- 3c. The focused coach is a deterministic, tab-scoped snapshot:
       // route changes never reshuffle it, all five cards are unique links, and
       // opening one carries an out-of-tree session bar into the live runner.
       // A fresh profile has no due or partial work, so all five reasons must be

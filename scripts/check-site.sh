@@ -740,8 +740,10 @@ info() {
 # requests app.wasm and must show actionable recovery guidance.
 # Today's Session adds one full-stage assertion covering the stable adaptive
 # five-card plan, cross-route coach, DOM-only renderer, and mobile-safe links.
-M5_CHECK_TOTAL=135
-M5_BROWSER_ASSERT_FLOOR=233
+# M12 adds one required static module and one full-stage Sample Lab workflow
+# assertion. The module is separately cached but deferred out of first boot.
+M5_CHECK_TOTAL=136
+M5_BROWSER_ASSERT_FLOOR=236
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -922,6 +924,7 @@ fi
 REQUIRED_FILES=(
   "index.html"
   "index.js"
+  "sample-lab.js"
   "app.wasm"
   "ghc_wasm_jsffi.js"
   "qr-phone.svg"
@@ -976,11 +979,12 @@ assert any(icon.get("src") == "./app-icon.svg" and "maskable" in icon.get("purpo
 ET.parse(root / "app-icon.svg")
 
 worker = (root / "sw.js").read_text(encoding="utf-8")
-assert 'const CACHE_VERSION = "m11-v3"' in worker
+assert 'const CACHE_VERSION = "m12-v1"' in worker
 match = re.search(r"const CORE_RELATIVE_URLS = (\[.*?\]);", worker, re.S)
 assert match, "CORE_RELATIVE_URLS not found"
 urls = json.loads(match.group(1))
 assert len(urls) == len(set(urls)), "duplicate core URL"
+assert "./sample-lab.js" in urls, urls
 assert all(url.startswith("./") and not url.startswith("./pages/") for url in urls), urls
 for url in urls:
     rel = url[2:]

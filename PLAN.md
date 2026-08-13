@@ -170,6 +170,16 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   **COMPLETE AND DEPLOYED 2026-08-11.** The optimized artifact passed the full
   135/135 release gate (235/235 browser assertions at both root and nested paths),
   then passed 73/73 against production. Contract: `docs/FLASHCARD-FLOW.md`.
+- **M12 — Sample Lab.** Add the second local-first SEXY ONE workflow: import
+  Audacity exports, arrange a four-slot A-D plan across SXC-1 user banks 15-80,
+  preview and annotate a 4×4 pad layout, package the original audio plus metadata
+  as one portable `.sxc1lab` file, and walk the phone through one CASIO Sampler
+  App assignment at a time. Audio never reaches a SEXY ONE server and the
+  planner is deferred until after trainer interactivity, so it adds no weight to
+  the critical boot graph. **IMPLEMENTATION COMPLETE 2026-08-13.** The optimized
+  artifact passed the full 136/136 release gate with 236/236 browser assertions
+  at both the origin root and nested-path deployment. Contract:
+  `docs/SAMPLE-LAB.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 

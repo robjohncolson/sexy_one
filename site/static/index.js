@@ -384,7 +384,17 @@ try {
   }
 }
 
-if (window.__SXC1_BOOTED === true) sxc1EnablePhoneReadyShell();
+if (window.__SXC1_BOOTED === true) {
+  sxc1EnablePhoneReadyShell();
+  // Sample Lab is deliberately deferred until the trainer is interactive. It
+  // has no place in the first-load module graph or app.wasm size budget.
+  import("./sample-lab.js")
+    .then((module) => module.startSampleLab({ lang: sxc1UiLang }))
+    .catch((error) => {
+      console.error("Sample Lab could not start", error);
+      window.__SXC1_SAMPLE_LAB_ERROR = String(error);
+    });
+}
 
 // M3 progress-ui (site/app/View/Progress.hs): two small, Miso-independent
 // DOM behaviours that deliberately never touch Haskell state -- see that
