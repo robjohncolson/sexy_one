@@ -113,7 +113,7 @@ round of work.
 - The mobile boot regressions cap initial WASM memory at 24 MiB and impersonate
   an older iPhone engine to prove it receives recovery guidance without an
   `app.wasm` request.
-- The phone-ready regressions require a registered `m14-v1` worker, relative
+- The phone-ready regressions require a registered `m14-v2` worker, relative
   standalone manifest, real network-disabled WASM boot at root and nested scope,
   the visible offline live region, byte-identical `.sxc1` download/file load,
   no pre-commit storage mutation, and a 320 px passport layout.

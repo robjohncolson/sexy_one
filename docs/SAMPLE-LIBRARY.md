@@ -89,5 +89,5 @@ and checks the 320 px layout and 44 px controls.
 
 The full Japanese course sweep independently pins Sample Library's catalog,
 filter, import, and project decisions as `JAC9`. The offline gate pins the
-`m14-v1` cache and boots the same deferred Sample Lab module at both root and
+`m14-v2` cache and boots the same deferred Sample Lab module at both root and
 nested deployment paths.
