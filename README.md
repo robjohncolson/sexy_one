@@ -106,7 +106,9 @@ pad destination or sound safely returns only that changed row to pending.
 is introduced. The optimized artifact passed the complete 136/136 release gate
 with 241/241 browser assertions at both root and nested paths, including the real
 project send/import controls, exact-cursor reload, receipt retry, ledger repair,
-offline cache, Japanese UI, and the 320 px mobile sweep. See
+offline cache, Japanese UI, and the 320 px mobile sweep. The byte-identical
+artifact is deployed at the Vercel mirror and passed 77/77 assertions against
+production. See
 [`docs/PHONE-BRIDGE.md`](docs/PHONE-BRIDGE.md).
 
 **M14 Sample Library + named projects.** `#/samples` keeps one
