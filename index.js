@@ -90,6 +90,133 @@ function sxc1ContentLang() {
 const sxc1UiLang = sxc1ContentLang();
 try { document.documentElement.lang = sxc1UiLang; } catch (e) { /* harmless */ }
 
+// M9 phone-ready shell. Registration waits until the trainer is interactive so
+// the service worker's cache fill never competes with the first useful boot.
+// Once installed it supplies a coherent connection-failure fallback for the
+// executable shell and both text languages. A new worker can activate only
+// after its complete versioned core cache exists.
+const PHONE_STRINGS = {
+  en: {
+    offline: "Offline — saved lessons remain available.",
+  },
+  ja: {
+    offline: "オフライン — 保存済みのレッスンを利用できます。",
+  },
+};
+const phoneStrings = PHONE_STRINGS[sxc1UiLang] || PHONE_STRINGS.en;
+let sxc1InstallPrompt = null;
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  sxc1InstallPrompt = event;
+  if (window.__SXC1_PWA) window.__SXC1_PWA.installable = true;
+});
+window.addEventListener("appinstalled", () => {
+  sxc1InstallPrompt = null;
+  if (window.__SXC1_PWA) window.__SXC1_PWA.installed = true;
+});
+
+function sxc1UpdateNetworkStatus() {
+  const status = document.getElementById("sxc1-network-status");
+  const offline = typeof navigator.onLine === "boolean" && !navigator.onLine;
+  if (status) {
+    status.textContent = offline ? phoneStrings.offline : "";
+    status.hidden = !offline;
+  }
+  document.documentElement.dataset.sxc1Online = String(!offline);
+  if (window.__SXC1_PWA) window.__SXC1_PWA.online = !offline;
+}
+
+async function sxc1EnablePhoneReadyShell() {
+  window.__SXC1_PWA = {
+    supported: "serviceWorker" in navigator,
+    registered: false,
+    ready: false,
+    offlineCapable: false,
+    online: navigator.onLine !== false,
+    installable: Boolean(sxc1InstallPrompt),
+    installed: window.matchMedia?.("(display-mode: standalone)")?.matches === true,
+    cacheVersion: null,
+  };
+  sxc1UpdateNetworkStatus();
+  window.addEventListener("online", sxc1UpdateNetworkStatus);
+  window.addEventListener("offline", sxc1UpdateNetworkStatus);
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const workerUrl = new URL("./sw.js", import.meta.url);
+    const scopeUrl = new URL("./", import.meta.url);
+    const registration = await navigator.serviceWorker.register(workerUrl, {
+      scope: scopeUrl.href,
+      updateViaCache: "none",
+    });
+    window.__SXC1_PWA.registered = true;
+    window.__SXC1_PWA.scope = registration.scope;
+    const ready = await navigator.serviceWorker.ready;
+    window.__SXC1_PWA.ready = true;
+    window.__SXC1_PWA.offlineCapable = true;
+    document.documentElement.dataset.sxc1OfflineReady = "true";
+
+    const active = ready.active || navigator.serviceWorker.controller;
+    if (active) {
+      const onStatus = (event) => {
+        if (!event.data || event.data.type !== "SXC1_STATUS") return;
+        window.__SXC1_PWA.cacheVersion = event.data.cacheVersion || null;
+        navigator.serviceWorker.removeEventListener("message", onStatus);
+      };
+      navigator.serviceWorker.addEventListener("message", onStatus);
+      active.postMessage("SXC1_STATUS");
+    }
+  } catch (err) {
+    // Offline readiness is an enhancement. A refused/unsupported worker must
+    // never turn an otherwise healthy trainer boot into an error.
+    window.__SXC1_PWA.error = err && err.message ? err.message : String(err);
+  }
+}
+
+const bootStatus = document.getElementById("boot-status");
+const bootStatusText = document.getElementById("boot-status-text");
+const BOOT_STRINGS = {
+  en: {
+    download: "Downloading the trainer…",
+    course: "Preparing the course…",
+    start: "Starting your session…",
+    unsupported: "This browser cannot run the trainer's WebAssembly build. On iPhone or iPad, update to iOS 16.4 or later, then reload. Your progress has not been changed.",
+    failed: "The trainer could not start. Check the connection, update the browser, and reload.",
+  },
+  ja: {
+    download: "トレーナーを読み込んでいます…",
+    course: "コースを準備しています…",
+    start: "セッションを開始しています…",
+    unsupported: "このブラウザではトレーナーのWebAssemblyを実行できません。iPhoneまたはiPadではiOS 16.4以降に更新してから、再読み込みしてください。進捗データは変更されていません。",
+    failed: "トレーナーを開始できませんでした。接続とブラウザの更新を確認して、再読み込みしてください。",
+  },
+};
+const bootStrings = BOOT_STRINGS[sxc1UiLang] || BOOT_STRINGS.en;
+const sxc1BootStartedAt = performance.now();
+const setBootStage = (message) => {
+  if (bootStatusText) bootStatusText.textContent = message;
+};
+
+// GHC's wasm32 runtime is built with fixed SIMD instructions. Test that
+// exact baseline before requesting the 850+ KB compressed module so an older
+// mobile engine gets a small, useful failure instead of a long generic boot
+// error. This 31-byte module returns a v128 and has no imports or side effects.
+const SXC1_SIMD_PROBE = new Uint8Array([
+  0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3,
+  2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11,
+]);
+let sxc1WasmSupported = false;
+try {
+  sxc1WasmSupported = typeof WebAssembly === "object"
+    && typeof WebAssembly.validate === "function"
+    && WebAssembly.validate(SXC1_SIMD_PROBE);
+} catch (_) {
+  sxc1WasmSupported = false;
+}
+setBootStage(sxc1WasmSupported ? bootStrings.download : bootStrings.unsupported);
+// Begin the dominant request before the two text corpora below. Passing the
+// response promise into instantiateStreaming preserves streaming compilation.
+const sxc1WasmResponsePromise = sxc1WasmSupported ? fetch("./app.wasm") : null;
+
 // M6 gate round 1 (briefs/M6-codex-gate1.json, finding M6-R1-5): THE
 // FETCH DEADLINE. The load below is awaited before hs_start, so a
 // server that accepts the connection and then never completes the body
@@ -122,7 +249,7 @@ const SXC1_CONTENT_TIMEOUT_MS = 15000;
 // failure shapes (non-2xx, thrown, timed out) resolve, PER BUNDLE, to
 // { ok: false, error }, so one failing bundle never hides or aborts the
 // other's result.
-const sxc1ContentPromise = (async () => {
+const sxc1ContentPromise = sxc1WasmSupported ? (async () => {
   const lang = sxc1ContentLang();
   let controller = null;
   let timer = null;
@@ -173,12 +300,17 @@ const sxc1ContentPromise = (async () => {
   } finally {
     if (timer !== null) clearTimeout(timer);
   }
-})();
-
-const bootStatus = document.getElementById("boot-status");
+})() : Promise.resolve({
+  lang: sxc1UiLang,
+  content: { ok: false, error: "unsupported WebAssembly runtime" },
+  manual: { ok: false, error: "unsupported WebAssembly runtime" },
+});
 
 try {
-  const wasi = new WASI([], ["GHCRTS=-H64m"], [
+  if (!sxc1WasmSupported || !sxc1WasmResponsePromise) {
+    throw new Error(bootStrings.unsupported);
+  }
+  const wasi = new WASI([], ["GHCRTS=-H16m"], [
     new OpenFile(new File([])), // stdin
     ConsoleStdout.lineBuffered((msg) => console.log("[wasm stdout]", msg)),
     ConsoleStdout.lineBuffered((msg) => console.warn("[wasm stderr]", msg)),
@@ -188,11 +320,13 @@ try {
   // into wasm, but the exports only exist once instantiation finishes, so
   // we pass a mutable placeholder object and fill it in afterwards.
   const instanceExports = {};
-  const { instance } = await WebAssembly.instantiateStreaming(fetch("./app.wasm"), {
+  const { instance } = await WebAssembly.instantiateStreaming(sxc1WasmResponsePromise, {
     wasi_snapshot_preview1: wasi.wasiImport,
     ghc_wasm_jsffi: ghc_wasm_jsffi(instanceExports),
   });
+  const sxc1WasmReadyAt = performance.now();
   Object.assign(instanceExports, instance.exports);
+  setBootStage(bootStrings.course);
 
   // The content bridge MUST be installed before hs_start: Main.main
   // reads it synchronously at boot (Bundle). Every method is total --
@@ -206,6 +340,7 @@ try {
   // rather than a second bridge keeps the wasm side's read (Bundle.
   // loadVia) one parameterised function instead of two copies.
   const sxc1Content = await sxc1ContentPromise;
+  const sxc1ContentReadyAt = performance.now();
   const part = (name) => { try { return sxc1Content[name] || { ok: false, error: "content bridge failure" }; } catch (e) { return { ok: false, error: "content bridge failure" }; } };
   window.__sxc1Content = {
     lang: () => { try { return sxc1Content.lang; } catch (e) { return "en"; } },
@@ -215,8 +350,24 @@ try {
     manualError: () => { const p = part("manual"); return p.ok ? undefined : String(p.error); },
   };
 
+  setBootStage(bootStrings.start);
   wasi.initialize(instance);          // runs _initialize, starting the Haskell RTS
   await instance.exports.hs_start();  // mounts the Miso app into <body>
+
+  window.__SXC1_BOOT_METRICS = {
+    wasmMs: Math.round(sxc1WasmReadyAt - sxc1BootStartedAt),
+    contentMs: Math.round(sxc1ContentReadyAt - sxc1BootStartedAt),
+    totalMs: Math.round(performance.now() - sxc1BootStartedAt),
+    memoryBytes: instance.exports.memory?.buffer?.byteLength || 0,
+    transferBytes: performance.getEntriesByType("resource")
+      .reduce((sum, entry) => sum + (Number(entry.transferSize) || 0), 0),
+    encodedBodyBytes: performance.getEntriesByType("resource")
+      .reduce((sum, entry) => sum + (Number(entry.encodedBodySize) || 0), 0),
+    effectiveType: navigator.connection?.effectiveType || null,
+    saveData: navigator.connection?.saveData === true,
+  };
+  document.documentElement.dataset.sxc1BootMs = String(window.__SXC1_BOOT_METRICS.totalMs);
+  document.documentElement.dataset.sxc1MemoryBytes = String(window.__SXC1_BOOT_METRICS.memoryBytes);
 
   if (bootStatus) {
     bootStatus.hidden = true;
@@ -229,8 +380,20 @@ try {
     bootStatus.hidden = false;
     bootStatus.classList.add("boot-error");
     const message = err && err.message ? err.message : String(err);
-    bootStatus.textContent = `Failed to start the SXC-1 Trainer application: ${message}`;
+    bootStatus.textContent = `${bootStrings.failed}\n\n${message}`;
   }
+}
+
+if (window.__SXC1_BOOTED === true) {
+  sxc1EnablePhoneReadyShell();
+  // Sample Lab is deliberately deferred until the trainer is interactive. It
+  // has no place in the first-load module graph or app.wasm size budget.
+  import("./sample-lab.js")
+    .then((module) => module.startSampleLab({ lang: sxc1UiLang }))
+    .catch((error) => {
+      console.error("Sample Lab could not start", error);
+      window.__SXC1_SAMPLE_LAB_ERROR = String(error);
+    });
 }
 
 // M3 progress-ui (site/app/View/Progress.hs): two small, Miso-independent
@@ -256,9 +419,12 @@ document.addEventListener("click", (event) => {
   const id = event.target && event.target.id;
   if (id === "btn-progress-wipe") {
     const confirmBtn = document.getElementById("btn-progress-wipe-confirm");
+    event.target.hidden = true;
     if (confirmBtn) confirmBtn.hidden = false;
   } else if (id === "btn-progress-wipe-confirm") {
     event.target.hidden = true;
+    const wipeBtn = document.getElementById("btn-progress-wipe");
+    if (wipeBtn) wipeBtn.hidden = false;
   } else if (id === "btn-content-retry" || id === "btn-lang-resync") {
     // M6 W1: the degraded-content retry affordance. A full reload IS the
     // retry -- it re-runs this file's guarded bundle load and the app's
@@ -307,3 +473,1393 @@ document.addEventListener("input", (event) => {
     ? `貼り付けたテキストに${n}件のレコードが見つかりました。`
     : n === 1 ? "1 record found in the pasted text." : `${n} records found in the pasted text.`;
 });
+
+// M9 progress passport. The Haskell codec remains the only authority: these
+// controls only move the already-generated export envelope into or out of a
+// local file. File imports populate the existing textarea, show the existing
+// preview, and still require the learner to press Import, which sends the text
+// through SXC1.Progress.Codec.importBlob before anything is committed.
+const PORTABILITY_STRINGS = {
+  en: {
+    backupHint: "Export first, then save the backup file or share it to another device.",
+    download: "Save backup file",
+    share: "Share backup",
+    importFile: "Choose a SEXY ONE backup file:",
+    downloaded: "Backup saved. Keep it somewhere you control.",
+    shared: "Backup shared.",
+    loaded: "Backup file loaded. Review the record count, then choose Import.",
+    tooLarge: "That file is too large to be a SEXY ONE backup.",
+    readFailed: "The backup file could not be read.",
+    shareFailed: "The backup could not be shared. Save the file instead.",
+    title: "SEXY ONE progress backup",
+    shareText: "My local SEXY ONE training progress backup.",
+  },
+  ja: {
+    backupHint: "最初にエクスポートしてから、バックアップファイルを保存するか、別の端末へ共有してください。",
+    download: "バックアップを保存",
+    share: "バックアップを共有",
+    importFile: "SEXY ONEのバックアップファイルを選択:",
+    downloaded: "バックアップを保存しました。安全な場所に保管してください。",
+    shared: "バックアップを共有しました。",
+    loaded: "バックアップを読み込みました。件数を確認してから「インポート」を選択してください。",
+    tooLarge: "このファイルはSEXY ONEのバックアップとして大きすぎます。",
+    readFailed: "バックアップファイルを読み込めませんでした。",
+    shareFailed: "バックアップを共有できませんでした。代わりにファイルを保存してください。",
+    title: "SEXY ONE 進捗バックアップ",
+    shareText: "SEXY ONEのローカル進捗バックアップです。",
+  },
+};
+const portabilityStrings = PORTABILITY_STRINGS[sxc1UiLang] || PORTABILITY_STRINGS.en;
+const MAX_PROGRESS_FILE_BYTES = 1024 * 1024;
+
+function progressExportValue() {
+  return document.getElementById("sxc1-export-blob")?.value?.trim() || "";
+}
+
+function progressBackupFile(value) {
+  const day = new Date().toISOString().slice(0, 10);
+  // `File` is also the name of the WASI shim class imported at the top of
+  // this module. The progress passport needs the browser-native constructor.
+  return new window.File([value], `sexy-one-progress-${day}.sxc1`, { type: "application/json" });
+}
+
+function setBackupStatus(message) {
+  const status = document.getElementById("sxc1-backup-status");
+  if (status) status.textContent = message || "";
+}
+
+function scanForProgressPortability() {
+  const root = document.getElementById("sxc1-progress-passport");
+  if (root && !root.querySelector("#btn-progress-download")) {
+    const hint = document.createElement("p");
+    hint.className = "progress-backup-hint";
+    hint.textContent = portabilityStrings.backupHint;
+    const actions = document.createElement("div");
+    actions.className = "progress-file-actions";
+    const downloadButton = document.createElement("button");
+    downloadButton.id = "btn-progress-download";
+    downloadButton.type = "button";
+    downloadButton.disabled = true;
+    downloadButton.textContent = portabilityStrings.download;
+    const shareButton = document.createElement("button");
+    shareButton.id = "btn-progress-share";
+    shareButton.type = "button";
+    shareButton.disabled = true;
+    shareButton.hidden = true;
+    shareButton.textContent = portabilityStrings.share;
+    actions.append(downloadButton, shareButton);
+    const status = document.createElement("p");
+    status.id = "sxc1-backup-status";
+    status.setAttribute("aria-live", "polite");
+    root.replaceChildren(hint, actions, status);
+  }
+  const fileRoot = document.getElementById("sxc1-import-file-shell");
+  if (fileRoot && !fileRoot.querySelector("#sxc1-import-file")) {
+    const fileLabel = document.createElement("label");
+    fileLabel.htmlFor = "sxc1-import-file";
+    fileLabel.textContent = portabilityStrings.importFile;
+    const fileInput = document.createElement("input");
+    fileInput.id = "sxc1-import-file";
+    fileInput.type = "file";
+    fileInput.accept = ".sxc1,.json,.txt,application/json,text/plain";
+    fileRoot.replaceChildren(fileLabel, fileInput);
+  }
+  const value = progressExportValue();
+  const exportButton = document.getElementById("btn-progress-export");
+  const download = document.getElementById("btn-progress-download");
+  const share = document.getElementById("btn-progress-share");
+  if (download) {
+    download.hidden = !value;
+    download.disabled = !value;
+  }
+  if (exportButton) exportButton.hidden = Boolean(value);
+  let shareSupported = false;
+  if (value && typeof window.File === "function" && typeof navigator.share === "function") {
+    try {
+      const file = progressBackupFile(value);
+      shareSupported = typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
+    } catch (_) { shareSupported = false; }
+  }
+  if (share) {
+    share.hidden = !shareSupported;
+    share.disabled = !value || !shareSupported;
+  }
+  window.__SXC1_PROGRESS_PORTABILITY = {
+    ready: Boolean(value),
+    download: Boolean(download),
+    share: shareSupported,
+    fileImport: Boolean(document.getElementById("sxc1-import-file")),
+    maxFileBytes: MAX_PROGRESS_FILE_BYTES,
+  };
+}
+
+function downloadProgressBackup() {
+  const value = progressExportValue();
+  if (!value || typeof window.File !== "function") return;
+  const file = progressBackupFile(value);
+  const href = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = file.name;
+  anchor.hidden = true;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 0);
+  setBackupStatus(portabilityStrings.downloaded);
+}
+
+async function shareProgressBackup() {
+  const value = progressExportValue();
+  if (!value) return;
+  try {
+    const file = progressBackupFile(value);
+    await navigator.share({ files: [file], title: portabilityStrings.title, text: portabilityStrings.shareText });
+    setBackupStatus(portabilityStrings.shared);
+  } catch (err) {
+    if (err && err.name === "AbortError") return;
+    setBackupStatus(portabilityStrings.shareFailed);
+  }
+}
+
+function readProgressFile(file) {
+  if (file && typeof file.text === "function") return file.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error || new Error("read failed")));
+    reader.readAsText(file);
+  });
+}
+
+document.addEventListener("click", (event) => {
+  const id = event.target && event.target.id;
+  if (id === "btn-progress-export") {
+    [0, 40, 120, 300, 700].forEach((delay) => setTimeout(scanForProgressPortability, delay));
+  } else if (id === "btn-progress-download") {
+    downloadProgressBackup();
+  } else if (id === "btn-progress-share") {
+    shareProgressBackup();
+  }
+});
+
+document.addEventListener("change", async (event) => {
+  if (!event.target || event.target.id !== "sxc1-import-file") return;
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (file.size > MAX_PROGRESS_FILE_BYTES) {
+    setBackupStatus(portabilityStrings.tooLarge);
+    event.target.value = "";
+    return;
+  }
+  try {
+    const value = await readProgressFile(file);
+    const input = document.getElementById("sxc1-import-input");
+    if (!input) return;
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    setBackupStatus(portabilityStrings.loaded);
+  } catch (_) {
+    setBackupStatus(portabilityStrings.readFailed);
+  }
+});
+
+scanForProgressPortability();
+
+// Mastery journey: a deliberately small, DOM-only progress surface. The pure
+// SXC1.Mastery module remains the executable specification; this projection
+// turns the same completion, recall, due-date, and prerequisite evidence into
+// an actionable queue and one progressively disclosed chapter trail. There is
+// no canvas, GPU context, camera, animation loop, or graph-layout dependency.
+(() => {
+  const makeEl = (tag, className, value) => {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (value !== undefined && value !== null) element.textContent = value;
+    return element;
+  };
+
+  // This JS-owned surface follows the same narrow localization exception as
+  // the import preview above: the shell creates these nodes, so the complete
+  // locale records live alongside their behavior.
+  const MASTERY_STRINGS = {
+    en: {
+      kicker: "Training",
+      title: "Mastery journey",
+      intro: "A focused route through what to review, continue, and learn next. Prerequisites shape the guidance, but never lock a lesson.",
+      summary: "{strong} of {total} skills are strong",
+      evidence: "{done}/{exercises} exercises · {durable}/{prompts} durable · {due} due",
+      nextTitle: "Your next moves",
+      nextHint: "Review comes first, then the strongest continuation of your course.",
+      routeTitle: "Course route",
+      routeHint: "Choose a chapter to inspect its skill trail.",
+      complete: "{done} of {total} exercises complete",
+      recommended: "Recommended next",
+      open: "Open deck",
+      review: "Review {due} due prompt",
+      reviewMany: "Review {due} due prompts",
+      continue: "Continue this skill",
+      begin: "Build the next foundation",
+      maintain: "Keep this skill strong",
+      follows: "Builds on {titles}",
+      foundation: "Foundation skill",
+      prereqsMet: "Suggested foundations complete",
+      prereqsOpen: "Suggested foundations remain — you can still begin",
+      fullList: "Browse all 50 skills",
+      weekly: "Open weekly pulse",
+      bands: { unseen: "Unseen", learning: "Learning", practiced: "Practiced", consolidating: "Review due", strong: "Strong" },
+    },
+    ja: {
+      kicker: "トレーニング",
+      title: "習熟の道筋",
+      intro: "復習・継続・次の学習を、迷わず選べる道筋です。前提スキルは案内に使いますが、レッスンを制限しません。",
+      summary: "{total}スキル中{strong}件が定着",
+      evidence: "演習 {done}/{exercises}・記憶 {durable}/{prompts} 定着・復習 {due}件",
+      nextTitle: "次にやること",
+      nextHint: "復習を優先し、その後にコースを最も自然に進めます。",
+      routeTitle: "コースの道筋",
+      routeHint: "章を選ぶと、スキルの流れを確認できます。",
+      complete: "演習 {total}件中{done}件完了",
+      recommended: "次のおすすめ",
+      open: "デッキを開く",
+      review: "期限の来た問題を{due}件復習",
+      reviewMany: "期限の来た問題を{due}件復習",
+      continue: "このスキルを続ける",
+      begin: "次の基礎を身につける",
+      maintain: "定着を維持する",
+      follows: "{titles}の上に積み上げます",
+      foundation: "基礎スキル",
+      prereqsMet: "推奨の基礎は完了済み",
+      prereqsOpen: "推奨の基礎が未完了です（今すぐ開始できます）",
+      fullList: "50スキルをすべて表示",
+      weekly: "週間パルスを開く",
+      bands: { unseen: "未学習", learning: "学習中", practiced: "練習済み", consolidating: "復習時期", strong: "定着" },
+    },
+  };
+
+  const fill = (template, values) => Object.entries(values)
+    .reduce((text, [key, value]) => text.split(`{${key}}`).join(String(value)), template || "");
+
+  // Parse only stable structural lines from the already validated course
+  // bundle. The full exercise grammar and its integrity checks remain
+  // Haskell-owned.
+  function courseFromBundle(text) {
+    if (typeof text !== "string") return [];
+    const chunks = text.split(/^!SXC1-DECK [^\n]*\n/gm).slice(1);
+    return chunks.map((chunk) => {
+      const lines = chunk.split("\n");
+      const valueOf = (prefix) => {
+        const line = lines.find((candidate) => candidate.startsWith(prefix));
+        return line ? line.slice(prefix.length).trim() : "";
+      };
+      const exercises = [];
+      let current = null;
+      const finishExercise = () => {
+        if (!current || !current.id) return;
+        const count = current.type === "drill" ? Math.max(1, current.steps) : 1;
+        current.prompts = Array.from({ length: count }, (_, index) => `${current.id}#${index + 1}`);
+        exercises.push(current);
+      };
+      for (const line of lines) {
+        if (/^## [^#]/.test(line)) {
+          finishExercise();
+          current = { id: "", title: line.slice(3).trim(), type: "", steps: 0, prompts: [] };
+        } else if (current && line.startsWith("type: ")) {
+          current.type = line.slice(6).trim();
+        } else if (current && line.startsWith("id: ")) {
+          current.id = line.slice(4).trim();
+        } else if (current && /^### Step(?:\s|$)/.test(line)) {
+          current.steps += 1;
+        }
+      }
+      finishExercise();
+      const requiresText = valueOf("requires:");
+      return {
+        id: valueOf("deck:"),
+        title: valueOf("# "),
+        chapter: valueOf("chapter:"),
+        requires: requiresText ? requiresText.split(",").map((value) => value.trim()).filter(Boolean) : [],
+        exercises,
+      };
+    }).filter((deck) => deck.id);
+  }
+
+  function masteryProjection(strings) {
+    let bundle;
+    try { bundle = window.__sxc1Content && window.__sxc1Content.text(); }
+    catch (_) { return null; }
+    const decks = courseFromBundle(bundle);
+    const progressElement = document.getElementById("sxc1-progress");
+    let progress;
+    try { progress = JSON.parse(progressElement ? progressElement.textContent : ""); }
+    catch (_) { return null; }
+    if (!decks.length || !progress) return null;
+
+    const today = Number(progress.masteryToday) || 0;
+    const recs = new Map((progress.masteryRecs || []).map((rec) => [rec[0], {
+      reps: Number(rec[1]) || 0,
+      interval: Number(rec[2]) || 0,
+      due: Number(rec[3]) || 0,
+    }]));
+    const done = new Set(progress.masteryDone || []);
+    const deckById = new Map(decks.map((deck) => [deck.id, deck]));
+    const chapters = [...new Set(decks.map((deck) => deck.chapter))];
+
+    const nodes = decks.map((deck, courseIndex) => {
+      const prompts = deck.exercises.flatMap((exercise) => exercise.prompts);
+      const doneCount = deck.exercises.filter((exercise) => done.has(exercise.id)).length;
+      let durable = 0;
+      let due = 0;
+      for (const prompt of prompts) {
+        const rec = recs.get(prompt);
+        if (!rec) continue;
+        if (rec.reps > 1 && rec.interval >= 5) durable += 1;
+        if (rec.due <= today) due += 1;
+      }
+      const complete = deck.exercises.length > 0 && doneCount >= deck.exercises.length;
+      const allDurable = prompts.length > 0 && durable === prompts.length;
+      const anyEvidence = doneCount > 0 || prompts.some((prompt) => recs.has(prompt));
+      const band = !anyEvidence ? "unseen"
+        : !complete ? "learning"
+        : !allDurable ? "practiced"
+        : due > 0 ? "consolidating" : "strong";
+      const prereqsMet = deck.requires.every((requiredId) => {
+        const required = deckById.get(requiredId);
+        return Boolean(required && required.exercises.every((exercise) => done.has(exercise.id)));
+      });
+      return {
+        id: deck.id,
+        title: deck.title,
+        chapter: deck.chapter,
+        requires: deck.requires,
+        exercises: deck.exercises.length,
+        done: doneCount,
+        prompts: prompts.length,
+        durable,
+        due,
+        band,
+        bandLabel: strings.bands[band],
+        prereqsMet,
+        courseIndex,
+      };
+    });
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const recommended = nodes.find((node) => node.due > 0)
+      || nodes.find((node) => node.done < node.exercises)
+      || null;
+    if (recommended) recommended.recommended = true;
+
+    for (const node of nodes) {
+      node.evidence = fill(strings.evidence, node);
+      node.prereqStatus = node.prereqsMet ? strings.prereqsMet : strings.prereqsOpen;
+      const titles = node.requires.map((id) => nodeById.get(id)?.title || id).join(", ");
+      node.dependency = titles ? fill(strings.follows, { titles }) : strings.foundation;
+    }
+
+    const counts = new Map(["unseen", "learning", "practiced", "consolidating", "strong"].map((key) => [key, 0]));
+    nodes.forEach((node) => counts.set(node.band, (counts.get(node.band) || 0) + 1));
+
+    // The action queue is the graph's useful decision: due work first,
+    // followed by incomplete work whose suggested foundations are ready,
+    // then the remaining course order. Keep it short enough to scan.
+    const queue = [];
+    const add = (candidates) => {
+      for (const node of candidates) {
+        if (queue.length >= 3) break;
+        if (!queue.includes(node)) queue.push(node);
+      }
+    };
+    add(recommended ? [recommended] : []);
+    add(nodes.filter((node) => node.due > 0).sort((a, b) => b.due - a.due || a.courseIndex - b.courseIndex));
+    add(nodes.filter((node) => node.band !== "strong" && node.prereqsMet));
+    add(nodes.filter((node) => node.band !== "strong"));
+    add(nodes);
+
+    const chapterData = chapters.map((title) => {
+      const chapterNodes = nodes.filter((node) => node.chapter === title);
+      const doneExercises = chapterNodes.reduce((sum, node) => sum + node.done, 0);
+      const exercises = chapterNodes.reduce((sum, node) => sum + node.exercises, 0);
+      return {
+        title,
+        nodes: chapterNodes,
+        done: doneExercises,
+        total: exercises,
+        strong: chapterNodes.filter((node) => node.band === "strong").length,
+      };
+    });
+    return {
+      nodes,
+      queue,
+      chapters: chapterData,
+      edgeCount: decks.reduce((sum, deck) => sum + deck.requires.filter((id) => deckById.has(id)).length, 0),
+      legend: [...counts].map(([key, count]) => [key, strings.bands[key], count]),
+      summary: fill(strings.summary, { strong: counts.get("strong") || 0, total: nodes.length }),
+      recommended,
+    };
+  }
+
+  function reasonFor(node, strings) {
+    if (node.due === 1) return fill(strings.review, { due: node.due });
+    if (node.due > 1) return fill(strings.reviewMany, { due: node.due });
+    if (node.band === "learning" || node.band === "practiced") return strings.continue;
+    if (node.band === "strong") return strings.maintain;
+    return strings.begin;
+  }
+
+  function deckLink(node, strings, className) {
+    const link = makeEl("a", className);
+    link.href = `#/x/${node.id}`;
+    link.dataset.deck = node.id;
+    link.dataset.band = node.band;
+    link.dataset.recommended = String(node.recommended === true);
+    link.setAttribute("aria-label", `${node.title}. ${node.bandLabel}. ${node.evidence}`);
+    const copy = makeEl("span", "mastery-deck-copy");
+    copy.append(
+      makeEl("strong", "mastery-deck-title", node.title),
+      makeEl("span", "mastery-deck-evidence", node.evidence),
+    );
+    const status = makeEl("span", `mastery-band mastery-band-${node.band}`, node.bandLabel);
+    link.append(copy, status);
+    return link;
+  }
+
+  function hydrateMasteryJourney(root) {
+    if (!root || (root.dataset.masteryHydrated === "true" && root.querySelector("#mastery-next"))) return;
+    const strings = MASTERY_STRINGS[root.dataset.lang === "ja" ? "ja" : "en"];
+    const model = masteryProjection(strings);
+    if (!model) return;
+    root.dataset.masteryHydrated = "true";
+
+    const hero = makeEl("header", "mastery-hero");
+    hero.append(
+      makeEl("p", "mastery-kicker", strings.kicker),
+      makeEl("h1", "", strings.title),
+      makeEl("p", "mastery-intro", strings.intro),
+    );
+    const progressCard = makeEl("div", "mastery-summary");
+    progressCard.append(makeEl("strong", "", model.summary));
+    const strongCount = model.nodes.filter((node) => node.band === "strong").length;
+    const overall = makeEl("progress", "mastery-overall-progress");
+    overall.max = model.nodes.length;
+    overall.value = strongCount;
+    overall.setAttribute("aria-label", model.summary);
+    const weeklyLink = makeEl("a", "mastery-weekly-link", strings.weekly);
+    weeklyLink.href = "#/x/week";
+    progressCard.append(overall, weeklyLink);
+    hero.append(progressCard);
+
+    const legend = makeEl("ul", "mastery-legend");
+    legend.setAttribute("aria-label", strings.title);
+    for (const [key, label, count] of model.legend) {
+      const item = makeEl("li", `mastery-legend-${key}`);
+      item.append(makeEl("span", "mastery-legend-count", String(count)), makeEl("span", "", label));
+      legend.append(item);
+    }
+    hero.append(legend);
+
+    const next = makeEl("section", "mastery-next");
+    next.id = "mastery-next";
+    const nextHeader = makeEl("header", "mastery-section-heading");
+    nextHeader.append(makeEl("h2", "", strings.nextTitle), makeEl("p", "", strings.nextHint));
+    const queue = makeEl("ol", "mastery-queue");
+    for (const [index, node] of model.queue.entries()) {
+      const item = makeEl("li", index === 0 ? "is-primary" : "");
+      const reason = makeEl("span", "mastery-queue-reason",
+        `${index === 0 ? `${strings.recommended} · ` : ""}${reasonFor(node, strings)}`);
+      const link = deckLink(node, strings, "mastery-queue-card");
+      link.prepend(reason);
+      item.append(link);
+      queue.append(item);
+    }
+    next.append(nextHeader, queue);
+
+    const route = makeEl("section", "mastery-route");
+    route.id = "mastery-route";
+    const routeHeader = makeEl("header", "mastery-section-heading");
+    routeHeader.append(makeEl("h2", "", strings.routeTitle), makeEl("p", "", strings.routeHint));
+    const tabs = makeEl("div", "mastery-chapter-tabs");
+    tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", strings.routeTitle);
+    const panel = makeEl("div", "mastery-chapter-panel");
+    panel.id = "mastery-chapter-panel";
+    panel.setAttribute("role", "tabpanel");
+
+    let selectedChapter = Math.max(0, model.chapters.findIndex((chapter) =>
+      chapter.nodes.some((node) => node.recommended)));
+    const renderChapter = () => {
+      const chapter = model.chapters[selectedChapter] || model.chapters[0];
+      if (!chapter) return;
+      const heading = makeEl("header", "mastery-chapter-heading");
+      heading.append(
+        makeEl("h3", "", chapter.title),
+        makeEl("p", "", fill(strings.complete, { done: chapter.done, total: chapter.total })),
+      );
+      const progress = makeEl("progress", "mastery-chapter-progress");
+      progress.max = Math.max(1, chapter.total);
+      progress.value = chapter.done;
+      progress.setAttribute("aria-label", fill(strings.complete, { done: chapter.done, total: chapter.total }));
+      heading.append(progress);
+      const trail = makeEl("ol", "mastery-trail");
+      for (const node of chapter.nodes) {
+        const item = makeEl("li", `mastery-trail-item mastery-trail-${node.band}${node.recommended ? " is-recommended" : ""}`);
+        const link = deckLink(node, strings, "mastery-trail-link");
+        const context = makeEl("p", "mastery-trail-context", `${node.dependency} · ${node.prereqStatus}`);
+        item.append(link, context);
+        trail.append(item);
+      }
+      panel.setAttribute("aria-labelledby", `mastery-chapter-tab-${selectedChapter}`);
+      panel.replaceChildren(heading, trail);
+      tabs.querySelectorAll("[role=tab]").forEach((tab, index) => {
+        tab.setAttribute("aria-selected", String(index === selectedChapter));
+        tab.tabIndex = index === selectedChapter ? 0 : -1;
+      });
+      publish();
+    };
+
+    model.chapters.forEach((chapter, index) => {
+      const tab = makeEl("button", "mastery-chapter-tab");
+      tab.id = `mastery-chapter-tab-${index}`;
+      tab.type = "button";
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-controls", panel.id);
+      tab.append(
+        makeEl("strong", "", chapter.title),
+        makeEl("span", "", fill(strings.complete, { done: chapter.done, total: chapter.total })),
+      );
+      tab.addEventListener("click", () => {
+        selectedChapter = index;
+        renderChapter();
+      });
+      tab.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        selectedChapter = (selectedChapter + direction + model.chapters.length) % model.chapters.length;
+        renderChapter();
+        tabs.querySelectorAll("[role=tab]")[selectedChapter]?.focus();
+        event.preventDefault();
+      });
+      tabs.append(tab);
+    });
+    route.append(routeHeader, tabs, panel);
+
+    const fullList = makeEl("details", "mastery-full-list");
+    fullList.id = "mastery-full-list";
+    fullList.append(makeEl("summary", "", strings.fullList));
+    const list = makeEl("ul", "");
+    for (const node of model.nodes) {
+      const item = makeEl("li", "");
+      const link = makeEl("a", "", node.title);
+      link.href = `#/x/${node.id}`;
+      link.dataset.deck = node.id;
+      link.setAttribute("aria-label", `${node.title}. ${node.bandLabel}`);
+      const band = makeEl("span", `mastery-band mastery-band-${node.band}`, node.bandLabel);
+      item.append(link, band);
+      list.append(item);
+    }
+    fullList.append(list);
+
+    root.replaceChildren(hero, next, route, fullList);
+
+    function publish() {
+      const state = {
+        mounted: true,
+        renderer: "dom",
+        nodeCount: model.nodes.length,
+        edgeCount: model.edgeCount,
+        chapterCount: model.chapters.length,
+        queueCount: model.queue.length,
+        renderedDeckCount: panel.querySelectorAll(".mastery-trail-link").length,
+        selectedChapter,
+        recommended: model.recommended?.id || null,
+      };
+      window.__sxc1MasteryJourney = state;
+      // Keep one release of diagnostic compatibility for field reports while
+      // making the retired renderer unambiguous.
+      window.__sxc1MasteryMap = { ...state, webgl: false, retired: true };
+    }
+
+    renderChapter();
+  }
+
+  function scanForMasteryJourney() {
+    hydrateMasteryJourney(document.getElementById("sxc1-mastery"));
+  }
+
+  // M10 Weekly Pulse. This is a projection over the versioned, bounded
+  // progress ledger and review schedule. It is all ordinary DOM/CSS: no
+  // canvas, animation loop, analytics endpoint, or background work.
+  const WEEKLY_STRINGS = {
+    en: {
+      kicker: "Reflection",
+      title: "Weekly pulse",
+      intro: "A calm view of your recent rhythm, the review load ahead, and the most useful next focus.",
+      rhythms: ["A clean week ahead", "Momentum started", "A steady rhythm", "A strong rhythm"],
+      rhythmBody: "{days} active days · {answers} answers tracked locally",
+      activeDays: "Active days",
+      answers: "Answers",
+      steady: "Steady answers",
+      streak: "Current rhythm",
+      dayUnit: "days",
+      forecastTitle: "Seven-day review outlook",
+      forecastBody: "Overdue work is gathered into Today; later bars show when saved prompts return.",
+      dueCount: "{count} reviews",
+      today: "Today",
+      strengthenedTitle: "Skills in motion",
+      strengthenedBody: "Skills with recent steady answers, ranked by fresh evidence.",
+      strengthenedCount: "{count} prompts strengthened",
+      fallbackCount: "{count} prompts practiced recently",
+      frictionTitle: "Worth another pass",
+      frictionBody: "Recent retries and shorter schedules surface here—never as a lock or penalty.",
+      frictionRecent: "{count} recent retries · {lapses} lifetime lapses",
+      frictionLifetime: "{lapses} lifetime lapses · shorter review interval",
+      emptyStrength: "Complete a card and recent strengths will appear here.",
+      emptyFriction: "No repeated difficulty is asking for attention right now.",
+      focusLabel: "Your next focus",
+      focusDue: "Clear {count} due prompts while they are fresh.",
+      focusFriction: "Revisit {title} with one short, deliberate pass.",
+      focusNext: "Build the next foundation: {title}.",
+      focusComplete: "Keep your strongest skills warm with a short mixed session.",
+      openSession: "Open today's session",
+      openExercise: "Open focused practice",
+      openDeck: "Open this skill",
+      trackingNote: "Detailed weekly history starts with your next answer. The outlook already uses your saved review schedule.",
+      localNote: "Stored only on this device and included in your progress passport (latest 200 learning marks).",
+    },
+    ja: {
+      kicker: "振り返り",
+      title: "週間パルス",
+      intro: "最近の学習リズム、これからの復習量、次に重点を置く内容を落ち着いて確認できます。",
+      rhythms: ["新しい一週間へ", "勢いが生まれています", "安定したリズム", "力強いリズム"],
+      rhythmBody: "学習日 {days}日・端末内に記録した解答 {answers}件",
+      activeDays: "学習日",
+      answers: "解答",
+      steady: "安定した解答",
+      streak: "現在のリズム",
+      dayUnit: "日",
+      forecastTitle: "7日間の復習見通し",
+      forecastBody: "期限を過ぎた内容は「今日」にまとめ、その後に戻ってくる問題を日別に表示します。",
+      dueCount: "復習 {count}件",
+      today: "今日",
+      strengthenedTitle: "伸びているスキル",
+      strengthenedBody: "最近の安定した解答をもとに、伸びが見えるスキルを表示します。",
+      strengthenedCount: "定着した問題 {count}件",
+      fallbackCount: "最近練習した問題 {count}件",
+      frictionTitle: "もう一度取り組む価値あり",
+      frictionBody: "最近のやり直しや短い復習間隔を案内します。制限やペナルティにはなりません。",
+      frictionRecent: "最近のやり直し {count}件・累計つまずき {lapses}件",
+      frictionLifetime: "累計つまずき {lapses}件・短めの復習間隔",
+      emptyStrength: "カードを完了すると、最近伸びたスキルがここに表示されます。",
+      emptyFriction: "今すぐ重点的に見直す必要のある項目はありません。",
+      focusLabel: "次の重点",
+      focusDue: "記憶が新しいうちに、期限の来た問題 {count}件を復習しましょう。",
+      focusFriction: "「{title}」を短く丁寧にもう一度確認しましょう。",
+      focusNext: "次の基礎「{title}」を身につけましょう。",
+      focusComplete: "短いミックスセッションで、定着したスキルを保ちましょう。",
+      openSession: "今日のセッションを開く",
+      openExercise: "重点練習を開く",
+      openDeck: "このスキルを開く",
+      trackingNote: "詳しい週間履歴は次の解答から始まります。復習見通しには、保存済みの予定をすでに反映しています。",
+      localNote: "この端末内だけに保存し、進捗パスポートに含めます（最新200件の学習記録）。",
+    },
+  };
+
+  function weeklyInputs() {
+    let bundle;
+    try { bundle = window.__sxc1Content && window.__sxc1Content.text(); }
+    catch (_) { return null; }
+    const decks = courseFromBundle(bundle);
+    const progressElement = document.getElementById("sxc1-progress");
+    let progress;
+    try { progress = JSON.parse(progressElement ? progressElement.textContent : ""); }
+    catch (_) { return null; }
+    return decks.length && progress ? { decks, progress } : null;
+  }
+
+  function weeklyProjection(inputs, lang, strings) {
+    const { decks, progress } = inputs;
+    const today = Number(progress.masteryToday) || Math.floor(Date.now() / 86400000);
+    const recs = new Map((progress.masteryRecs || []).map((rec) => [rec[0], {
+      reps: Number(rec[1]) || 0,
+      interval: Number(rec[2]) || 0,
+      due: Number(rec[3]) || 0,
+      lapses: Number(rec[4]) || 0,
+      ease: Number(rec[5]) || 2500,
+      lastSeen: Number(rec[6]) || 0,
+      seen: Number(rec[7]) || 0,
+    }]));
+    const done = new Set(progress.masteryDone || []);
+    const deckById = new Map(decks.map((deck) => [deck.id, deck]));
+    const exerciseById = new Map();
+    const promptContext = new Map();
+    decks.forEach((deck) => deck.exercises.forEach((exercise) => {
+      exerciseById.set(exercise.id, { deck, exercise });
+      exercise.prompts.forEach((prompt) => promptContext.set(prompt, { deck, exercise }));
+    }));
+
+    const history = (progress.weeklyPulse || []).map((entry) => ({
+      day: Number(entry[0]) || 0,
+      deck: String(entry[1] || ""),
+      exercise: String(entry[2] || ""),
+      prompt: entry[3] == null ? null : String(entry[3]),
+      grade: String(entry[4] || ""),
+    })).filter((entry) => entry.day > 0 && entry.deck && entry.exercise);
+    const weekStart = today - 6;
+    const recent = history.filter((entry) => entry.day >= weekStart && entry.day <= today);
+    const answers = recent.filter((entry) => entry.prompt !== null);
+    const steadyAnswers = answers.filter((entry) => entry.grade === "good" || entry.grade === "easy");
+    const activeDaySet = new Set(recent.map((entry) => entry.day));
+    if (!activeDaySet.size) {
+      recs.forEach((rec) => {
+        if (rec.lastSeen >= weekStart && rec.lastSeen <= today) activeDaySet.add(rec.lastSeen);
+      });
+    }
+    const activeDays = activeDaySet.size;
+    const rhythmIndex = activeDays >= 5 ? 3 : activeDays >= 3 ? 2 : activeDays >= 1 ? 1 : 0;
+
+    const outlook = Array.from({ length: 7 }, (_, index) => ({ day: today + index, count: 0 }));
+    recs.forEach((rec) => {
+      if (!rec.due || rec.due > today + 6) return;
+      const index = Math.max(0, rec.due - today);
+      outlook[index].count += 1;
+    });
+    const maxLoad = Math.max(1, ...outlook.map((day) => day.count));
+    const weekday = new Intl.DateTimeFormat(lang === "ja" ? "ja-JP" : "en", {
+      weekday: "narrow", timeZone: "UTC",
+    });
+    outlook.forEach((day, index) => {
+      day.label = index === 0 ? strings.today : weekday.format(new Date(day.day * 86400000));
+      day.percent = Math.max(day.count ? 12 : 2, Math.round((day.count / maxLoad) * 100));
+    });
+
+    const strengthMap = new Map();
+    steadyAnswers.forEach((entry) => {
+      const item = strengthMap.get(entry.deck) || { id: entry.deck, count: 0, fallback: false };
+      item.count += 1;
+      strengthMap.set(entry.deck, item);
+    });
+    if (!strengthMap.size) {
+      recs.forEach((rec, prompt) => {
+        if (rec.lastSeen < weekStart || rec.lastSeen > today || rec.reps <= 0) return;
+        const context = promptContext.get(prompt);
+        if (!context) return;
+        const item = strengthMap.get(context.deck.id)
+          || { id: context.deck.id, count: 0, fallback: true };
+        item.count += 1;
+        strengthMap.set(context.deck.id, item);
+      });
+    }
+    const strengths = [...strengthMap.values()]
+      .map((item) => ({ ...item, title: deckById.get(item.id)?.title || item.id, href: `#/x/${item.id}` }))
+      .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title)).slice(0, 3);
+
+    const recentFriction = new Map();
+    answers.filter((entry) => entry.grade === "again" || entry.grade === "hard")
+      .forEach((entry) => recentFriction.set(entry.prompt, (recentFriction.get(entry.prompt) || 0) + 1));
+    const friction = [];
+    recs.forEach((rec, prompt) => {
+      const retries = recentFriction.get(prompt) || 0;
+      if (!retries && rec.lapses <= 0 && rec.ease >= 2300) return;
+      const context = promptContext.get(prompt);
+      if (!context) return;
+      friction.push({
+        prompt,
+        title: context.exercise.title || context.exercise.id,
+        href: `#/x/${context.deck.id}/${context.exercise.id}`,
+        retries,
+        lapses: rec.lapses,
+        score: retries * 1000 + rec.lapses * 20 + Math.max(0, 2500 - rec.ease),
+      });
+    });
+    friction.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title));
+    const frictionTop = friction.slice(0, 3);
+
+    const due = outlook[0].count;
+    let focus;
+    if (due > 0) {
+      focus = { text: fill(strings.focusDue, { count: due }), href: "#/x/today", action: strings.openSession };
+    } else if (frictionTop[0]) {
+      focus = { text: fill(strings.focusFriction, frictionTop[0]), href: frictionTop[0].href, action: strings.openExercise };
+    } else {
+      const next = decks.find((deck) => deck.exercises.some((exercise) => !done.has(exercise.id)));
+      focus = next
+        ? { text: fill(strings.focusNext, { title: next.title }), href: `#/x/${next.id}`, action: strings.openDeck }
+        : { text: strings.focusComplete, href: "#/x/today", action: strings.openSession };
+    }
+
+    return {
+      today, historyCount: history.length, records: recs.size, activeDays,
+      answers: answers.length, steadyAnswers: steadyAnswers.length,
+      streak: Number(progress.streak) || 0, rhythm: strings.rhythms[rhythmIndex],
+      outlook, strengths, friction: frictionTop, focus,
+    };
+  }
+
+  function hydrateWeeklyPulse(root) {
+    // Miso may reuse the same empty <section> node while moving between the
+    // DOM-owned Mastery and Weekly shells. A dataset flag can therefore
+    // survive an id change after another renderer replaced the children;
+    // require this surface's own marker as well as the flag.
+    if (!root || (root.dataset.weeklyHydrated === "true" && root.querySelector(".weekly-hero"))) return;
+    const lang = root.dataset.lang === "ja" ? "ja" : "en";
+    const strings = WEEKLY_STRINGS[lang];
+    const inputs = weeklyInputs();
+    const model = inputs ? weeklyProjection(inputs, lang, strings) : null;
+    if (!model) return;
+    root.dataset.weeklyHydrated = "true";
+
+    const hero = makeEl("header", "weekly-hero");
+    hero.append(
+      makeEl("p", "weekly-kicker", strings.kicker),
+      makeEl("h1", "", strings.title),
+      makeEl("p", "weekly-intro", strings.intro),
+    );
+    const rhythm = makeEl("div", "weekly-rhythm");
+    rhythm.append(
+      makeEl("strong", "", model.rhythm),
+      makeEl("span", "", fill(strings.rhythmBody, { days: model.activeDays, answers: model.answers })),
+    );
+    hero.append(rhythm);
+
+    const stats = makeEl("ul", "weekly-stats");
+    [
+      [strings.activeDays, `${model.activeDays}/7`],
+      [strings.answers, String(model.answers)],
+      [strings.steady, String(model.steadyAnswers)],
+      [strings.streak, `${model.streak} ${strings.dayUnit}`],
+    ].forEach(([label, value]) => {
+      const item = makeEl("li", "");
+      item.append(makeEl("strong", "", value), makeEl("span", "", label));
+      stats.append(item);
+    });
+
+    const forecast = makeEl("section", "weekly-section weekly-forecast-section");
+    const forecastHeader = makeEl("header", "weekly-section-heading");
+    forecastHeader.append(makeEl("h2", "", strings.forecastTitle), makeEl("p", "", strings.forecastBody));
+    const bars = makeEl("ol", "weekly-forecast");
+    bars.setAttribute("aria-label", strings.forecastTitle);
+    model.outlook.forEach((day) => {
+      const item = makeEl("li", "");
+      item.setAttribute("aria-label", `${day.label}: ${fill(strings.dueCount, day)}`);
+      const track = makeEl("span", "weekly-bar-track");
+      const fillBar = makeEl("span", "weekly-bar-fill");
+      fillBar.style.height = `${day.percent}%`;
+      track.append(fillBar);
+      item.append(
+        makeEl("strong", "weekly-bar-count", String(day.count)),
+        track,
+        makeEl("span", "weekly-bar-day", day.label),
+      );
+      bars.append(item);
+    });
+    forecast.append(forecastHeader, bars);
+
+    const insightGrid = makeEl("div", "weekly-insight-grid");
+    const makeInsight = (className, title, body, items, emptyText, renderItem) => {
+      const section = makeEl("section", `weekly-section ${className}`);
+      const heading = makeEl("header", "weekly-section-heading");
+      heading.append(makeEl("h2", "", title), makeEl("p", "", body));
+      section.append(heading);
+      if (!items.length) section.append(makeEl("p", "weekly-empty", emptyText));
+      else {
+        const list = makeEl("ul", "weekly-insight-list");
+        items.forEach((item) => list.append(renderItem(item)));
+        section.append(list);
+      }
+      return section;
+    };
+    const strengths = makeInsight("weekly-strengths", strings.strengthenedTitle, strings.strengthenedBody,
+      model.strengths, strings.emptyStrength, (item) => {
+        const row = makeEl("li", "");
+        const link = makeEl("a", "weekly-insight-link");
+        link.href = item.href;
+        link.append(
+          makeEl("strong", "", item.title),
+          makeEl("span", "", fill(item.fallback ? strings.fallbackCount : strings.strengthenedCount, item)),
+        );
+        row.append(link);
+        return row;
+      });
+    const difficulties = makeInsight("weekly-friction", strings.frictionTitle, strings.frictionBody,
+      model.friction, strings.emptyFriction, (item) => {
+        const row = makeEl("li", "");
+        const link = makeEl("a", "weekly-insight-link");
+        link.href = item.href;
+        link.append(
+          makeEl("strong", "", item.title),
+          makeEl("span", "", fill(item.retries ? strings.frictionRecent : strings.frictionLifetime,
+            { count: item.retries, lapses: item.lapses })),
+        );
+        row.append(link);
+        return row;
+      });
+    insightGrid.append(strengths, difficulties);
+
+    const focus = makeEl("section", "weekly-focus");
+    const focusCopy = makeEl("div", "weekly-focus-copy");
+    focusCopy.append(makeEl("span", "weekly-focus-label", strings.focusLabel), makeEl("strong", "", model.focus.text));
+    const focusLink = makeEl("a", "primary-training-action wizard-choice wizard-yes", model.focus.action);
+    focusLink.id = "btn-weekly-focus";
+    focusLink.href = model.focus.href;
+    focus.append(focusCopy, focusLink);
+
+    const notes = makeEl("footer", "weekly-notes");
+    if (!model.historyCount && model.records) notes.append(makeEl("p", "weekly-tracking-note", strings.trackingNote));
+    notes.append(makeEl("p", "", strings.localNote));
+
+    root.replaceChildren(hero, stats, forecast, insightGrid, focus, notes);
+    window.__SXC1_WEEKLY = {
+      mounted: true,
+      renderer: "dom",
+      historyCap: 200,
+      historyCount: model.historyCount,
+      activeDays: model.activeDays,
+      answers: model.answers,
+      steadyAnswers: model.steadyAnswers,
+      outlook: model.outlook.map((day) => day.count),
+      strengthenedCount: model.strengths.length,
+      frictionCount: model.friction.length,
+      focusHref: model.focus.href,
+    };
+  }
+
+  function scanForWeeklyPulse() {
+    hydrateWeeklyPulse(document.getElementById("sxc1-weekly"));
+  }
+
+  // Today's Session is a tab-scoped coaching layer over the same course and
+  // progress projection. Its five-card plan is deliberately stable while the
+  // learner moves between routes: progress can update the completion marks,
+  // but does not reshuffle the work underneath them. sessionStorage is only a
+  // convenience; privacy modes that refuse it fall back to in-memory state.
+  const SESSION_KEY = "sxc1.today-session.v1";
+  let memorySession = null;
+  const renderedSessionKeys = new WeakMap();
+  const SESSION_STRINGS = {
+    en: {
+      kicker: "Training",
+      title: "Today's session",
+      intro: "Five well-chosen cards: review what is due, continue what you started, then add one useful next step.",
+      measure: "{count} cards · about {minutes} min",
+      progress: "{done} of {total} complete",
+      due: "Review due",
+      continue: "Continue",
+      new: "Learn next",
+      maintain: "Keep sharp",
+      ready: "Ready",
+      done: "Done",
+      start: "Start session",
+      resume: "Resume session",
+      reset: "Build a new plan",
+      completeTitle: "Session complete",
+      completeBody: "Nicely done. Your review schedule and mastery journey now reflect this work.",
+      mastery: "See your mastery journey",
+      weekly: "See your weekly pulse",
+      back: "Session plan",
+      inExercise: "Card {current} of {total}",
+      next: "Next session card",
+      finish: "Finish session",
+      kinds: { quiz: "Quiz", drill: "Practice", lookup: "Find it" },
+    },
+    ja: {
+      kicker: "トレーニング",
+      title: "今日のセッション",
+      intro: "復習する内容、学習中の内容、次の一歩を組み合わせた5つのカードです。",
+      measure: "{count}カード・約{minutes}分",
+      progress: "{total}件中{done}件完了",
+      due: "復習時期",
+      continue: "続きから",
+      new: "次を学ぶ",
+      maintain: "定着を保つ",
+      ready: "準備完了",
+      done: "完了",
+      start: "セッションを開始",
+      resume: "セッションを再開",
+      reset: "新しいプランを作成",
+      completeTitle: "セッション完了",
+      completeBody: "お疲れさまでした。今回の学習は復習予定と習熟の道筋に反映されました。",
+      mastery: "習熟の道筋を見る",
+      weekly: "週間パルスを見る",
+      back: "セッションプラン",
+      inExercise: "{total}件中{current}件目",
+      next: "次のセッションカード",
+      finish: "セッションを完了",
+      kinds: { quiz: "クイズ", drill: "練習", lookup: "検索" },
+    },
+  };
+
+  function readSession() {
+    try {
+      const raw = window.sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { /* in-memory fallback below */ }
+    return memorySession;
+  }
+
+  function writeSession(plan) {
+    memorySession = plan;
+    try { window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(plan)); }
+    catch (_) { /* the plan remains stable in this page */ }
+  }
+
+  function removeSession() {
+    memorySession = null;
+    try { window.sessionStorage.removeItem(SESSION_KEY); }
+    catch (_) { /* no persisted copy */ }
+  }
+
+  function sessionInputs() {
+    let bundle;
+    try { bundle = window.__sxc1Content && window.__sxc1Content.text(); }
+    catch (_) { return null; }
+    const decks = courseFromBundle(bundle);
+    const progressElement = document.getElementById("sxc1-progress");
+    let progress;
+    try { progress = JSON.parse(progressElement ? progressElement.textContent : ""); }
+    catch (_) { return null; }
+    return decks.length && progress ? { decks, progress } : null;
+  }
+
+  function makeSessionPlan(inputs, lang) {
+    const { decks, progress } = inputs;
+    const today = Number(progress.masteryToday) || 0;
+    const done = new Set(progress.masteryDone || []);
+    const recs = new Map((progress.masteryRecs || []).map((rec) => [rec[0], {
+      reps: Number(rec[1]) || 0,
+      interval: Number(rec[2]) || 0,
+      due: Number(rec[3]) || 0,
+    }]));
+    const deckById = new Map(decks.map((deck) => [deck.id, deck]));
+    const deckComplete = (id) => {
+      const deck = deckById.get(id);
+      return Boolean(deck && deck.exercises.length
+        && deck.exercises.every((exercise) => done.has(exercise.id)));
+    };
+    const all = [];
+    decks.forEach((deck) => deck.exercises.forEach((exercise) => {
+      const promptRecs = exercise.prompts.map((prompt) => recs.get(prompt)).filter(Boolean);
+      all.push({
+        id: exercise.id,
+        title: exercise.title || exercise.id,
+        type: exercise.type || "quiz",
+        deckId: deck.id,
+        deckTitle: deck.title,
+        href: `#/x/${deck.id}/${exercise.id}`,
+        due: promptRecs.filter((rec) => rec.due <= today).length,
+        seen: promptRecs.length > 0,
+        finished: done.has(exercise.id),
+        prereqsMet: deck.requires.every(deckComplete),
+        courseIndex: all.length,
+        minutes: exercise.type === "drill" ? 2 : 1,
+      });
+    }));
+
+    const chosen = [];
+    const used = new Set();
+    const usedKinds = new Set();
+    const addFrom = (candidates, reason, limit = 99) => {
+      let added = 0;
+      while (chosen.length < 5 && added < limit) {
+        const available = candidates.filter((item) => !used.has(item.id));
+        if (!available.length) break;
+        const item = available.find((candidate) => !usedKinds.has(candidate.type)) || available[0];
+        chosen.push({ ...item, reason });
+        used.add(item.id);
+        usedKinds.add(item.type);
+        added += 1;
+      }
+    };
+    const due = all.filter((item) => item.due > 0)
+      .sort((a, b) => b.due - a.due || a.courseIndex - b.courseIndex);
+    const continuing = all.filter((item) => !item.finished && item.seen)
+      .sort((a, b) => a.courseIndex - b.courseIndex);
+    const fresh = all.filter((item) => !item.finished && !item.seen && item.prereqsMet)
+      .sort((a, b) => a.courseIndex - b.courseIndex);
+    addFrom(due, "due", 2);
+    addFrom(continuing, "continue", 2);
+    addFrom(fresh, "new", 1);
+    addFrom(due, "due");
+    addFrom(continuing, "continue");
+    addFrom(fresh, "new");
+    addFrom(all.filter((item) => !item.finished), "new");
+    addFrom(all, "maintain");
+
+    const signature = `${lang}:${all.length}:${all[0]?.id || "none"}:${all.at(-1)?.id || "none"}`;
+    const items = chosen.map(({ courseIndex, prereqsMet, seen, finished, ...item }) => item);
+    return {
+      version: 1,
+      day: today,
+      signature,
+      id: `${today}:${signature}:${items.map((item) => `${item.id}:${item.reason}`).join(",")}`,
+      items,
+      completed: items.filter((item) => done.has(item.id)).map((item) => item.id),
+    };
+  }
+
+  function reconcileSessionCompletion(plan, progress) {
+    const persisted = new Set(progress.masteryDone || []);
+    const completed = plan.items
+      .filter((item) => persisted.has(item.id))
+      .map((item) => item.id);
+    const previous = Array.isArray(plan.completed) ? plan.completed : [];
+    if (completed.length === previous.length
+      && completed.every((id, index) => id === previous[index])) return plan;
+    const reconciled = { ...plan, completed };
+    writeSession(reconciled);
+    return reconciled;
+  }
+
+  function currentSession(inputs, lang) {
+    const allExercises = inputs.decks.flatMap((deck) => deck.exercises);
+    const signature = `${lang}:${allExercises.length}:${allExercises[0]?.id || "none"}:${allExercises.at(-1)?.id || "none"}`;
+    const today = Number(inputs.progress.masteryToday) || 0;
+    const ids = new Set(allExercises.map((exercise) => exercise.id));
+    const stored = readSession();
+    if (stored && stored.version === 1 && stored.day === today && stored.signature === signature
+      && Array.isArray(stored.items) && stored.items.length > 0
+      && stored.items.every((item) => ids.has(item.id))) {
+      return reconcileSessionCompletion(stored, inputs.progress);
+    }
+    const plan = makeSessionPlan(inputs, lang);
+    writeSession(plan);
+    return plan;
+  }
+
+  function publishSession(plan, mounted) {
+    const completed = new Set(plan.completed || []);
+    const reasonCounts = plan.items.reduce((counts, item) => {
+      counts[item.reason] = (counts[item.reason] || 0) + 1;
+      return counts;
+    }, {});
+    window.__sxc1TodaySession = {
+      mounted,
+      renderer: "dom",
+      stable: true,
+      planId: plan.id,
+      itemCount: plan.items.length,
+      completedCount: completed.size,
+      ids: plan.items.map((item) => item.id),
+      types: plan.items.map((item) => item.type),
+      reasonCounts,
+      estimatedMinutes: Math.max(5, plan.items.reduce((sum, item) => sum + item.minutes, 0)),
+    };
+  }
+
+  function hydrateTodaySession(root) {
+    if (!root) return;
+    const lang = root.dataset.lang === "ja" ? "ja" : "en";
+    const strings = SESSION_STRINGS[lang];
+    const inputs = sessionInputs();
+    if (!inputs) return;
+    let plan = currentSession(inputs, lang);
+    const renderKey = () => `${plan.id}:${(plan.completed || []).join(",")}`;
+    if (renderedSessionKeys.get(root) === renderKey() && root.querySelector(".session-hero")) return;
+
+    const render = () => {
+      renderedSessionKeys.set(root, renderKey());
+      const completed = new Set(plan.completed || []);
+      const remaining = plan.items.filter((item) => !completed.has(item.id));
+      const minutes = Math.max(5, plan.items.reduce((sum, item) => sum + item.minutes, 0));
+      const hero = makeEl("header", "session-hero");
+      hero.append(
+        makeEl("p", "session-kicker", strings.kicker),
+        makeEl("h1", "", remaining.length ? strings.title : strings.completeTitle),
+        makeEl("p", "session-intro", remaining.length ? strings.intro : strings.completeBody),
+      );
+      const meter = makeEl("div", "session-meter");
+      const progressText = fill(strings.progress, { done: completed.size, total: plan.items.length });
+      meter.append(
+        makeEl("strong", "", remaining.length ? fill(strings.measure, { count: plan.items.length, minutes }) : progressText),
+        makeEl("span", "", progressText),
+      );
+      const progress = makeEl("progress", "session-progress");
+      progress.max = plan.items.length;
+      progress.value = completed.size;
+      progress.setAttribute("aria-label", progressText);
+      meter.append(progress);
+      hero.append(meter);
+
+      const list = makeEl("ol", "session-list");
+      plan.items.forEach((item, index) => {
+        const isDone = completed.has(item.id);
+        const row = makeEl("li", `session-item session-reason-${item.reason}${isDone ? " is-done" : ""}`);
+        row.dataset.exercise = item.id;
+        row.dataset.reason = item.reason;
+        const link = makeEl("a", "session-card");
+        link.href = item.href;
+        const number = makeEl("span", "session-number", isDone ? "✓" : String(index + 1));
+        const copy = makeEl("span", "session-copy");
+        copy.append(
+          makeEl("span", "session-reason", strings[item.reason]),
+          makeEl("strong", "session-title", item.title),
+          makeEl("span", "session-context", `${item.deckTitle} · ${strings.kinds[item.type] || item.type}`),
+        );
+        const status = makeEl("span", "session-status", isDone ? strings.done : strings.ready);
+        link.append(number, copy, status);
+        row.append(link);
+        list.append(row);
+      });
+
+      const actions = makeEl("div", "session-actions");
+      if (remaining.length) {
+        const start = makeEl("a", "primary-training-action wizard-choice wizard-yes",
+          completed.size ? strings.resume : strings.start);
+        start.id = "btn-session-start";
+        start.href = remaining[0].href;
+        actions.append(start);
+      } else {
+        const weekly = makeEl("a", "primary-training-action wizard-choice wizard-yes", strings.weekly);
+        weekly.id = "btn-session-weekly";
+        weekly.href = "#/x/week";
+        actions.append(weekly);
+        const mastery = makeEl("a", "session-secondary", strings.mastery);
+        mastery.id = "btn-session-mastery";
+        mastery.href = "#/x/map";
+        actions.append(mastery);
+      }
+      const reset = makeEl("button", "session-reset", strings.reset);
+      reset.id = "btn-session-reset";
+      reset.type = "button";
+      reset.addEventListener("click", () => {
+        removeSession();
+        plan = makeSessionPlan(inputs, lang);
+        writeSession(plan);
+        render();
+      });
+      actions.append(reset);
+      root.replaceChildren(hero, list, actions);
+      publishSession(plan, true);
+    };
+    render();
+  }
+
+  function sessionExerciseRoute() {
+    const match = window.location.hash.match(/^#\/x\/([^/]+)\/([^/]+)$/);
+    return match ? { deck: match[1], exercise: match[2] } : null;
+  }
+
+  function updateSessionCoach() {
+    const oldBar = document.getElementById("sxc1-session-coach");
+    const route = sessionExerciseRoute();
+    const stored = readSession();
+    if (!route || !stored) {
+      oldBar?.remove();
+      document.body.classList.remove("session-coach-active");
+      return;
+    }
+    const inputs = sessionInputs();
+    const lang = inputs?.progress?.uiLang === "ja" ? "ja" : "en";
+    const strings = SESSION_STRINGS[lang];
+    const plan = inputs ? currentSession(inputs, lang) : null;
+    const index = route && plan ? plan.items.findIndex((item) => item.id === route.exercise && item.deckId === route.deck) : -1;
+    if (!plan || index < 0 || !document.getElementById("sxc1-exercise")) {
+      oldBar?.remove();
+      document.body.classList.remove("session-coach-active");
+      return;
+    }
+
+    const summaryVisible = Boolean(document.getElementById("ex-summary"));
+    if (summaryVisible && !(plan.completed || []).includes(route.exercise)) {
+      plan.completed = [...(plan.completed || []), route.exercise];
+      writeSession(plan);
+    }
+    const completed = new Set(plan.completed || []);
+    const next = plan.items.slice(index + 1).find((item) => !completed.has(item.id))
+      || plan.items.find((item) => !completed.has(item.id));
+    const signature = `${plan.id}:${route.exercise}:${summaryVisible}:${completed.size}:${next?.id || "done"}`;
+    if (oldBar?.dataset.signature === signature) return;
+
+    const bar = oldBar || makeEl("aside", "session-coach");
+    bar.id = "sxc1-session-coach";
+    bar.dataset.signature = signature;
+    bar.setAttribute("aria-label", strings.title);
+    const back = makeEl("a", "session-coach-back", `← ${strings.back}`);
+    back.href = "#/x/today";
+    const position = makeEl("strong", "session-coach-position",
+      fill(strings.inExercise, { current: index + 1, total: plan.items.length }));
+    const live = makeEl("span", "session-coach-live",
+      fill(strings.progress, { done: completed.size, total: plan.items.length }));
+    live.setAttribute("aria-live", "polite");
+    bar.replaceChildren(back, position, live);
+    if (summaryVisible) {
+      const forward = makeEl("a", "session-coach-next", next ? strings.next : strings.finish);
+      forward.href = next ? next.href : "#/x/today";
+      bar.append(forward);
+    }
+    if (!oldBar) document.body.append(bar);
+    document.body.classList.add("session-coach-active");
+    publishSession(plan, false);
+  }
+
+  function scanForTodaySession() {
+    hydrateTodaySession(document.getElementById("sxc1-session"));
+    updateSessionCoach();
+  }
+
+  // A review grade or hands-on decision already means "keep going".
+  // Remember that intent across Miso's render, then replace the otherwise
+  // redundant completion summary with the next card. Today's Session owns
+  // its own order, so prefer the coach's next planned link; direct course
+  // study falls back to the authored next-card link rendered by Haskell.
+  // Again still changes the spaced-repetition interval, but never traps the
+  // learner in an immediate loop. Skip records unfinished drill prompts and
+  // leaves them due rather than pretending the work was mastered.
+  let pendingRatedAdvance = null;
+  let pendingRatedFocus = null;
+  document.addEventListener("click", (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest("#btn-ex-grade-again, #btn-ex-grade-hard, #btn-ex-grade-good, #btn-ex-grade-easy, #btn-ex-skip, .btn-ex-confirm")
+      : null;
+    if (!button) return;
+    pendingRatedAdvance = window.location.hash;
+  }, true);
+
+  function advanceRatedCard() {
+    if (pendingRatedFocus) {
+      if (window.location.hash !== pendingRatedFocus) {
+        pendingRatedFocus = null;
+      } else {
+        const title = document.querySelector("#sxc1-exercise #ex-title");
+        if (title && !document.getElementById("ex-summary")) {
+          title.focus();
+          pendingRatedFocus = null;
+        }
+      }
+    }
+    if (!pendingRatedAdvance) return;
+    if (window.location.hash !== pendingRatedAdvance) {
+      pendingRatedAdvance = null;
+      return;
+    }
+    const summary = document.getElementById("ex-summary");
+    if (!summary) return;
+    const forward = document.querySelector("#sxc1-session-coach .session-coach-next")
+      || summary.querySelector("#btn-ex-next-card");
+    const href = forward?.getAttribute("href");
+    pendingRatedAdvance = null;
+    if (!href || !href.startsWith("#/")) return;
+    pendingRatedFocus = href;
+    window.location.hash = href;
+  }
+
+  scanForMasteryJourney();
+  scanForTodaySession();
+  advanceRatedCard();
+  scanForWeeklyPulse();
+  scanForProgressPortability();
+  new MutationObserver(() => {
+    scanForMasteryJourney();
+    scanForTodaySession();
+    advanceRatedCard();
+    scanForWeeklyPulse();
+    scanForProgressPortability();
+  }).observe(document.body, {
+    childList: true,
+    subtree: true,
+    // The Mastery and Weekly Haskell shells are both empty <section>s.
+    // Miso can reuse that node and change only its id, which produces no
+    // childList mutation; observing the two routing attributes makes that
+    // legitimate empty-shell transition visible to the DOM hydrators.
+    attributes: true,
+    attributeFilter: ["id", "data-lang"],
+  });
+})();

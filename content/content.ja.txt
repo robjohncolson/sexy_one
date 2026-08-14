@@ -1,45 +1,14 @@
-!SXC1-BUNDLE v1 ja 52
+!SXC1-BUNDLE v1 ja 50
 !SXC1-DECK 000-ch0-01.ex.md
-# ガイドブックを正しく読む — CONTENTS、ご了承事項、安全上の表示
+# 安全上の表示を理解する
 
 deck: ch0-01
 chapter: Front matter
 tier: intro
-summary: ガイドブックの構成を把握し、安全上の表示と絵表示を正しく読み取れるようにします。
+summary: SXC-1の「警告」「注意」「禁止」の表示を正しく読み取れるようにします。
 cite: guide-book 3 "use the product correctly"
 
-最初の音を出す前に、ガイドブックそのものがどう構成されているか、そして「警告」「注意」の表示が実際に何を意味するのかを押さえましょう。
-ガイドブックの他の説明は、すべてこの決まりの上に成り立っています。
-
-## ガイドブックの各PARTが始まるページ
-
-type: lookup
-find: guide-book 1 "Hot beats pour from your fingertips!"
-id: l-0-01
-limit: 30
-tags: front-matter, intro
-
-ガイドブックは番号付きの5つのPART（準備編・パッドプレイ編・サンプリング編・シーケンサー編・スキルアップ編）に分かれていて、それぞれ開始ページが決まっています。
-CONTENTSの一覧を見つけて、各PARTが始まるページ番号を読み取ってください。
-
-### Hint
-
-表紙の写真のすぐ下、本の冒頭にあるCONTENTSの一覧を見てください。
-
-## 使用の前にご了承いただきたいこと
-
-type: lookup
-find: guide-book 2 "Please note the following"
-id: l-0-02
-limit: 45
-tags: front-matter, intro
-
-安全上のご注意の前に、CASIOからいくつかの一般的な注意事項が示されています。本書の内容の正確さ、損害やメモリー内容の消失についての責任の所在、本書を複写してよいかどうか、そして内容が予告なく変更されることがある点です。
-その注意事項の一覧を探して、ひととおり目を通してください。
-
-### Hint
-
-表紙とCONTENTSのすぐ後、「安全上のご注意」が始まる前を見てください。
+最初の音を出す前に、SXC-1の「警告」「注意」「禁止」の表示が何を意味するかを押さえ、危険な操作をすぐに見分けられるようにしましょう。
 
 ## 「警告」の表示が意味すること
 
@@ -71,6 +40,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: 死亡または重傷を負う可能性がある内容。
+
 軽傷を負う可能性および物的損害が発生する可能性がある内容です。死亡または重傷を扱う「警告」よりも、程度の軽い内容を示します。
 
 ### Why
@@ -88,230 +59,23 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: 斜線の入った丸が「指示」、塗りつぶした丸が「禁止」を表す。
+
 斜線の入った丸の記号は「してはいけないこと」（禁止）を、塗りつぶした丸の記号は「しなければならないこと」（指示）を表します。
 
 ### Why
 
 「警告」「注意」の表示は危害の程度を、絵表示は指示の向きを表します。禁止の記号は避けるべき行為を、指示の記号は実際に行うべき行為を示すので、本文を読む前に絵表示を見るだけで、どの種類の指示かが分かります。
-
-## 表示と絵表示の意味がまとめて説明されている場所
-
-type: lookup
-find: guide-book 3 "Examples of graphic symbols"
-id: l-0-03
-limit: 45
-tags: front-matter, intro
-
-安全上の表示や絵表示の意味を忘れてしまっても、ガイドブックの1か所にまとめて説明があります。2つの表示を並べた小さな表と、それに続く2つの絵表示の例です。その場所を探してください。
-
-### Hint
-
-「安全上のご注意」の冒頭、最初の「警告」の項目より前にあります。
-
-## 電池の液漏れと乳幼児 — 電池についての「警告」
-
-type: lookup
-find: guide-book 3 "rinse it off with clean water"
-id: l-0-04
-limit: 60
-tags: front-matter, core
-
-電池から漏れた液が皮膚や衣服に付いてしまった場合、さらには目に入ってしまった場合を考えてみましょう。そのときに何をすればよいかを具体的に示した「警告」を探してください。
-あわせて、同じ項目グループにある、乳幼児の手の届く所に電池を置かないという記述も読んでください。
-
-### Hint
-
-安全上のご注意で最初に出てくる⚠「警告」の見出しの下、「電池について」のグループを見てください。
-!SXC1-DECK 002-ch0-02.ex.md
-# 暗記ではなく参照する警告 — ケーブル・置き場所・異常時
-
-deck: ch0-02
-chapter: Front matter
-tier: core
-summary: USBケーブル・置き場所・異常時・ヘッドホン使用に関する警告項目の場所を確認する。
-cite: guide-book 4 "Location and place of use"
-
-これらの警告項目は参照資料です。すべてを暗記するのではなく、各グループがどこに載っているかを覚えておき、必要になった瞬間に読み返せるようにしましょう。
-
-## USBケーブルの決まり
-
-type: lookup
-find: guide-book 3 "To prevent fire and electric shock caused by the USB cable"
-id: l-0-05
-limit: 60
-tags: front-matter, core
-
-USBケーブルについての項目のうち、いくつかは「してはいけないこと」です（指定品以外のケーブルやUSB-ACアダプターは使わない、重いものを乗せない、束ねたまま使わない、濡れた手で触れない）。一方、「しなければならないこと」も1つあり（ケーブルが傷んだときの対処）、雷の項目には代わりに感電注意の絵表示が付いています。これらのケーブルの決まりを集めた警告グループを探し、すべての項目にざっと目を通してください。
-
-### Hint
-
-最初の⚠警告見出しの下、電池の項目のすぐ後にある「USBケーブルについて」のグループです。
-
-## 本機を置いてはいけない・使ってはいけない場所
-
-type: lookup
-find: guide-book 4 "Do not place or use the unit in locations such as the following."
-id: l-0-06
-limit: 60
-tags: front-matter, core
-
-湿気やほこりの多い場所、油煙が当たる場所、高温になる場所や直射日光が当たる場所、振動の多い場所、そして0℃～40℃を外れる環境は、いずれも置き場所として不適切です。さらに、不安定な場所に置かない、本機の上に重いものを置かない、という項目も別にあります。本機を置いてはいけない・使ってはいけない場所を挙げた警告グループを探してください。
-
-### Hint
-
-⚠警告の項目の中から「置き場所・使用場所について」の見出しを探してください。
-
-## 発煙・異臭・発熱 — 異常時の3つの処置
-
-type: lookup
-find: guide-book 4 "emitting smoke, an unusual odor, or heat"
-id: l-0-07
-limit: 60
-tags: front-matter, core
-
-本機に発煙・異臭・発熱などの異常が起きたとき、あるいは水や異物が内部に入ったとき、ガイドブックはどちらにも同じ3つの処置を番号付きで示しています。その3つを探し、順番どおりにすべて読んでください。
-
-### Hint
-
-⚠警告の項目の中から「異常（煙・臭い・発熱など）について」の見出しを探してください。同じ処置は「水・異物は避ける」の下にも繰り返し出てきます。
-
-## ヘッドホンや本機を絶対に使ってはいけない場所
-
-type: lookup
-find: guide-book 4 "while driving a vehicle"
-id: l-0-08
-limit: 60
-tags: front-matter, intro
-
-「してはいけないこと」の項目が2つあり、特定の状況・場所でのヘッドホンや本機の使用を禁じています。乗物の運転中と、周囲の音が聞こえないと危険な場所です。両方の項目を探し、2つ目に挙げられている具体的な場所を確認してください。
-
-### Hint
-
-「置き場所・使用場所について」の警告グループの最後にある、2つの「してはいけないこと」の項目です。
-!SXC1-DECK 004-ch0-03.ex.md
-# 調べて読む注意事項：電池・表示部・お手入れ・音量
-
-deck: ch0-03
-chapter: Front matter
-tier: core
-summary: 電池の取り扱い、表示部、お手入れ、音量に関する「注意」の項目を探します。
-cite: guide-book 5 "Care and cleaning"
-
-引き続き参照資料です。電池の液漏れや画面のガラスの破損、本機の汚れを防ぎ、聴力を守るための注意事項を取り上げます。それぞれの項目がどこにあるかを覚えましょう。
-
-## 電池の取り扱いルール
-
-type: lookup
-find: guide-book 5 "To prevent fire and injury due to bursting"
-id: l-0-09
-limit: 60
-tags: front-matter, core
-
-破裂や液漏れを防ぐための電池の取り扱いルールは、1つの「注意」の項目にまとめられています。新しい電池と古い電池を混ぜない、種類の違う電池を混ぜない、極性（＋と－の向き）に注意して正しく入れる、長時間使わないときは取り出しておく、消耗したら速やかに交換する、などです。
-その項目を見つけて、箇条書きすべてに目を通しましょう。なお、爆発に関する電池の注意は、後の「使用上のご注意」の「電池について」にも記載されています。
-
-### Hint
-
-安全上のご注意の「⚠ 注意」の見出しの下にある「電池について」の項目を探しましょう。
-
-## 表示部と分解に関する警告
-
-type: lookup
-find: guide-book 5 "Do not press hard on the display or subject it to strong impact."
-id: l-0-10
-limit: 45
-tags: front-matter, intro
-
-画面のガラスと本機の内部を守る短い「警告」が2つあります。1つは表示部を強く押さないこと、もう1つは分解・改造をしないことです。両方を見つけて、それぞれ何が起こると書かれているかを読みましょう。
-
-### Hint
-
-「⚠ 警告」の最後の2項目で、「注意」の項目が始まる直前にあります。「表示部について」と「分解・改造しない」です。
-
-## 安全なお手入れと除菌
-
-type: lookup
-find: guide-book 5 "Before cleaning, turn the power off and disconnect the USB cable."
-id: l-0-11
-limit: 60
-tags: front-matter, core
-
-本機を拭く前に、電源とUSBケーブルについて「しなければならないこと」が1つあります。お手入れに関する「注意」の項目を見つけて読みましょう。詳しいお手入れの手順や、使ってはいけない薬品の一覧は、後の「使用上のご注意」に記載されています。
-
-### Hint
-
-「⚠ 注意」の項目の中から「お手入れについて」を探しましょう。
-
-## 音量と聴力に関する注意
-
-type: lookup
-find: guide-book 6 "Be careful about the volume when using headphones."
-id: l-0-12
-limit: 45
-tags: front-matter, intro
-
-音量に関する「注意」が2つあります。1つはヘッドホン使用時の音量について、もう1つは大きな音量での長時間使用についてです。両方を見つけて、聴力にどんな影響があると書かれているかを読みましょう。
-
-### Hint
-
-「⚠ 注意」の項目の中で、ヘッドホンを差し込んだままぶらさげないという項目の後にある「音量について」を探しましょう。
 !SXC1-DECK 006-ch0-04.ex.md
 # 最後の注意、最初の習慣
 
 deck: ch0-04
 chapter: Front matter
 tier: core
-summary: ストラップ・バックアップ・健康に関する「注意」項目の場所を確認し、本機を使うたびに役立つ3つの操作の習慣を学びます。
+summary: 音量・内蔵マイク・表示部に関する、日常的な3つの操作習慣を学びます。
 cite: guide-book 7 "Operating precautions"
 
-安全上のご注意は、場所を覚えておきたい3つの「注意」項目で締めくくられます。
-続いて使用上のご注意が始まり、そのうち3つは、本機を使うたびに役立つ習慣になります。
-
-## ストラップの注意
-
-type: lookup
-find: guide-book 6 "do not swing the unit around by the strap"
-id: l-0-13
-limit: 45
-tags: front-matter, intro
-
-市販のストラップを本機に取り付けた場合にしてはいけないことが、「注意」項目の1つに書かれています。
-取り付けた直後に確認すべきことは、後の使用上のご注意に別途書かれています。
-まずは「注意」項目のほうを探してください。
-
-### Hint
-
-⚠「注意」の項目の中で、「音量について」の後にある「ストラップについて」を探してください。
-
-## 大切なデータは控えをとる
-
-type: lookup
-find: guide-book 6 "Regularly back up the contents stored in this unit using the dedicated smartphone app."
-id: l-0-14
-limit: 45
-tags: front-matter, core
-
-本機の故障や修理などにより、記憶内容が消えることがあります。
-本機に記憶させた内容を、どのような方法で、どのくらいの頻度でバックアップすべきかを示す、「しなければならないこと」の「注意」項目を探してください。
-
-### Hint
-
-⚠「注意」の項目の中で「大切なデータは控えをとる」を探してください。
-
-## 強い光に関する健康上の注意
-
-type: lookup
-find: guide-book 6 "strong light stimulation or flashing light"
-id: l-0-15
-limit: 45
-tags: front-matter, intro
-
-本機は明るく点滅するLEDに覆われています。
-強い光の刺激や光の点滅に関する健康上の注意を探し、そこに挙げられた3つのアドバイスを読んでください。
-
-### Hint
-
-⚠「注意」の項目の終わり近くにある「健康上の注意」を探してください。
+この3つの操作習慣は、耳を守り、毎回SXC-1を意図どおりに使うために役立ちます。
 
 ## MAIN VOL を最初に最小にする理由
 
@@ -344,6 +108,8 @@ tags: front-matter, core
 
 ### Answer
 
+distractor: 音源をマイクから離し、テスト録音は行わない。
+
 内蔵マイクは近距離収音設計のため、録音する音源をマイクに近づけて使用します。
 重要な録音をする場合は、事前に試し録りを行い、マイクとの距離や周囲の騒音を確認します。
 
@@ -371,90 +137,16 @@ tags: front-matter, core
 
 スクリーンセイバー機能は表示の焼き付き防止のためのもので、操作をせずに約30分経過すると表示だけが自動的にオフになり、ボタン操作やパッド操作で復帰できます。
 本機全体の電源を切るオートパワーオフ機能とは異なる、とマニュアルも強調しています。
-
-## 精密な電子部品の取り扱いルール
-
-type: lookup
-find: guide-book 7 "made up of precision electronic components"
-id: l-0-16
-limit: 60
-tags: front-matter, core
-
-使用上のご注意の最初の項目グループは、精密な電子部品で構成された本機を守るためのものです。
-落とさない、重いものを乗せない、圧力をかけない。尖ったものでボタンやパッド、表示部を操作しない。分解しない。静電気が発生しやすい場所では使わない。
-そのグループを探して、各項目にひととおり目を通してください。
-
-### Hint
-
-「使用上のご注意」の冒頭、いちばん最初の項目グループです。
 !SXC1-DECK 008-ch0-05.ex.md
 # 使用環境・故障ではない特性・電源の挙動
 
 deck: ch0-05
 chapter: Front matter
 tier: core
-summary: 使用環境とデータ消失に関する注意の場所を確認し、USB給電とLINE OUTの挙動を学ぶ。
+summary: USB給電が優先されるしくみと、LINE OUTの挙動を学ぶ。
 cite: guide-book 7 "Operating environment"
 
-使用上のご注意の残りの部分です。本機を置いてよい場所、故障ではない正常な特性、録音データを脅かすもの — さらに、しっかり覚えておく価値のある電源と出力に関する2つの事実を扱います。
-
-## 使用温度範囲と使用環境
-
-type: lookup
-find: guide-book 7 "Operating temperature range"
-id: l-0-17
-limit: 45
-tags: front-matter, core
-
-本機の置き場所に関する決まりは、すべて1つの数値範囲から始まります。使用環境についての記述を探し、本機の使用温度範囲と、置いてはいけない場所の一覧を読んでください。
-
-### Hint
-
-使用上のご注意の中にある「使用環境について」の見出しを探してください。
-
-## ノイズ・衝撃音・LEDの個体差 — 正常？それとも故障？
-
-type: lookup
-find: guide-book 7 "This noise is not a product malfunction"
-id: l-0-18
-limit: 60
-tags: front-matter, intro
-cite: guide-book 8 "Individual variation may occur in the brightness and color tone of the LEDs"
-
-何も再生していないときにかすかに聞こえる「サー」「ジー」といったノイズ、電源を入れる際の「パチッ」という突発的な衝撃音、輝度や色味がわずかに異なるLED — 本機を修理に出す前に、これらが故障かどうかを述べている使用上のご注意を探してください。
-
-### Hint
-
-ノイズと電源投入時の注意は、使用上のご注意の箇条書きにあります。LEDの注意は、その直後に「LEDについて」という短い見出しで独立しています。
-
-## 電池駆動での録音を脅かすもの
-
-type: lookup
-find: guide-book 7 "If the power is cut during recording, the data being recorded may be lost."
-id: l-0-19
-limit: 60
-tags: front-matter, core
-cite: guide-book 9 "Take particular care while recording, because recorded data may be lost."
-
-録音は、電源が切れるとデータが失われてしまう唯一の作業です。そのことを述べた使用上のご注意を探し、そこで指示されている2つの習慣 — 長時間録音時にどの電源を使うか、電池使用の場合は録音前に何を確認するか — を読んでください。
-
-### Hint
-
-MAIN VOLに関する注意の近くにある、録音中に電源が切れた場合の箇条書きを探してください。同じ注意は後の「電池について」でも繰り返されています。
-
-## 本機に近づけてはいけないもの
-
-type: lookup
-find: guide-book 7 "Keep magnetic cards away."
-id: l-0-20
-limit: 60
-tags: front-matter, intro
-
-シンナー、アルコール、化粧品類、さらには油脂を含む食品までもが樹脂ケースを傷めるおそれがあります — そして、財布に入っている身近なカード類には、本機に近づけるだけで使えなくなるものがあります。近づけてはいけない物質・物品を挙げた注意を探してください。
-
-### Hint
-
-使用上のご注意の最初のページの最後にある箇条書きです。「薬品類にご注意ください」と、磁気カードについての項目です。
+電池、USB給電、外部スピーカーを接続したときに戸惑わないための、電源と出力に関する2つの実用的なポイントを扱います。
 
 ## 電池をセットしてアダプターも接続 — 優先されるのは？
 
@@ -485,6 +177,8 @@ LINE OUT端子に外部スピーカーを接続しました。本機の内蔵ス
 
 ### Answer
 
+distractor: LINE OUTを接続すると、内蔵スピーカーは自動的にミュートされる。
+
 LINE OUTを接続しても、本機のスピーカーからは引き続き音源が出力されます。本機のスピーカーからの音源を聞こえなくするには、MAIN VOLを最小にしてください。
 
 ### Why
@@ -496,71 +190,11 @@ LINE OUTと内蔵スピーカーは独立した出力なので、MAIN VOLを下�
 deck: ch0-06
 chapter: Front matter
 tier: core
-summary: 接続と電池の注意書きの場所を確認し、「各部の名称」の表の前半を学ぶ。
+tags: visual-source
+summary: パネル上段の表示部、操作ボタン、スライダー、FXセクションを学ぶ。
 cite: guide-book 10 "Names of parts"
 
-参照資料を探す問題も残り4問 — 外部機器の接続、PHONE端子のプラグ、スマートフォンの給電、eneloopの設定です。
-そのあとはいよいよパネルの探検です。表示部、各種ボタン、スライダー、FXセクションを順に見ていきます。
-
-## 外部機器を正しい順番で接続する
-
-type: lookup
-find: guide-book 8 "turn on the power in the order of this unit first, then the external devices."
-id: l-0-21
-limit: 60
-tags: front-matter, core
-
-本機をスピーカーやミキサーにつなぐ前に、「接続について」の注意書きを探しましょう。
-接続のあいだ各機器の電源はどうしておくのか、接続後はどの順番で電源を入れるのか、音が歪んで聞こえたらどうするのかが書かれています。
-
-### Hint
-
-「使用上のご注意」の中の「接続について」という見出しを探してください。ストラップの注意のすぐ後にあります。
-
-## PHONE端子に合うプラグは
-
-type: lookup
-find: guide-book 8 "use only a 3.5 mm stereo mini plug (3-pole)"
-id: l-0-22
-limit: 45
-tags: front-matter, core
-
-どんなヘッドホンプラグでもPHONE端子に挿してよいわけではありません。
-PHONE端子に使えるプラグの種類を、極数まで正確に指定している接続の注意書きを探してください。
-
-### Hint
-
-「使用上のご注意」の「接続について」の中にある1項目です。
-
-## スマートフォンから給電を受けずに通信する
-
-type: lookup
-find: guide-book 8 "connect the smartphone to the DATA port and the USB AC adaptor to the POWER/DATA port"
-id: l-0-23
-limit: 60
-tags: front-matter, core
-
-スマートフォンをPOWER/DATA端子に接続すると、スマートフォン側から本機へ給電される場合があります。
-スマートフォンからの給電を行わずに通信するには、どの機器をどの端子につなげばよいのか — それを示したUSB給電の注意書きを探してください。
-
-### Hint
-
-「USB給電に関するご注意」の最後の項目で、「接続について」の注意のすぐ後にあります。
-
-## eneloopに交換したら変える設定
-
-type: lookup
-find: guide-book 9 "After switching to eneloop batteries, set the battery setting"
-id: l-0-24
-limit: 60
-tags: front-matter, core
-
-本機の電池をアルカリ乾電池からeneloopに替えたら、電池残量が正しく扱われるように設定を1つ変更する必要があります。
-電池の交換に関する注意書きを探し、どの設定をどの値にすればよいのかを読み取ってください。
-
-### Hint
-
-「使用上のご注意」の中の「電池の交換について」を見てください。設定そのものはシステム設定の中にあります。
+表示部、十字ボタン、入力音量とメイン音量のスライダー、2系統のFX操作からパネルを見ていきます。
 
 ## パネル項目1：表示部
 
@@ -591,6 +225,8 @@ tags: front-matter, intro
 十字ボタンは何に使いますか。
 
 ### Answer
+
+distractor: 再生と停止だけに使い、メニュー操作には使わない。
 
 メニューの選択や数値の変更などに使います。本機の操作全般を受け持つナビゲーション用のボタンです。
 
@@ -641,9 +277,10 @@ tags: front-matter, core
 
 `MAIN VOL` スライダーはどの出力の音量を調整しますか。
 
-### Answer
-
-内蔵スピーカーとヘッドホンの音量です。1本のスライダーを2つの出力で共用しています。
+- [x] 内蔵スピーカーとヘッドホン
+- [ ] 内蔵スピーカーのみ
+- [ ] ヘッドホンと LINE OUT
+- [ ] 録音に使う入力レベル
 
 ### Why
 
@@ -662,6 +299,8 @@ tags: front-matter, core
 
 ### Answer
 
+distractor: ボタンでエフェクトを選び、ダイヤルでON/OFFだけを切り替える。
+
 ボタンでエフェクトのON/OFF、ダイヤルでエフェクトの選択とパラメータの変更ができます。
 
 ### Why
@@ -679,6 +318,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: `▲`、`▼`、`FX1`、`FX2`、`A`、`B` の6つ。
+
 `▶/■`、`REC`、`ONE SHOT`、`LOOP`、`DEL`、`EDIT` の6つです。
 
 ### Why
@@ -691,6 +332,7 @@ tags: front-matter, intro
 deck: ch0-07
 chapter: Front matter
 tier: intro
+tags: visual-source
 summary: 各機能ボタン、パッド部、内蔵マイク、バンク選択ボタン、5つの端子を識別する。
 cite: guide-book 10 "Names of parts"
 
@@ -743,6 +385,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: 同じパッドをもう一度叩くまで、音が繰り返し再生される。
+
 全音再生です。パッドの音源が最初から最後まで一度だけ再生され、自動的に止まります。
 
 ## LOOP が切り替えるもの
@@ -755,6 +399,8 @@ tags: front-matter, intro
 機能ボタン `LOOP` は何を切り替えますか。
 
 ### Answer
+
+distractor: 音が最初から最後まで1回だけ再生され、自動的に止まる。
 
 ループ再生です。パッドの音源が、停止するまで繰り返し再生されます。
 
@@ -791,6 +437,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: サウンドバンク選択とシーケンスバンク選択を切り替える。
+
 編集モードです。パラメーター編集と波形編集を切り替えます。
 
 ## パッド部
@@ -804,6 +452,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: パッドは設定の選択専用で、叩いても音は鳴らない。
+
 割り当てられた音源が再生されます。パッド部は、音源を再生・録音・編集するときに使用します。
 
 ## 内蔵マイク
@@ -816,6 +466,8 @@ tags: front-matter, intro
 内蔵マイクは何に使いますか。
 
 ### Answer
+
+distractor: AUDIO INに外部音源を接続したときだけ録音に使える。
 
 本機単体で録音する場合に使います。外部機器をつながなくてもサンプリングできます。
 
@@ -848,6 +500,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: PHONE、MIC IN、MIDI OUT、USB-A、DC INの5つ。
+
 PHONE端子、LINE OUT端子、AUDIO IN端子と、DATA端子、POWER/DATA端子です。
 
 ### Why
@@ -865,6 +519,8 @@ PHONE端子には何を接続しますか。プラグの形式も答えてくだ
 
 ### Answer
 
+distractor: ミキサーやパワードスピーカーをモノラルのラインケーブルで接続する。
+
 ヘッドホンです（3.5mmステレオミニ）。
 
 ## LINE OUT端子
@@ -877,6 +533,8 @@ tags: front-matter, intro
 LINE OUT端子には何を接続しますか。音はどちら向きに流れますか。
 
 ### Answer
+
+distractor: ヘッドホンを接続し、MAIN VOLが最小より上ならミュートされる。
 
 ミキサーやスピーカーなどに接続して、音源を出力します（3.5mmステレオミニ）。
 
@@ -909,6 +567,8 @@ DATA端子はどんな端子で、何をやり取りしますか。
 
 ### Answer
 
+distractor: 給電専用で、MIDIやオーディオデータは送受信できない。
+
 スマートフォンとのデータ通信（MIDI/オーディオ転送）用のUSB端子です。本機への電源供給は行いません。
 
 ## POWER/DATA端子
@@ -922,6 +582,8 @@ POWER/DATA端子はどんな端子で、どんな2つの役割を持ちますか
 
 ### Answer
 
+distractor: 給電専用で、スマートフォンとのデータ通信はできない。
+
 電源供給とスマートフォンとのデータ通信（MIDI/オーディオ転送）用のUSB端子です。2つのUSB端子のうち、本機に電源を供給できるのはこちらだけです。
 !SXC1-DECK 014-ch0-08.ex.md
 # 端子・スイッチ・裏面の各部、そしてモードマップ
@@ -929,6 +591,7 @@ POWER/DATA端子はどんな端子で、どんな2つの役割を持ちますか
 deck: ch0-08
 chapter: Front matter
 tier: core
+tags: visual-source
 summary: 各部の名称の残りを確認し、各画面が演奏モードとどうつながるかを学ぶ。
 cite: guide-book 11 "Operation overview"
 
@@ -964,6 +627,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: 表示の明るさを切り替えるだけで、本機の電源は切らない。
+
 本機の電源をON/OFFします。オートパワーオフで電源が切れたあとの復帰にもこのスイッチを使い、一度OFF→ONにします。
 
 ## INPUT SELECT の3つのポジション
@@ -976,6 +641,8 @@ tags: front-matter, core
 `INPUT SELECT` スイッチは、録音する入力ソースを切り替えます。`MIC`・`♪`・`USB` の3つのポジションが、それぞれ何を選択するのかを対応づけてください。
 
 ### Answer
+
+distractor: `MIC`はUSB、`♪`は内蔵マイク、`USB`はAUDIO INを選ぶ。
 
 `MIC` は内蔵マイク、`♪` は AUDIO IN端子、`USB` はUSB端子を選択します。
 
@@ -994,6 +661,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: 前面のモニタースピーカーで、ヘッドホンを抜くとオフになる。
+
 本機単体で再生する場合に使用します。図では本機裏面に配置されています。
 
 ### Why
@@ -1011,6 +680,8 @@ tags: front-matter, intro
 
 ### Answer
 
+distractor: 開くとシステム設定が初期化され、電池を入れる場所ではない。
+
 電池を入れるときは電池ブタを外します。
 
 ## 演奏をする通常のモード
@@ -1023,6 +694,8 @@ tags: front-matter, intro
 モードマップの中心には、他のすべての画面への出発点となる画面が1つあります。機能一覧の表で「演奏をする通常のモード」と説明されているのはどのモードですか。
 
 ### Answer
+
+distractor: EDITモードが通常の演奏用ホーム画面である。
 
 演奏モードです。本機のホーム画面にあたり、バンク選択、シーケンス、REC・DEL・EDITの各モード、システム設定のすべてへ、この画面から移動します。
 
@@ -1055,6 +728,8 @@ tags: front-matter, core
 
 ### Answer
 
+distractor: `REC`で音源削除、`DEL`で音源編集、`EDIT`でサンプリングを始める。
+
 `REC` はRECモード（サンプリング）、`DEL` はDELモード（音源削除）、`EDIT` はEDITモード（音源の編集）に入ります。
 
 ### Why
@@ -1078,20 +753,6 @@ tags: front-matter, core
 ### Why
 
 `EDIT` を短押しすると、現在のパッドの音源に対するEDITモードが開きます。長押しすると、サンプラー全体に関わる設定を変更するシステム設定が開きます。
-
-## モードマップと機能一覧の表
-
-type: lookup
-find: guide-book 11 "For a description of each function, see the corresponding page."
-id: l-0-25
-limit: 60
-tags: front-matter, core
-
-ガイドブックのある1ページに、全体の見取り図がまとまっています。すべての画面、画面間を移動するボタン操作、そして各機能の説明ページを示した表です。そのページを探し、表からRECモードの説明ページを読み取ってください。
-
-### Hint
-
-「操作一覧」のセクションを探しましょう。「各部の名称」のすぐ後、最初の番号付きPARTが始まる直前にあります。
 !SXC1-DECK 016-prep-01.ex.md
 # 電源・音量・電池の基本
 
@@ -1113,6 +774,8 @@ tags: preparation, intro
 電源スイッチを [ON] の位置にスライドさせました。画面には何が表示されますか。また、それが表示されたとき本機はどのような状態ですか。
 
 ### Answer
+
+distractor: パッドを叩くまで画面は何も表示しない。
 
 起動画面が表示され、本機が使用可能となります。
 
@@ -1137,34 +800,6 @@ MAIN VOL のスライダーはどの出力の音量レベルを調整します�
 ### Why
 
 MAIN VOL は内蔵スピーカーと PHONE 端子の音量をまとめて調整します。音を小さくしたいときはスライダーを左へ、大きくしたいときは右へスライドさせます。音が出ないときのチェックがこのスライダーから始まるのはそのためです。
-
-## USB給電に関するご注意を探す
-
-type: lookup
-find: guide-book 8 "USB power takes priority"
-id: l-1-08
-limit: 60
-tags: preparation, core
-
-本機に電池がセットされた状態で、同時に POWER/DATA 端子に USB-ACアダプターも接続されているとします。USB給電に関する使用上のご注意を探し、どちらの給電が優先されるかを読み取ってください。
-
-### Hint
-
-ガイドブック前方の「使用上のご注意」のページで、USB給電に関する見出しを探してください。
-
-## REPLACE THE BATTERY への対処を探す
-
-type: lookup
-find: guide-book 9 "replace the batteries as soon as possible"
-id: l-1-07
-limit: 60
-tags: preparation, core
-
-画面に `REPLACE THE BATTERY` と表示されました。電池の交換についての使用上のご注意を探し、どれくらい早く対処すべきか、また交換の前に電源スイッチをどうしなければならないかを読み取ってください。
-
-### Hint
-
-ガイドブック前方の「使用上のご注意」のページで、電池に関する見出しを探してください。
 
 ## 付属のケーブルの接続先
 
@@ -1194,6 +829,8 @@ tags: preparation, intro
 本機用にカシオが別売で用意している USB-ACアダプターの型番は何ですか。
 
 ### Answer
+
+distractor: AD-XA06J Type-A。
 
 AD-XA06J Type-C です。
 
@@ -1230,6 +867,8 @@ tags: preparation, core
 
 ### Answer
 
+distractor: USB 3対応なら長さに制限なく使用できる。
+
 USB2.0規格に適合した、長さ1m以下のケーブルを使用します。
 
 ### Why
@@ -1265,6 +904,8 @@ tags: preparation, intro
 
 ### Answer
 
+distractor: 前面にあり、平らな端を真上に持ち上げて開ける。
+
 本機の裏面にあります。電池ブタの突起部（“－”形状）を押しながらスライドして外します。
 
 ### Why
@@ -1299,6 +940,8 @@ tags: preparation, core
 目安として、eneloop 使用時は電池交換までおよそどれくらい本機を連続使用できますか。
 
 ### Answer
+
+distractor: 使用条件にかかわらず約8時間。
 
 約2時間です。アルカリ乾電池使用時や使用状況によっては、1時間もしくはそれ以下になることがあります。
 
@@ -1358,6 +1001,8 @@ tags: preparation, intro
 電源を入れた状態で一定時間操作しないと、どうなりますか。
 
 ### Answer
+
+distractor: 画面を暗くするだけで、本機の電源は入ったままになる。
 
 自動的に電源が切れます。これがオートパワーオフ機能です。
 
@@ -1444,34 +1089,6 @@ cite: startup-guide 6 "The startup screen appears and the unit is ready for use"
 check: USBケーブルを接続していない状態で起動画面が表示される。本機は電池だけで動作している。
 
 USBケーブルを接続しないまま、電源スイッチを[ON]の位置にスライドさせます。
-
-## アダプターとケーブルの電源要件を探す
-
-type: lookup
-find: guide-book 12 "use a product that conforms to the USB standard with an output of DC 5 V, 1 A or higher"
-id: l-1-02
-limit: 60
-tags: preparation, intro
-
-本機用に市販のアダプターとケーブルを購入しようとしています。準備編のページから、市販のUSB-ACアダプターに必要な出力と、ケーブルが適合すべき規格および長さの上限を記した注意書きを探してください。
-
-### Hint
-
-「音を出す前の準備」の中で、電池の装着手順のすぐ後にある注意書きを見てください。
-
-## アダプターの型番を探す
-
-type: lookup
-find: guide-book 12 "separately available USB AC adaptor (AD-XA06J Type-C)"
-id: l-1-03
-limit: 45
-tags: preparation, intro
-
-市販品ではなく、CASIOが自ら用意しているアダプターを使いたいと考えています。別売のUSB-ACアダプターの型番を探してください。
-
-### Hint
-
-準備編のページで、コンセントに繋いで使用する方法を説明している箇所の括弧内に書かれています。
 !SXC1-DECK 020-prep-03.ex.md
 # 電源を入れて、音を聴いてみよう
 
@@ -1483,20 +1100,6 @@ summary: 電源の入れ方・切り方を練習し、オートパワーオフ�
 cite: startup-guide 6 "Slide the power switch to the [ON] position."
 
 電源の用意ができたら、本機のふだんの電源操作 ― 入れる、切る、オートパワーオフからの復帰 ― をひととおり行い、内蔵スピーカーとヘッドホンがどう入れ替わるかを耳で確かめましょう。
-
-## 電池での連続使用時間の目安を探す
-
-type: lookup
-find: guide-book 12 "continuous operation on batteries is approximately 2 hours when using eneloop"
-id: l-1-04
-limit: 45
-tags: preparation, intro
-
-長いセッションで電池と USB-AC アダプターのどちらを使うか選ぶ前に、それぞれの電池で本機を連続使用できる時間の目安を調べましょう。
-
-### Hint
-
-「音を出す前の準備」の資料の中で、電池の装着方法の説明の近くを探してみてください。
 
 ## 電源を入れる・切る
 
@@ -1598,10 +1201,10 @@ deck: prep-04
 chapter: Part: Preparation
 tier: intro
 requires: prep-03
-summary: LINE OUT端子から音を出し、トラブルシューティングを活用して、オートパワーオフの設定を見つける。
+summary: 外部オーディオ機器を安全に接続し、オートパワーオフの設定を変更する。
 cite: guide-book 13 "Active speakers / external mixer, etc."
 
-準備の仕上げです。本機を外部機器へ安全な手順で接続し、トラブルシューティングがどこに載っているかを覚え、オートパワーオフを制御するシステム設定を見つけます。
+準備の仕上げです。本機を安全な電源投入順で外部機器へ接続し、オートパワーオフを制御するシステム設定を開きます。
 
 ## LINE OUT端子から音を出す
 
@@ -1633,34 +1236,6 @@ check: 外部機器からだけ音が聞こえ、本機裏面のスピーカー�
 
 外部機器と同時に、本機裏面のスピーカーからも音源が出力されていることに注目してください。聞こえなくするには、本機のMAIN VOLを最小にします。LINE OUTの出力レベルは変わりません。
 
-## 「音が出ない」ときの確認項目を探す
-
-type: lookup
-find: startup-guide 13 "Check that headphones, external speakers, or the like are correctly connected to the"
-id: l-1-05
-limit: 45
-tags: preparation, intro
-
-本機の音が出なくなってしまったようです。故障と決めつける前に、音が出ないときの確認内容をまとめたトラブルシューティングの項目を探し、最初に何を確認するよう書かれているかを読みましょう。
-
-### Hint
-
-スタートアップガイドのトラブルシューティングにある、「音が出ない」の見出しの下を見てください。
-
-## 「電源が入らない」ときの確認項目を探す
-
-type: lookup
-find: startup-guide 13 "Replace the batteries with new ones."
-id: l-1-06
-limit: 45
-tags: preparation, intro
-
-電源スイッチを[ON]にしても、まったく反応がありません。電源が入らないときのトラブルシューティングの項目を探し、確認内容を2つとも読みましょう。
-
-### Hint
-
-スタートアップガイドのトラブルシューティングの中の、アプリと接続できないときの項目のすぐ後にあります。
-
 ## オートパワーオフまでの時間はどこで設定するか
 
 type: quiz
@@ -1678,20 +1253,6 @@ tags: preparation, intro
 ### Why
 
 この時間は本機自体のシステム設定の項目です。準備編のページはそこを指し示すだけで、実際の項目は次の演習で探しに行きます。
-
-## オートパワーオフまでの時間の設定項目を探す
-
-type: lookup
-find: guide-book 55 "Sets the time until Auto Power Off: 20 minutes, 1 hour, 2 hours, or off"
-id: l-1-01
-limit: 90
-tags: preparation, intro
-
-オートパワーオフまでの時間を設定するシステム設定の項目を探しましょう。設定できる4つの値と、どれがデフォルトかを読み取ってください。
-
-### Hint
-
-演奏モードで`EDIT`ボタンを長押しすると、本機のシステム設定が開きます。ガイドブックのシステム設定のページでも同じ一覧が見られます。項目名は`APO Time`です。
 !SXC1-DECK 024-pad-01.ex.md
 # バンク：選び方としくみ
 
@@ -1771,6 +1332,8 @@ tags: banks, core
 何で決まるか説明してください。
 
 ### Answer
+
+distractor: 電源を入れると必ず`A`が点灯し、パッドの色は工場出荷時に戻る。
 
 最後に電源を切ったときの状態で決まります。同じ `A`～`D` ボタンが点灯し、
 各パッドも前回と同じ色で光ります。
@@ -1894,6 +1457,8 @@ tags: banks, core
 
 ### Answer
 
+distractor: メニュー設定だけを戻し、自分で登録した音源はすべて残す。
+
 本機が出荷時の状態に戻ります。自分で登録した音は消去されます。
 
 ### Why
@@ -1944,52 +1509,10 @@ tags: banks, core
 deck: pad-02
 chapter: Part: Pad play
 tier: intro
-summary: バンクの基本を調べてから、BANK1のパッド配置と、ワンショット音源とループ音源の違いを学ぶ。
+summary: BANK1のパッド配置と、ワンショット音源とループ音源の違いを学ぶ。
 cite: guide-book 17 "In BANK1, the following sounds are assigned to the 16 pads"
 
-まず3つの調べる練習でバンクの解説ページに慣れ、続く一連のカードで、BANK1のパッド配置と本機の2種類の音の鳴り方（ワンショット音源とループ音源）を記憶に定着させます。
-
-## バンクをいくつまで作れるかを調べる
-
-type: lookup
-find: guide-book 16 "You can create up to 80 banks."
-id: l-2-05
-limit: 45
-tags: banks, intro
-
-本機でバンクを最大いくつまで作れるか、また、どのバンクにあらかじめ音が登録（プリセット）されていて、どのバンクが自分で音を登録するユーザーエリアなのかを調べましょう。
-
-### Hint
-
-BANK1～14とBANK15以降の違いを説明している部分の近くを見てみましょう。
-
-## 十字ボタンの増減幅を調べる
-
-type: lookup
-find: guide-book 16 "The ↑/↓ buttons increase or decrease the"
-id: l-2-06
-limit: 45
-tags: banks, intro
-
-`SELECT BANK` 画面では、十字ボタンの上下と左右のどちらか一方でバンクの番号が少しずつ、もう一方で大きく増減します。どちらがいくつずつ増減させるのかを示した図の注記を見つけましょう。
-
-### Hint
-
-フィンガードラムの解説の冒頭近くにある2つの `SELECT BANK` 画面のすぐ下で、十字ボタンの上下左右に数字が添えられた図を見てみましょう。
-
-## Initializeで何が消去されるかを調べる
-
-type: lookup
-find: guide-book 16 "any sounds you have assigned yourself will be erased"
-id: l-2-10
-limit: 60
-tags: banks, intro
-
-「Initialize」を実行すると、本機は出荷時の状態に戻ります。自分で登録した音がどうなるかを述べた注意書きを見つけましょう。
-
-### Hint
-
-「SXC-1の『バンク』について」の解説の中で、出荷時の状態に戻るという文のすぐ下を見てみましょう。
+一連のカードで、BANK1のパッド配置と、本機の2種類の音の鳴り方（ワンショット音源とループ音源）を結び付けます。
 
 ## BANK1の基本ドラムキットの音
 
@@ -2092,6 +1615,8 @@ tags: pad-play, intro
 
 ### Answer
 
+distractor: 同じパッドをもう一度叩くまで繰り返し鳴る。
+
 単発の音が一度だけ鳴ります。パッドを叩くと、繰り返さずに1回だけ鳴り切ります。
 
 ## ループ音源はどう鳴る
@@ -2104,6 +1629,8 @@ tags: pad-play, intro
 本機の説明どおりの言葉で言うと、ループ音源のパッドを叩くとどうなりますか。また、どうすれば止められますか。
 
 ### Answer
+
+distractor: 1回だけ最後まで鳴って自動的に止まる。
 
 一度叩くと音がループします（繰り返します）。同じパッドをもう一度叩くと止まります。
 
@@ -2154,22 +1681,6 @@ cite: guide-book 17 "Tap the same pad again and it stops"
 check: パッド`13`が元の色に戻り、ループの音が止まる。
 
 パッド`13`をもう一度叩いて、ループを止めましょう。
-
-## BANK1のパッド配置を探す
-
-type: lookup
-find: guide-book 17 "In BANK1, the following sounds are assigned to the 16 pads"
-id: l-2-02
-limit: 45
-tags: pad-play, intro
-
-BANK1の16個のパッドにどの音が割り当てられているかを示す図を探しましょう。
-キック、スネア、コード弾き、ベース、ピアノ、そしてリズムのループ音源が載っています。
-
-### Hint
-
-フィンガードラム解説の冒頭近くにある「パッドを叩いて音を出そう」のページを見てみましょう。
-本体上面の写真から、パッドの列ごとに割り当てられた音が引き出し線で示されています。
 
 ## Beat Sync機能のはたらき
 
@@ -2240,6 +1751,8 @@ BPMが設定されている音源を再生しながら、異なるBPMの音源�
 Beat SyncがONのとき、あとから鳴らした音源はどうなりますか。また、その音程はどうなりますか。
 
 ### Answer
+
+distractor: 2つ目の音源はテンポと音程の両方が1つ目に合うよう変わる。
 
 あとから鳴らした音源は、先に鳴っている音源のテンポに合わせて再生されます。
 音程のある音源の場合、音程は変わらずテンポだけが変わります。
@@ -2374,19 +1887,6 @@ tags: waveform, intro
 
 時間の経過に沿った音の大きさをひと目で読み取れれば、音のどこが大きく鳴っているかが分かります。リズムの頭に合わせてパッドを叩くときに、まさに必要になる見かたです。
 
-## 波形表示がほかに使われている場所
-
-type: quiz
-id: q-2-29
-cite: guide-book 19 "also used in the systems employed for professional recording"
-tags: waveform, intro
-
-本機のほかに、同じような波形表示が活用されているとガイドブックに書かれているのはどこですか。
-
-### Answer
-
-プロのレコーディングに使われるシステムです。波形は、音を目で見えるようにグラフにする定番の方法なのです。
-
 ## ループ音源にあわせてフィンガードラム
 
 type: drill
@@ -2435,20 +1935,6 @@ check: パッド `5` ～ `8` を叩くたびに、リズム＋ベースのルー
 verify: pad 5 bank A
 
 リズム＋ベースのループを再生しながら、パッド `5` ～ `8` を順に叩いてキーボードの音を重ねてみましょう。
-
-## 波形のコラムを探す
-
-type: lookup
-find: guide-book 19 "Horizontal axis: passage of time"
-id: l-2-12
-limit: 45
-tags: waveform, intro
-
-音を目で見えるようにグラフにした「波形」を解説しているコラムを探し、2 つの軸がそれぞれ何を表すかを確かめましょう。
-
-### Hint
-
-フィンガードラムの解説の中で、叩いたパッドの波形の上をタテの線が移動する説明が最初に出てくるあたりを探してみましょう。
 
 ## 複数のループを一度に止める
 
@@ -2587,6 +2073,8 @@ tags: one-shot-loop, intro
 
 ### Answer
 
+distractor: プリセットのすべてのパッドがワンショット音源に設定されている。
+
 あらかじめそれぞれの内容に合わせた設定になっています。ドラムの単発音やコードはワンショット音源、リズムやフレーズはループ音源として設定されています。
 
 ## ONE SHOT消灯でLOOP点灯のとき
@@ -2617,6 +2105,8 @@ tags: one-shot-loop, stretch
 `ONE SHOT`ボタンと`LOOP`ボタンをうまく使うとできる、より踏み込んだ鳴らし方を、ガイドブックは2つ挙げています。それは何ですか。
 
 ### Answer
+
+distractor: 音源の音量を上げ下げするためだけに使う。
 
 長い音の余韻を途中で切ってパーカッシブに鳴らすことと、短い音をループさせることです。
 
@@ -2664,20 +2154,6 @@ check: 音はパッドを押している間だけ繰り返し再生され、指�
 verify: cc 104 0
 
 今度は`LOOP`を点灯させたまま`ONE SHOT`を押して消灯させ、パッドを押し続けてみましょう。設定はパッドごとにそのまま記憶されるので、終わったら元の設定に戻しておきましょう。
-
-## ONE SHOT/LOOPの動作表を探す
-
-type: lookup
-find: guide-book 21 "These buttons set whether a sound plays once"
-id: l-2-01
-limit: 60
-tags: one-shot-loop, core
-
-`ONE SHOT`ボタンと`LOOP`ボタンはそれぞれ点灯と消灯を選べるので、組み合わせは4通りあります。パッドを叩いたとき各組み合わせで音がどう鳴るかをまとめた表と、4行の状態表を探しましょう。
-
-### Hint
-
-フィンガードラムの練習のすぐあとにある、`ONE SHOT`ボタンと`LOOP`ボタンの働きを説明するセクションを見てみましょう。
 !SXC1-DECK 034-pad-06.ex.md
 # グループ化、バンクの切り替え、エフェクトのダイヤル
 
@@ -2795,22 +2271,6 @@ verify: pad 11 bank A
 
 続いてベースのパッド`9`を叩いてから、ピアノのパッド`11`を叩きましょう。別のグループのパッドの音は重なります。
 
-## BANK1のグループ分けの図を探す
-
-type: lookup
-find: guide-book 22 "Bass (pads 9–10)"
-id: l-2-11
-limit: 45
-tags: grouping, intro
-
-BANK1の16個のパッドのうち、どのパッドがリズムのグループ、ベースのグループ、ピアノのグループに
-属するかを示した「例 BANK1の場合」の図を探しましょう。
-
-### Hint
-
-「複数の音の重なりと切り替わりについて」のページで、切り替わりと重なりを見比べる表の下を
-見てみましょう。
-
 ## 再生中のバンク切り替えの落とし穴
 
 type: quiz
@@ -2898,6 +2358,8 @@ tags: effects, core
 複数のパッドの音が重なっているときにエフェクトを選択しました。エフェクトはどの音にかかりますか。
 
 ### Answer
+
+distractor: エフェクトを選んだ時点で鳴っていたパッドだけにかかる。
 
 鳴っている音全体にかかります。さらに、エフェクトを選択したあとで叩いたパッドの音にもかかります。
 
@@ -3036,6 +2498,8 @@ PHASERも音にうねりを加えるエフェクトです。ガイドブック�
 
 ### Answer
 
+distractor: FLANGERとまったく同じdepth・rate・feedback・mixの変化をする。
+
 フランジャーとは変化の仕方が違います。ステージ数、レート、デプス、フィードバック、ミックスが複合的に変化します。
 
 ### Why
@@ -3070,6 +2534,8 @@ tags: effects, stretch
 ROLL 1、ROLL 1/2、ROLL 1/4は互いにどう違いますか。また、ROLL PATTERNはこの3つと何が違いますか。
 
 ### Answer
+
+distractor: 4つのROLL設定は音量以外すべて同じである。
 
 ROLL 1、ROLL 1/2、ROLL 1/4は、パッドを段階的により細かく連打したような効果を与えます。ROLL PATTERNは、ある一定のパターンでパッドを連打したような効果を与えます。
 
@@ -3112,20 +2578,6 @@ FX2はどのような範囲を、どのように変化しますか。
 ### Why
 
 連続可変だからこそ、FX2のダイヤルは演奏用のコントロールとして使えます。0～100の間を行き来させて、ロールやディレイを滑らかに出し入れしましょう。
-
-## FX1/FX2のエフェクト一覧を探す
-
-type: lookup
-find: guide-book 25 "The effects provided for `FX1` and `FX2`, and what each dial changes, are as follows."
-id: l-2-03
-limit: 60
-tags: effects, core
-
-FX1とFX2それぞれに用意されたエフェクトの一覧と、各エフェクトが音をどう変化させるかの短い解説を探しましょう。
-
-### Hint
-
-FX1・FX2を紹介するフィンガードラムのセクションのすぐあと、エフェクトを1つずつ解説している部分を見てみましょう。
 !SXC1-DECK 038-pad-08.ex.md
 # フィンガードラムのテクニックと Beat Sync の実践
 
@@ -3137,20 +2589,6 @@ summary: CREATIVE NOTE のフィンガードラムのコツを練習し、Beat S
 cite: guide-book 26 "The trick is to decide which finger taps each pad"
 
 実機で取り組むミッションは 2 つ。CREATIVE NOTE が教えるとおりにフィンガードラムのテクニックを身につけ、続いて Beat Sync を ON にして、何が変わるのかを耳で確かめましょう。
-
-## FX2 の可変範囲を探す
-
-type: lookup
-find: guide-book 25 "FX2 varies continuously from dry (effect 0) to wet (effect 100)."
-id: l-2-04
-limit: 45
-tags: effects, intro
-
-FX2 ダイヤルの効果の強さは、名前と数値を持つ 2 つの端の間を連続可変します。その正確な範囲を記した一文を探しましょう。
-
-### Hint
-
-「エフェクト解説」の一覧のいちばん最後、2 つの DELAY の項目のあとを見てみましょう。
 
 ## フィンガードラムのコツ
 
@@ -3221,20 +2659,6 @@ BANK1 のグループはあらかじめ設定されています。グループ�
 
 グループと点灯色は自分で自由に設計できます。自分のバンクのグループごとにわかりやすい色にしておくと、音が切り替わるのか重なるのかがひと目で分かります。
 
-## グループ化の設定場所を探す
-
-type: lookup
-find: guide-book 22 "See PART 4, pp. 48–49"
-id: l-2-08
-limit: 45
-tags: grouping, intro
-
-パッドごとのグループと点灯色の設定方法は、本の別の場所で詳しく説明されています。その場所をずばり示している、グループ化の解説の中の注記を探しましょう。
-
-### Hint
-
-「複数の音の重なりと切り替わりについて」のページの下にある吹き出しの注記を見てみましょう。
-
 ## Beat Sync を体感する：タイムストレッチとクォンタイズ
 
 type: drill
@@ -3282,26 +2706,10 @@ deck: pad-09
 chapter: Part: Pad play
 tier: intro
 requires: pad-04, pad-08
-summary: 音を途切れさせずに2つのバンクの音を重ね、Beat Syncとバンク管理の説明がガイドブックのどこにあるかを知る。
+summary: 音を途切れさせずに2つのバンクの音を重ね、アプリでバンクを管理する。
 cite: guide-book 23 "Try layering sounds from another bank"
 
-1回の演奏で複数のバンクの音を使うことができます。Beat SyncをONにする場所の記述を探し、
-BANK2とBANK1の音を重ねて鳴らしてから、アプリでバンクを管理し名前を変更できるページを探しましょう。
-
-## Beat SyncをONにする場所を探す
-
-type: lookup
-find: guide-book 18 "turn it ON in the system settings"
-id: l-2-07
-limit: 45
-tags: beat-sync, intro
-
-Beat Syncは初期設定ではOFFになっています。Beat Syncの紹介の中から、どこでONにするのか、
-そしてその場所が本のどのPARTで説明されているのかを述べた一文を探してください。
-
-### Hint
-
-「SXC-1のBeat Sync機能について」の説明の冒頭、タイムストレッチの解説より前の最初の段落を見てみましょう。
+1回の演奏で複数のバンクの音を使うことができます。BANK2とBANK1の音を途切れさせずに重ねてから、アプリでバンクを管理し名前を変更する方法を学びましょう。
 
 ## 2つのバンクの音を重ねる
 
@@ -3346,22 +2754,6 @@ check: 両方のバンクから鳴る3つのループの上に、キックとス
 verify: pad 1 bank A
 
 それに合わせて、パッド`1`と`2`でキックとスネアをプレイしてみましょう。
-
-## アプリのバンク管理ページを探す
-
-type: lookup
-find: guide-book 60 "rename the banks and sequences displayed in the app"
-id: l-2-09
-limit: 60
-tags: banks, intro
-
-バンクのページには、専用アプリでバンクに名前を付けたり、便利に管理したりできると
-書かれています。本の専用アプリの章で、バンクのコピー・削除・ダウンロード・
-名前の変更が説明されているページを探してください。
-
-### Hint
-
-スキルアップ編の専用アプリのセクションで、「データの整理 / ダウンロードも可能」の見出しの下を見てみましょう。
 !SXC1-DECK 042-smp-01.ex.md
 # サンプリングを始める準備
 
@@ -3373,38 +2765,6 @@ cite: guide-book 28 "Getting ready to start sampling"
 
 録音を始める前に、音をどこから取り込むのか -- 内蔵マイクか、AUDIO IN 端子か、DATA 端子に接続したスマートフォンか -- を SXC-1 に指定し、入力レベルを適切に合わせておく必要があります。このデッキでは、サンプリング前の準備をひととおり確認します。
 
-## 機器をつなぐ前に読んでおく項目
-
-type: quiz
-id: q-3-12
-cite: guide-book 28 "You can also record from an instrument or external device connected to this unit"
-tags: sampling, intro
-
-楽器やスマートフォンを本機に接続して、そこからサンプリングしようとしています。サンプリング編では、接続の前にガイドブックのどの項目を必ず読むよう案内していますか。
-
-- [x] 「接続について」
-- [ ] 「各部の名称」
-- [ ] 「操作一覧」
-- [ ] 「安全上のご注意」
-
-### Why
-
-サンプリング編の注記には、外部機器から録音する前に「接続について」の項目を必ず読むようにと書かれています。そこには、接続前に電源を切ること、電源を入れる順番、音が歪んで聞こえるときの対処がまとめられています。
-
-## 接続の説明を探す
-
-type: lookup
-find: guide-book 8 "turn on the power in the order of this unit first, then the external devices"
-id: l-3-02
-limit: 60
-tags: sampling, intro
-
-楽器やスマートフォンから録音する前に、接続についての説明を読むよう案内されています。本機と外部機器の電源を入れる順番が書かれている項目を探し、音が歪んで聞こえる場合の対処を読んでください。
-
-### Hint
-
-ガイドブック前半、「各部の名称」の図より前にある「使用上のご注意」のページを探してください。
-
 ## サンプリングを気軽に始められる理由
 
 type: quiz
@@ -3415,6 +2775,8 @@ tags: sampling, intro
 サンプリング編の扉ページによると、SXC-1 でサンプリングを手軽に始められるのはなぜですか。また、録った音はどのくらい早く演奏できますか。
 
 ### Answer
+
+distractor: サンプリングには外部マイクが必要で、録音後に転送しないとパッドで鳴らせない。
 
 内蔵マイクで手軽に録音でき、録った音はパッドですぐに演奏できます。
 
@@ -3513,7 +2875,7 @@ id: q-3-09
 cite: guide-book 28 "Set INPUT VOL to maximum"
 tags: sampling, core
 
-内蔵マイクでサンプリングするとき、ガイドブックでは `INPUT VOL` をどこに合わせておくよう案内していますか。
+内蔵マイクでサンプリングするとき、`INPUT VOL` はどこに合わせますか。
 
 - [x] 最大
 - [ ] 最小
@@ -3552,6 +2914,8 @@ tags: sampling, core
 接続した機器から録音するとき、表示部の何に注目し、そのためにどの2つの音量をそれぞれ調整しますか。
 
 ### Answer
+
+distractor: レベルメーターは見ず、`MAIN VOL`だけを調整する。
 
 レベルメーター表示に注目します。録音時にメーターが振り切った状態にならないよう、接続した機器の音量と本機の `INPUT VOL` をそれぞれ調整します。
 
@@ -3600,20 +2964,6 @@ check: `INPUT VOL` スライダーが一番上の位置にある。
 
 `INPUT VOL` を一番上まで上げて最大にしておきます。
 
-## 空のパッドがあるもう1つのバンクを探す
-
-type: lookup
-find: guide-book 28 "In BANK 14, you can sample to the pads that are unlit"
-id: l-3-01
-limit: 45
-tags: sampling, intro
-
-BANK 15 は最初からすべてのパッドが空ですが、ほかにもう1つ、サンプルを入れる余地のあるバンクがあります。そのバンクの名前と、空のパッドの見分け方を教えてくれる注記を探してください。
-
-### Hint
-
-「サンプリングを始める準備」の手順1の下、`SELECT BANK 15` の画面写真のすぐ横にある注記を見てみましょう。
-
 ## サンプリングモードに入るボタンはどれ
 
 type: quiz
@@ -3660,6 +3010,8 @@ tags: sampling, intro
 サンプリングモードに入ると、表示部には何が表示されますか。
 
 ### Answer
+
+distractor: 現在のバンク番号とMASTER BPMだけを表示する。
 
 `SAMPLING MODE` の文字と現在のトリガー設定（例：`AUTO TRIGGER`）、そして L と R のレベルメーターが表示されます。
 
@@ -3714,6 +3066,8 @@ tags: sampling, core
 
 ### Answer
 
+distractor: 入力音がオートトリガーのレベルを超えるまで録音は始まらない。
+
 パッドを選んだ時点で録音が始まります。入力音まかせにせず、サンプリング開始のタイミングを自分で決めたいときに選びます。
 
 ### Why
@@ -3754,20 +3108,6 @@ cite: guide-book 29 "Select it with the directional buttons"
 check: ほかの設定に切り替えてから戻ると、表示部に再び `AUTO TRIGGER` と表示されます。
 
 十字ボタンの `←`/`→` でほかのトリガー設定を順に切り替えてから、`AUTO TRIGGER` に戻します。
-
-## トリガー設定の説明を探す
-
-type: lookup
-find: guide-book 29 "is a setting that starts recording automatically"
-id: l-3-03
-limit: 60
-tags: sampling, core
-
-サンプリングモードには、録音を開始する方法が複数あります。2つのトリガー設定がどこで説明されているかを探し、それぞれの働きを読んでみましょう。
-
-### Hint
-
-「BANK15のパッドにサンプリングしてみよう」の番号付き手順の中、画面表示の図のあたりを見てください。一方の設定は手順3の下に太字で、もう一方は手順4の下に説明されています。
 
 ## 自分の声をパッド 4 にサンプリングする
 
@@ -3943,6 +3283,8 @@ tags: sampling, intro
 
 ### Answer
 
+distractor: `REC`ボタンは点滅したままで、レベルメーターは動かない。
+
 `REC` ボタンが点滅から点灯に変わり、表示部のレベルメーターが音に合わせて振れます。
 
 ## 録音の停止
@@ -4013,6 +3355,8 @@ tags: sampling, intro
 
 ### Answer
 
+distractor: 新しいサンプルを聴くには保存して本機を再起動する必要がある。
+
 パッドを叩きます。登録されたサンプルがすぐに再生されます。
 
 ### Why
@@ -4029,6 +3373,8 @@ tags: sampling, core
 扱いやすいサンプルを作るために、ガイドブックはどんな習慣をすすめていますか。
 
 ### Answer
+
+distractor: 数えずにすぐ話し始め、終わりのタイミングは本機に任せる。
 
 録音する前に頭の中で「1、2、3、4」とカウントしてから声を出し、タイミング良く停止します。こうすると、サンプルがカウントにきれいに収まります。
 
@@ -4147,6 +3493,8 @@ DELモードで、点滅しているパッドを1つ押しました。いま、�
 
 ### Answer
 
+distractor: 選んだパッドが点滅し、ほかのパッドはすべて消灯する。
+
 選んだパッドは白点灯し、それ以外のサンプルが登録されているパッドは点滅し続けます。
 
 ### Why
@@ -4181,6 +3529,8 @@ tags: sampling, core
 削除を決定するのはどのボタンですか。また、決定すると何が起こりますか。
 
 ### Answer
+
+distractor: `B`で削除を実行し、`A`でキャンセルする。
 
 `A` ボタンで決定します。画面に `DELETING` と表示され、サンプルが削除されて、パッドが消灯します。
 
@@ -4294,6 +3644,8 @@ tags: sampling, stretch
 
 ### Answer
 
+distractor: サンプルを切り取らず、全体の音程だけを変更する。
+
 サンプルの一部を切り取って、その部分だけを再生できます。
 
 ### Why
@@ -4347,6 +3699,8 @@ tags: sampling, core
 
 ### Answer
 
+distractor: 元のサンプルをそのままコピーすることしかできない。
+
 同じサンプルをそのままコピーするだけでなく、その際に新しい音を加えたりエフェクトをかけたりでき、活用の幅が広がります。
 
 ### Why
@@ -4382,25 +3736,13 @@ tags: sampling, core
 
 ### Answer
 
+distractor: フレーズを分割せず1つのパッドに録音する手動機能。
+
 長いフレーズをサンプリングして、拍ごとに自動でパッドに振り分けてくれる機能です。
 
 ### Why
 
 拍ごとに自動で振り分けられるので、切れ目が音楽的にそろいます。各パッドにフレーズの1拍分が入り、順番どおりに再生することも、並べ替えて新しいフレーズを作ることもできます。
-
-## SOUND EDIT 画面の設定項目を探す
-
-type: lookup
-find: guide-book 33 "menu showing `PITCH :0`, `VOLUME :100`, `GROUP :0`, `COLOR :6`"
-id: l-3-05
-limit: 45
-tags: sampling, intro
-
-サンプリング編にある `SOUND EDIT` 画面の写真を探し、そこに並んでいる設定項目を正確に読み取ってください。
-
-### Hint
-
-「さらに楽しさがアップする、いろいろな機能」の「サンプルの編集」にあり、専用アプリについての説明のすぐそばです。
 !SXC1-DECK 054-smp-07.ex.md
 # サンプリング：道しるべと活用のヒント
 
@@ -4411,20 +3753,6 @@ summary: 章末の道しるべをたどり、サンプリングの歴史とバ�
 cite: guide-book 34 "Sampling changed the style of music production"
 
 サンプリング編は、その先を指し示して締めくくられます――より深い編集はあとのPARTへ、そして増えていく自分だけの「音のライブラリー」とのつき合い方へ。このデッキでは、その道しるべをたどります。
-
-## リサンプリングとチョップの詳しい説明はどこにあるか
-
-type: lookup
-find: guide-book 33 "For details, go to PART 4"
-id: l-3-06
-limit: 45
-tags: sampling, intro
-
-リサンプリングとチョップは、サンプリング編では紹介されるだけです。詳しくはガイドブックのどのPARTで説明されるのか、その案内を探してください。
-
-### Hint
-
-「さらに楽しさがアップする、いろいろな機能」の見開きの一番最後、チョップの説明のあとを見てください。
 
 ## サンプリングが生まれたのはいつか
 
@@ -4455,6 +3783,8 @@ tags: sampling, core
 
 ### Answer
 
+distractor: リズム音源だけを入れ、ベースやコードなどは別のバンクに分ける。
+
 リズム系・ベース系・コード系などのサンプルを、1つのバンクにバランス良くまとめます。パッド演奏をする上で便利なだけでなく、シーケンサー機能を使った曲作りもやりやすくなります。
 
 ### Why
@@ -4478,20 +3808,6 @@ tags: sampling, intro
 ### Why
 
 イエローは最初の色にすぎません。サンプリング手順の注記に、点灯色はあとから変更できるとあります――その設定は、あとのPARTのサンプル編集のページにあります。
-
-## パッドの点灯色の設定を探す
-
-type: lookup
-find: guide-book 49 "Sets the lighting color of the pad"
-id: l-3-04
-limit: 90
-tags: sampling, intro
-
-パッド4をイエローではなくライトブルーに光らせたいとします。パッドの点灯色を設定する `SOUND EDIT` の項目を探し、何色から選べるかを読み取ってください。
-
-### Hint
-
-スキルアップ編の、サンプルを加工・編集するページにあります。`PITCH` や `VOLUME` と同じメニューの、1つ先の項目です。
 !SXC1-DECK 056-seq-01.ex.md
 # シーケンサーを知ろう
 
@@ -4533,6 +3849,8 @@ tags: sequencer, intro
 シーケンサーでは、よく知られた制作スタイルを手軽に体験できます。何と呼ばれていますか。
 
 ### Answer
+
+distractor: 「リアルタイム制作」— 演奏全体を一度に録音する方法。
 
 「打ち込み」です。すべてをその場で演奏するのではなく、音をひとつずつ置いて曲を組み立てていく制作スタイルです。
 
@@ -4583,6 +3901,8 @@ tags: sequencer, intro
 `A`～`D` ボタンを長押しした直後、シーケンス選択画面に表示される3行を答えてください。
 
 ### Answer
+
+distractor: `SOUND BANK`、`BANK = 80`、`SAVE(A) EXIT(B)`と表示される。
 
 上から `SEQUENCE SLCT`、`BANK = 1`、`OK(A) CANCEL(B)` の3行です。
 
@@ -4671,6 +3991,8 @@ tags: sequencer, core
 
 ### Answer
 
+distractor: サンプルと一緒にサウンドバンク1～80へ保存される。
+
 シーケンスバンク 1～50 として保存されます。シーケンスバンクは音色バンクとは別物で、
 サンプルではなくパターンを保存します。
 
@@ -4703,6 +4025,8 @@ tags: sequencer, core
 シーケンスバンク5以降にパターンを保存したいとき、バンクはどう選びますか。また、OK で決定すると何が起こりますか。
 
 ### Answer
+
+distractor: バンク5以上は割り当てられず、`A`～`D`はシーケンスバンク1～4に固定される。
 
 シーケンス選択の際に、十字ボタンでバンク番号を選択します。`A` で OK を選択するとシーケンスモードが表示され、
 選択中の `A`～`D` ボタンにそのシーケンスが登録されます。
@@ -4756,52 +4080,6 @@ cite: guide-book 36 "Long-press the lit button to return to Performance mode"
 check: 演奏モードの表示に戻る。
 
 点灯している `A` ボタンを長押しして、演奏モードに戻ります。
-
-## シーケンスはどこまで大きくできる
-
-type: lookup
-find: guide-book 36 "a performance pattern of up to 8 measures made with the samples of one bank"
-id: l-4-01
-limit: 60
-tags: sequencer, intro
-
-「シーケンス」とは何かを説明した囲み記事を探し、2つの数字を読み取ってください。
-1つのシーケンスの最大小節数と、作成できるパターンの最大数です。
-
-### Hint
-
-シーケンスモードに入る手順のすぐ下にある、「シーケンスとは？」というタイトルの囲みです。
-
-## 作ったパターンの行き先
-
-type: lookup
-find: guide-book 36 "By default, sequence banks 1–4 are assigned to the `A`–`D` buttons"
-id: l-4-02
-limit: 60
-tags: sequencer, intro
-
-「シーケンスバンク」の説明を探してください。初期設定で `A`～`D` ボタンに登録されているのはどの
-シーケンスバンクか、そしてバンク5以降に保存するにはシーケンス選択の際に何をするかを読み取ります。
-
-### Hint
-
-「シーケンスとは？」の囲みのすぐ下にある、「＝『シーケンスバンク』」で終わる見出しを探してください。
-
-## シーケンスバンク管理の楽な方法
-
-type: lookup
-find: guide-book 36 "Sequence banks are easy to manage using the dedicated app"
-id: l-4-13
-limit: 90
-tags: sequencer, intro
-
-50個のシーケンスバンクを小さな画面だけで扱うのは大変です。シーケンスバンクの管理
-（のちに出てくるシーケンスのコピー＆ペーストも）が何を使うと簡単にできるかを述べた注記を探し、
-本の最終パートのどのページを参照しているかも確かめてください。
-
-### Hint
-
-シーケンスバンクの説明のいちばん下にある、専用アプリに触れた1行の注記です。
 
 ## シーケンスバンク5以降を選択する
 
@@ -4875,6 +4153,8 @@ tags: sequencer, intro
 
 ### Answer
 
+distractor: シーケンスが使うサウンドバンクの番号。
+
 シーケンスのテンポです。BPM の値で表示されます。
 
 ## メトロノームのエリア
@@ -4906,6 +4186,8 @@ tags: sequencer, intro
 小節数のエリアには2つの情報が表示されます。それは何と何ですか。
 
 ### Answer
+
+distractor: 選択中のパッド番号とMIDIチャンネル。
 
 シーケンスの小節数と、下のマスにどの小節の情報が表示されているかです。
 
@@ -4947,21 +4229,6 @@ tags: sequencer, core
 1小節を16分割するのは、見た目の都合ではありません。シーケンスモードで扱う音の最小単位である
 「16分音符」に対応していて、のちに「クォンタイズ」として登場します。
 
-## シーケンスモード表示を見て回る
-
-type: lookup
-find: guide-book 37 "This display shows the state of creating a 1-measure sequence"
-id: l-4-03
-limit: 60
-tags: sequencer, intro
-
-シーケンスモード表示の各部を説明した図を探し、ラベルの付いた各エリアの意味を読みましょう。
-バンク、テンポ、メトロノーム、小節数、パッド番号、パッド入力です。
-
-### Hint
-
-シーケンスモードに入る手順のすぐ後、小節数を決めるページの前にある、1ページを使った表示の解説図です。
-
 ## シーケンスが初期設定で使うサンプル
 
 type: quiz
@@ -4972,6 +4239,8 @@ tags: sequencer, core
 シーケンスモードで使用するサンプルは、初期設定ではどのバンクのものですか。また、それを変更するにはどうしますか。
 
 ### Answer
+
+distractor: 演奏モードで現在開いているサウンドバンクを常に使う。
 
 サンプルは BANK1 に設定されています。別のバンクのサンプルを使いたい場合は、
 EDIT機能の「SOUND BANK」で変更します。
@@ -5106,6 +4375,8 @@ tags: sequencer, core
 
 ### Answer
 
+distractor: 初期値はBPM = 100で、変更できない。
+
 初期状態で BPM＝120 に設定されており、EDIT機能の「BPM」で変更できます。
 
 ## 白いマスの意味
@@ -5156,6 +4427,8 @@ tags: sequencer, core
 記録はどう終了しますか。また、そのとき `REC` ボタンと `▶/■` ボタンはどうなりますか。
 
 ### Answer
+
+distractor: `REC`を押し、そのボタンだけが点滅をやめる。
 
 `▶/■` ボタンを押します。記録が終了し、両方のボタンは点滅から点灯に戻ります。
 
@@ -5217,22 +4490,6 @@ cite: guide-book 39 "pressing the `▶/■` button plays back what you entered"
 check: 1回目に押すと両方のボタンが点滅から点灯に戻り、2回目に押すと記録したパターンが再生される。
 
 `▶/■` ボタンを押して記録を終了し、もう一度 `▶/■` ボタンを押して入力結果を再生します。
-
-## テンポの初期値と変更場所
-
-type: lookup
-find: guide-book 39 "The tempo is set to BPM = 120 by default"
-id: l-4-05
-limit: 60
-tags: sequencer, intro
-
-記録の手順解説の中で、シーケンスの初期状態のテンポを述べている箇所を探し、
-EDIT機能のどの項目で変更できるかも確かめてください。
-
-### Hint
-
-点灯している `REC` ボタンを押す操作の説明の中、4回のカウントを説明しているすぐそばにあります。
-同じ文がEDIT機能を指し示しています。
 !SXC1-DECK 064-seq-05.ex.md
 # ステップ入力とクォンタイズ
 
@@ -5315,6 +4572,8 @@ tags: sequencer, core
 
 ### Answer
 
+distractor: タイミングを最も近い8分音符の位置へ補正する。
+
 最も近い16分音符のタイミングに修正されます。このような機能は「クォンタイズ」と呼ばれます。
 
 ## ステップ入力で音を直す
@@ -5354,21 +4613,6 @@ cite: guide-book 40 "Play the sequence with the `▶/■` button and check the r
 check: 再生すると、直したタイミングで音が鳴る。
 
 `▶/■` ボタンでシーケンスを再生し、結果を確かめてみましょう。
-
-## シーケンサーが扱う音の最小単位
-
-type: lookup
-find: guide-book 40 "The smallest unit of sound handled in the SXC-1's Sequence mode"
-id: l-4-06
-limit: 60
-tags: sequencer, core
-
-シーケンサーのタイミング修正を説明した囲み記事を探しましょう。音の最小単位は何か、そして
-叩くタイミングがそれより小さい単位で前後した場合にどうなるかを確かめます。
-
-### Hint
-
-パターンの編集を説明するページの下部にある、「クォンタイズについて」という囲み記事です。
 
 ## メトロノーム音を消す
 
@@ -5419,6 +4663,8 @@ tags: sequencer, core
 ガイドブックはどんな方法をすすめていますか。
 
 ### Answer
+
+distractor: すべてのパッドを一度に演奏する必要があり、重ね録りはできない。
 
 パッド1つずつに分けて入力します。初めにハイハットだけで演奏し、その音を聴きながら
 キックを演奏し、最後にスネアを重ねて完成です。
@@ -5522,34 +4768,6 @@ verify: pad 2 bank A
 check: 3つの行がすべて埋まり、パターン全体が1つのグルーヴとして再生される。
 
 最後に、パッド`2`のスネアを重ねて完成させます。
-
-## お手本のドラムパターン図
-
-type: lookup
-find: guide-book 41 "Example 1: Dance beat"
-id: l-4-07
-limit: 60
-tags: sequencer, intro
-
-そのまま入力できるドラムパターンの図が載っているページを探し、例として挙げられた3つのグルーヴの名前を答えてください。
-
-### Hint
-
-編集とクォンタイズのページのすぐあと、いろいろなドラムパターンを作ってみよう、という見出しの下にあります。
-
-## リアルタイム入力とステップ入力
-
-type: lookup
-find: guide-book 41 "Use the two input styles for different situations"
-id: l-4-08
-limit: 90
-tags: sequencer, core
-
-2つの入力スタイルを使い分けるコツを説明した囲み記事を探してください。それぞれが何と呼ばれ、何が得意で、ドラムパターンを3回に分けて作るどんな例が挙げられているかを確かめましょう。
-
-### Hint
-
-ドラムパターンの例が載っているページの下部にある、キャラクターの吹き出しです。
 !SXC1-DECK 068-seq-07.ex.md
 # ドラムの先へ
 
@@ -5647,6 +4865,8 @@ tags: sequencer, core
 
 ### Answer
 
+distractor: 練習中は両方点灯し、入力中は`REC`だけが点滅する。
+
 練習中は `▶/■` が点滅、`REC` が点灯。入力中は両方とも点滅します。
 再生中に `REC` ボタンを押すと、練習中から入力中に切り替わります。
 
@@ -5673,22 +4893,6 @@ cite: guide-book 43 "press the `REC` button to start inputting"
 check: 両方のボタンが点滅し、以降はパッドを叩いたタイミングでマスが埋まっていく。
 
 パートが固まったら、`REC` ボタンを押して入力をスタートします。
-
-## ループ音源はシーケンスに組み込める？
-
-type: lookup
-find: guide-book 43 "Only one-shot sounds can be incorporated into a sequence"
-id: l-4-12
-limit: 90
-tags: sequencer, core
-
-ループ音源をシーケンスに入れられるかどうかに答えている注記を探しましょう。
-その代わりの方法と、それがガイドブックの最終 PART のどこで説明されているかもあわせて読み取りましょう。
-
-### Hint
-
-シンセコードを入力する手順の最後の番号付きステップのすぐ下、
-練習のヒントの直前にある一文です。
 !SXC1-DECK 070-seq-08.ex.md
 # SEQUENCE EDIT の設定項目
 
@@ -5732,6 +4936,8 @@ tags: sequencer, core
 `SEQUENCE EDIT` 画面で、十字ボタンはどのような働きをしますか。
 
 ### Answer
+
+distractor: ←/→で項目を選び、↑/↓で値を変更する。
 
 ↑/↓ で項目を選び、←/→ で選んだ項目の値を設定します。
 
@@ -5784,6 +4990,8 @@ tags: sequencer, core
 CLEAR の項目では何ができますか。また、その3つの範囲は何ですか。
 
 ### Answer
+
+distractor: 選択した1音だけを削除し、範囲の選択肢はない。
 
 音をまとめて削除できます。範囲は `TRACK`・`BAR`・`ALL` の3つです。
 
@@ -5854,6 +5062,8 @@ tags: sequencer, core
 CLEAR の範囲を選んで `A` を押しました。次に何が起こりますか。
 
 ### Answer
+
+distractor: `B`で実行し、`A`でキャンセルする。
 
 確認画面（例：`CLEAR ALL?  OK(A)  CANCEL(B)`）が表示されます。`A` ボタンで実行、
 `B` ボタンでキャンセルされます。
@@ -5957,73 +5167,10 @@ deck: seq-09
 chapter: Part: Sequencer
 tier: intro
 requires: seq-04, seq-08
-summary: EDIT機能の設定一覧を自分で引き、音をまとめて削除し、シーケンサーの位置づけを大きな視点でとらえます。
+summary: 音をまとめて削除し、音楽制作全体の中でシーケンサーの役割を理解します。
 cite: guide-book 45 "It's OK to start building a song from any part!"
 
-シーケンサー編の締めくくりです。EDIT機能の設定一覧を自分で引く練習をし、
-取り消しのきかない CLEAR の3つの範囲を手順に沿って一度ずつ実行し、
-シーケンサーと専用アプリ、そして音楽制作全体とのつながりを押さえましょう。
-
-## シーケンスの音色バンクを変える
-
-type: lookup
-find: guide-book 44 "Sets the sound bank used for creating and playing the sequence"
-id: l-4-04
-limit: 60
-tags: sequencer, core
-
-シーケンスを別のバンクのサンプルで鳴らしたい、という場面です。シーケンスの作成／再生に
-使う音色バンクを設定する EDIT機能の項目を探しましょう。
-
-### Hint
-
-「シーケンスモードでの各種設定」のページを開きましょう。`SEQUENCE EDIT` 画面の
-最初の項目です。
-
-## CLEAR の3つの範囲
-
-type: lookup
-find: guide-book 44 "Lets you delete sounds in bulk"
-id: l-4-09
-limit: 90
-tags: sequencer, core
-
-音をまとめて削除できる項目の解説を探し、`TRACK`・`BAR`・`ALL` という3つの範囲が
-それぞれ何を削除するのかを正確に読み取りましょう。
-
-### Hint
-
-`SEQUENCE EDIT` 画面の3番目の項目で、テンポの設定のすぐ次にあります。
-
-## メトロノームの設定範囲
-
-type: lookup
-find: guide-book 44 "You can set the metronome ON/OFF"
-id: l-4-10
-limit: 60
-tags: sequencer, intro
-
-メトロノームの解説を探し、設定できる範囲を読み取りましょう。ON/OFF のほかに、`VOLUME`
-と `PATTERN` がそれぞれどの値を取れるのかを確認します。
-
-### Hint
-
-`SEQUENCE EDIT` 画面の、CLEAR と PRECOUNT の間にあります。
-
-## PRECOUNT の働き
-
-type: lookup
-find: guide-book 44 "Sets whether or not a pre-count (4 counts at the beginning) sounds"
-id: l-4-11
-limit: 60
-tags: sequencer, intro
-
-予備カウントの解説を探しましょう。何を設定する項目か、カウントは何回鳴るか、
-どの入力方法に対する設定かを読み取ります。
-
-### Hint
-
-`SEQUENCE EDIT` 画面の最後の項目です。
+シーケンサー編の締めくくりです。取り消しのきかないCLEARの3つの範囲を手順に沿って一度ずつ実行し、シーケンサーと専用アプリ、そして音楽制作全体とのつながりを押さえましょう。
 
 ## 音をまとめて削除する
 
@@ -6089,6 +5236,8 @@ CREATIVE NOTE によると、曲作りはどこから始めればよいとされ
 
 ### Answer
 
+distractor: 曲作りは必ずリズムパターンから始めなければならない。
+
 やりやすい方法ならどこからでも構いません。リズムパターンから作るも良し、気持ちいいコード
 進行や、ふと閃いたメロディから始めるも良しです。
 
@@ -6123,6 +5272,8 @@ tags: sequencer, intro
 なりますか。
 
 ### Answer
+
+distractor: シーケンスのテンポは変更できるが、パターンのコピーや貼り付けはできない。
 
 シーケンスの作成／編集をより便利に行えます。たとえば、入力したパターンのコピー＆
 ペーストができます。
@@ -6204,6 +5355,8 @@ tags: midi, stretch
 
 ### Answer
 
+distractor: どちらも初期値はチャンネル16。
+
 初期状態では IN/OUT とも 1 に設定されています。
 
 ## チャンネル設定は電源オフ後も残るか
@@ -6233,21 +5386,9 @@ MIDI チャンネルを変更したあと、システム設定の画面が開い
 
 ### Answer
 
+distractor: `B`ボタンを押してシステム設定を終了する。
+
 再度 `EDIT` ボタンを押すと、システム設定から抜けることができます。
-
-## MIDI の更新履歴を探す
-
-type: lookup
-find: midi 5 "This section lists the revision history of this document."
-id: l-5-17
-limit: 90
-tags: midi, stretch
-
-MIDI インプリメンテーションのドキュメントで、どのファームウェアバージョンが最初に MIDI に対応したか、そしてその後の各版で何が更新されたか（例えば、ダイヤルが Control Change の受信に対応した時期）を記録した表を探してください。
-
-### Hint
-
-ドキュメントの最後の項で、ノート・マッピングの表の後にあります。
 
 ## 送信と受信のノートナンバー範囲
 
@@ -6266,20 +5407,6 @@ SXC-1 が送信するノートナンバーと受信するノートナンバー�
 ### Why
 
 受信だけが 16 ノート（100-115）多いのは、これらが受信のみの「Active」枠で、常に選択中のバンクのパッドを鳴らすためです。
-
-## MIDI インプリメンテーション・チャートを探す
-
-type: lookup
-find: midi 2 "MIDI implementation chart"
-id: l-5-15
-limit: 60
-tags: midi, stretch
-
-SXC-1 がどの MIDI メッセージを送受信するのかを、メッセージの種類ごとに示した標準のチャートを探してください。例えば、プログラム・チェンジを送信するか、クロックに反応するかが分かります。
-
-### Hint
-
-製品情報の近くにある 1 ページ大の表で、送信と受信の列に〇と×が並んでいます。
 
 ## 音量スライダーが使う CC
 
@@ -6310,6 +5437,8 @@ tags: midi, stretch
 
 ### Answer
 
+distractor: `FX1`はCC 7、`FX2`はCC 8で、ボタンは押した時も離した時も64を送る。
+
 `FX1` ダイヤルは CC 16、`FX2` ダイヤルは CC 17 です。ボタンは押した時 127、離した時 0 を送信します。
 
 ## INPUT SELECT スイッチが送信する値
@@ -6323,21 +5452,9 @@ tags: midi, stretch
 
 ### Answer
 
+distractor: `MIC`は127、`AUDIO IN`は64、`USB`は0を送る。
+
 `MIC` は 0、`AUDIO IN` は 64、`USB` は 127 を送信します。
-
-## コントロール・チェンジリストを探す
-
-type: lookup
-find: midi 3 "Control Change list"
-id: l-5-13
-limit: 60
-tags: midi, stretch
-
-本機のすべてのスライダー、ダイヤル、ボタンにコントロール・チェンジ番号を割り当てた表を探してください。「`REC` ボタンはどの CC を送信するのか」といった疑問に答えられるようになります。
-
-### Hint
-
-MIDI インプリメンテーション・チャートのすぐ後にある、番号付きの項です。
 !SXC1-DECK 076-lvl-02.ex.md
 # ノート・マッピングと重ね演奏
 
@@ -6349,20 +5466,6 @@ cite: midi 4 "Regardless of the bank or the unit's mode, these behave the same a
 cite: guide-book 47 "select the bank that has the sounds you want to perform in real time"
 
 このデッキではMIDIの全体像の最後のピース -- ノートとパッドの対応 -- を押さえ、そのあとは本機を手に取り、シーケンスの再生にパッド演奏をリアルタイムで重ねます。
-
-## 受信したFXダイヤル値の動作
-
-type: lookup
-find: midi 3 "differs depending on whether each FX button is ON or OFF"
-id: l-5-16
-limit: 90
-tags: midi, stretch
-
-本機が `FX1` / `FX2` ダイヤルのCC値を受信したとき、同じ値でも、対応するFXボタンのON/OFFによって意味が異なります。両方の場合を明記した表を探してください。
-
-### Hint
-
-コントロール・チェンジ リストの下にある脚注（※1）を見てみましょう。ボタンOFF時の列とボタンON時の列があります。
 
 ## Bank Aのパッド1のノートナンバー
 
@@ -6396,51 +5499,10 @@ tags: midi, stretch
 
 ### Answer
 
+distractor: ノート範囲でバンクA～Dを選び、演奏モードでだけ動作する。
+
 バンクや本体のモードに関わらず、「現在の」バンクのパッド1～16を押した時と同じ動作をします。
 例えば、ノートナンバー100を受信するとパッド1を押した時と同じです。
-
-## ノート・マッピングの表を探す
-
-type: lookup
-find: midi 4 "Regardless of the bank or the unit's mode"
-id: l-5-14
-limit: 60
-tags: midi, stretch
-
-すべてのパッドとすべてのバンクについて、どのMIDIノートナンバーで鳴るかがわかる表を探してください。受信のみの追加の列も含まれています。
-
-### Hint
-
-コントロール・チェンジ リストのすぐ後にある番号付きのセクションで、1行が1パッドに対応しています。
-
-## Beat Syncのシステム設定を探す
-
-type: lookup
-find: guide-book 55 "Sets the automatic beat matching described on p. 18 to ON/OFF"
-id: l-5-04
-limit: 60
-tags: leveling-up, intro
-
-Beat SyncのON/OFFを設定するシステム設定の項目を探し、機能そのものの説明が何ページにあると書かれているかを確認してください。
-
-### Hint
-
-演奏モードで `EDIT` ボタンを長押ししてシステム設定を開き、Beat Syncの行までスクロールしてください。
-
-## リサンプリング時のエフェクトの説明はどこにあるか
-
-type: lookup
-find: guide-book 51 "as described in PART 1, p. 24"
-id: l-5-05
-limit: 60
-tags: leveling-up, intro
-
-リサンプリングのページでは、エフェクトがかかった状態の音をコピー先に録音できます。
-エフェクトのかけ方が説明されている前のPARTを参照させる一文を探してください。
-
-### Hint
-
-基本のリサンプリング手順の後にある囲みのひとつ、「エフェクトをかけた音をリサンプリング」の項を見てみましょう。
 
 ## 重ね演奏のためにシーケンス再生をスタートする
 
@@ -6472,6 +5534,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: 割り当てた`A`～`D`ボタンが点滅し、`▶/■`は点灯し続ける。
+
 シーケンスバンクが登録された `A`～`D` ボタンが点灯し、`▶/■` ボタンが点滅します。
 
 ## 演奏に使うバンクを選ぶ
@@ -6484,6 +5548,8 @@ tags: leveling-up, core
 重ね演奏を始める前に、演奏モードで何を選択しておきますか。
 
 ### Answer
+
+distractor: 演奏にはシーケンスのサウンドバンクが固定され、別のバンクは選べない。
 
 リアルタイムで演奏したい音のあるバンクです。
 シーケンスバンクは、再生をスタートするときに `A`～`D` ボタンで別途選択します。
@@ -6518,6 +5584,8 @@ Beat SyncをONにした状態でシーケンスを再生中、BPMが設定され
 
 ### Answer
 
+distractor: ループは録音時の速さを保ち、シーケンスのテンポには従わない。
+
 サンプルは自動でシーケンスのテンポに合わせて鳴ります。
 ループは録音されたときの速さではなく、シーケンスのビートにシンクロします。
 !SXC1-DECK 078-lvl-03.ex.md
@@ -6543,6 +5611,8 @@ Beat SyncをONにした状態で、BPMが設定されたループのサンプル
 
 ### Answer
 
+distractor: シーケンスが自分のテンポを保ち、サンプルをそのテンポに合わせる。
+
 サンプルのテンポです。シーケンスはサンプルのテンポで再生されます（シーケンスの再生中にループのサンプルを鳴らす場合とは逆で、そのときはサンプルが自動でシーケンスのテンポに合わせて鳴ります）。
 
 ## サンプルを編集するには
@@ -6555,6 +5625,8 @@ tags: leveling-up, core
 演奏モードから `SOUND EDIT` の数値を変更するまでの3つのステップを説明してください。
 
 ### Answer
+
+distractor: `EDIT`を長押しし、パッドを選び、FXダイヤルで値を変更する。
 
 `EDIT` ボタンを押し、編集したいサンプルが登録されたパッドを叩き、↑/↓で項目を選択して←/→で数値を変更します。
 
@@ -6605,6 +5677,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: 音程を変えても再生速度や長さは変わらない。
+
 サンプルの再生スピードも変わります。音程を上げると速く、下げると遅く、長く再生されます。
 
 ## VOLUMEの設定範囲
@@ -6636,6 +5710,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: 同じ番号のパッドは重なって鳴り、0にすると互いの音を止める。
+
 同じ番号のパッドがグループ化され、最後に叩いたパッドの音が優先して鳴り、前の音が止まります。0はグループ化しない設定で、音は重なって鳴ります。
 
 ## グループはバンクをまたいで働く
@@ -6648,6 +5724,8 @@ tags: leveling-up, stretch
 Bank Aのパッドからループ音源が鳴っています。Bank Bに切り替えて、同じ `GROUP` 番号が設定されたサンプルのパッドを叩くと、どうなりますか。
 
 ### Answer
+
+distractor: グループはバンクごとに独立しているため、別バンクの音には影響しない。
 
 Bank Aの音が止まります。グループの設定は全てのバンクで共通なので、あるバンクで鳴っている音を、別のバンクの同じグループの音で止めることができます。
 
@@ -6737,6 +5815,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: パッドの再生音量を1～8で設定する。
+
 パッドの点灯色を設定します。1 Neon Yellow（ネオンイエロー）、2 Orange（オレンジ）、
 3 Red（レッド）、4 Purple（パープル）、5 Blue（ブルー）、6 Light Blue（ライトブルー）、
 7 Green（グリーン）、8 Light Green（ライトグリーン）です。
@@ -6752,6 +5832,8 @@ tags: leveling-up, core
 この数値はどこから来たものですか。また、変更できますか。
 
 ### Answer
+
+distractor: BPMは解析されず、必ず手動で入力する。
 
 録音時に自動解析された数値です。手動でも設定可能です。
 
@@ -6785,6 +5867,8 @@ EDITモードにいるとき、どんな操作を1つ行うと波形編集表示
 
 ### Answer
 
+distractor: パッドを選んだ状態で`A`ボタンを押す。
+
 ダイヤルを回します。
 
 ## 波形編集で変えられるもの
@@ -6817,6 +5901,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: はい — 一度に調整できるのは片方のポイントだけ。
+
 いいえ -- 両方のダイヤルで同時にできます。片方のダイヤルで始点を、もう片方で終点を
 調整します。
 
@@ -6830,6 +5916,8 @@ tags: leveling-up, core
 サンプルの始点と終点を動かすとき、ガイドブックはどのような方法をすすめていますか。
 
 ### Answer
+
+distractor: パッドを鳴らさず、開始と終了の数値を入力する。
 
 パッドを叩いて音を聴きながら調整します。こうすれば、切り出したサンプルが実際に
 どう鳴るかを確かめながら作業できます。
@@ -6869,8 +5957,7 @@ summary: 耳で聴きながらサンプルの始点と終点をトリミング�
 cite: guide-book 49 "Turning a dial in EDIT mode brings up the waveform editing display"
 cite: guide-book 50 "Sampling a saved sample again"
 
-波形のページでの実践ミッションが2つ、点灯色の表を調べる練習が1つ、
-そしてリサンプリングの前半、つまり音をコピーできる状態に本機を整えるところまで進みます。
+波形を扱う2つの実践ミッションに続いて、リサンプリングの前半、つまり音をコピーできる状態に本機を整えるところまで進みます。
 
 ## サンプルの始点と終点を編集する
 
@@ -6935,21 +6022,6 @@ check: `BPM` の項目が---と表示され、サンプルがBeat Syncに追従�
 左ボタンを長押ししてBPMを---に設定し、このサンプルをBeat Syncの対象外にします。
 同期を戻したいときは、あとで値を設定し直してください。
 
-## どのCOLOR番号がどの色か
-
-type: lookup
-find: guide-book 49 "Sets the lighting color of the pad."
-id: l-5-01
-limit: 60
-tags: leveling-up, intro
-
-パッドをグリーンに光らせたいとします。`COLOR` 設定のどの値がどの点灯色になるのか、
-Neon Yellow から Light Green までを一覧にした表を探してください。
-
-### Hint
-
-「サンプルを加工・編集してみよう」の2ページ目、COLORの見出しのすぐ下にあります。
-
 ## リサンプリングの手順を始める
 
 type: quiz
@@ -6960,6 +6032,8 @@ tags: leveling-up, core
 `RESAMPLING` の設定には、どうやってたどり着きますか。
 
 ### Answer
+
+distractor: 演奏モードで`EDIT`を長押ししてシステム設定を開く。
 
 演奏モードで `REC` を押してサンプリングモードに入り、十字ボタンで `RESAMPLING` を選択します。
 
@@ -6995,6 +6069,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: 選んだ保存先パッドですぐ録音が始まり、ほかのパッドはすべて消灯する。
+
 選択したパッドは白点灯に変わり、他のパッドは点滅します。画面には
 `WAIT FOR SOUND / PAD COPY` と表示されます。
 
@@ -7009,6 +6085,8 @@ tags: leveling-up, core
 `♪` または `USB` にするのはどんなときですか。
 
 ### Answer
+
+distractor: 使用できるのは`MIC`だけで、新しい入力を加えないリサンプリングはできない。
 
 リサンプリング時に内蔵マイクからの音を加えたいときは `MIC`、外部入力からの音を
 加えるとき、または何も加えないときは `♪` か `USB` にします。
@@ -7074,6 +6152,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: コピー先のパッドを叩くとコピーが始まる。
+
 コピー元のパッドを叩くことです。
 
 ## リサンプリング中のボタン
@@ -7104,6 +6184,8 @@ tags: leveling-up, core
 リサンプリングの録音は自分で停止する必要がありますか。終了はどうやってわかりますか。
 
 ### Answer
+
+distractor: リサンプリングは必ず`REC`を押して終了する。
 
 いいえ。コピー元のサンプルが鳴り終わると自動で終了し、コピー先のパッドが黄色に点灯します。
 
@@ -7136,6 +6218,8 @@ tags: leveling-up, stretch
 
 ### Answer
 
+distractor: コピー元はコピー先と同じバンクにある必要がある。
+
 コピー先のパッドを選んだら、`A`～`D` ボタンでコピー元の音があるバンクを選択し、それからコピー元のパッドを叩きます。
 
 ## バンクをまたぐための事前準備
@@ -7148,6 +6232,8 @@ tags: leveling-up, stretch
 バンクをまたいだリサンプリングを行うには、*あらかじめ*何をしておく必要がありますか。
 
 ### Answer
+
+distractor: すべてのバンクへいつでも移動できるため、事前準備は不要。
 
 コピーしたい音のあるバンクを、あらかじめ `A`～`D` ボタンに登録しておきます。コピー元に選べるのは、これらのボタンに登録されているバンクだけです。
 
@@ -7162,6 +6248,8 @@ tags: leveling-up, stretch
 
 ### Answer
 
+distractor: コピーされるのは元のサンプルだけで、入力音はモニターされるが録音されない。
+
 コピー元のサンプルと入力音が混ざった状態で、1つの新しいサンプルとして録音されます。
 
 ## エフェクトをかけた音をリサンプリング
@@ -7174,6 +6262,8 @@ tags: leveling-up, stretch
 コピー元のパッドを叩くタイミングでエフェクトをかけました。その後、コピー先のパッドにはどんな音が残っていますか。
 
 ### Answer
+
+distractor: エフェクトはライブ設定のままで、エフェクトをオフにすると消える。
 
 エフェクトがかかった状態の音です。エフェクトはコピーの一部として録音されるため、エフェクトを切ってもコピー先ではかかったままの音が鳴ります。
 
@@ -7188,6 +6278,8 @@ tags: leveling-up, stretch
 
 ### Answer
 
+distractor: はい — エフェクトは元のサンプルだけにかかり、追加音にはかからない。
+
 いいえ。新たに加えた音にもエフェクトがかかるため、コピー先のパッドに録音される音はすべて同じエフェクトがかかった状態になります。
 
 ## リサンプリングの使いどころ
@@ -7200,6 +6292,8 @@ tags: leveling-up, core
 ガイドブックが挙げているリサンプリングの3つの使い方を答えてください。
 
 ### Answer
+
+distractor: サンプルを同じ内容でバックアップコピーするためだけに使う。
 
 連打したい音を複数のパッドに振り分ける、エフェクトの ON/OFF をパッドの叩き分けで表現する、複数のバンクからお気に入りの音を1つのバンクに集める、の3つです。
 !SXC1-DECK 086-lvl-07.ex.md
@@ -7259,6 +6353,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: BPMを解析せず、フレーズを同じ長さに分割する。
+
 入力されたフレーズをBPM解析し、拍ごとに分割して、複数のパッドに自動で登録できます。
 
 ## オートチョップの準備手順
@@ -7271,6 +6367,8 @@ tags: leveling-up, core
 サンプリングモードから始めて、オートチョップの3つの準備手順を順に並べてください。
 
 ### Answer
+
+distractor: `AUTO CHOP`を選び、1つのパッドを選び、全体の小節数を入力する。
 
 十字ボタンで `AUTO CHOP` を選択し、音を登録したい複数のパッドを選択して、1つのパッドに振り分ける拍数を指定します。
 
@@ -7302,6 +6400,8 @@ tags: leveling-up, intro
 フレーズが入力される前、画面には `WAIT FOR SOUND / AUTO CHOP 4 X 4` と表示されています。この2つの数字は何を表していますか。
 
 ### Answer
+
+distractor: パッド数とは関係なく、全体の小節数だけを表示する。
 
 1つのパッドに振り分ける拍数×選択したパッドの数です。ここでは4つのパッドに4拍ずつ振り分けます。
 
@@ -7368,6 +6468,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: `REC`を押すまで録音が続き、解析によって自動停止することはない。
+
 サンプリングしたいフレーズが入力されると録音が始まり、4拍×4＝4小節分の解析が
 終わると自動的に終了します。
 
@@ -7402,6 +6504,8 @@ tags: leveling-up, stretch
 
 ### Answer
 
+distractor: いいえ — 1つを延長すると、それ以降の分割サンプルがすべてずれる。
+
 はい。各サンプルの範囲は前後に広げることができ、振り分けられた他のサンプルには
 影響しません。
 
@@ -7415,6 +6519,8 @@ tags: leveling-up, stretch
 振り分けられたサンプルの範囲を広げるとき、どんな注意点がありますか。
 
 ### Answer
+
+distractor: 音への影響はなく、前後のスライスは常になめらかにつながる。
 
 順番に再生したとき、前後のサンプルとつながらなくなる可能性があります。
 
@@ -7449,6 +6555,8 @@ tags: leveling-up, intro
 
 ### Answer
 
+distractor: 分割したサンプルをタイミングを変えず元の順番に戻すこと。
+
 バラバラにしたサンプルを並べ替えたり、再生するタイミングをズラしたりして
 新たなフレーズを作り出す、サンプラーならではのテクニックです。
 
@@ -7463,6 +6571,8 @@ tags: leveling-up, stretch
 どんな演奏ができるようになりますか。
 
 ### Answer
+
+distractor: グループ化しても、各スライスは前の音に重なって鳴る。
 
 新しくパッドを叩くたびに前のサンプルが止まるので、曲を再構成したような
 演奏ができます。
@@ -7506,6 +6616,8 @@ tags: leveling-up, stretch
 
 ### Answer
 
+distractor: 1つのパッドへ録音し、あとから一定間隔で本機に分割させる。
+
 サンプリングモードで `AUTO TRIGGER` または `MANUAL TRIGGER` を選択し、
 空のパッドを1つ押してフレーズを入力し、分割したいタイミングごとに
 次の空のパッドを押します。
@@ -7521,6 +6633,8 @@ tags: leveling-up, stretch
 `AUTO TRIGGER` の場合、それぞれ録音はいつ始まりますか。
 
 ### Answer
+
+distractor: どちらのトリガーモードも、フレーズが入力されるまで録音を待つ。
 
 `MANUAL TRIGGER` の場合は最初の空のパッドを押した時点で、`AUTO TRIGGER` の
 場合はサンプリングしたいフレーズが入力された時点で録音が始まります。
@@ -7627,6 +6741,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: ←/→で項目を選び、↑/↓で設定を変更する。
+
 十字ボタンの上下で項目を選び、左右で選んだ項目の設定を変更します。
 
 ## AUTO Trig Lv の設定内容
@@ -7639,6 +6755,8 @@ tags: leveling-up, stretch
 `AUTO Trig Lv` について説明してください。何を設定する項目で、範囲は何段階・何dBから何dBまでで、デフォルトはいくつですか。
 
 ### Answer
+
+distractor: パッドLEDの明るさを0～4で調整する。
 
 サンプリングモードで `AUTO TRIGGER` を選択した際に、録音が自動スタートする音量を1～5の5段階で設定します（-28dB～-12dBまで4dB刻み）。デフォルトは3です。
 
@@ -7671,6 +6789,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: 1～5の5段階で、初期値は5。
+
 パッドやボタンのLEDの輝度を0～4の5段階で設定します。0では消灯します。デフォルトは3です。
 
 ## Disp Bright の設定
@@ -7701,6 +6821,8 @@ tags: leveling-up, core
 `APO Time` に設定できる値は何ですか。また、デフォルトはどれですか。
 
 ### Answer
+
+distractor: 30分、3時間、6時間、オフで、初期値は3時間。
 
 20分、1時間、2時間、オフの4つです。デフォルトは20分です。
 
@@ -7734,6 +6856,8 @@ tags: leveling-up, intro
 
 ### Answer
 
+distractor: USBでは正確な電圧、電池では数値の残量パーセントを表示する。
+
 USB給電時は電源コードのアイコンを表示し、電池使用時は残量を3段階で表示します。
 
 ## FW Version の表示
@@ -7765,6 +6889,8 @@ tags: leveling-up, intro
 
 ### Answer
 
+distractor: シリアル番号は自動表示され、←/→で編集できる。
+
 `SERIAL No.` の項目で十字ボタンの右を押します。確認のみで、変更はできません。
 !SXC1-DECK 092-lvl-10.ex.md
 # システム設定を自分の手で
@@ -7773,7 +6899,7 @@ deck: lvl-10
 chapter: Part: Leveling up
 tier: core
 requires: pad-01
-summary: システム設定を自分で開き、リファレンスの値を調べ、Beat Sync を ON にする。
+summary: システム設定を開き、主要な値を理解し、Beat SyncをONにする。
 cite: guide-book 55 "In Performance mode, long-press the `EDIT` button"
 
 各システム設定が何をするかは、もう読んで知っています。今度は自分の手で画面を操作しましょう。
@@ -7789,6 +6915,8 @@ tags: leveling-up, stretch
 `Initialize` の項目では、実行を決定する手順はどうなっていますか。また、実行すると本機はどうなりますか。
 
 ### Answer
+
+distractor: →を押して`B`で確定し、サンプリングしたデータは残る。
 
 十字ボタンの右を押した後、`A` ボタンで決定します。本機は工場出荷時の状態に初期化されて再起動し、サンプリングしたデータは削除されます。
 
@@ -7829,48 +6957,6 @@ check: `SYSTEM SETTING` 画面が閉じ、本機が演奏モードに戻って�
 ### Why
 
 トリガーレベルも Beat Sync も MIDI のチャンネルも、そして Initialize さえも、この先に残っている設定はすべてこの同じ長押しの先にあります。この画面の操作が当たり前になれば、この章の残りは項目を選ぶだけです。
-
-## 設定範囲とデフォルトをひとまとめに
-
-type: lookup
-id: l-5-02
-find: guide-book 55 "Sets the brightness of the display in 5 levels from 1 to 5"
-limit: 90
-tags: leveling-up, core
-
-すべてのシステム設定を1ページにまとめたリファレンスを探し、それを使って答えてください。デフォルトが3の項目をすべて挙げてください。また、デフォルトが最大値になっているただひとつの項目はどれですか。
-
-### Hint
-
-演奏モードで `EDIT` ボタンを長押しし、画面をガイドブックの該当ページと見比べてください。項目が同じ順に並んでいて、それぞれに設定範囲とデフォルトが書かれています。
-
-## AUTO Trig Lv の dB 対応表
-
-type: lookup
-id: l-5-03
-find: guide-book 55 "-28 dB to -12 dB in 4 dB steps"
-limit: 60
-tags: leveling-up, stretch
-
-`AUTO Trig Lv` の値は1～5ですが、これはただの段階の番号です。各段階が何 dB にあたるかを示したガイドブックの記述を探し、レベル1が何 dB に相当するかを導いてください。
-
-### Hint
-
-システム設定のリファレンスにある、録音が自動スタートする音量の項目を見てください。dB の範囲と刻み幅がカッコ内に書かれています。
-
-## ファームウェアのバージョンとシリアルナンバーはどこで見るか
-
-type: lookup
-id: l-5-06
-find: guide-book 55 "Displays the firmware version (view only)"
-limit: 60
-tags: leveling-up, intro
-
-サポートからファームウェアのバージョンとシリアルナンバーを尋ねられました。どちらも本機だけで確認できるとガイドブックが説明している箇所を探し、片方だけに必要な追加のボタン操作もあわせて確かめてください。
-
-### Hint
-
-どちらもシステム設定の一覧の下のほうにある、確認のみの項目です。
 
 ## Beat Sync を ON にする
 
@@ -8028,6 +7114,8 @@ tags: leveling-up, intro
 
 ### Answer
 
+distractor: 付属ケーブルをPOWER/DATA端子へ差し込む。
+
 サポートページを見ます。
 
 ## アプリと本機を起動する順番
@@ -8040,6 +7128,8 @@ tags: leveling-up, core
 アプリと本機はどの順番で起動しますか。また、連携できたことはどうやって分かりますか。
 
 ### Answer
+
+distractor: 先に本機の電源を入れ、そのあとアプリを起動する。
 
 先にアプリを起動してから、本機の電源を入れます。本機の状態に合わせて、アプリのパッドが表示されます。
 !SXC1-DECK 096-lvl-12.ex.md
@@ -8092,36 +7182,6 @@ check: アプリに、本機のパッドと同じ内容・点灯色でパッド�
 アプリと連携すると、ファイルの取り込み、シーケンスの編集、バックアップ、ファームウェアのアップデートなど、本機単体ではできないことができるようになります。
 起動の順番にも意味があります。本機の電源を入れる前にアプリが動いていることで、起動する本機の状態をアプリが読み取り、それに合わせてパッドを表示できるのです。
 
-## アプリはどこからダウンロードするか
-
-type: lookup
-id: l-5-07
-find: guide-book 56 "https://www.casio.com/jp/support/creator-economy/sampler/content/application/"
-limit: 60
-tags: leveling-up, intro
-
-ガイドブックで CASIO Sampler App のダウンロード先を示している箇所を探しましょう。
-ダウンロード先は2通りの示し方で載っています。読み取るためのものと、入力するためのもの、その両方を確認してください。
-
-### Hint
-
-専用アプリのパートの冒頭、タイトルのすぐ下を見ましょう。
-読み取り用のコードは「ダウンロードはこちらから」の文字のそばに印刷されています。
-
-## 付属のケーブルで接続できないときは
-
-type: lookup
-id: l-5-08
-find: guide-book 56 "If you cannot connect with the included USB Type-C cable, see the support page."
-limit: 60
-tags: leveling-up, intro
-
-付属の USB Type-C ケーブルでスマートフォンと接続できない場合にどうすればよいかを示した注記を探しましょう。
-
-### Hint
-
-専用アプリのパートの「本機とスマートフォンを接続しよう」にある注記で、接続の図のすぐそばに書かれています。
-
 ## アプリで登録を始める操作
 
 type: quiz
@@ -8151,6 +7211,8 @@ tags: leveling-up, intro
 
 ### Answer
 
+distractor: 画面上部のHomeタブを選ぶ。
+
 画面下のタブバーで「パッド」を選びます。
 
 ## 登録元の2つの選択肢
@@ -8164,6 +7226,8 @@ tags: leveling-up, core
 音源の登録元として選べる2つの選択肢は何ですか。
 
 ### Answer
+
+distractor: 「マイクから録音」と「クラウドからストリーミング」。
 
 「ファイルから選択」と「他のバンクから選択」です。
 
@@ -8234,20 +7298,6 @@ check: 空だったパッドにサンプルが登録され、タップすると�
 本機だけで音源を別のバンクへ移すには、リサンプリングが必要です。アプリなら同じ作業が3回のタップで済みます。
 色々なサンプルを集めて、自分だけのバンクを作成する近道です。
 
-## 「ファイルから選択」で使用できるファイル形式
-
-type: lookup
-id: l-5-09
-find: guide-book 57 "WAV, MP3, and FLAC sound files or .cswp files can be used"
-limit: 60
-tags: leveling-up, core
-
-アプリの登録手順の中で、「ファイルから選択」で使用できる音源ファイルの種類を挙げている注記を探してください。
-
-### Hint
-
-専用アプリのパートの「パッドにサンプルを登録しよう」の手順で、選択先のウインドウに付いている※の注記です。
-
 ## 同じバンク内でのサンプルのコピー
 
 type: quiz
@@ -8277,6 +7327,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: はい — スワイプでのコピーは現在のバンク内でしかできない。
+
 いいえ。同じバンク内でのスワイプコピーだけでなく、他のバンクへコピーすることもできます。
 
 ## ピアノ単音のワザ
@@ -8289,6 +7341,8 @@ tags: leveling-up, stretch
 ガイドブックでは、ピアノの単音などを複数のパッドにコピーすることを勧めています。コピーに何をすると、どんなことができますか。
 
 ### Answer
+
+distractor: 各コピーに同じGROUP番号を設定し、音程は変えない。
 
 SOUND EDITで各コピーの音程を変更します。同じ単音が音程違いでパッドに並び、キーボードのような感覚でパッドプレイを楽しめます。
 
@@ -8369,6 +7423,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: FXダイヤルで調整し、波形は拡大できない。
+
 開始 / 終了ポイントは波形をスワイプして調整します。スライダーで波形を拡大できるため、精度の高い調整が可能です。
 
 ## アプリのシーケンス表示
@@ -8381,6 +7437,8 @@ tags: leveling-up, core
 アプリのシーケンス表示（タブバーのシーケンスタブ）には何が表示され、入力はどのように行いますか。
 
 ### Answer
+
+distractor: 現在選んでいるパッドの1トラックだけを表示する。
 
 全パッド分のトラックが表示され、マス目をタップすることで本機と同様に入力できます。
 
@@ -8412,6 +7470,8 @@ tags: leveling-up, core
 アプリのシーケンス表示で*小節番号*を長押しするとメニューが表示されます。そこでできる5つの操作は何ですか。
 
 ### Answer
+
+distractor: Cut、Copy、Paste、Duplicate to next measureで、パッド番号のメニューと同じ。
 
 「カット」「コピー」「ペースト」「クリア」「小節を無効」の5つです。（パッド番号の長押しメニューは少し違い、「小節を無効」の代わりに4番目に「次の小節に複製」が入ります。）
 
@@ -8450,21 +7510,6 @@ check: ペースト先の小節に同じパターンが入り、アプリと本�
 マス目もメニューも本機と連動しているので、ここで作ったものはそのまま本機の `▶/■` で再生できます。
 アプリは同じシーケンスをのぞき込む大きな窓であって、別のプロジェクトではないのです。
 
-## 長押しメニューでできること
-
-type: lookup
-id: l-5-10
-find: guide-book 59 "Long-press a pad number or measure number to display the edit window"
-limit: 60
-tags: leveling-up, core
-
-ガイドブックでアプリのシーケンサーの2つの長押しメニューが載っている箇所を探し、
-それぞれのメニューにだけあって、もう一方にはない操作を1つずつ見つけましょう。
-
-### Hint
-
-専用アプリの章の「シーケンスの作成も便利に」のあたりを見てください。2つのメニューは、シーケンス表示の図のわきに書かれています。
-
 ## データの整理でできることのすべて
 
 type: quiz
@@ -8475,6 +7520,8 @@ tags: leveling-up, core
 作成したバンクやシーケンスのコピー / 削除のほかに、アプリのデータの整理では何ができますか。
 
 ### Answer
+
+distractor: バンク名の変更だけができ、ダウンロードやデータ割り当てはできない。
 
 スマートフォンへのダウンロード、ダウンロードしたデータの本機への登録、そしてアプリ内で表示されるバンクやシーケンスの名前の変更ができます。
 
@@ -8507,6 +7554,8 @@ tags: leveling-up, core
 
 ### Answer
 
+distractor: Play Sequence、Stop Sequence、Change Tempo。
+
 「シーケンス登録」「シーケンス削除」「シーケンスコピー」「ダウンロード」「名前を変更」の5つです。
 
 ## 本機のソフトウェアをアップデートする
@@ -8519,6 +7568,8 @@ tags: leveling-up, intro
 本機のソフトウェアにアップデートがあるとします。アプリのどこから更新できますか。
 
 ### Answer
+
+distractor: Settingsタブから行い、Homeにはアップデート項目はない。
 
 タブバーのホームからです。本機のソフトウェアにアップデートがある場合、ここから簡単に更新できます。
 !SXC1-DECK 102-lvl-15.ex.md
@@ -8544,6 +7595,8 @@ tags: leveling-up, core
 歯車アイコンの奥にあるアプリの設定画面では、サンプラーの設定やアップデートが行えます。そこに並ぶ6つの項目は何ですか。
 
 ### Answer
+
+distractor: UI LanguageとMIDI Channelだけ。
 
 「システムアップデート」「システム情報」「本体設定」「バックアップ」「リストア」「システム初期化」の6つです。
 
@@ -8580,31 +7633,3 @@ check: 本機が自動的に再起動し、サンプリングしたデータが�
 ### Why
 
 Initialize は確実にまっさらな状態へ戻る唯一の方法で、それを安全に行えるのはアプリの「バックアップ」と「リストア」の組み合わせがあるからです。初期化で削除されるサンプリングしたデータは、ほかのどんな方法でも復元できません。
-
-## シーケンス管理をガイドブックで探す
-
-type: lookup
-id: l-5-11
-find: guide-book 60 "Assign Sequence / Delete Sequence / Copy Sequence / Download / Rename"
-limit: 60
-tags: leveling-up, core
-
-ガイドブックの中で、アプリのシーケンス管理メニューが載っている場所を探し、そのうちシーケンスをスマートフォンへ移すのはどの操作かを読み取ってください。
-
-### Hint
-
-専用アプリの章の、データの整理を扱うパートにあります。メニューはシーケンス名の横の「⋮」から開きます。
-
-## 設定画面をガイドブックで探す
-
-type: lookup
-id: l-5-12
-find: guide-book 60 "Configure and update the sampler."
-limit: 60
-tags: leveling-up, core
-
-アプリの設定画面にあるものをすべて挙げた図のキャプションを探し、Initialize の後にデータを戻すときに使うのはどの項目かを確かめてください。
-
-### Hint
-
-専用アプリの章のいちばん最後、アップデート / 設定の項を見てください。一覧は歯車アイコンの説明のすぐ横にあります。

@@ -1,0 +1,43 @@
+{
+  "id": "./",
+  "name": "SEXY ONE — SXC-1 Trainer",
+  "short_name": "SEXY ONE",
+  "description": "A bilingual, offline-ready training course for the Casio SXC-1 sampler.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "./#/x/today",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14161b",
+  "theme_color": "#18794e",
+  "categories": ["education", "music"],
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today's session",
+      "short_name": "Session",
+      "url": "./#/x/today",
+      "icons": [{ "src": "./app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Weekly pulse",
+      "short_name": "Weekly",
+      "url": "./#/x/week",
+      "icons": [{ "src": "./app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Mastery journey",
+      "short_name": "Mastery",
+      "url": "./#/x/map",
+      "icons": [{ "src": "./app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

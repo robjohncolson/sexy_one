@@ -1,49 +1,15 @@
-!SXC1-BUNDLE v1 en 52
+!SXC1-BUNDLE v1 en 50
 !SXC1-DECK 000-ch0-01.ex.md
-# Reading the manual safely: contents, notes, and safety labels
+# Understand the safety labels
 
 deck: ch0-01
 chapter: Front matter
 tier: intro
-summary: Find your way around the Guide Book and read its safety labels and symbols correctly.
+summary: Read the SXC-1's Warning, Caution, and prohibition symbols correctly.
 cite: guide-book 3 "use the product correctly"
 
-Before the first sound, learn how the Guide Book itself is organized and what its
-Warning and Caution labels actually promise. Everything else in the manual leans on
-these conventions.
-
-## Where each PART of the Guide Book begins
-
-type: lookup
-find: guide-book 1 "Hot beats pour from your fingertips!"
-id: l-0-01
-limit: 30
-tags: front-matter, intro
-
-The Guide Book is split into five numbered PARTs, each with its own starting page.
-Find the table of contents and read off the page where each PART begins.
-
-### Hint
-
-It is the very first thing after the cover photo — look at the CONTENTS list at the
-front of the book.
-
-## The general notes that precede use
-
-type: lookup
-find: guide-book 2 "Please note the following"
-id: l-0-02
-limit: 45
-tags: front-matter, intro
-
-Before the safety material, CASIO states some general notes: how accurate the manual
-is, who is liable for damages and lost data, whether you may reproduce the manual, and
-that its contents can change. Find that list of notes and skim all of them once.
-
-### Hint
-
-Look immediately after the cover and CONTENTS, before the "Safety precautions" section
-begins.
+Before the first sound, learn what the SXC-1's Warning, Caution, and prohibition
+symbols mean so you can recognize an unsafe action immediately.
 
 ## What the Warning label means
 
@@ -79,6 +45,8 @@ indicate?
 
 ### Answer
 
+distractor: Content that could result in death or serious injury.
+
 Content that could result in minor injury or property damage — less severe than
 Warning, which covers death or serious injury.
 
@@ -100,6 +68,8 @@ crossed-out circle and a filled circle. State what each symbol marks.
 
 ### Answer
 
+distractor: The crossed-out circle marks Required; the filled circle marks Prohibited.
+
 The crossed-out circle marks "something you must not do" (Prohibited). The filled
 circle marks "something you must do" (Required).
 
@@ -108,259 +78,17 @@ circle marks "something you must do" (Required).
 The labels grade severity; the symbols grade direction. A Prohibited item is an action
 to avoid, a Required item is an action you must actually take — reading the symbol
 tells you which kind of instruction you are looking at before you read a word.
-
-## Where the labels and symbols are explained in detail
-
-type: lookup
-find: guide-book 3 "Examples of graphic symbols"
-id: l-0-03
-limit: 45
-tags: front-matter, intro
-
-If you ever forget what a safety label or a graphic symbol means, the manual explains
-them once, in one place: a small table of the two labels followed by worked examples of
-the two symbols. Find that spot.
-
-### Hint
-
-It sits at the very head of the "Safety precautions" section, before the first Warning
-item.
-
-## Battery fluid and children: the battery Warning
-
-type: lookup
-find: guide-book 3 "rinse it off with clean water"
-id: l-0-04
-limit: 60
-tags: front-matter, core
-
-Suppose fluid leaking from a battery gets on someone's skin or clothing — or worse,
-into their eyes. Find the Warning that says exactly what to do, and read what the same
-group of items says about keeping batteries away from infants and small children.
-
-### Hint
-
-Look under the first ⚠ Warning heading of the safety material, in its "Batteries"
-group.
-!SXC1-DECK 002-ch0-02.ex.md
-# Warnings you look up, not memorize: cables, placement, emergencies
-
-deck: ch0-02
-chapter: Front matter
-tier: core
-summary: Locate the Warning items on USB cables, placement, emergencies, and headphone use.
-cite: guide-book 4 "Location and place of use"
-
-These Warning items are reference material: you do not memorize every bullet, you
-learn where each group lives so you can re-read it the moment it matters.
-
-## The USB cable rules
-
-type: lookup
-find: guide-book 3 "To prevent fire and electric shock caused by the USB cable"
-id: l-0-05
-limit: 60
-tags: front-matter, core
-
-Several practices around the USB cable are Prohibited (only the specified cable and
-adaptor, no heavy objects on the cable, no bundled use, no wet hands), one is
-Required (what to do if the cable is damaged), and the lightning item carries the
-beware-of-electric-shock symbol instead. Find the Warning group that collects these
-cable rules and skim every bullet.
-
-### Hint
-
-It is the "USB cable" group under the first ⚠ Warning heading, right after the battery
-items.
-
-## Where this unit must not be placed or used
-
-type: lookup
-find: guide-book 4 "Do not place or use the unit in locations such as the following."
-id: l-0-06
-limit: 60
-tags: front-matter, core
-
-High humidity, dust, oil smoke, heat and direct sunlight, strong vibration, and
-temperatures outside 0°C to 40°C all disqualify a location — and there are separate
-items about unstable stands and heavy objects on top. Find the Warning group that
-lists where this unit must not be placed or used.
-
-### Hint
-
-Look for the "Location and place of use" heading among the ⚠ Warning items.
-
-## Smoke, odor, or heat: the three emergency steps
-
-type: lookup
-find: guide-book 4 "emitting smoke, an unusual odor, or heat"
-id: l-0-07
-limit: 60
-tags: front-matter, core
-
-If this unit ever emits smoke, an unusual odor, or heat — or water or a foreign
-object gets inside — the manual prescribes the same three numbered steps. Find them
-and read all three in order.
-
-### Hint
-
-Look for the "Abnormalities" heading among the ⚠ Warning items; the same steps repeat
-under "Avoid water and foreign objects".
-
-## Where headphones and this unit must never be used
-
-type: lookup
-find: guide-book 4 "while driving a vehicle"
-id: l-0-08
-limit: 60
-tags: front-matter, intro
-
-Two Prohibited items rule out using headphones or this unit in certain situations and
-places — while driving, and anywhere that not hearing your surroundings would be
-dangerous. Find both items and note the specific places the second one names.
-
-### Hint
-
-They are the last two Prohibited items in the "Location and place of use" Warning
-group.
-!SXC1-DECK 004-ch0-03.ex.md
-# Cautions you look up: batteries, display, cleaning, volume
-
-deck: ch0-03
-chapter: Front matter
-tier: core
-summary: Locate the Caution items on battery handling, the display, cleaning, and listening volume.
-cite: guide-book 5 "Care and cleaning"
-
-More reference material: the Caution items that keep batteries from leaking, the glass
-display intact, the case clean, and your hearing safe. Learn where each group lives.
-
-## The battery handling rules
-
-type: lookup
-find: guide-book 5 "To prevent fire and injury due to bursting"
-id: l-0-09
-limit: 60
-tags: front-matter, core
-
-A single Caution group lists the battery handling rules that prevent bursting and
-fluid leakage: no mixing new and old, no mixing types, correct polarity, removal
-before long storage, prompt replacement, and more. Find that group and skim every
-bullet — and note that explosion-related battery cautions also appear later, under
-"About the batteries".
-
-### Hint
-
-Look for the "Batteries" group under the ⚠ Caution heading of the safety material.
-
-## The display and disassembly warnings
-
-type: lookup
-find: guide-book 5 "Do not press hard on the display or subject it to strong impact."
-id: l-0-10
-limit: 45
-tags: front-matter, intro
-
-Two short Warning items protect the glass screen and the unit's insides: one about
-pressing on the display, one about disassembly and modification. Find both and read
-what each says could happen.
-
-### Hint
-
-They are the last two ⚠ Warning groups, just before the Caution items begin —
-"Display" and "Do not disassemble or modify".
-
-## Cleaning and disinfecting safely
-
-type: lookup
-find: guide-book 5 "Before cleaning, turn the power off and disconnect the USB cable."
-id: l-0-11
-limit: 60
-tags: front-matter, core
-
-Before you wipe this unit down, there is one Required step involving the power and the
-USB cable. Find the Caution item about care and cleaning and read it — the full
-cleaning procedure and the list of chemicals to avoid come later, in the operating
-precautions.
-
-### Hint
-
-Look for "Care and cleaning" among the ⚠ Caution items.
-
-## The volume and hearing cautions
-
-type: lookup
-find: guide-book 6 "Be careful about the volume when using headphones."
-id: l-0-12
-limit: 45
-tags: front-matter, intro
-
-Two Caution items concern listening volume — one about headphones specifically, and
-one about long sessions at high volume. Find both and read what each one warns can
-happen to your hearing.
-
-### Hint
-
-Look for the "Volume" group among the ⚠ Caution items, after the item about
-headphone cables dangling.
 !SXC1-DECK 006-ch0-04.ex.md
 # Last cautions, first habits
 
 deck: ch0-04
 chapter: Front matter
 tier: core
-summary: Locate the strap, backup, and health cautions, and learn three everyday operating habits.
+summary: Learn three everyday habits for volume, the microphone, and the display.
 cite: guide-book 7 "Operating precautions"
 
-The safety section closes with three Caution items worth knowing the location of —
-then the operating precautions begin, and three of them are habits you will use every
-single session.
-
-## The strap cautions
-
-type: lookup
-find: guide-book 6 "do not swing the unit around by the strap"
-id: l-0-13
-limit: 45
-tags: front-matter, intro
-
-If you attach a commercially available strap to this unit, one Caution item tells you
-what not to do with it — and a separate note later, in the operating precautions,
-tells you what to confirm right after attaching it. Find the Caution item first.
-
-### Hint
-
-Look for the "Strap" group among the ⚠ Caution items, after the volume cautions.
-
-## Backing up important data
-
-type: lookup
-find: guide-book 6 "Regularly back up the contents stored in this unit using the dedicated smartphone app."
-id: l-0-14
-limit: 45
-tags: front-matter, core
-
-Memory contents can be lost to malfunction or repair. Find the Required Caution item
-that says how — and how often — to back up what is stored in this unit.
-
-### Hint
-
-Look for "Back up important data" among the ⚠ Caution items.
-
-## The strong-light health precaution
-
-type: lookup
-find: guide-book 6 "strong light stimulation or flashing light"
-id: l-0-15
-limit: 45
-tags: front-matter, intro
-
-This unit is covered in bright, flashing LEDs. Find the health precaution about strong
-or flashing light, and read the three pieces of advice it gives.
-
-### Hint
-
-Look for "Health precaution" near the end of the ⚠ Caution items.
+These three operating habits protect your ears and help the SXC-1 behave as expected
+in every session.
 
 ## Why MAIN VOL goes to minimum first
 
@@ -397,6 +125,8 @@ recording. Name both.
 
 ### Answer
 
+distractor: Keep the source far from the microphone and skip the test recording.
+
 It is designed for close-range sound pickup, so keep whatever you are recording close
 to the mic. Before an important recording, make a test recording first to check the
 distance to the mic and the surrounding noise.
@@ -429,105 +159,17 @@ The screen saver exists to prevent display burn-in: after about 30 minutes witho
 operation it turns only the display off, and any button or pad operation restores it.
 The manual stresses that this is different from the Auto Power Off function, which
 turns the whole unit's power off.
-
-## Handling rules for precision electronics
-
-type: lookup
-find: guide-book 7 "made up of precision electronic components"
-id: l-0-16
-limit: 60
-tags: front-matter, core
-
-The first group of operating precautions protects this unit's precision electronics:
-no drops, heavy objects, or pressure; no pointed objects on the buttons, pads, or
-display; no disassembly; no static-prone locations. Find that group and skim every
-bullet.
-
-### Hint
-
-It is the very first bullet group at the head of the "Operating precautions" section.
 !SXC1-DECK 008-ch0-05.ex.md
 # Operating environment, quirks, and power behavior
 
 deck: ch0-05
 chapter: Front matter
 tier: core
-summary: Locate the environment and data-loss precautions, and learn how USB power and LINE OUT behave.
+summary: Learn how USB power takes priority and how LINE OUT behaves.
 cite: guide-book 7 "Operating environment"
 
-The rest of the operating precautions: where this unit can live, which quirks are
-normal, what threatens a recording — plus two power-and-output facts worth actually
-memorizing.
-
-## The operating temperature range and environment
-
-type: lookup
-find: guide-book 7 "Operating temperature range"
-id: l-0-17
-limit: 45
-tags: front-matter, core
-
-Every location rule for this unit starts from one number range. Find the operating
-environment guidance and read the temperature range this unit is rated for, plus the
-list of locations to avoid.
-
-### Hint
-
-Look for the "Operating environment" heading inside the operating precautions.
-
-## Noise, pops, and LED variation: normal or broken?
-
-type: lookup
-find: guide-book 7 "This noise is not a product malfunction"
-id: l-0-18
-limit: 60
-tags: front-matter, intro
-cite: guide-book 8 "Individual variation may occur in the brightness and color tone of the LEDs"
-
-A faint "hiss" or "buzz" when nothing is playing, a popping sound at power-on, LEDs
-that differ slightly in brightness and color — before you send this unit in for
-repair, find the operating precautions that say whether any of these is a
-malfunction.
-
-### Hint
-
-The noise and power-on notes are bullets in the operating precautions; the LED note
-has its own short "LEDs" heading just after them.
-
-## What threatens a recording on battery power
-
-type: lookup
-find: guide-book 7 "If the power is cut during recording, the data being recorded may be lost."
-id: l-0-19
-limit: 60
-tags: front-matter, core
-cite: guide-book 9 "Take particular care while recording, because recorded data may be lost."
-
-Recording is the one activity where a power cut destroys data. Find the operating
-precaution that says so, and read the two habits it prescribes: which power supply to
-use for long recording sessions, and what to check first when running on batteries.
-
-### Hint
-
-Look for the bullet about power being cut during recording, near the MAIN VOL
-precaution; "About the batteries" repeats the advice later.
-
-## What to keep away from this unit
-
-type: lookup
-find: guide-book 7 "Keep magnetic cards away."
-id: l-0-20
-limit: 60
-tags: front-matter, intro
-
-Thinner, alcohols, cosmetics, even oily foods can attack the resin case — and one
-whole category of everyday wallet contents can be ruined just by coming close to this
-unit. Find the precautions that list the substances and objects to keep away.
-
-### Hint
-
-They are the last bullets of the operating precautions' first page: "Beware of
-chemicals" and the item about cards with magnetic strips.
+Two practical power-and-output facts prevent surprises when batteries, USB power,
+and external speakers are connected.
 
 ## Batteries in, adaptor connected: which wins?
 
@@ -563,6 +205,8 @@ built-in speaker, and how do you silence it if you want only the external speake
 
 ### Answer
 
+distractor: Connecting LINE OUT automatically mutes the built-in speaker.
+
 Sound is still output from this unit's speaker — connecting LINE OUT does not mute
 it. To silence this unit's speaker, set MAIN VOL to minimum.
 
@@ -577,78 +221,12 @@ the opposite case — they do take over from the speaker.)
 deck: ch0-06
 chapter: Front matter
 tier: core
-summary: Locate the connection and battery notes, then learn the first half of the Names of parts table.
+tags: visual-source
+summary: Learn the display, controls, sliders, and FX section at the top of the panel.
 cite: guide-book 10 "Names of parts"
 
-Four last reference lookups — connecting gear, the PHONE plug, smartphone power, the
-eneloop setting — and then the panel tour begins: display, buttons, sliders, and the
-FX section.
-
-## Connecting external devices in the right order
-
-type: lookup
-find: guide-book 8 "turn on the power in the order of this unit first, then the external devices."
-id: l-0-21
-limit: 60
-tags: front-matter, core
-
-Before plugging this unit into speakers or a mixer, find the "Connections" notes: what
-state every device's power should be in while you connect, which order to power things
-on afterward, and what to do if the sound comes out distorted.
-
-### Hint
-
-Look for the "Connections" heading in the operating precautions, just after the strap
-note.
-
-## What plug fits the PHONE jack
-
-type: lookup
-find: guide-book 8 "use only a 3.5 mm stereo mini plug (3-pole)"
-id: l-0-22
-limit: 45
-tags: front-matter, core
-
-Not every headphone plug belongs in the PHONE jack. Find the connection note that
-says exactly which plug type — down to the pole count — the PHONE jack accepts.
-
-### Hint
-
-It is one bullet inside the "Connections" notes of the operating precautions.
-
-## Smartphone data without drawing its power
-
-type: lookup
-find: guide-book 8 "connect the smartphone to the DATA port and the USB AC adaptor to the POWER/DATA port"
-id: l-0-23
-limit: 60
-tags: front-matter, core
-
-A smartphone on the POWER/DATA port may end up supplying power to this unit. Find the
-USB power precaution that says how to communicate with a smartphone *without* drawing
-power from it — which device goes on which port.
-
-### Hint
-
-It is the last bullet of "Precautions concerning USB power", right after the
-"Connections" notes.
-
-## The setting to change for eneloop batteries
-
-type: lookup
-find: guide-book 9 "After switching to eneloop batteries, set the battery setting"
-id: l-0-24
-limit: 60
-tags: front-matter, core
-
-Switching this unit from alkaline to eneloop batteries requires one settings change so
-the battery gauge behaves correctly. Find the battery-replacement notes and read which
-setting to change and which value to give it.
-
-### Hint
-
-Look under "Replacing the batteries" in the battery precautions; the setting itself
-lives in the system settings.
+Begin the panel tour with the display, directional buttons, input and main-volume
+sliders, and the two FX controls.
 
 ## Panel item 1: the display
 
@@ -681,6 +259,8 @@ tags: front-matter, intro
 What are the directional buttons used for?
 
 ### Answer
+
+distractor: They only start and stop playback; they do not navigate menus.
 
 Selecting menus, changing values, and so on — they are this unit's general-purpose
 navigation controls.
@@ -733,10 +313,10 @@ tags: front-matter, core
 
 Which outputs does the `MAIN VOL` slider control?
 
-### Answer
-
-The volume of the built-in speaker and the headphones — one shared slider for both
-outputs.
+- [x] The built-in speaker and the headphones
+- [ ] The built-in speaker only
+- [ ] The headphones and LINE OUT
+- [ ] The input level used for recording
 
 ### Why
 
@@ -756,6 +336,8 @@ Within each pair, what do the buttons do, and what do the dials do?
 
 ### Answer
 
+distractor: The buttons select the effect; the dials only switch it ON/OFF.
+
 The buttons switch the effect ON/OFF; the dials select effects and change parameters.
 
 ### Why
@@ -774,6 +356,8 @@ The function button row holds six buttons. Name all six.
 
 ### Answer
 
+distractor: `▲`, `▼`, `FX1`, `FX2`, `A`, and `B`.
+
 `▶/■`, `REC`, `ONE SHOT`, `LOOP`, `DEL`, and `EDIT`.
 
 ### Why
@@ -786,6 +370,7 @@ playback style, deletion, and editing. The next deck drills what each one does.
 deck: ch0-07
 chapter: Front matter
 tier: intro
+tags: visual-source
 summary: Identify each function button, the pads, the mic, the bank buttons, and all five connectors.
 cite: guide-book 10 "Names of parts"
 
@@ -841,6 +426,8 @@ What does the `ONE SHOT` function button toggle?
 
 ### Answer
 
+distractor: The sound repeats continuously until the pad is tapped again.
+
 Full-sound playback: a pad's sound plays once from start to end and stops on its own.
 
 ## What LOOP toggles
@@ -853,6 +440,8 @@ tags: front-matter, intro
 What does the `LOOP` function button toggle?
 
 ### Answer
+
+distractor: The sound plays once from beginning to end, then stops itself.
 
 Loop playback: a pad's sound repeats until stopped.
 
@@ -890,6 +479,8 @@ What does the `EDIT` function button switch?
 
 ### Answer
 
+distractor: It switches between sound-bank selection and sequence-bank selection.
+
 Editing modes — parameter editing and waveform editing.
 
 ## The pads section
@@ -904,6 +495,8 @@ are the pads used for overall?
 
 ### Answer
 
+distractor: The pads only select settings; tapping one never plays a sound.
+
 The assigned sound plays. The pads section is used to play, record, and edit sounds.
 
 ## The built-in microphone
@@ -916,6 +509,8 @@ tags: front-matter, intro
 What is the built-in microphone for?
 
 ### Answer
+
+distractor: It works only when an external source is connected to AUDIO IN.
 
 Recording with this unit on its own — sampling without any external gear connected.
 
@@ -950,6 +545,8 @@ five.
 
 ### Answer
 
+distractor: The PHONE, MIC IN, MIDI OUT, USB-A, and DC IN connectors.
+
 The PHONE, LINE OUT, and AUDIO IN jacks, and the DATA and POWER/DATA ports.
 
 ### Why
@@ -968,6 +565,8 @@ What does the PHONE jack connect, and in what plug format?
 
 ### Answer
 
+distractor: A mixer or powered speakers, through a mono line cable.
+
 Headphones, via a 3.5 mm stereo mini plug.
 
 ## The LINE OUT jack
@@ -980,6 +579,8 @@ tags: front-matter, intro
 What does the LINE OUT jack connect to, and which direction does sound flow?
 
 ### Answer
+
+distractor: It connects headphones and is muted whenever MAIN VOL is above minimum.
 
 It outputs sound to a mixer, speakers, or similar equipment, via a 3.5 mm stereo mini
 plug.
@@ -1014,6 +615,8 @@ What is the DATA port, and what does it carry?
 
 ### Answer
 
+distractor: It supplies power only; MIDI and audio data cannot pass through it.
+
 A USB port for data communication with a smartphone — MIDI and audio transfer. It
 does not supply power to this unit.
 
@@ -1028,6 +631,8 @@ What is the POWER/DATA port, and what two jobs does it do?
 
 ### Answer
 
+distractor: It supplies power only and cannot communicate with a smartphone.
+
 A USB port for power supply and for data communication with a smartphone (MIDI/audio
 transfer) — the only port of the two that powers this unit.
 !SXC1-DECK 014-ch0-08.ex.md
@@ -1036,6 +641,7 @@ transfer) — the only port of the two that powers this unit.
 deck: ch0-08
 chapter: Front matter
 tier: core
+tags: visual-source
 summary: Finish the panel tour, then learn how every screen connects to Performance mode.
 cite: guide-book 11 "Operation overview"
 
@@ -1076,6 +682,8 @@ What does the power switch do?
 
 ### Answer
 
+distractor: It changes display brightness but does not turn the unit off.
+
 It turns this unit's power ON and OFF. It is also how you recover after Auto Power
 Off: switch it OFF and then ON once.
 
@@ -1090,6 +698,8 @@ The `INPUT SELECT` switch chooses the input used for recording. Map each of its 
 positions — `MIC`, `♪`, and `USB` — to what it selects.
 
 ### Answer
+
+distractor: `MIC` selects USB, `♪` selects the built-in mic, and `USB` selects AUDIO IN.
 
 `MIC` selects the built-in microphone, `♪` selects the AUDIO IN jack, and `USB`
 selects the USB port.
@@ -1111,6 +721,8 @@ place it?
 
 ### Answer
 
+distractor: It is a front-panel monitor that turns off whenever headphones are unplugged.
+
 It is used for playback with this unit on its own, and the diagram places it on the
 rear.
 
@@ -1131,6 +743,8 @@ What is the battery cover's role in the parts table?
 
 ### Answer
 
+distractor: Opening it resets the system settings; it does not hold batteries.
+
 You remove the battery cover to insert batteries.
 
 ## The normal mode for performing
@@ -1144,6 +758,8 @@ The mode map centers on one screen that every other screen is reached from. Whic
 mode does the function table call "the normal mode for performing"?
 
 ### Answer
+
+distractor: EDIT mode, which is the unit's normal performance home screen.
 
 Performance mode — this unit's home screen, from which bank selection, sequences,
 REC, DEL, EDIT, and the system settings are all reached.
@@ -1180,6 +796,8 @@ From Performance mode, which mode does each of `REC`, `DEL`, and `EDIT` enter?
 
 ### Answer
 
+distractor: `REC` deletes sounds, `DEL` edits sounds, and `EDIT` starts sampling.
+
 `REC` enters REC mode (sampling), `DEL` enters DEL mode (deleting sounds), and `EDIT`
 enters EDIT mode (editing sounds).
 
@@ -1207,23 +825,6 @@ settings?
 
 A short press of `EDIT` opens EDIT mode for the current pad's sound; a long press
 opens the system settings, which affect this unit as a whole.
-
-## The mode map and function table
-
-type: lookup
-find: guide-book 11 "For a description of each function, see the corresponding page."
-id: l-0-25
-limit: 60
-tags: front-matter, core
-
-One page of the Guide Book shows the whole map: every screen, the press that moves
-between each pair of screens, and a table giving the page where each function is
-explained. Find it, and use the table to read off which page explains REC mode.
-
-### Hint
-
-Look for the "Operation overview" section, right after "Names of parts" and just
-before the first numbered PART begins.
 !SXC1-DECK 016-prep-01.ex.md
 # Power, volume, and battery basics
 
@@ -1247,6 +848,8 @@ You slide the power switch to the [ON] position. What do you see, and what state
 this unit in once you see it?
 
 ### Answer
+
+distractor: The display stays blank until you tap a pad.
 
 The startup screen appears, and this unit is ready for use.
 
@@ -1275,40 +878,6 @@ sound?
 MAIN VOL covers the built-in speaker and the PHONE jack together: slide left to lower
 the sound, right to raise it. That is why the no-sound troubleshooting checklist starts
 with this slider.
-
-## Find the USB power precautions
-
-type: lookup
-find: guide-book 8 "USB power takes priority"
-id: l-1-08
-limit: 60
-tags: preparation, core
-
-Suppose batteries are installed in this unit *and* a USB AC adaptor is connected to the
-POWER/DATA port at the same time. Find the operating precautions that cover USB power,
-and read which power source takes priority.
-
-### Hint
-
-Look in the Operating precautions pages near the front of the Guide Book, under the
-heading about USB power.
-
-## Find how to respond to REPLACE THE BATTERY
-
-type: lookup
-find: guide-book 9 "replace the batteries as soon as possible"
-id: l-1-07
-limit: 60
-tags: preparation, core
-
-The display shows `REPLACE THE BATTERY`. Find the operating precautions on replacing
-the batteries, and read how soon you should act — and what you must do with the power
-switch before swapping them.
-
-### Hint
-
-Look in the Operating precautions pages near the front of the Guide Book, under the
-battery headings.
 
 ## Where the included cable connects
 
@@ -1340,6 +909,8 @@ What is the model number of the USB AC adaptor that CASIO offers separately for 
 unit?
 
 ### Answer
+
+distractor: AD-XA06J Type-A.
 
 AD-XA06J Type-C.
 
@@ -1380,6 +951,8 @@ what must the replacement cable conform to, and how long may it be?
 
 ### Answer
 
+distractor: Any USB 3 cable is suitable, with no length limit.
+
 It must conform to the USB 2.0 standard and be no longer than 1 m.
 
 ### Why
@@ -1416,6 +989,8 @@ tags: preparation, intro
 Where is the battery cover, and how do you remove it?
 
 ### Answer
+
+distractor: It is on the front; lift its smooth edge straight upward.
 
 It is on the rear of the unit. While pressing the raised tab (the "−" shape) on the
 cover, slide the cover off.
@@ -1454,6 +1029,8 @@ As a rough guideline, about how long can you expect to run this unit continuousl
 eneloop batteries before they need replacing?
 
 ### Answer
+
+distractor: Approximately 8 hours, regardless of how the unit is used.
 
 Approximately 2 hours. On alkaline batteries, or depending on usage conditions, continuous
 operation may drop to 1 hour or less.
@@ -1519,6 +1096,8 @@ While the power is on, what happens if no operation is performed for a set perio
 time?
 
 ### Answer
+
+distractor: It only dims the display; the unit remains powered on.
 
 The power turns off automatically. This is the Auto Power Off function.
 
@@ -1614,39 +1193,6 @@ cite: startup-guide 6 "The startup screen appears and the unit is ready for use"
 check: The startup screen appears with no USB cable connected — this unit is running on the batteries alone.
 
 Leave the USB cable disconnected and slide the power switch to [ON].
-
-## Find the power requirements for adaptor and cable
-
-type: lookup
-find: guide-book 12 "use a product that conforms to the USB standard with an output of DC 5 V, 1 A or higher"
-id: l-1-02
-limit: 60
-tags: preparation, intro
-
-You are buying a third-party adaptor and cable to power this unit. Find the note in the
-preparation pages that states the output a commercially available USB AC adaptor must
-provide, and the standard and maximum length for the cable.
-
-### Hint
-
-Look at the notes under "Getting ready before making sound", right after the battery
-installation instructions.
-
-## Find the adaptor's model number
-
-type: lookup
-find: guide-book 12 "separately available USB AC adaptor (AD-XA06J Type-C)"
-id: l-1-03
-limit: 45
-tags: preparation, intro
-
-You want the adaptor CASIO itself offers rather than a third-party one. Find the model
-number of the separately available USB AC adaptor.
-
-### Hint
-
-It is named in parentheses where the preparation pages describe using this unit plugged
-into a power outlet.
 !SXC1-DECK 020-prep-03.ex.md
 # Switch it on, hear it out
 
@@ -1659,22 +1205,6 @@ cite: startup-guide 6 "Slide the power switch to the [ON] position."
 
 With a power source sorted, run this unit through its everyday power routine — on, off,
 Auto Power Off recovery — and hear how the built-in speaker and headphones trade places.
-
-## Finding the battery-life guideline
-
-type: lookup
-find: guide-book 12 "continuous operation on batteries is approximately 2 hours when using eneloop"
-id: l-1-04
-limit: 45
-tags: preparation, intro
-
-Before choosing between batteries and a USB AC adaptor for a long session, find the
-guideline for how long this unit runs continuously on each type of battery.
-
-### Hint
-
-Look in the "Getting ready before making sound" material, near the instructions for
-installing batteries.
 
 ## Turn the power on and off
 
@@ -1783,12 +1313,11 @@ deck: prep-04
 chapter: Part: Preparation
 tier: intro
 requires: prep-03
-summary: Send sound out the LINE OUT jack, use the troubleshooting checklists, and find the Auto Power Off setting.
+summary: Connect external audio gear safely and change the Auto Power Off setting.
 cite: guide-book 13 "Active speakers / external mixer, etc."
 
-One last preparation lap: connect this unit to external gear the safe way, learn where
-the troubleshooting checklists live, and find the system setting that controls Auto
-Power Off.
+One last preparation lap: connect this unit to external gear in the safe power-up
+order, then open the system setting that controls Auto Power Off.
 
 ## Send sound out the LINE OUT jack
 
@@ -1825,39 +1354,6 @@ check: Only the external gear is audible; the rear speaker of this unit is silen
 Notice the rear speaker still sounds alongside the external gear. To silence it, slide
 this unit's MAIN VOL to minimum — the LINE OUT level is unaffected.
 
-## Finding the no-sound checklist
-
-type: lookup
-find: startup-guide 13 "Check that headphones, external speakers, or the like are correctly connected to the"
-id: l-1-05
-limit: 45
-tags: preparation, intro
-
-This unit's sound seems to have vanished. Before assuming something is broken, find the
-troubleshooting entry that lists what to check when no sound comes out, and read what it
-tells you to check first.
-
-### Hint
-
-Look in the startup guide's troubleshooting section, under the heading about missing
-sound.
-
-## Finding the power-won't-turn-on checklist
-
-type: lookup
-find: startup-guide 13 "Replace the batteries with new ones."
-id: l-1-06
-limit: 45
-tags: preparation, intro
-
-You slide the power switch to [ON] and nothing happens at all. Find the troubleshooting
-entry for when the power does not turn on, and read both things it tells you to check.
-
-### Hint
-
-It is in the startup guide's troubleshooting section, just after the entry about
-connecting with the app.
-
 ## Where the Auto Power Off delay is set
 
 type: quiz
@@ -1877,23 +1373,6 @@ until the power turns off set?
 
 The delay is a system setting on this unit itself — the preparation pages only point
 there, and the next exercise sends you to find the actual entry.
-
-## Find the Auto Power Off time setting
-
-type: lookup
-find: guide-book 55 "Sets the time until Auto Power Off: 20 minutes, 1 hour, 2 hours, or off"
-id: l-1-01
-limit: 90
-tags: preparation, intro
-
-Find the system-settings entry that sets the time until Auto Power Off. Read which four
-values it can take and which one is the default.
-
-### Hint
-
-Long-press the `EDIT` button in Performance mode to open the system settings on this
-unit, or find the same list in the Guide Book's system-settings pages. The entry is
-named `APO Time`.
 !SXC1-DECK 024-pad-01.ex.md
 # Banks: choosing and understanding them
 
@@ -1976,6 +1455,8 @@ Describe what determines which `A`-`D` button is lit, and which color each pad
 lights up in, immediately after power-on.
 
 ### Answer
+
+distractor: Button `A` always lights at power-on and every pad returns to its factory color.
 
 Whichever state the unit was in when the power was last turned off: the same
 `A`-`D` button stays lit and each pad keeps the color it had.
@@ -2102,6 +1583,8 @@ sounds you assigned yourself?
 
 ### Answer
 
+distractor: It resets menu settings but preserves every sound you assigned.
+
 It returns the unit to its factory default state — and any sounds you have assigned
 yourself are erased.
 
@@ -2155,59 +1638,11 @@ playback interrupts the sound.
 deck: pad-02
 chapter: Part: Pad play
 tier: intro
-summary: Look up the bank basics, then learn BANK1's pad layout and the difference between one-shot and looped sounds.
+summary: Learn BANK1's pad layout and the difference between one-shot and looped sounds.
 cite: guide-book 17 "In BANK1, the following sounds are assigned to the 16 pads"
 
-Three quick lookups ground you in the bank pages, then a run of cards fixes BANK1's
-pad layout and this unit's two sound behaviors — one-shot and looped — in memory.
-
-## Finding how many banks there are
-
-type: lookup
-find: guide-book 16 "You can create up to 80 banks."
-id: l-2-05
-limit: 45
-tags: banks, intro
-
-Find out the total number of banks you can create on this unit, and which banks are
-preset versus which are left for you to fill.
-
-### Hint
-
-Look near the explanation of BANK 1 through 14 versus BANK 15 and up.
-
-## Finding the directional-button steps
-
-type: lookup
-find: guide-book 16 "The ↑/↓ buttons increase or decrease the"
-id: l-2-06
-limit: 45
-tags: banks, intro
-
-On the `SELECT BANK` screen, one pair of directional buttons changes the bank number in
-small steps and the other pair in big steps. Find the diagram note that says exactly
-which pair does which, and by how much.
-
-### Hint
-
-Look just under the two `SELECT BANK` screens near the start of the finger-drumming
-walkthrough, where the four directional buttons are drawn with numbers next to them.
-
-## Finding what Initialize erases
-
-type: lookup
-find: guide-book 16 "any sounds you have assigned yourself will be erased"
-id: l-2-10
-limit: 60
-tags: banks, intro
-
-Running "Initialize" returns this unit to its factory default state. Find the note that
-says what happens to the sounds you assigned yourself.
-
-### Hint
-
-Look in the "About the SXC-1's banks" explanation, right under the sentence about the
-factory default state.
+A run of cards connects BANK1's pad layout with the SXC-1's two sound behaviors —
+one-shot and looped playback.
 
 ## BANK1's basic kit sounds
 
@@ -2318,6 +1753,8 @@ In this unit's own vocabulary, what does a one-shot sound do when you tap its pa
 
 ### Answer
 
+distractor: It repeats continuously until you tap the pad again.
+
 A single sound plays just once: tap the pad and it plays through one time, rather than
 repeating.
 
@@ -2332,6 +1769,8 @@ In this unit's own vocabulary, what does a looped sound do when you tap its pad 
 how do you stop it?
 
 ### Answer
+
+distractor: It plays through once and stops automatically.
 
 Tap once and the sound loops (repeats); tap the same pad again and it stops.
 
@@ -2383,23 +1822,6 @@ cite: guide-book 17 "Tap the same pad again and it stops"
 check: Pad `13` returns to its original color and the loop falls silent.
 
 Tap pad `13` again to stop the loop.
-
-## Finding the BANK1 pad layout
-
-type: lookup
-find: guide-book 17 "In BANK1, the following sounds are assigned to the 16 pads"
-id: l-2-02
-limit: 45
-tags: pad-play, intro
-
-Find the callout figure that shows which sound sits on each of BANK1's 16 pads —
-kick, snare, chords, bass, piano, and the rhythm loops.
-
-### Hint
-
-Look at the "Tap the pads to make sounds" spread near the start of the
-finger-drumming walkthrough, where a top-panel photo has a callout for each row of
-pads.
 
 ## What Beat Sync does
 
@@ -2471,6 +1893,8 @@ A sound with a BPM setting is playing. You start another sound whose BPM is diff
 With Beat Sync ON, what happens to the second sound — and what happens to its pitch?
 
 ### Answer
+
+distractor: The second sound changes both tempo and pitch to match the first.
 
 The second sound is played back matched to the tempo of the sound that is already
 playing. For a sound that has a pitch, only the tempo changes — the pitch stays the
@@ -2610,20 +2034,6 @@ On the waveform display, what do the vertical axis and the horizontal axis each 
 Reading loudness-over-time at a glance tells you where a sound's hits fall — which
 is exactly what you need when timing a tap to the start of a rhythm.
 
-## Where else waveform displays are used
-
-type: quiz
-id: q-2-29
-cite: guide-book 19 "also used in the systems employed for professional recording"
-tags: waveform, intro
-
-Beyond this unit, where does the manual say the same kind of waveform display is used?
-
-### Answer
-
-In the systems employed for professional recording — the waveform is a standard way of
-making sound visible.
-
 ## Finger drum along with a looped sound
 
 type: drill
@@ -2676,22 +2086,6 @@ verify: pad 5 bank A
 
 While the rhythm + bass loop plays, tap pads `5` through `8` in order to layer keyboard
 sounds on top.
-
-## Finding the waveform sidebar
-
-type: lookup
-find: guide-book 19 "Horizontal axis: passage of time"
-id: l-2-12
-limit: 45
-tags: waveform, intro
-
-Find the sidebar that explains the waveform display — the graph that makes sound
-visible — and what its two axes mean.
-
-### Hint
-
-Look inside the finger-drumming walkthrough, right where the manual first shows the
-vertical line moving across a tapped pad's waveform.
 
 ## Stop multiple loops at once
 
@@ -2841,6 +2235,8 @@ How do the preset sounds' ONE SHOT/LOOP settings arrive out of the box?
 
 ### Answer
 
+distractor: Every preset pad is configured as a one-shot sound.
+
 Preconfigured to suit their content — drum hits and chords come as one-shot sounds,
 rhythms and phrases come as looped sounds.
 
@@ -2874,6 +2270,8 @@ The manual names two advanced plays that skillful use of the `ONE SHOT` and `LOO
 buttons makes possible. What are they?
 
 ### Answer
+
+distractor: They only raise or lower the volume of a sound.
 
 Cutting off the tail of a long sound partway through for a percussive effect, and
 looping a short sound.
@@ -2930,23 +2328,6 @@ verify: cc 104 0
 Now press `ONE SHOT` so it goes unlit while `LOOP` stays lit, and hold the pad down.
 When done,
 restore the setting you found the pad with, since the setting is remembered per pad.
-
-## Finding the ONE SHOT/LOOP behavior table
-
-type: lookup
-find: guide-book 21 "These buttons set whether a sound plays once"
-id: l-2-01
-limit: 60
-tags: one-shot-loop, core
-
-The `ONE SHOT` and `LOOP` buttons can each be lit or unlit, for four possible
-combinations. Find the tables and the four-row state diagram that lay out exactly what
-each combination does when you tap a pad.
-
-### Hint
-
-Look at the section explaining the `ONE SHOT` button and the `LOOP` button, right after
-the finger-drumming exercise.
 !SXC1-DECK 034-pad-06.ex.md
 # Grouping, bank switching, and the effect dials
 
@@ -3067,22 +2448,6 @@ verify: pad 11 bank A
 
 Now tap bass pad `9`, then piano pad `11`. Pads in different groups layer.
 
-## Finding BANK1's grouping figure
-
-type: lookup
-find: guide-book 22 "Bass (pads 9–10)"
-id: l-2-11
-limit: 45
-tags: grouping, intro
-
-Find the example figure that marks which of BANK1's 16 pads belong to the rhythm
-group, the bass group, and the piano group.
-
-### Hint
-
-Look in the "How multiple sounds layer and switch" section, under the switch-versus-
-layer comparison table.
-
 ## The bank-switching trap during playback
 
 type: quiz
@@ -3171,6 +2536,8 @@ Several pads' sounds are layered and an effect is selected. Which sounds does th
 effect apply to?
 
 ### Answer
+
+distractor: Only the pad that was sounding when the effect was selected is affected.
 
 The entire sound that is playing — and also the sounds of pads you tap after selecting
 the effect.
@@ -3326,6 +2693,8 @@ flanger, and which parameters change in combination?
 
 ### Answer
 
+distractor: It uses exactly the same depth, rate, feedback, and mix behavior as FLANGER.
+
 It changes the sound in a different way than the flanger; the number of stages, rate,
 depth, feedback, and mix change in combination.
 
@@ -3365,6 +2734,8 @@ How do ROLL 1, ROLL 1/2, and ROLL 1/4 differ from each other, and what makes ROL
 PATTERN different from all three?
 
 ### Answer
+
+distractor: All four ROLL settings are identical except for their volume.
 
 ROLL 1, ROLL 1/2, and ROLL 1/4 sound as if the pad were being tapped repeatedly at
 progressively finer spacing; ROLL PATTERN instead repeats in a certain fixed pattern.
@@ -3412,22 +2783,6 @@ Across what range does FX2 vary, and how?
 
 Because the sweep is continuous, FX2's dial works as a performance control: ride it
 between 0 and 100 to fade rolls and delays in and out of the mix.
-
-## Finding the FX1/FX2 effect list
-
-type: lookup
-find: guide-book 25 "The effects provided for `FX1` and `FX2`, and what each dial changes, are as follows."
-id: l-2-03
-limit: 60
-tags: effects, core
-
-Find the full list of effect types available on FX1 and on FX2, along with a short
-description of what each one does to the sound.
-
-### Hint
-
-Look right after the finger-drumming section that introduces FX1 and FX2, in the part
-that walks through each effect one by one.
 !SXC1-DECK 038-pad-08.ex.md
 # Finger-drumming technique and Beat Sync in action
 
@@ -3440,21 +2795,6 @@ cite: guide-book 26 "The trick is to decide which finger taps each pad"
 
 Two hands-on missions: build finger-drumming technique the way the CREATIVE NOTE
 teaches it, then switch Beat Sync ON and hear exactly what it changes.
-
-## Finding the FX2 sweep range
-
-type: lookup
-find: guide-book 25 "FX2 varies continuously from dry (effect 0) to wet (effect 100)."
-id: l-2-04
-limit: 45
-tags: effects, intro
-
-The FX2 dial's strength control sweeps between two named endpoints with two numbers.
-Find the note that states the exact range.
-
-### Hint
-
-Look at the very end of the "Effects explained" list, after the two DELAY entries.
 
 ## The finger-drumming trick
 
@@ -3533,22 +2873,6 @@ the note in the grouping section?
 Groups and colors are yours to design: give each group of your own bank a color that
 is easy to tell apart, and switch-versus-layer behavior becomes visible at a glance.
 
-## Finding where grouping is set up
-
-type: lookup
-find: guide-book 22 "See PART 4, pp. 48–49"
-id: l-2-08
-limit: 45
-tags: grouping, intro
-
-Setting up each pad's group and lighting color is explained in detail elsewhere in
-the book. Find the note in the grouping section that points to exactly where.
-
-### Hint
-
-Look at the balloon note at the bottom of the "How multiple sounds layer and switch"
-page.
-
 ## Observe Beat Sync: time stretch and quantize
 
 type: drill
@@ -3603,27 +2927,11 @@ deck: pad-09
 chapter: Part: Pad play
 tier: intro
 requires: pad-04, pad-08
-summary: Layer sounds from two banks without a dropout, and know where Beat Sync and bank management live in the manual.
+summary: Layer sounds from two banks without a dropout and manage banks in the app.
 cite: guide-book 23 "Try layering sounds from another bank"
 
-One performance can draw on more than one bank. Find the Beat Sync pointer, layer
-BANK2 and BANK1 sounds together, then find where the app manages and renames banks.
-
-## Finding where Beat Sync is switched ON
-
-type: lookup
-find: guide-book 18 "turn it ON in the system settings"
-id: l-2-07
-limit: 45
-tags: beat-sync, intro
-
-Beat Sync is OFF by default. Find the sentence in the Beat Sync introduction that says
-where you turn it ON — and which part of the book covers that place.
-
-### Hint
-
-Look at the start of the "About the SXC-1's Beat Sync feature" explanation, in the
-first paragraph before time stretch is described.
+One performance can draw on more than one bank. Layer BANK2 and BANK1 sounds together
+without interruption, then learn how the app manages and renames banks.
 
 ## Layer sounds across two banks
 
@@ -3668,23 +2976,6 @@ check: Kick and snare hits land on top of the three-loop bed from both banks.
 verify: pad 1 bank A
 
 Along with it, play kick and snare with pads `1` and `2`.
-
-## Finding the app's bank management
-
-type: lookup
-find: guide-book 60 "rename the banks and sequences displayed in the app"
-id: l-2-09
-limit: 60
-tags: banks, intro
-
-The bank pages mention that the dedicated app can name banks and manage them in other
-convenient ways. Find the page in the app part of the book where copying, deleting,
-downloading, and renaming banks are described.
-
-### Hint
-
-Look in Part: Leveling up, in the section on the dedicated app — under "Data
-organization / download also available".
 !SXC1-DECK 042-smp-01.ex.md
 # Getting ready to sample
 
@@ -3698,45 +2989,6 @@ Before you record anything, the SXC-1 needs to know where the sound is coming fr
 the built-in microphone, the AUDIO IN jack, or a smartphone on the DATA port -- and the
 input level has to be right. This deck covers the whole setup checklist.
 
-## What to read before connecting anything
-
-type: quiz
-id: q-3-12
-cite: guide-book 28 "You can also record from an instrument or external device connected to this unit"
-tags: sampling, intro
-
-You are about to plug an instrument or a smartphone into this unit so you can sample
-from it. Which section of the Guide Book does the sampling chapter tell you to read
-first?
-
-- [x] Connections
-- [ ] Names of parts
-- [ ] Operation overview
-- [ ] Safety precautions
-
-### Why
-
-The sampling chapter's note says to be sure to read the Connections section before
-recording from external devices -- it covers power-off before plugging in, power-on
-order, and what to do if the sound distorts.
-
-## Find the connection instructions
-
-type: lookup
-find: guide-book 8 "turn on the power in the order of this unit first, then the external devices"
-id: l-3-02
-limit: 60
-tags: sampling, intro
-
-Before recording from an instrument or smartphone, you are told to read the connection
-instructions. Find the section that gives the power-on order for this unit and external
-devices, and read what to do if the sound is distorted.
-
-### Hint
-
-Look in the Operating precautions pages near the front of the Guide Book, before the
-Names of parts diagram.
-
 ## Why sampling is easy to start
 
 type: quiz
@@ -3748,6 +3000,8 @@ According to the opening page of Part: Sampling, what makes sampling easy to sta
 the SXC-1, and how soon can you play back what you record?
 
 ### Answer
+
+distractor: Sampling requires an external microphone and recordings must be transferred before pads can play them.
 
 You can record easily with the built-in microphone, and recorded sounds can be played
 on the pads right away.
@@ -3858,8 +3112,7 @@ id: q-3-09
 cite: guide-book 28 "Set INPUT VOL to maximum"
 tags: sampling, core
 
-When sampling with the built-in microphone, where does the Guide Book tell you to set
-`INPUT VOL`?
+When sampling with the built-in microphone, where should you set `INPUT VOL`?
 
 - [x] Maximum
 - [ ] Minimum
@@ -3903,6 +3156,8 @@ While recording from a connected device, what should you watch on the display, a
 which two volume controls do you adjust for it?
 
 ### Answer
+
+distractor: Ignore the level meter and adjust only `MAIN VOL`.
 
 Watch the level meter: adjust the connected device's volume and this unit's
 `INPUT VOL` so the meter does not peak out (swing all the way) while recording.
@@ -3956,22 +3211,6 @@ check: The `INPUT VOL` slider rests at its top position.
 
 Slide `INPUT VOL` all the way up to maximum.
 
-## Find the other bank with empty pads
-
-type: lookup
-find: guide-book 28 "In BANK 14, you can sample to the pads that are unlit"
-id: l-3-01
-limit: 45
-tags: sampling, intro
-
-BANK 15 starts out with every pad empty, but one other bank also has room for your
-samples. Find the note that names that bank and tells you how to spot its empty pads.
-
-### Hint
-
-Look at the note under step 1 of "Getting ready to start sampling", right beside the
-`SELECT BANK 15` screenshot.
-
 ## Which button enters Sampling mode
 
 type: quiz
@@ -4021,6 +3260,8 @@ tags: sampling, intro
 Describe what the display shows once you are in Sampling mode.
 
 ### Answer
+
+distractor: It shows only the current bank number and MASTER BPM.
 
 It reads `SAMPLING MODE` with the current trigger setting (for example
 `AUTO TRIGGER`), plus L and R level meters.
@@ -4080,6 +3321,8 @@ With `MANUAL TRIGGER`, when does recording start -- and when would you choose it
 
 ### Answer
 
+distractor: Recording waits until the input crosses the automatic trigger level.
+
 Recording starts the moment you select a pad. Choose it when you want to decide the
 sampling start timing yourself instead of letting the input sound trigger it.
 
@@ -4126,23 +3369,6 @@ check: The display shows `AUTO TRIGGER` again after you have stepped away and ba
 
 Use the directional buttons `←`/`→` to step through the other trigger settings, then
 return to `AUTO TRIGGER`.
-
-## Find the trigger settings explained
-
-type: lookup
-find: guide-book 29 "is a setting that starts recording automatically"
-id: l-3-03
-limit: 60
-tags: sampling, core
-
-Sampling mode has more than one way to start a recording. Find where the two named
-trigger settings are explained, and read what each one does.
-
-### Hint
-
-Look inside the numbered steps of "Try sampling to a pad in BANK 15", around the
-display screenshot -- one setting is explained in bold under step 3, the other under
-step 4.
 
 ## Sample your voice to pad 4
 
@@ -4335,6 +3561,8 @@ display?
 
 ### Answer
 
+distractor: The `REC` button keeps flashing and the level meter stays still.
+
 The `REC` button is lit (no longer flashing), and the level meter on the display swings
 in time with the sound.
 
@@ -4411,6 +3639,8 @@ Right after a recording stops, how do you check what you captured?
 
 ### Answer
 
+distractor: You must save and restart the unit before the new sample can be heard.
+
 Tap the pad -- the sample assigned to it plays back immediately.
 
 ### Why
@@ -4431,6 +3661,8 @@ What habit does the Guide Book recommend so that your samples come out easy to w
 with?
 
 ### Answer
+
+distractor: Begin speaking immediately, without counting, and let the unit choose the end.
 
 Before recording, count "1, 2, 3, 4" in your head, then speak and stop with good
 timing -- so the sample fits neatly into counts.
@@ -4564,6 +3796,8 @@ now?
 
 ### Answer
 
+distractor: The selected pad flashes and every other pad turns off.
+
 The pad you selected lights up white, and the other assigned pads keep flashing.
 
 ### Why
@@ -4601,6 +3835,8 @@ tags: sampling, core
 Which button confirms the deletion, and what do you see when it happens?
 
 ### Answer
+
+distractor: Press `B` to delete; `A` cancels the operation.
 
 Confirm with the `A` button: the display reads `DELETING`, the sample is deleted, and
 the pad goes out.
@@ -4725,6 +3961,8 @@ mode let you do with a sample?
 
 ### Answer
 
+distractor: It changes the pitch of the entire sample without trimming it.
+
 Cut out part of the sample and play just that portion.
 
 ### Why
@@ -4783,6 +4021,8 @@ As you resample a pad's sound onto another pad, what can you do to it along the 
 
 ### Answer
 
+distractor: It can only make an unchanged copy of the source sample.
+
 Copy the same sample as-is, add new sounds on top, or apply effects as you do so --
 expanding the range of ways you can use it.
 
@@ -4823,6 +4063,8 @@ Part: Sampling mention for this?
 
 ### Answer
 
+distractor: A manual process that records the phrase onto one pad without splitting it.
+
 A feature that samples the long phrase and automatically distributes it across pads
 beat by beat.
 
@@ -4830,22 +4072,6 @@ beat by beat.
 
 Beat-by-beat auto distribution means the slices land musically -- each pad holds one
 beat of the phrase, ready to replay in order or rearrange into something new.
-
-## Find the SOUND EDIT screen's settings
-
-type: lookup
-find: guide-book 33 "menu showing `PITCH :0`, `VOLUME :100`, `GROUP :0`, `COLOR :6`"
-id: l-3-05
-limit: 45
-tags: sampling, intro
-
-Find the screenshot of the `SOUND EDIT` screen in Part: Sampling and read off exactly
-which settings it lists.
-
-### Hint
-
-It is under "Editing samples" in the sample-features section, right beside the note
-about the dedicated app.
 !SXC1-DECK 054-smp-07.ex.md
 # Sampling: pointers and creative notes
 
@@ -4857,22 +4083,6 @@ cite: guide-book 34 "Sampling changed the style of music production"
 
 Part: Sampling ends by pointing forward -- to deeper editing in a later PART, and to a
 way of thinking about your growing sound library. This deck follows those pointers.
-
-## Where resampling and chop are explained in detail
-
-type: lookup
-find: guide-book 33 "For details, go to PART 4"
-id: l-3-06
-limit: 45
-tags: sampling, intro
-
-Resampling and chop are only introduced in Part: Sampling. Find the pointer that tells
-you which PART of the Guide Book explains them in detail.
-
-### Hint
-
-Look at the very end of the "Various features that make it even more fun" spread,
-after the chop explanation.
 
 ## When sampling was born
 
@@ -4907,6 +4117,8 @@ what does a balanced bank make easier?
 
 ### Answer
 
+distractor: Use rhythm samples only; basses, chords, and other sounds should stay in separate banks.
+
 Rhythm-type, bass-type, chord-type, and other samples together in one bank, in a
 well-balanced way. It is convenient for pad performance, and it also makes it easier to
 create songs with the sequencer feature.
@@ -4936,22 +4148,6 @@ Your new sample's pad lights up yellow. Is it stuck that way?
 Yellow is just the starting color. A note in the sampling steps says you can change the
 lighting color later -- the setting that does it lives in a later PART's sample-editing
 pages.
-
-## Find the pad color setting
-
-type: lookup
-find: guide-book 49 "Sets the lighting color of the pad"
-id: l-3-04
-limit: 90
-tags: sampling, intro
-
-You want pad 4 to light up light blue instead of yellow. Find the `SOUND EDIT` setting
-that sets a pad's lighting color, and read how many colors it offers.
-
-### Hint
-
-It is in Part: Leveling up, among the sample processing and editing pages -- the same
-menu where `PITCH` and `VOLUME` live, one entry further down.
 !SXC1-DECK 056-seq-01.ex.md
 # Meet the sequencer
 
@@ -4995,6 +4191,8 @@ tags: sequencer, intro
 The sequencer lets you experience a well-known production style. What is it called?
 
 ### Answer
+
+distractor: “Real-time production” — recording the whole performance in one take.
 
 "Step-based music production" -- building music by placing sounds step by step
 rather than performing everything live.
@@ -5049,6 +4247,8 @@ Name the three lines shown on the sequence selection screen when you first long-
 an `A`-`D` button.
 
 ### Answer
+
+distractor: `SOUND BANK`, then `BANK = 80`, then `SAVE(A) EXIT(B)`.
 
 `SEQUENCE SLCT`, then `BANK = 1`, then `OK(A) CANCEL(B)`.
 
@@ -5141,6 +4341,8 @@ Where are the patterns you create saved?
 
 ### Answer
 
+distractor: Inside sound banks 1-80, together with the samples.
+
 As sequence banks 1-50. A sequence bank is separate from a sound bank: it stores a
 pattern, not samples.
 
@@ -5174,6 +4376,8 @@ You want to save a pattern to sequence bank 5 or higher. How do you pick the ban
 and what happens to it when you confirm with OK?
 
 ### Answer
+
+distractor: Banks 5 and above cannot be assigned; `A`-`D` are fixed to sequence banks 1-4.
 
 At the time of sequence selection, choose the bank number with the directional
 buttons. When you choose OK with `A`, Sequence mode is displayed and the sequence is
@@ -5229,57 +4433,6 @@ cite: guide-book 36 "Long-press the lit button to return to Performance mode"
 check: The Performance mode display returns.
 
 Long-press the lit `A` button to return to Performance mode.
-
-## How big can a sequence get
-
-type: lookup
-find: guide-book 36 "a performance pattern of up to 8 measures made with the samples of one bank"
-id: l-4-01
-limit: 60
-tags: sequencer, intro
-
-Find the boxed explanation of what a "sequence" is, and read off two numbers: the
-maximum length of one sequence in measures, and the maximum number of patterns you
-can create.
-
-### Hint
-
-It sits right under the numbered steps for entering Sequence mode, in a box titled
-"What is a sequence?".
-
-## Where your patterns end up
-
-type: lookup
-find: guide-book 36 "By default, sequence banks 1–4 are assigned to the `A`–`D` buttons"
-id: l-4-02
-limit: 60
-tags: sequencer, intro
-
-Find the explanation of the "sequence bank": which sequence banks are assigned to the
-`A`-`D` buttons by default, and what you do at sequence selection to save to bank 5
-or higher.
-
-### Hint
-
-Look for the heading that ends with = the "sequence bank", directly below the
-"What is a sequence?" box.
-
-## The easier way to manage sequence banks
-
-type: lookup
-find: guide-book 36 "Sequence banks are easy to manage using the dedicated app"
-id: l-4-13
-limit: 90
-tags: sequencer, intro
-
-Fifty sequence banks are a lot to juggle from a small screen. Find the note that says
-where sequence-bank management (and sequence copy/paste later on) is more convenient,
-and note which pages it points to in the book's final part.
-
-### Hint
-
-It is a one-line callout at the very bottom of the sequence-bank explanation,
-mentioning the dedicated app.
 
 ## Select a sequence bank 5 or higher
 
@@ -5356,6 +4509,8 @@ What does the tempo area of the Sequence mode display show?
 
 ### Answer
 
+distractor: The number of the sound bank used by the sequence.
+
 The tempo of the sequence, as a BPM value.
 
 ## The metronome area
@@ -5387,6 +4542,8 @@ tags: sequencer, intro
 The number-of-measures area shows two things. What are they?
 
 ### Answer
+
+distractor: The selected pad number and its MIDI channel.
 
 The number of measures in the sequence, and which measure's information is shown in
 the cells below.
@@ -5429,22 +4586,6 @@ How does the pad input area represent one measure of your pattern?
 Sixteen parts per measure is not an arbitrary display choice -- it matches the
 sequencer's smallest timing unit, the 16th note, which you will meet as "quantize".
 
-## Tour the Sequence mode display
-
-type: lookup
-find: guide-book 37 "This display shows the state of creating a 1-measure sequence"
-id: l-4-03
-limit: 60
-tags: sequencer, intro
-
-Find the annotated picture of the Sequence mode display and read what each labeled
-area means: bank, tempo, metronome, number of measures, pad number, and pad input.
-
-### Hint
-
-It is the full-page display tour directly after the steps for entering Sequence
-mode, before you are asked to set a measure count.
-
 ## Which samples a sequence uses by default
 
 type: quiz
@@ -5455,6 +4596,8 @@ tags: sequencer, core
 Which bank's samples does Sequence mode use by default, and how do you change that?
 
 ### Answer
+
+distractor: It always uses whichever sound bank is currently open in Performance mode.
 
 The samples are set to BANK1. To use samples from a different bank, change it with
 "SOUND BANK" in the EDIT function.
@@ -5592,6 +4735,8 @@ What is the sequence tempo by default, and where do you change it?
 
 ### Answer
 
+distractor: BPM = 100 by default and it cannot be edited.
+
 BPM = 120 by default; change it with "BPM" in the EDIT function.
 
 ## What the white cells mean
@@ -5643,6 +4788,8 @@ tags: sequencer, core
 How do you end the recording, and what do the `REC` and `▶/■` buttons do then?
 
 ### Answer
+
+distractor: Press `REC`; only that button stops flashing.
 
 Press the `▶/■` button. Recording ends, and both buttons return from flashing to
 lit.
@@ -5706,22 +4853,6 @@ check: On the first press both buttons return from flashing to lit; on the secon
 
 Press `▶/■` to end the recording, then press `▶/■` again to play back what you
 entered.
-
-## The tempo, before and after
-
-type: lookup
-find: guide-book 39 "The tempo is set to BPM = 120 by default"
-id: l-4-05
-limit: 60
-tags: sequencer, intro
-
-Find where the recording walkthrough states the default tempo of a sequence, and note
-which EDIT-function item changes it.
-
-### Hint
-
-It is in the paragraph about pressing the lit `REC` button, right where the 4-count
-is explained -- the same sentence points at the EDIT function.
 !SXC1-DECK 064-seq-05.ex.md
 # Step input and quantize
 
@@ -5804,6 +4935,8 @@ sequencer do, and what is this feature called?
 
 ### Answer
 
+distractor: Timing is corrected to the nearest eighth note.
+
 The timing is corrected to the nearest 16th-note timing. This kind of feature is
 called "quantize".
 
@@ -5845,22 +4978,6 @@ cite: guide-book 40 "Play the sequence with the `▶/■` button and check the r
 check: On playback, the sound now plays at the corrected timing.
 
 Play the sequence with the `▶/■` button and check the result.
-
-## The sequencer's timing resolution
-
-type: lookup
-find: guide-book 40 "The smallest unit of sound handled in the SXC-1's Sequence mode"
-id: l-4-06
-limit: 60
-tags: sequencer, core
-
-Find the boxed explanation of the sequencer's timing correction: what the smallest
-unit of sound is, and what happens to taps that are off by less than that unit.
-
-### Hint
-
-It is a callout box titled "About quantize", at the bottom of the page about editing
-a pattern.
 
 ## Silencing the metronome
 
@@ -5912,6 +5029,8 @@ A drum pattern needs several pads at once and your fingers cannot keep up. What 
 the manual suggest?
 
 ### Answer
+
+distractor: Every pad must be performed together in one take; layering is not possible.
 
 Input one pad at a time: first perform just the hi-hat, then perform the kick while
 listening to it, and finally layer the snare on top.
@@ -6022,37 +5141,6 @@ verify: pad 2 bank A
 check: All three rows are filled and the full pattern plays back as one groove.
 
 Finally, layer the snare on pad `2` on top.
-
-## The ready-made pattern charts
-
-type: lookup
-find: guide-book 41 "Example 1: Dance beat"
-id: l-4-07
-limit: 60
-tags: sequencer, intro
-
-Find the page with ready-made drum pattern charts to program, and name the three
-example grooves it offers.
-
-### Hint
-
-It comes right after the page about editing and quantize, under the heading about
-creating various drum patterns.
-
-## Real-time input vs. step input
-
-type: lookup
-find: guide-book 41 "Use the two input styles for different situations"
-id: l-4-08
-limit: 90
-tags: sequencer, core
-
-Find the tip that contrasts the two input styles: what each one is called, what each
-is best at, and the three-pass example it gives for building a drum pattern.
-
-### Hint
-
-It is the character callout at the bottom of the drum-pattern-examples page.
 !SXC1-DECK 068-seq-07.ex.md
 # Beyond the drums
 
@@ -6154,6 +5242,8 @@ inputting?
 
 ### Answer
 
+distractor: Practicing: both buttons lit. Inputting: only `REC` flashes.
+
 Practicing: `▶/■` flashing, `REC` lit. Inputting: both flashing. Pressing `REC`
 during playback is what switches you from one to the other.
 
@@ -6180,23 +5270,6 @@ cite: guide-book 43 "press the `REC` button to start inputting"
 check: Both buttons flash, and from now on your taps fill in cells at their timings.
 
 When the part feels solid, press the `REC` button to start inputting.
-
-## Can looped sounds go into a sequence?
-
-type: lookup
-find: guide-book 43 "Only one-shot sounds can be incorporated into a sequence"
-id: l-4-12
-limit: 90
-tags: sequencer, core
-
-Find the note that answers whether looped sounds can be put into a sequence -- and
-read what the workaround is, including where in the book's final part it is
-explained.
-
-### Hint
-
-It is the sentence directly under the last numbered step of the synth-chords
-walkthrough, just before the practice tip.
 !SXC1-DECK 070-seq-08.ex.md
 # The SEQUENCE EDIT settings
 
@@ -6240,6 +5313,8 @@ tags: sequencer, core
 On the `SEQUENCE EDIT` screen, what do the directional buttons do?
 
 ### Answer
+
+distractor: ←/→ selects an item; ↑/↓ changes its value.
 
 ↑/↓ selects an item; ←/→ sets the selected item's value.
 
@@ -6291,6 +5366,8 @@ tags: sequencer, core
 What does the CLEAR item let you do, and what are its three scopes?
 
 ### Answer
+
+distractor: It deletes one selected note only; there are no scope choices.
 
 It lets you delete sounds in bulk. Its three scopes are `TRACK`, `BAR`, and `ALL`.
 
@@ -6361,6 +5438,8 @@ tags: sequencer, core
 You have chosen a CLEAR scope and pressed `A`. What happens next?
 
 ### Answer
+
+distractor: Press `B` to execute and `A` to cancel.
 
 A confirmation display appears (for example `CLEAR ALL?  OK(A)  CANCEL(B)`); press
 `A` to execute, or `B` to cancel.
@@ -6464,73 +5543,11 @@ deck: seq-09
 chapter: Part: Sequencer
 tier: intro
 requires: seq-04, seq-08
-summary: Look up the EDIT-function reference, clear sounds in bulk, and place the sequencer in the bigger picture.
+summary: Clear sounds in bulk and place the sequencer in the bigger music-making picture.
 cite: guide-book 45 "It's OK to start building a song from any part!"
 
-Close out the chapter: practice finding the EDIT-function reference on your own,
-run the destructive CLEAR scopes once under supervision, and pick up the context
-cards that connect the sequencer to the app and to music-making at large.
-
-## Changing a sequence's sound bank
-
-type: lookup
-find: guide-book 44 "Sets the sound bank used for creating and playing the sequence"
-id: l-4-04
-limit: 60
-tags: sequencer, core
-
-Your sequence should play a different bank's samples. Find the EDIT-function item
-that sets the sound bank used for creating and playing the sequence.
-
-### Hint
-
-Open the settings reference for Sequence mode -- it is the first item on the
-`SEQUENCE EDIT` screen.
-
-## The three CLEAR scopes
-
-type: lookup
-find: guide-book 44 "Lets you delete sounds in bulk"
-id: l-4-09
-limit: 90
-tags: sequencer, core
-
-Find the reference entry for deleting sounds in bulk, and read exactly what each of
-its three scopes -- `TRACK`, `BAR`, `ALL` -- deletes.
-
-### Hint
-
-It is the third item on the `SEQUENCE EDIT` screen, right after the tempo setting.
-
-## Metronome ranges
-
-type: lookup
-find: guide-book 44 "You can set the metronome ON/OFF"
-id: l-4-10
-limit: 60
-tags: sequencer, intro
-
-Find the metronome's reference entry and read its setting ranges: what values
-`VOLUME` can take, and what values `PATTERN` can take, besides ON/OFF.
-
-### Hint
-
-It is on the `SEQUENCE EDIT` screen, between CLEAR and PRECOUNT.
-
-## What PRECOUNT does
-
-type: lookup
-find: guide-book 44 "Sets whether or not a pre-count (4 counts at the beginning) sounds"
-id: l-4-11
-limit: 60
-tags: sequencer, intro
-
-Find the reference entry for the pre-count: what it controls, how many counts sound,
-and which input style it applies to.
-
-### Hint
-
-It is the last item on the `SEQUENCE EDIT` screen.
+Close out the chapter by running the destructive CLEAR scopes once under supervision,
+then connect the sequencer to the app and to music-making at large.
 
 ## Clear sounds in bulk
 
@@ -6597,6 +5614,8 @@ According to the CREATIVE NOTE, where should you start when building a song?
 
 ### Answer
 
+distractor: A song must always begin with a rhythm pattern.
+
 Anywhere that works for you: starting from a rhythm pattern is fine, and so is a
 chord progression that feels good, or a melody that suddenly comes to you.
 
@@ -6631,6 +5650,8 @@ What does the dedicated app let you do with sequences that is more convenient th
 working on the unit alone?
 
 ### Answer
+
+distractor: It changes sequence tempo but cannot copy or paste patterns.
 
 Create and edit sequences more conveniently -- for example, copying and pasting
 patterns you have input.
@@ -6717,6 +5738,8 @@ What are the factory-default values of `MIDI IN Ch.` and `MIDI OUT Ch.`?
 
 ### Answer
 
+distractor: Both default to channel 16.
+
 Both are set to channel 1 by default.
 
 ## Do channel changes survive power-off
@@ -6749,23 +5772,9 @@ returns you to normal Performance mode?
 
 ### Answer
 
+distractor: Press the `B` button to leave system settings.
+
 Press the `EDIT` button again to exit the system settings.
-
-## Find the MIDI revision history
-
-type: lookup
-find: midi 5 "This section lists the revision history of this document."
-id: l-5-17
-limit: 90
-tags: midi, stretch
-
-In the MIDI implementation document, find the table that records which firmware
-version first added MIDI support and what each later document revision changed
-(for example, when the dials gained Control Change reception).
-
-### Hint
-
-It is the last section of the document, after the note mapping table.
 
 ## Transmitted vs. received note range
 
@@ -6785,23 +5794,6 @@ Which note numbers does the SXC-1 transmit, and which does it receive?
 
 Reception covers 16 extra notes (100-115) because those are the receive-only
 "Active" slots that always trigger the current bank's pads.
-
-## Find the MIDI implementation chart
-
-type: lookup
-find: midi 2 "MIDI implementation chart"
-id: l-5-15
-limit: 60
-tags: midi, stretch
-
-Find the standard chart that shows, message type by message type, what MIDI the
-SXC-1 transmits and receives at all -- for example, whether it sends Program Change
-or responds to Clock.
-
-### Hint
-
-It is a full-page table near the product information, with Transmit and Receive
-columns full of circle and cross marks.
 
 ## Which CC the volume sliders use
 
@@ -6835,6 +5827,8 @@ buttons transmit when pressed and released?
 
 ### Answer
 
+distractor: `FX1` is CC 7 and `FX2` is CC 8; buttons send 64 for both press and release.
+
 The `FX1` dial is CC 16 and the `FX2` dial is CC 17. Buttons transmit value 127
 when pressed and 0 when released.
 
@@ -6850,23 +5844,9 @@ Change list). Which value corresponds to each position?
 
 ### Answer
 
+distractor: `MIC` sends 127, `AUDIO IN` sends 64, and `USB` sends 0.
+
 `MIC` transmits 0, `AUDIO IN` transmits 64, and `USB` transmits 127.
-
-## Find the Control Change list
-
-type: lookup
-find: midi 3 "Control Change list"
-id: l-5-13
-limit: 60
-tags: midi, stretch
-
-Find the table that assigns a Control Change number to every slider, dial, and
-button on the unit, so you can answer questions like "what CC does the `REC`
-button send?"
-
-### Hint
-
-It is the numbered section right after the MIDI implementation chart.
 !SXC1-DECK 076-lvl-02.ex.md
 # Note maps and layered play
 
@@ -6879,23 +5859,6 @@ cite: guide-book 47 "select the bank that has the sounds you want to perform in 
 
 This deck finishes the MIDI picture -- how notes map to pads -- and then puts the
 unit back in your hands: playing pads live on top of a sequence.
-
-## How received FX dial values behave
-
-type: lookup
-find: midi 3 "differs depending on whether each FX button is ON or OFF"
-id: l-5-16
-limit: 90
-tags: midi, stretch
-
-When the unit receives CC values for the `FX1` or `FX2` dial, the same value means
-two different things depending on the state of the matching FX button. Find the
-table that spells out both cases.
-
-### Hint
-
-Look for the footnote under the Control Change list -- it has one column for the
-button OFF and one for the button ON.
 
 ## The note number for pad 1, Bank A
 
@@ -6933,55 +5896,10 @@ Note numbers 100-115 are receive-only. What happens when the unit receives one?
 
 ### Answer
 
+distractor: They select banks A-D by note range and work only in Performance mode.
+
 It triggers pads 1-16 of the *current* bank, regardless of which bank is selected
 or what mode the unit is in -- for example, note 100 acts like pressing pad 1.
-
-## Find the note mapping table
-
-type: lookup
-find: midi 4 "Regardless of the bank or the unit's mode"
-id: l-5-14
-limit: 60
-tags: midi, stretch
-
-Find the table that tells you, for every pad and every bank, which MIDI note
-number triggers it -- including the extra receive-only column.
-
-### Hint
-
-It is the numbered section right after the Control Change list, one row per pad.
-
-## Locate the Beat Sync system setting
-
-type: lookup
-find: guide-book 55 "Sets the automatic beat matching described on p. 18 to ON/OFF"
-id: l-5-04
-limit: 60
-tags: leveling-up, intro
-
-Find the system-settings entry that turns Beat Sync on or off, and note where it
-says the feature itself is explained.
-
-### Hint
-
-Long-press the `EDIT` button in Performance mode to open the system settings, then
-scroll to the Beat Sync line.
-
-## Where effects during resampling are explained
-
-type: lookup
-find: guide-book 51 "as described in PART 1, p. 24"
-id: l-5-05
-limit: 60
-tags: leveling-up, intro
-
-The resampling pages let you bake an effect into the copy. Find the sentence that
-points you back to the earlier PART where applying effects is explained.
-
-### Hint
-
-Look under "Resampling a sound with an effect applied", one of the boxed variations
-after the main resampling steps.
 
 ## Starting sequence playback for layering
 
@@ -7015,6 +5933,8 @@ playing and that playback is running?
 
 ### Answer
 
+distractor: The assigned `A`-`D` button flashes while `▶/■` stays steadily lit.
+
 The assigned `A`-`D` button is lit, and the `▶/■` button is flashing.
 
 ## Picking the bank you perform with
@@ -7027,6 +5947,8 @@ tags: leveling-up, core
 Before you start layering, what should you select in Performance mode?
 
 ### Answer
+
+distractor: Performance is forced to the sequence's sound bank; you cannot choose another.
 
 The bank that has the sounds you want to perform in real time -- the sequence bank
 is chosen separately with the `A`-`D` buttons when you start playback.
@@ -7063,6 +5985,8 @@ has a BPM set. What happens to the loop?
 
 ### Answer
 
+distractor: The loop keeps its own recorded speed and ignores sequence tempo.
+
 The sample automatically plays in time with the tempo of the sequence -- the loop
 locks to the sequence's beat instead of its own recorded speed.
 !SXC1-DECK 078-lvl-03.ex.md
@@ -7091,6 +6015,8 @@ sequence playback. Whose tempo wins?
 
 ### Answer
 
+distractor: The sequence keeps its own tempo and forces the sample to follow it.
+
 The sample's: the sequence plays at the sample's tempo. (It is the reverse of
 triggering the loop during playback, where the loop follows the sequence.)
 
@@ -7105,6 +6031,8 @@ Describe the three steps that get you from Performance mode to changing a value 
 `SOUND EDIT`.
 
 ### Answer
+
+distractor: Long-press `EDIT`, then choose a pad and use the FX dials to edit values.
 
 Press the `EDIT` button, tap the pad whose sample you want to edit, then use ↑/↓
 to select an item and ←/→ to change its value.
@@ -7159,6 +6087,8 @@ sample?
 
 ### Answer
 
+distractor: Pitch changes without affecting playback speed or length.
+
 It changes the sample's playback speed too -- raise the pitch and it plays faster,
 lower it and it plays slower and longer.
 
@@ -7192,6 +6122,8 @@ What does setting `GROUP` to a number from 1 to 16 do, and what does 0 mean?
 
 ### Answer
 
+distractor: Pads with the same number layer; setting 0 makes them cut each other off.
+
 Pads with the same number are grouped: the sound of the pad tapped last takes
 priority and stops the previous one. Setting 0 means no grouping, so sounds layer.
 
@@ -7206,6 +6138,8 @@ A loop is playing from a pad in Bank A. You switch to Bank B and tap a pad whose
 sample has the same `GROUP` number. What happens?
 
 ### Answer
+
+distractor: Nothing happens across banks because groups are isolated to each bank.
 
 The Bank A sound stops -- group settings are shared across all banks, so a
 same-group sound in a different bank can stop a sound playing in another bank.
@@ -7300,6 +6234,8 @@ What does the `COLOR` item set, and which colors do the eight values give you?
 
 ### Answer
 
+distractor: It sets the pad's playback volume from 1 to 8.
+
 It sets the lighting color of the pad: 1 Neon Yellow, 2 Orange, 3 Red, 4 Purple,
 5 Blue, 6 Light Blue, 7 Green, 8 Light Green.
 
@@ -7314,6 +6250,8 @@ A sample's `BPM` item already shows a number you never typed in. Where did it co
 from, and can you change it?
 
 ### Answer
+
+distractor: It is never analyzed; the BPM must always be entered manually.
 
 It was analyzed automatically during recording. You can also set it manually.
 
@@ -7346,6 +6284,8 @@ tags: leveling-up, core
 You are in EDIT mode. What single action brings up the waveform editing display?
 
 ### Answer
+
+distractor: Press the `A` button while the pad is selected.
 
 Turning a dial.
 
@@ -7380,6 +6320,8 @@ one at a time?
 
 ### Answer
 
+distractor: Yes — only one point can be adjusted at a time.
+
 No -- you can adjust the start and end points with both dials at once, one dial for
 each point.
 
@@ -7394,6 +6336,8 @@ What working method does the manual recommend while you move a sample's start an
 end points?
 
 ### Answer
+
+distractor: Enter start and end numbers without playing the pad.
 
 Adjust while tapping the pad and listening to the sound, so you hear exactly what
 the trimmed sample will play.
@@ -7433,8 +6377,8 @@ summary: Trim a sample's start and end points by ear, manage its BPM, and walk u
 cite: guide-book 49 "Turning a dial in EDIT mode brings up the waveform editing display"
 cite: guide-book 50 "Sampling a saved sample again"
 
-Two hands-on missions on the waveform page, a color-table lookup, and then the
-first half of resampling: getting the unit ready to copy a sound.
+Two hands-on waveform missions lead into the first half of resampling: getting the
+unit ready to copy a sound.
 
 ## Edit a sample's start and end points
 
@@ -7499,22 +6443,6 @@ check: The `BPM` item reads --- and the sample no longer follows Beat Sync.
 Long-press the left button to set the BPM to ---, excluding this sample from Beat
 Sync. Restore a value afterwards if you want the sync back.
 
-## Which COLOR number is which color
-
-type: lookup
-find: guide-book 49 "Sets the lighting color of the pad."
-id: l-5-01
-limit: 60
-tags: leveling-up, intro
-
-You want a green pad. Find the table that lists which `COLOR` setting value gives
-which lighting color, from Neon Yellow through Light Green.
-
-### Hint
-
-It is on the second page of "Try processing and editing samples", right under the
-COLOR heading.
-
 ## Starting the resampling procedure
 
 type: quiz
@@ -7525,6 +6453,8 @@ tags: leveling-up, core
 How do you reach the `RESAMPLING` setting?
 
 ### Answer
+
+distractor: Long-press `EDIT` in Performance mode to open system settings.
 
 Enter Sampling mode by pressing `REC` in Performance mode, then select
 `RESAMPLING` with the directional buttons.
@@ -7561,6 +6491,8 @@ display show now?
 
 ### Answer
 
+distractor: Recording begins immediately on the destination pad and every other pad turns off.
+
 The selected pad changes to lit white and the other pads flash; the display shows
 `WAIT FOR SOUND / PAD COPY`.
 
@@ -7575,6 +6507,8 @@ During resampling, when should the `INPUT SELECT` switch be at `MIC`, and when a
 `♪` or `USB`?
 
 ### Answer
+
+distractor: Only `MIC` is valid; resampling without new input is not allowed.
 
 `MIC` when you want to add sound from the built-in mic during resampling; `♪` or
 `USB` when adding sound from an external input -- or when adding nothing at all.
@@ -7645,6 +6579,8 @@ resampling?
 
 ### Answer
 
+distractor: Tapping the copy-destination pad starts the copy.
+
 Tapping the copy-source pad.
 
 ## The buttons during resampling
@@ -7676,6 +6612,8 @@ tags: leveling-up, core
 Do you have to stop a resampling recording yourself? How do you know it is done?
 
 ### Answer
+
+distractor: You must press `REC` to end every resampling operation.
 
 No -- when the copy-source sample finishes sounding, resampling ends
 automatically, and the copy-destination pad lights yellow.
@@ -7712,6 +6650,8 @@ What changes in the procedure?
 
 ### Answer
 
+distractor: The source must be in the same bank as the destination.
+
 After selecting the copy-destination pad, select the bank containing the
 copy-source sound with the `A`-`D` buttons, then tap the copy-source pad.
 
@@ -7725,6 +6665,8 @@ tags: leveling-up, stretch
 What must you do *in advance* for cross-bank resampling to work?
 
 ### Answer
+
+distractor: No preparation is needed because every bank is always reachable.
 
 Assign the banks containing the sounds you want to copy to the `A`-`D` buttons in
 advance -- you can only reach a source bank that is on one of those buttons.
@@ -7741,6 +6683,8 @@ What lands on the destination pad?
 
 ### Answer
 
+distractor: Only the source sample is copied; the input sound is monitored but not recorded.
+
 The copy-source sample and the input sound, recorded mixed together as one new
 sample.
 
@@ -7755,6 +6699,8 @@ You apply an effect at the moment you tap the copy-source pad. What does the
 destination pad hold afterwards?
 
 ### Answer
+
+distractor: The effect remains a live setting and disappears when the effect is switched off.
 
 The sound with the effect applied -- the effect is recorded into the copy
 permanently, so the destination plays it even with the effect off.
@@ -7771,6 +6717,8 @@ Is the added sound recorded dry?
 
 ### Answer
 
+distractor: Yes — the effect applies only to the source sample, not the added sound.
+
 No -- the effect is also applied to the newly added sound, so everything on the
 destination pad shares the same treatment.
 
@@ -7784,6 +6732,8 @@ tags: leveling-up, core
 Name the three uses the manual suggests for resampling.
 
 ### Answer
+
+distractor: It is only for making exact backup copies of samples.
 
 Distribute a sound you want to hit repeatedly across multiple pads, express effect
 ON/OFF by tapping different pads, and gather favorite sounds from multiple banks
@@ -7851,6 +6801,8 @@ do beyond recording it to a single pad?
 
 ### Answer
 
+distractor: It divides a phrase into equal time slices without analyzing BPM.
+
 It can analyze the BPM of the input phrase, split it beat by beat, and
 automatically assign the pieces to multiple pads.
 
@@ -7864,6 +6816,8 @@ tags: leveling-up, core
 Put the three setup steps of an auto chop in order, starting from Sampling mode.
 
 ### Answer
+
+distractor: Select `AUTO CHOP`, choose one pad, and enter the total number of measures.
 
 Select `AUTO CHOP` with the directional buttons, select the multiple pads you want
 to assign the sound to, then specify the number of beats to distribute to each pad.
@@ -7898,6 +6852,8 @@ Before the phrase comes in, the display reads `WAIT FOR SOUND / AUTO CHOP 4 X 4`
 What do the two numbers mean?
 
 ### Answer
+
+distractor: It shows only the total number of measures, unrelated to pad count.
 
 Beats per pad times the number of selected pads -- here, 4 beats distributed to
 each of 4 pads.
@@ -7969,6 +6925,8 @@ does it end?
 
 ### Answer
 
+distractor: Recording continues until you press `REC`; analysis never stops it automatically.
+
 Recording starts when the phrase is input, and ends automatically when analysis of
 4 beats × 4 = 4 measures is complete.
 
@@ -8003,6 +6961,8 @@ happens to its neighbors?
 
 ### Answer
 
+distractor: No — extending one slice shifts every later distributed sample.
+
 Yes -- each sample's range can be extended forward or backward, and doing so does
 not affect the other distributed samples.
 
@@ -8016,6 +6976,8 @@ tags: leveling-up, stretch
 What is the warned-about downside of extending a distributed sample's range?
 
 ### Answer
+
+distractor: There is no audible cost; adjacent slices always remain seamless.
 
 The sample may no longer connect smoothly with the samples before and after it
 when you play the slices in sequence.
@@ -8050,6 +7012,8 @@ In sampler terms, what is "chopping"?
 
 ### Answer
 
+distractor: Restoring split samples to their original order without changing timing.
+
 Rearranging broken-up samples, or shifting their playback timing, to create new
 phrases -- a technique unique to samplers.
 
@@ -8064,6 +7028,8 @@ What does setting your auto-chopped samples to the same group unlock when you ta
 the pads freely?
 
 ### Answer
+
+distractor: Every slice layers over the previous one, even when grouped.
 
 Each new tap cuts off the previous slice, so you can perform as if you were
 rearranging the song itself.
@@ -8108,6 +7074,8 @@ chosen points?
 
 ### Answer
 
+distractor: Record onto one pad and let the unit divide it at fixed intervals afterward.
+
 In Sampling mode select `AUTO TRIGGER` or `MANUAL TRIGGER`, press one empty pad,
 input the phrase, and press the next empty pad at each point where you want a
 split.
@@ -8123,6 +7091,8 @@ In the split-at-your-own-timing procedure, when does recording start with
 `MANUAL TRIGGER`, and when with `AUTO TRIGGER`?
 
 ### Answer
+
+distractor: Both trigger modes wait for the input phrase before recording starts.
 
 With `MANUAL TRIGGER`, recording starts the moment you press the first empty pad;
 with `AUTO TRIGGER`, it starts when the phrase is input.
@@ -8242,6 +7212,8 @@ change its value?
 
 ### Answer
 
+distractor: Left/right selects an item; up/down changes its setting.
+
 The up/down directional buttons select an item; the left/right buttons change the
 selected item's setting.
 
@@ -8256,6 +7228,8 @@ Describe the `AUTO Trig Lv` setting: what it controls, its range in levels and i
 dB, and its default.
 
 ### Answer
+
+distractor: It controls pad LED brightness from 0 to 4.
 
 When `AUTO TRIGGER` is selected in Sampling mode, it sets the volume at which
 recording starts automatically -- 5 levels from 1 to 5, spanning -28 dB to -12 dB
@@ -8294,6 +7268,8 @@ lowest value?
 
 ### Answer
 
+distractor: It has levels 1-5 and defaults to 5.
+
 It sets the brightness of the pad and button LEDs in 5 levels from 0 to 4, where
 0 means unlit. The default is 3.
 
@@ -8326,6 +7302,8 @@ tags: leveling-up, core
 What values can `APO Time` take, and which is the default?
 
 ### Answer
+
+distractor: 30 minutes, 3 hours, 6 hours, or off; default 3 hours.
 
 20 minutes, 1 hour, 2 hours, or off. The default is 20 minutes.
 
@@ -8363,6 +7341,8 @@ batteries?
 
 ### Answer
 
+distractor: It shows an exact voltage on USB and a numeric battery percentage on batteries.
+
 On USB power it shows a power-cord icon; on batteries it shows the remaining
 charge in 3 levels.
 
@@ -8396,6 +7376,8 @@ How do you make the `SERIAL No.` item show the serial number?
 
 ### Answer
 
+distractor: The serial number appears automatically and can be edited with left/right.
+
 Press the right directional button on the `SERIAL No.` item. It is view only.
 !SXC1-DECK 092-lvl-10.ex.md
 # Hands on the system settings
@@ -8404,7 +7386,7 @@ deck: lvl-10
 chapter: Part: Leveling up
 tier: core
 requires: pad-01
-summary: Open the system settings yourself, look up the reference values, and turn Beat Sync ON.
+summary: Open the system settings, understand the key values, and turn Beat Sync ON.
 cite: guide-book 55 "In Performance mode, long-press the `EDIT` button"
 
 You have read what every system setting does -- now drive the screen yourself.
@@ -8422,6 +7404,8 @@ On the `Initialize` item, what is the confirmation procedure, and what happens t
 the unit once it runs?
 
 ### Answer
+
+distractor: Press right, then confirm with `B`; sampled data is preserved.
 
 Press the right directional button, then confirm with the `A` button. The unit
 restarts in its factory default state -- and the data you have sampled is
@@ -8471,57 +7455,6 @@ Press the `EDIT` button again to exit the system settings.
 Every remaining setting on this unit -- trigger level, Beat Sync, MIDI channels,
 even Initialize -- lives behind this same long-press. Once this screen feels
 routine, the rest of the chapter is just picking items.
-
-## Ranges and defaults, all in one place
-
-type: lookup
-id: l-5-02
-find: guide-book 55 "Sets the brightness of the display in 5 levels from 1 to 5"
-limit: 90
-tags: leveling-up, core
-
-Find the reference that lists every system setting on one screenful, and use it
-to answer: which items have a default of 3, and which single item defaults to
-its maximum value?
-
-### Hint
-
-Long-press the `EDIT` button in Performance mode and compare the screen against
-the matching section of the Guide Book -- it walks the items in the same order,
-each with its range and default.
-
-## The AUTO Trig Lv dB table
-
-type: lookup
-id: l-5-03
-find: guide-book 55 "-28 dB to -12 dB in 4 dB steps"
-limit: 60
-tags: leveling-up, stretch
-
-`AUTO Trig Lv` runs from 1 to 5, but those are just level numbers. Find the spot
-in the Guide Book that says what the levels mean in dB, and work out which dB
-value level 1 corresponds to.
-
-### Hint
-
-Look inside the system-settings reference, in the entry for the automatic
-trigger level -- the dB span and step size are given in parentheses.
-
-## Where to read the firmware version and serial number
-
-type: lookup
-id: l-5-06
-find: guide-book 55 "Displays the firmware version (view only)"
-limit: 60
-tags: leveling-up, intro
-
-Support asks for your firmware version and serial number. Find where the Guide
-Book says both can be read on the unit itself, and note the extra button press
-one of them needs.
-
-### Hint
-
-Both live at the bottom of the system-settings list, as view-only items.
 
 ## Turn Beat Sync ON
 
@@ -8704,6 +7637,8 @@ the manual tell you to do?
 
 ### Answer
 
+distractor: Force the included cable into the POWER/DATA port instead.
+
 See the support page.
 
 ## Launch order for app and unit
@@ -8717,6 +7652,8 @@ In what order do you start the app and this unit, and how do you know the link
 worked?
 
 ### Answer
+
+distractor: Turn on the unit first, then launch the app.
 
 Launch the app first, then turn on this unit's power. The app's pads are
 displayed to match the state of the unit.
@@ -8772,38 +7709,6 @@ The app opens up file import, sequence editing, backup, and firmware updates --
 none of which the unit can do alone. The launch order matters: the app is running
 before the unit powers up, so it can read the unit's state as it boots.
 
-## Where to download the app
-
-type: lookup
-id: l-5-07
-find: guide-book 56 "https://www.casio.com/jp/support/creator-economy/sampler/content/application/"
-limit: 60
-tags: leveling-up, intro
-
-Find where the Guide Book gives the download location for the CASIO Sampler App,
-and note the two forms it offers (one to scan, one to type).
-
-### Hint
-
-Look at the start of the dedicated-app section, right under its title -- the
-scannable form is printed beside the words "Download here".
-
-## If the included cable will not connect
-
-type: lookup
-id: l-5-08
-find: guide-book 56 "If you cannot connect with the included USB Type-C cable, see the support page."
-limit: 60
-tags: leveling-up, intro
-
-Find the note that says what to do when the included USB Type-C cable will not
-connect to your smartphone.
-
-### Hint
-
-It is a note in the "Connect this unit to your smartphone" part of the
-dedicated-app section, right by the connection figure.
-
 ## Starting an assignment in the app
 
 type: quiz
@@ -8834,6 +7739,8 @@ The app is open but you do not see the pad grid. How do you get to the pad view?
 
 ### Answer
 
+distractor: Select the Home tab at the top of the screen.
+
 Select the Pad tab in the tab bar at the bottom of the screen.
 
 ## The two assignment sources
@@ -8847,6 +7754,8 @@ After you tap "Assign Sound", a window for choosing the source appears. What are
 its two source options?
 
 ### Answer
+
+distractor: “Record from microphone” and “Stream from cloud”.
 
 "Select from file" and "Select from another bank".
 
@@ -8924,22 +7833,6 @@ On the unit alone, moving a sound between banks means resampling it. The app
 does the same job in three taps -- it is the fast way to gather favorite
 sounds into one custom bank.
 
-## Which file formats "Select from file" accepts
-
-type: lookup
-id: l-5-09
-find: guide-book 57 "WAV, MP3, and FLAC sound files or .cswp files can be used"
-limit: 60
-tags: leveling-up, core
-
-Find the note in the app's assignment procedure that lists exactly which sound
-file types "Select from file" can use.
-
-### Hint
-
-It is a footnote to the source-choosing window in the "Assign samples to pads"
-procedure of the dedicated-app section.
-
 ## Copying a sample within a bank
 
 type: quiz
@@ -8970,6 +7863,8 @@ Is the app's sample copy limited to the bank you are looking at?
 
 ### Answer
 
+distractor: Yes — swipe copying works only inside the current bank.
+
 No -- besides the swipe copy within a bank, you can also copy to another bank
 ("Copy to another bank").
 
@@ -8984,6 +7879,8 @@ The manual suggests copying a single piano note to several pads. What do you do
 to the copies, and what does it get you?
 
 ### Answer
+
+distractor: Give every copy the same GROUP number; pitch should remain unchanged.
 
 Change each copy's pitch in SOUND EDIT, so the pads hold the same note at
 different pitches -- pad play with a keyboard-like feel.
@@ -9071,6 +7968,8 @@ does the slider add?
 
 ### Answer
 
+distractor: Use the FX dials; the waveform cannot be zoomed.
+
 You adjust the start/end points by swiping the waveform; the slider zooms in on
 the waveform, allowing highly precise adjustment.
 
@@ -9085,6 +7984,8 @@ What does the app's sequence view (the Sequence tab) display, and how do you
 enter notes there?
 
 ### Answer
+
+distractor: It shows only one track for the currently selected pad.
 
 It displays tracks for all pads, and you enter notes by tapping the cells --
 just as on this unit.
@@ -9119,6 +8020,8 @@ Long-pressing a *measure number* in the app's sequence view opens a menu. What
 five operations does it offer?
 
 ### Answer
+
+distractor: Cut, Copy, Paste, and Duplicate to next measure — exactly the pad-number menu.
 
 Cut, Copy, Paste, Clear, and Disable measure. (The pad-number long-press menu
 differs: its fourth item is Duplicate to next measure instead of Disable
@@ -9164,22 +8067,6 @@ The grid, menus, and unit stay mirrored, so everything you build here is
 immediately playable from the unit's own `▶/■` -- the app is a bigger window
 onto the same sequence, not a separate project.
 
-## What the long-press menus offer
-
-type: lookup
-id: l-5-10
-find: guide-book 59 "Long-press a pad number or measure number to display the edit window"
-limit: 60
-tags: leveling-up, core
-
-Find where the Guide Book lists the app sequencer's two long-press menus, and
-spot the one operation each menu has that the other lacks.
-
-### Hint
-
-Look in the dedicated-app section's sequence-creation part -- the two menus are
-spelled out beside the sequencer-grid figure.
-
 ## Everything data organization can do
 
 type: quiz
@@ -9191,6 +8078,8 @@ Beyond copying and deleting the banks and sequences you have created, what else
 can the app's data organization do?
 
 ### Answer
+
+distractor: It can only rename banks; it cannot download or assign data.
 
 Download them to your smartphone, assign downloaded data to this unit, and
 rename the banks and sequences displayed in the app.
@@ -9225,6 +8114,8 @@ What five operations does the app's sequence management menu offer?
 
 ### Answer
 
+distractor: Play Sequence, Stop Sequence, and Change Tempo.
+
 Assign Sequence, Delete Sequence, Copy Sequence, Download, and Rename.
 
 ## Updating the unit's software
@@ -9238,6 +8129,8 @@ A software update is available for this unit. From where in the app can you
 apply it?
 
 ### Answer
+
+distractor: From the Settings tab; Home never offers updates.
 
 From the Home tab -- if an update is available for this unit's software, it can
 be applied easily from there.
@@ -9266,6 +8159,8 @@ Behind the gear icon, the app's settings screen configures and updates the
 sampler. What six entries does it offer?
 
 ### Answer
+
+distractor: Only UI Language and MIDI Channel.
 
 System Update, System Information, Unit Settings, Backup, Restore, and System
 Initialization.
@@ -9310,35 +8205,3 @@ Confirm with the `A` button.
 Initialize is the only way back to a known-clean state, and the app's Backup /
 Restore pair is what makes it survivable -- the sampled data it deletes cannot
 be recovered any other way.
-
-## Sequence management, from the book
-
-type: lookup
-id: l-5-11
-find: guide-book 60 "Assign Sequence / Delete Sequence / Copy Sequence / Download / Rename"
-limit: 60
-tags: leveling-up, core
-
-Find where the Guide Book lists the app's sequence management menu, and read off
-which of its operations moves a sequence *to* the smartphone.
-
-### Hint
-
-It is in the dedicated-app section's data-organization part -- the menu opens
-from the "⋮" next to a sequence's name.
-
-## The settings screen, from the book
-
-type: lookup
-id: l-5-12
-find: guide-book 60 "Configure and update the sampler."
-limit: 60
-tags: leveling-up, core
-
-Find the figure caption listing everything on the app's settings screen, and
-check which entry you would use after an Initialize to bring your data back.
-
-### Hint
-
-Look at the very end of the dedicated-app section, under updates and settings --
-the list sits beside the gear-icon callout.
