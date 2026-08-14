@@ -92,7 +92,24 @@ The contract is in [`docs/FLASHCARD-FLOW.md`](docs/FLASHCARD-FLOW.md).
 This optimized M11 artifact is deployed at the Vercel mirror below and passed the
 complete 135/135 local gate plus 73/73 assertions against production.
 
-**Current (M14 Sample Library + named projects).** `#/samples` now keeps one
+**Current (M15 Phone Bridge + resumable handoff).** The computer's **Send
+project to phone** action shares the existing schema-1 `.sxc1lab` file through
+the native file share sheet when available and saves the same file otherwise.
+Opening that project on the phone enters handoff review directly. Each pad now
+offers only **Share/Skip**, then replaces that pair with **Loaded/Problem** after
+the file leaves SEXY ONE; the outcome itself advances to the next unresolved
+destination. The exact cursor and a Loaded/Problem/Skipped receipt survive app
+switching and reloads in a bounded, independently repairable local ledger.
+Loaded rows remain complete when unresolved rows are retried, and changing a
+pad destination or sound safely returns only that changed row to pending.
+`.sxc1lab` remains schema 1 and no server, account, or CASIO protocol imitation
+is introduced. The optimized artifact passed the complete 136/136 release gate
+with 241/241 browser assertions at both root and nested paths, including the real
+project send/import controls, exact-cursor reload, receipt retry, ledger repair,
+offline cache, Japanese UI, and the 320 px mobile sweep. See
+[`docs/PHONE-BRIDGE.md`](docs/PHONE-BRIDGE.md).
+
+**M14 Sample Library + named projects.** `#/samples` keeps one
 searchable local catalog shared by up to 32 projects. Identical imports reuse
 the same IndexedDB audio; legacy M12/M13 sounds are fingerprinted lazily only
 when a same-size import makes a duplicate possible, so the upgrade adds no
@@ -1403,11 +1420,11 @@ measured at an earlier milestone's close say so):
 | M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
 | Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 134,299 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
-| Deferred `sample-lab.js` module | 101,279 bytes raw / **25,388 bytes gzipped** — loaded only after trainer interactivity |
+| Deferred `sample-lab.js` module | 118,090 bytes raw / **28,679 bytes gzipped** — loaded only after trainer interactivity |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,184,010 bytes (≈13.2 MB) |
-| `check-site.sh`, full run (**136** checks, both browser sweeps of 108 routes, **240** browser assertions per served stage incl. real offline boot, Sample Library/Inbox migration, deduplication and project round-trip, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and manuals) | ≈2–3 min |
-| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **240** assertions per stage / **9** named `ja course:` (JAC1–JAC9, including mastery, Weekly Pulse, Sample Inbox, and Sample Library) / **4** named `ja manual:` (JAM1–JAM4) per stage |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,202,237 bytes (≈13.2 MB) |
+| `check-site.sh`, full run (**136** checks, both browser sweeps of 108 routes, **241** browser assertions per served stage incl. real offline boot, resumable Phone Bridge receipt, Sample Library/Inbox migration, deduplication and project round-trip, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and manuals) | ≈2–3 min |
+| Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **241** assertions per stage / **9** named `ja course:` (JAC1–JAC9, including mastery, Weekly Pulse, Sample Inbox/Phone Bridge, and Sample Library) / **4** named `ja manual:` (JAM1–JAM4) per stage |
 | `exe:exercise-check --bundle-structural-diff` (EN/JA exercise corpus) / `--manual-structural-diff` (EN/JA manual documents, the reader's own parser) | **51/51** checks (1 + one per live deck) / **109/109** checks (1 + one per page), each with its own negative controls |
 | `node scripts/browser-check.mjs --self-test` / `--self-test-negative` | **198/198** assertions / **42/42** sabotage passes, each catching exactly its own mapped assertion(s) |
 | `exe:content-check --self-test` | **412/412** checks |

@@ -9,6 +9,7 @@ const ROUTE = "#/samples";
 const META_KEY = "sxc1.sample-lab.v1";
 const WORKSPACE_KEY = "sxc1.sample-workspace.v1";
 const LIBRARY_KEY = "sxc1.sample-library.v1";
+const HANDOFF_KEY = "sxc1.sample-handoffs.v1";
 const DB_NAME = "sxc1-sample-lab";
 const DB_VERSION = 1;
 const DB_STORE = "audio";
@@ -20,6 +21,8 @@ const MAX_BATCH_FILES = 64;
 const MAX_PROJECTS = 32;
 const MAX_LIBRARY_ITEMS = 2048;
 const MAX_INBOX_ITEMS = 256;
+const MAX_HANDOFF_SESSIONS = 32;
+const MAX_HANDOFF_ENTRIES = 64;
 const SLOT_NAMES = ["A", "B", "C", "D"];
 const SUPPORTED_EXTENSIONS = new Set(["wav", "mp3", "flac", "cswp"]);
 
@@ -128,8 +131,10 @@ const COPY = {
     supported: "Supported by CASIO app",
     retained: "Retained as project data",
     recommendWav: "For the closest hardware match, export 48 kHz / 16-bit PCM WAV from Audacity.",
-    saveShare: "Save / share project",
-    handoff: "Phone handoff",
+    saveShare: "Send project to phone",
+    handoff: "Start phone handoff",
+    resumeHandoff: "Resume phone handoff",
+    reviewReceipt: "Review handoff receipt",
     tools: "Project tools",
     importProject: "Import .sxc1lab project",
     usage: "Storage",
@@ -168,14 +173,33 @@ const COPY = {
     step2: "Open the destination bank and pad, choose Assign Sound, then Select from file.",
     step3: "Share or download this original audio file, select it in CASIO's app, and confirm the assignment there.",
     shareFile: "Share this file",
-    downloadFile: "Download this file",
-    nextPad: "Next pad",
-    finish: "Finish handoff",
+    downloadFile: "Save this file",
+    skipPad: "Skip for now",
+    loadedPad: "Loaded",
+    problemPad: "Problem",
+    awaitingConfirm: "File sent — confirm what happened in CASIO Sampler App.",
+    skippedPad: "Skipped {destination}.",
+    loadedPadStatus: "Loaded {destination}; continuing.",
+    problemPadStatus: "Marked {destination} as a problem; continuing.",
+    receiptEyebrow: "HANDOFF RECEIPT",
+    receiptTitle: "Handoff reviewed",
+    receiptComplete: "All {total} pads are marked loaded.",
+    receiptPartial: "{loaded} loaded · {problem} problem · {skipped} skipped",
+    receiptLoaded: "Loaded",
+    receiptProblem: "Problem",
+    receiptSkipped: "Skipped",
+    retryUnresolved: "Retry unresolved",
+    finish: "Back to planner",
+    handoffSaved: "Handoff progress is saved on this device.",
     progress: "Pad {current} of {total}",
     noPreview: "This file can travel with the project but cannot be previewed in this browser.",
     previewFailed: "Browser preview is unavailable for this file; its original bytes are still safe.",
     playing: "Playing {name}",
     downloadReady: "Downloaded {name}",
+    sharedReady: "Shared {name}",
+    projectDownloaded: "Project saved — move the .sxc1lab file to your phone and open it in SEXY ONE.",
+    projectShared: "Project shared. Open the .sxc1lab file on your phone to continue.",
+    shareCancelled: "Sharing was cancelled; nothing changed.",
   },
   ja: {
     homeTitle: "サンプルライブラリを作る",
@@ -281,8 +305,10 @@ const COPY = {
     supported: "CASIOアプリ対応形式",
     retained: "プロジェクトデータとして保持",
     recommendWav: "ハードウェアに合わせる場合は、Audacityから48 kHz / 16-bit PCM WAVで書き出してください。",
-    saveShare: "プロジェクトを保存／共有",
-    handoff: "スマートフォンへ",
+    saveShare: "プロジェクトをスマートフォンへ送る",
+    handoff: "スマートフォンで引き渡し開始",
+    resumeHandoff: "スマートフォンで引き渡し再開",
+    reviewReceipt: "引き渡し記録を確認",
     tools: "プロジェクトツール",
     importProject: ".sxc1labプロジェクトを読み込む",
     usage: "ストレージ",
@@ -322,13 +348,32 @@ const COPY = {
     step3: "元の音声ファイルを共有またはダウンロードし、CASIOアプリで選んで確定します。",
     shareFile: "このファイルを共有",
     downloadFile: "このファイルを保存",
-    nextPad: "次のパッド",
-    finish: "引き渡し完了",
+    skipPad: "今はスキップ",
+    loadedPad: "読み込み済み",
+    problemPad: "問題あり",
+    awaitingConfirm: "ファイルを送りました。CASIO Sampler Appでの結果を確認してください。",
+    skippedPad: "{destination}をスキップしました。",
+    loadedPadStatus: "{destination}を読み込み済みにして次へ進みます。",
+    problemPadStatus: "{destination}を問題ありとして次へ進みます。",
+    receiptEyebrow: "引き渡し記録",
+    receiptTitle: "引き渡し確認済み",
+    receiptComplete: "{total}パッドすべてを読み込み済みにしました。",
+    receiptPartial: "読み込み済み {loaded} · 問題あり {problem} · スキップ {skipped}",
+    receiptLoaded: "読み込み済み",
+    receiptProblem: "問題あり",
+    receiptSkipped: "スキップ",
+    retryUnresolved: "未解決項目を再試行",
+    finish: "パッド配置へ戻る",
+    handoffSaved: "引き渡しの進捗はこの端末に保存されます。",
     progress: "{total}件中 {current}件目",
     noPreview: "プロジェクトには保存できますが、このブラウザでは試聴できません。",
     previewFailed: "ブラウザで試聴できませんが、元のファイルはそのまま保持されています。",
     playing: "再生中：{name}",
     downloadReady: "保存しました：{name}",
+    sharedReady: "共有しました：{name}",
+    projectDownloaded: ".sxc1labファイルを保存しました。スマートフォンへ移し、SEXY ONEで開いてください。",
+    projectShared: "プロジェクトを共有しました。スマートフォンで.sxc1labファイルを開いて続けてください。",
+    shareCancelled: "共有をキャンセルしました。変更はありません。",
   },
 };
 
@@ -338,6 +383,8 @@ let strings = COPY.en;
 let state = null;
 let workspace = null;
 let libraryState = null;
+let handoffState = null;
+let handoffSession = null;
 let overlay = null;
 let db = null;
 let persistentAudio = true;
@@ -390,6 +437,68 @@ function defaultWorkspace(project = defaultProject()) {
 
 function defaultLibrary() {
   return { schema: 1, items: [], updatedAt: new Date().toISOString() };
+}
+
+function defaultHandoffState() {
+  return { schema: 1, sessions: [], updatedAt: new Date().toISOString() };
+}
+
+function normalizeHandoffEntry(raw) {
+  if (!raw || typeof raw !== "object" || typeof raw.key !== "string" || !raw.key) return null;
+  const status = ["pending", "shared", "loaded", "problem", "skipped"].includes(raw.status)
+    ? raw.status
+    : "pending";
+  return {
+    key: raw.key.slice(0, 320),
+    slot: SLOT_NAMES.includes(raw.slot) ? raw.slot : "A",
+    bank: clampInt(raw.bank, 15, 80, 15),
+    pad: clampInt(raw.pad, 1, 16, 1),
+    blobId: String(raw.blobId || "").slice(0, 180),
+    name: String(raw.name || "Sample").slice(0, 80),
+    originalName: String(raw.originalName || "sample").slice(0, 240),
+    status,
+    sharedAt: typeof raw.sharedAt === "string" ? raw.sharedAt : "",
+    resolvedAt: typeof raw.resolvedAt === "string" ? raw.resolvedAt : "",
+  };
+}
+
+function normalizeHandoffSession(raw) {
+  if (!raw || typeof raw !== "object" || typeof raw.projectId !== "string" || !raw.projectId) return null;
+  const entries = [];
+  const keys = new Set();
+  if (Array.isArray(raw.entries)) {
+    raw.entries.slice(0, MAX_HANDOFF_ENTRIES).forEach((candidate) => {
+      const entry = normalizeHandoffEntry(candidate);
+      if (entry && !keys.has(entry.key)) {
+        keys.add(entry.key);
+        entries.push(entry);
+      }
+    });
+  }
+  return {
+    projectId: raw.projectId.slice(0, 180),
+    entries,
+    currentKey: keys.has(raw.currentKey) ? raw.currentKey : "",
+    startedAt: typeof raw.startedAt === "string" ? raw.startedAt : new Date().toISOString(),
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
+    finishedAt: typeof raw.finishedAt === "string" ? raw.finishedAt : "",
+  };
+}
+
+function normalizeHandoffState(raw) {
+  const result = defaultHandoffState();
+  const projectIds = new Set();
+  if (raw && typeof raw === "object" && Array.isArray(raw.sessions)) {
+    raw.sessions.slice(0, MAX_HANDOFF_SESSIONS).forEach((candidate) => {
+      const session = normalizeHandoffSession(candidate);
+      if (session && !projectIds.has(session.projectId)) {
+        projectIds.add(session.projectId);
+        result.sessions.push(session);
+      }
+    });
+  }
+  if (raw && typeof raw.updatedAt === "string") result.updatedAt = raw.updatedAt;
+  return result;
 }
 
 function normalizePad(raw) {
@@ -557,6 +666,7 @@ function loadWorkspace() {
   try {
     workspace = normalizeWorkspace(readJson(WORKSPACE_KEY), readJson(META_KEY));
     libraryState = normalizeLibrary(readJson(LIBRARY_KEY));
+    handoffState = normalizeHandoffState(readJson(HANDOFF_KEY));
     seedLibraryFromProjects();
     state = workspace.projects.find((project) => project.id === workspace.activeProjectId) || workspace.projects[0];
     workspace.activeProjectId = state.id;
@@ -565,8 +675,16 @@ function loadWorkspace() {
     state = defaultProject();
     workspace = defaultWorkspace(state);
     libraryState = defaultLibrary();
+    handoffState = defaultHandoffState();
   }
   return state;
+}
+
+function persistHandoffs() {
+  handoffState.updatedAt = new Date().toISOString();
+  try { localStorage.setItem(HANDOFF_KEY, JSON.stringify(handoffState)); }
+  catch (_) { persistentAudio = false; }
+  publishDiagnostics();
 }
 
 function persistProject() {
@@ -607,6 +725,7 @@ function switchProject(projectId) {
   armedPlacement = null;
   librarySelection = null;
   libraryEditing = false;
+  handoffSession = null;
   state = next;
   workspace.activeProjectId = next.id;
   persistProject();
@@ -628,6 +747,7 @@ function createProject(name) {
   armedPlacement = null;
   librarySelection = null;
   libraryEditing = false;
+  handoffSession = null;
   persistProject();
   renderPlanner();
   announce(strings.projectCreated);
@@ -639,12 +759,16 @@ async function deleteCurrentProject() {
   const index = workspace.projects.findIndex((project) => project.id === state.id);
   if (index < 0) return;
   stopPreview();
+  const deletedProjectId = state.id;
   workspace.projects.splice(index, 1);
   state = workspace.projects[Math.min(index, workspace.projects.length - 1)];
   workspace.activeProjectId = state.id;
   armedPlacement = null;
   librarySelection = null;
   libraryEditing = false;
+  handoffSession = null;
+  handoffState.sessions = handoffState.sessions.filter((session) => session.projectId !== deletedProjectId);
+  persistHandoffs();
   persistProject();
   renderPlanner();
   announce(strings.projectDeleted);
@@ -896,6 +1020,150 @@ function allAssignedPads() {
     }
   });
   return rows;
+}
+
+function handoffRowKey(row) {
+  return JSON.stringify([row.slot, row.bank, row.pad, row.data.blobId]);
+}
+
+function handoffCounts(session = handoffSession) {
+  const counts = { total: 0, pending: 0, shared: 0, loaded: 0, problem: 0, skipped: 0 };
+  (session?.entries || []).forEach((entry) => {
+    counts.total += 1;
+    counts[entry.status] += 1;
+  });
+  counts.unresolved = counts.pending + counts.shared + counts.problem + counts.skipped;
+  return counts;
+}
+
+function savedHandoffForProject(projectId = state?.id) {
+  return handoffState?.sessions.find((session) => session.projectId === projectId) || null;
+}
+
+function handoffMatchesRows(session, rows = allAssignedPads()) {
+  if (!session || session.entries.length !== rows.length) return false;
+  return session.entries.every((entry, index) => entry.key === handoffRowKey(rows[index]));
+}
+
+function handoffButtonLabel() {
+  const session = savedHandoffForProject();
+  if (!handoffMatchesRows(session)) return strings.handoff;
+  const counts = handoffCounts(session);
+  if (counts.pending + counts.shared === 0 && counts.total > 0) return strings.reviewReceipt;
+  if (session.entries.some((entry) => entry.status !== "pending")) return strings.resumeHandoff;
+  return strings.handoff;
+}
+
+function syncHandoffSession(rows = allAssignedPads()) {
+  const previous = savedHandoffForProject();
+  const previousEntries = new Map((previous?.entries || []).map((entry) => [entry.key, entry]));
+  const now = new Date().toISOString();
+  const entries = rows.slice(0, MAX_HANDOFF_ENTRIES).map((row) => {
+    const key = handoffRowKey(row);
+    const saved = previousEntries.get(key);
+    return normalizeHandoffEntry({
+      key,
+      slot: row.slot,
+      bank: row.bank,
+      pad: row.pad,
+      blobId: row.data.blobId,
+      name: row.data.name,
+      originalName: row.data.originalName,
+      status: saved?.status || "pending",
+      sharedAt: saved?.sharedAt || "",
+      resolvedAt: saved?.resolvedAt || "",
+    });
+  });
+  const changed = !previous || previous.entries.length !== entries.length
+    || entries.some((entry, index) => previous.entries[index]?.key !== entry.key);
+  let currentKey = entries.some((entry) => entry.key === previous?.currentKey
+      && ["pending", "shared"].includes(entry.status))
+    ? previous.currentKey
+    : entries.find((entry) => ["pending", "shared"].includes(entry.status))?.key || "";
+  const finished = entries.length > 0 && entries.every((entry) => ["loaded", "problem", "skipped"].includes(entry.status));
+  if (finished) currentKey = "";
+  const session = {
+    projectId: state.id,
+    entries,
+    currentKey,
+    startedAt: previous?.startedAt || now,
+    updatedAt: now,
+    finishedAt: finished ? (changed ? now : previous?.finishedAt || now) : "",
+  };
+  const index = handoffState.sessions.findIndex((candidate) => candidate.projectId === state.id);
+  if (index >= 0) handoffState.sessions[index] = session;
+  else {
+    handoffState.sessions.push(session);
+    if (handoffState.sessions.length > MAX_HANDOFF_SESSIONS) {
+      handoffState.sessions.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+      handoffState.sessions.length = MAX_HANDOFF_SESSIONS;
+    }
+  }
+  handoffSession = session;
+  persistHandoffs();
+  return session;
+}
+
+function currentHandoffEntry() {
+  return handoffSession?.entries.find((entry) => entry.key === handoffSession.currentKey) || null;
+}
+
+function nextHandoffEntry(afterKey = "") {
+  const entries = handoffSession?.entries || [];
+  const start = Math.max(-1, entries.findIndex((entry) => entry.key === afterKey));
+  for (let offset = 1; offset <= entries.length; offset += 1) {
+    const entry = entries[(start + offset) % entries.length];
+    if (["pending", "shared"].includes(entry.status)) return entry;
+  }
+  return null;
+}
+
+function finishOrAdvanceHandoff(message = "") {
+  const next = nextHandoffEntry(handoffSession.currentKey);
+  handoffSession.currentKey = next?.key || "";
+  handoffSession.updatedAt = new Date().toISOString();
+  handoffSession.finishedAt = next ? "" : handoffSession.updatedAt;
+  persistHandoffs();
+  if (next) renderHandoff(); else renderHandoffReceipt();
+  if (message) announce(message);
+}
+
+function markCurrentHandoff(status) {
+  if (!handoffSession || !["loaded", "problem", "skipped"].includes(status)) return;
+  const entry = currentHandoffEntry();
+  if (!entry) return;
+  const destination = `${entry.slot} / BANK ${entry.bank} / PAD ${entry.pad}`;
+  entry.status = status;
+  entry.resolvedAt = new Date().toISOString();
+  const message = status === "loaded"
+    ? fill(strings.loadedPadStatus, { destination })
+    : status === "problem"
+      ? fill(strings.problemPadStatus, { destination })
+      : fill(strings.skippedPad, { destination });
+  finishOrAdvanceHandoff(message);
+}
+
+function retryUnresolvedHandoff() {
+  if (!handoffSession) return;
+  handoffSession.entries.forEach((entry) => {
+    if (entry.status !== "loaded") {
+      entry.status = "pending";
+      entry.sharedAt = "";
+      entry.resolvedAt = "";
+    }
+  });
+  handoffSession.currentKey = handoffSession.entries.find((entry) => entry.status === "pending")?.key || "";
+  handoffSession.finishedAt = "";
+  handoffSession.updatedAt = new Date().toISOString();
+  persistHandoffs();
+  renderHandoff();
+}
+
+function beginHandoff() {
+  const rows = allAssignedPads();
+  if (!rows.length) { renderPlanner(); announce(strings.noPads, "warning"); return; }
+  syncHandoffSession(rows);
+  if (currentHandoffEntry()) renderHandoff(); else renderHandoffReceipt();
 }
 
 function referencedBlobIds(project = state) {
@@ -1895,7 +2163,7 @@ function projectTools() {
   importInput.hidden = true;
   importInput.addEventListener("change", async () => {
     const file = importInput.files?.[0];
-    if (file) await importProjectFile(file);
+    if (file) await importProjectFile(file, { openHandoff: true });
     importInput.value = "";
   });
   const importLabel = el("button", "sample-button sample-button-secondary", strings.importProject);
@@ -1923,19 +2191,21 @@ function plannerFooter() {
   save.id = "btn-sample-project-export";
   save.type = "button";
   save.addEventListener("click", exportAndShareProject);
-  const handoff = el("button", "sample-button sample-button-primary", strings.handoff);
+  const handoff = el("button", "sample-button sample-button-primary", handoffButtonLabel());
   handoff.id = "btn-sample-handoff";
   handoff.type = "button";
   handoff.addEventListener("click", async () => {
     if (!allAssignedPads().length) { announce(strings.noPads, "warning"); return; }
     stopPreview();
     announce(strings.checking);
+    const saved = savedHandoffForProject();
+    const resuming = handoffMatchesRows(saved)
+      && saved.entries.some((entry) => entry.status !== "pending");
     const report = await validateProject();
-    if (report.issues.length) renderValidation(report);
-    else {
-      handoffIndex = 0;
-      renderHandoff();
-    }
+    if (report.blocking) renderValidation(report);
+    else if (resuming) beginHandoff();
+    else if (report.issues.length) renderValidation(report);
+    else beginHandoff();
   });
   actions.append(save, handoff);
   footer.append(actions, projectTools());
@@ -2107,8 +2377,10 @@ async function exportAndShareProject() {
     const blob = await exportProjectBlob();
     const name = projectFilename();
     const file = new File([blob], name, { type: blob.type, lastModified: Date.now() });
-    await shareOrDownload(file, name);
-    announce(strings.exported);
+    const result = await shareOrDownload(file, name);
+    if (result === "shared") announce(strings.projectShared);
+    else if (result === "downloaded") announce(strings.projectDownloaded);
+    else announce(strings.shareCancelled, "warning");
   } catch (_) { announce(strings.readFailed, "warning"); }
 }
 
@@ -2137,7 +2409,7 @@ async function readProjectManifest(file) {
   return { manifest, project, payloadOffset: 12 + manifestLength };
 }
 
-async function importProjectFile(file) {
+async function importProjectFile(file, options = {}) {
   try {
     const parsed = await readProjectManifest(file);
     const existing = workspace.projects.findIndex((project) => project.id === parsed.project.id);
@@ -2170,9 +2442,14 @@ async function importProjectFile(file) {
     armedPlacement = null;
     librarySelection = null;
     libraryEditing = false;
+    handoffSession = null;
     persistProject();
     stopPreview();
-    renderPlanner();
+    if (options?.openHandoff === true && allAssignedPads().length) {
+      const report = await validateProject();
+      if (report.issues.length) renderValidation(report);
+      else beginHandoff();
+    } else renderPlanner();
     announce(strings.imported);
     return true;
   } catch (_) {
@@ -2256,8 +2533,7 @@ function renderValidation(report) {
     proceed.id = "btn-sample-validation-continue";
     proceed.type = "button";
     proceed.addEventListener("click", () => {
-      handoffIndex = 0;
-      renderHandoff();
+      beginHandoff();
     });
     actions.append(proceed);
   }
@@ -2271,7 +2547,13 @@ function renderValidation(report) {
 function renderHandoff() {
   const rows = allAssignedPads();
   if (!rows.length) { renderPlanner(); announce(strings.noPads, "warning"); return; }
-  handoffIndex = Math.min(Math.max(0, handoffIndex), rows.length - 1);
+  if (!handoffSession || handoffSession.projectId !== state.id || !handoffMatchesRows(handoffSession, rows)) {
+    syncHandoffSession(rows);
+  }
+  const entry = currentHandoffEntry();
+  if (!entry) { renderHandoffReceipt(); return; }
+  handoffIndex = rows.findIndex((row) => handoffRowKey(row) === entry.key);
+  if (handoffIndex < 0) { syncHandoffSession(rows); renderHandoff(); return; }
   const row = rows[handoffIndex];
   overlay.dataset.view = "handoff";
   const shell = el("div", "sample-lab-shell sample-handoff-shell");
@@ -2289,6 +2571,7 @@ function renderHandoff() {
   const progress = el("p", "sample-handoff-progress", fill(strings.progress, { current: handoffIndex + 1, total: rows.length }));
   const destination = el("h2", "sample-handoff-destination", `${row.slot} / BANK ${row.bank} / PAD ${row.pad}`);
   destination.id = "sample-handoff-destination";
+  destination.tabIndex = -1;
   card.append(progress, destination, el("strong", "sample-handoff-name", row.data.name));
   const info = el("dl", "sample-handoff-info");
   info.append(el("dt", "", strings.file), el("dd", "", `${row.data.originalName} · ${formatBytes(row.data.bytes)}`));
@@ -2296,37 +2579,120 @@ function renderHandoff() {
   const steps = el("ol", "sample-handoff-steps");
   steps.append(el("li", "", strings.step1), el("li", "", strings.step2), el("li", "", strings.step3));
   card.append(steps);
-  const status = el("p", "sample-status", "");
+  const status = el("p", "sample-status", entry.status === "shared" ? strings.awaitingConfirm : strings.handoffSaved);
   status.id = "sample-lab-status";
   status.setAttribute("aria-live", "polite");
   card.append(status);
   const actions = el("div", "sample-primary-actions");
-  const share = el("button", "sample-button sample-button-secondary", navigator.share ? strings.shareFile : strings.downloadFile);
-  share.id = "btn-sample-share-file";
-  share.type = "button";
-  share.addEventListener("click", async () => {
-    const record = await getAudio(row.data.blobId);
-    if (!record?.blob) { announce(strings.readFailed, "warning"); return; }
-    const file = new File([record.blob], row.data.originalName, { type: row.data.mime || record.blob.type, lastModified: Date.now() });
-    const result = await shareOrDownload(file, row.data.originalName);
-    if (result === "downloaded") announce(fill(strings.downloadReady, { name: row.data.originalName }));
-  });
-  const next = el("button", "sample-button sample-button-primary", handoffIndex === rows.length - 1 ? strings.finish : strings.nextPad);
-  next.id = "btn-sample-next-pad";
-  next.type = "button";
-  next.addEventListener("click", () => {
-    if (handoffIndex >= rows.length - 1) renderPlanner();
-    else { handoffIndex += 1; renderHandoff(); requestAnimationFrame(() => overlay.querySelector("h1")?.focus()); }
-  });
-  actions.append(share, next);
+  if (entry.status === "shared") {
+    const loaded = el("button", "sample-button sample-button-primary", strings.loadedPad);
+    loaded.id = "btn-sample-handoff-loaded";
+    loaded.type = "button";
+    loaded.addEventListener("click", () => markCurrentHandoff("loaded"));
+    const problem = el("button", "sample-button sample-button-danger", strings.problemPad);
+    problem.id = "btn-sample-handoff-problem";
+    problem.type = "button";
+    problem.addEventListener("click", () => markCurrentHandoff("problem"));
+    actions.append(loaded, problem);
+  } else {
+    const share = el("button", "sample-button sample-button-primary", navigator.share && navigator.canShare ? strings.shareFile : strings.downloadFile);
+    share.id = "btn-sample-share-file";
+    share.type = "button";
+    share.addEventListener("click", async () => {
+      Array.from(actions.querySelectorAll("button")).forEach((button) => { button.disabled = true; });
+      const record = await getAudio(row.data.blobId);
+      if (!record?.blob) {
+        Array.from(actions.querySelectorAll("button")).forEach((button) => { button.disabled = false; });
+        announce(strings.readFailed, "warning");
+        return;
+      }
+      const file = new File([record.blob], row.data.originalName, { type: row.data.mime || record.blob.type, lastModified: Date.now() });
+      const result = await shareOrDownload(file, row.data.originalName);
+      if (result === "cancelled") {
+        Array.from(actions.querySelectorAll("button")).forEach((button) => { button.disabled = false; });
+        announce(strings.shareCancelled, "warning");
+        return;
+      }
+      entry.status = "shared";
+      entry.sharedAt = new Date().toISOString();
+      entry.resolvedAt = "";
+      handoffSession.updatedAt = entry.sharedAt;
+      persistHandoffs();
+      renderHandoff();
+      announce(result === "shared"
+        ? fill(strings.sharedReady, { name: row.data.originalName })
+        : fill(strings.downloadReady, { name: row.data.originalName }));
+    });
+    const skip = el("button", "sample-button sample-button-secondary", strings.skipPad);
+    skip.id = "btn-sample-skip-pad";
+    skip.type = "button";
+    skip.addEventListener("click", () => markCurrentHandoff("skipped"));
+    actions.append(share, skip);
+  }
   card.append(actions);
   shell.append(header, heroSection, card);
+  overlay.replaceChildren(shell);
+  destination.focus();
+  publishDiagnostics();
+}
+
+function renderHandoffReceipt() {
+  if (!handoffSession || handoffSession.projectId !== state.id) { beginHandoff(); return; }
+  overlay.dataset.view = "receipt";
+  const counts = handoffCounts();
+  const shell = el("div", "sample-lab-shell sample-handoff-shell sample-receipt-shell");
+  const heroSection = el("section", "sample-hero sample-handoff-hero");
+  heroSection.append(el("p", "sample-eyebrow", strings.receiptEyebrow));
+  const title = el("h1", "", strings.receiptTitle);
+  title.tabIndex = -1;
+  const summaryText = counts.loaded === counts.total
+    ? fill(strings.receiptComplete, { total: counts.total })
+    : fill(strings.receiptPartial, counts);
+  heroSection.append(title, el("p", "sample-lede", summaryText));
+  const card = el("section", "sample-handoff-card sample-receipt-card");
+  card.setAttribute("aria-labelledby", "sample-receipt-heading");
+  const heading = el("h2", "sample-validation-summary", state.name);
+  heading.id = "sample-receipt-heading";
+  card.append(heading);
+  const list = el("ul", "sample-receipt-list");
+  handoffSession.entries.forEach((entry) => {
+    const item = el("li", `is-${entry.status}`);
+    item.dataset.status = entry.status;
+    const destination = el("strong", "", `${entry.slot} / BANK ${entry.bank} / PAD ${entry.pad}`);
+    const name = el("span", "", entry.name);
+    const status = el("span", "sample-receipt-status",
+      entry.status === "loaded" ? strings.receiptLoaded
+        : entry.status === "problem" ? strings.receiptProblem : strings.receiptSkipped);
+    item.append(destination, name, status);
+    list.append(item);
+  });
+  card.append(list);
+  const status = el("p", "sample-status", strings.handoffSaved);
+  status.id = "sample-lab-status";
+  status.setAttribute("aria-live", "polite");
+  card.append(status);
+  const actions = el("div", "sample-primary-actions");
+  if (counts.problem + counts.skipped > 0) {
+    const retry = el("button", "sample-button sample-button-secondary", strings.retryUnresolved);
+    retry.id = "btn-sample-handoff-retry";
+    retry.type = "button";
+    retry.addEventListener("click", retryUnresolvedHandoff);
+    actions.append(retry);
+  }
+  const finish = el("button", "sample-button sample-button-primary", strings.finish);
+  finish.id = "btn-sample-handoff-finish";
+  finish.type = "button";
+  finish.addEventListener("click", renderPlanner);
+  actions.append(finish);
+  card.append(actions);
+  shell.append(projectHeader(), heroSection, card);
   overlay.replaceChildren(shell);
   title.focus();
   publishDiagnostics();
 }
 
 function publishDiagnostics() {
+  const savedHandoff = handoffSession || savedHandoffForProject();
   window.__SXC1_SAMPLE_LAB = {
     ready: started,
     route: ROUTE,
@@ -2342,9 +2708,25 @@ function publishDiagnostics() {
     inboxItems: state ? state.inbox.map((item) => ({ id: item.id, name: item.name, filename: item.originalName, bytes: item.bytes })) : [],
     placement: armedPlacement ? { ...armedPlacement } : null,
     assignedPads: state ? allAssignedPads().map((row) => ({ slot: row.slot, bank: row.bank, pad: row.pad, name: row.data.name, filename: row.data.originalName })) : [],
+    handoff: savedHandoff ? {
+      projectId: savedHandoff.projectId,
+      currentKey: savedHandoff.currentKey,
+      finishedAt: savedHandoff.finishedAt,
+      counts: handoffCounts(savedHandoff),
+      entries: savedHandoff.entries.map((entry) => ({
+        key: entry.key,
+        slot: entry.slot,
+        bank: entry.bank,
+        pad: entry.pad,
+        name: entry.name,
+        filename: entry.originalName,
+        status: entry.status,
+      })),
+    } : null,
     exportProjectBlob,
     importProjectFile,
     validateProject,
+    beginHandoff,
   };
 }
 
@@ -2367,12 +2749,19 @@ export async function startSampleLab(options = {}) {
   try { db = await openDatabase(); }
   catch (_) { persistentAudio = false; }
   persistProject();
+  persistHandoffs();
   enhanceHome();
   setRouteActive();
   window.addEventListener("hashchange", setRouteActive);
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || overlay.hidden) return;
     if (armedPlacement) { event.preventDefault(); cancelPlacement(); return; }
+    if (["validation", "handoff", "receipt"].includes(overlay.dataset.view)) {
+      event.preventDefault();
+      renderPlanner();
+      requestAnimationFrame(() => overlay.querySelector("#btn-sample-handoff")?.focus());
+      return;
+    }
     if (libraryEditing || librarySelection || creatingProject) {
       event.preventDefault();
       libraryEditing = false;

@@ -90,6 +90,11 @@ round of work.
     exactly `Skip for now` / `Yes — done`; Skip records all remaining prompts as
     skipped and due, then continues. Do not make absence from the device look like
     mastery, and do not strand the learner on a repeat-card summary.
+17. Phone handoff never equates sharing a file with loading a pad. Keep the
+    two-step replacement flow `Share/Skip` → `Loaded/Problem`, advance from the
+    recorded outcome without a Next button, and persist the exact cursor plus
+    receipt independently from the project. Retrying unresolved rows must keep
+    Loaded rows complete. See `docs/PHONE-BRIDGE.md`.
 
 ## Regression anchors
 
@@ -113,13 +118,17 @@ round of work.
 - The mobile boot regressions cap initial WASM memory at 24 MiB and impersonate
   an older iPhone engine to prove it receives recovery guidance without an
   `app.wasm` request.
-- The phone-ready regressions require a registered `m14-v2` worker, relative
+- The phone-ready regressions require a registered `m15-v1` worker, relative
   standalone manifest, real network-disabled WASM boot at root and nested scope,
   the visible offline live region, byte-identical `.sxc1` download/file load,
   no pre-commit storage mutation, and a 320 px passport layout.
 - The Weekly Pulse regression pins a three-active-day fixture, four tracked
   answers, exact `[1,0,1,0,0,0,1]` review outlook, strengths, friction,
   due-first focus, Japanese chrome, zero canvases, and both small-phone sweeps.
+- The Phone Bridge regression reloads while Loaded/Problem is pending, resumes
+  the exact destination, records four mixed outcomes with automatic advance,
+  checks the 320 px receipt and retry path, corrupts only the receipt ledger,
+  and opens a portable phone import directly in handoff review.
 
 ## Build, verification, and deployment
 

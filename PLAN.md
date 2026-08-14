@@ -201,6 +201,18 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   136/136 checks with 240/240 browser assertions at both root and nested
   deployment paths, then passed 76/76 against production.
   Contract: `docs/SAMPLE-LIBRARY.md`.
+- **M15 — Phone Bridge + resumable handoff.** Turn the one-pad-at-a-time phone
+  guide into a truthful persisted state machine: send the schema-1 project with
+  native file sharing or a save fallback, open phone imports in handoff review,
+  replace Share/Skip with Loaded/Problem, advance from the outcome itself, and
+  retain the exact cursor plus a Loaded/Problem/Skipped receipt across app
+  switching and reloads. Handoff state stays bounded and independent so corrupt
+  receipt data cannot damage the M14 workspace or Library. **IMPLEMENTATION
+  COMPLETE 2026-08-14.** The optimized artifact passed 136/136 checks with
+  241/241 browser assertions at both root and nested deployment paths, including
+  an exact-cursor reload, receipt retry, corrupt-ledger recovery, real project
+  send/import controls, Japanese UI, and the 320 px mobile sweep.
+  Contract: `docs/PHONE-BRIDGE.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 
