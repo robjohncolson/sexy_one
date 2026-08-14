@@ -25,10 +25,11 @@ No account, upload endpoint, tracking request, or SEXY ONE server is introduced.
 Each assigned pad moves through a small explicit state machine:
 
 ```text
-Pending --Share/save--> Shared --Loaded--> Loaded
+Pending --Share/save--> Shared --Loaded---> Loaded
    |                       |
-   +--Skip for now------> Skipped
-                           +--Problem--> Problem
+   |                       +----Problem---> Problem
+   |
+   +--Skip for now-------------------------> Skipped
 ```
 
 - `Share this file / Skip for now` is the only initial decision pair.

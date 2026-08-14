@@ -23,6 +23,8 @@ const MAX_LIBRARY_ITEMS = 2048;
 const MAX_INBOX_ITEMS = 256;
 const MAX_HANDOFF_SESSIONS = 32;
 const MAX_HANDOFF_ENTRIES = 64;
+const MAX_HANDOFF_KEY_CHARS = 320;
+const MAX_HANDOFF_TIMESTAMP_CHARS = 40;
 const SLOT_NAMES = ["A", "B", "C", "D"];
 const SUPPORTED_EXTENSIONS = new Set(["wav", "mp3", "flac", "cswp"]);
 
@@ -388,6 +390,7 @@ let handoffSession = null;
 let overlay = null;
 let db = null;
 let persistentAudio = true;
+let handoffPersisted = true;
 let currentAudio = null;
 let currentObjectUrl = null;
 let renderQueued = false;
@@ -443,13 +446,17 @@ function defaultHandoffState() {
   return { schema: 1, sessions: [], updatedAt: new Date().toISOString() };
 }
 
+function normalizedHandoffTimestamp(value) {
+  return typeof value === "string" ? value.slice(0, MAX_HANDOFF_TIMESTAMP_CHARS) : "";
+}
+
 function normalizeHandoffEntry(raw) {
   if (!raw || typeof raw !== "object" || typeof raw.key !== "string" || !raw.key) return null;
   const status = ["pending", "shared", "loaded", "problem", "skipped"].includes(raw.status)
     ? raw.status
     : "pending";
   return {
-    key: raw.key.slice(0, 320),
+    key: raw.key.slice(0, MAX_HANDOFF_KEY_CHARS),
     slot: SLOT_NAMES.includes(raw.slot) ? raw.slot : "A",
     bank: clampInt(raw.bank, 15, 80, 15),
     pad: clampInt(raw.pad, 1, 16, 1),
@@ -457,8 +464,8 @@ function normalizeHandoffEntry(raw) {
     name: String(raw.name || "Sample").slice(0, 80),
     originalName: String(raw.originalName || "sample").slice(0, 240),
     status,
-    sharedAt: typeof raw.sharedAt === "string" ? raw.sharedAt : "",
-    resolvedAt: typeof raw.resolvedAt === "string" ? raw.resolvedAt : "",
+    sharedAt: normalizedHandoffTimestamp(raw.sharedAt),
+    resolvedAt: normalizedHandoffTimestamp(raw.resolvedAt),
   };
 }
 
@@ -475,13 +482,16 @@ function normalizeHandoffSession(raw) {
       }
     });
   }
+  const currentKey = typeof raw.currentKey === "string"
+    ? raw.currentKey.slice(0, MAX_HANDOFF_KEY_CHARS)
+    : "";
   return {
     projectId: raw.projectId.slice(0, 180),
     entries,
-    currentKey: keys.has(raw.currentKey) ? raw.currentKey : "",
-    startedAt: typeof raw.startedAt === "string" ? raw.startedAt : new Date().toISOString(),
-    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
-    finishedAt: typeof raw.finishedAt === "string" ? raw.finishedAt : "",
+    currentKey: keys.has(currentKey) ? currentKey : "",
+    startedAt: normalizedHandoffTimestamp(raw.startedAt) || new Date().toISOString(),
+    updatedAt: normalizedHandoffTimestamp(raw.updatedAt) || new Date().toISOString(),
+    finishedAt: normalizedHandoffTimestamp(raw.finishedAt),
   };
 }
 
@@ -497,7 +507,7 @@ function normalizeHandoffState(raw) {
       }
     });
   }
-  if (raw && typeof raw.updatedAt === "string") result.updatedAt = raw.updatedAt;
+  if (raw) result.updatedAt = normalizedHandoffTimestamp(raw.updatedAt) || result.updatedAt;
   return result;
 }
 
@@ -682,8 +692,12 @@ function loadWorkspace() {
 
 function persistHandoffs() {
   handoffState.updatedAt = new Date().toISOString();
-  try { localStorage.setItem(HANDOFF_KEY, JSON.stringify(handoffState)); }
-  catch (_) { persistentAudio = false; }
+  try {
+    localStorage.setItem(HANDOFF_KEY, JSON.stringify(handoffState));
+    handoffPersisted = true;
+  } catch (_) {
+    handoffPersisted = false;
+  }
   publishDiagnostics();
 }
 
@@ -2698,6 +2712,7 @@ function publishDiagnostics() {
     route: ROUTE,
     schema: FORMAT_SCHEMA,
     storage: persistentAudio ? "indexeddb" : "temporary",
+    handoffStorage: handoffPersisted ? "localStorage" : "temporary",
     projectId: state?.id || null,
     projectName: state?.name || null,
     projects: workspace ? workspace.projects.map((project) => ({ id: project.id, name: project.name, inbox: project.inbox.length, assigned: assignedPadCount(project) })) : [],

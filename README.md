@@ -1420,9 +1420,9 @@ measured at an earlier milestone's close say so):
 | M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
 | Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 134,299 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
-| Deferred `sample-lab.js` module | 118,090 bytes raw / **28,679 bytes gzipped** — loaded only after trainer interactivity |
+| Deferred `sample-lab.js` module | 118,524 bytes raw / **28,784 bytes gzipped** — loaded only after trainer interactivity |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,202,237 bytes (≈13.2 MB) |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,202,671 bytes (≈13.2 MB) |
 | `check-site.sh`, full run (**136** checks, both browser sweeps of 108 routes, **241** browser assertions per served stage incl. real offline boot, resumable Phone Bridge receipt, Sample Library/Inbox migration, deduplication and project round-trip, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and manuals) | ≈2–3 min |
 | Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **241** assertions per stage / **9** named `ja course:` (JAC1–JAC9, including mastery, Weekly Pulse, Sample Inbox/Phone Bridge, and Sample Library) / **4** named `ja manual:` (JAM1–JAM4) per stage |
 | `exe:exercise-check --bundle-structural-diff` (EN/JA exercise corpus) / `--manual-structural-diff` (EN/JA manual documents, the reader's own parser) | **51/51** checks (1 + one per live deck) / **109/109** checks (1 + one per page), each with its own negative controls |

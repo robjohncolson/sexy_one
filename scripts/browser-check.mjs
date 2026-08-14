@@ -9768,6 +9768,7 @@ async function main() {
         { sampleLab, sampleLabMobile },
       );
       await click('#btn-sample-skip-pad');
+      await waitForTrue(evaluate, "Boolean(document.querySelector('#btn-sample-handoff-finish'))", 8000);
       await click('#btn-sample-handoff-finish');
 
       // -- 3c. M13 Sample Inbox. This drives both placement modes (desktop
@@ -10302,7 +10303,11 @@ async function main() {
         await waitFor(() => document.querySelector('#btn-sample-skip-pad'));
         destinations.push(document.querySelector('.sample-handoff-destination')?.textContent.trim() || null);
         document.querySelector('#btn-sample-skip-pad')?.click();
-        await waitFor(() => document.querySelector('#btn-sample-share-file'));
+        await waitFor(() => {
+          const destination = document.querySelector('.sample-handoff-destination')?.textContent.trim() || null;
+          return destination && destination !== destinations[destinations.length - 1]
+            && document.querySelector('#btn-sample-share-file');
+        });
         destinations.push(document.querySelector('.sample-handoff-destination')?.textContent.trim() || null);
 
         const downloads = [];
@@ -10380,6 +10385,8 @@ async function main() {
         library: window.__SXC1_SAMPLE_LAB?.libraryItems?.length ?? null,
         handoff: window.__SXC1_SAMPLE_LAB?.handoff || null,
         repaired: JSON.parse(localStorage.getItem('sxc1.sample-handoffs.v1') || 'null'),
+        workspace: JSON.parse(localStorage.getItem('sxc1.sample-workspace.v1') || 'null'),
+        persistedLibrary: JSON.parse(localStorage.getItem('sxc1.sample-library.v1') || 'null'),
       }))()`);
       const phoneImportLanding = await evaluate(`(async () => {
         const waitFor = async (test, timeout = 10000) => {
@@ -10409,6 +10416,7 @@ async function main() {
           && phoneBridgeStart.before?.buttons?.join(',') === 'btn-sample-share-file,btn-sample-skip-pad'
           && /\.wav$/i.test(phoneBridgeStart.downloaded || '')
           && phoneBridgeStart.afterButtons.join(',') === 'btn-sample-handoff-loaded,btn-sample-handoff-problem'
+          && /^[A-D] \/ BANK \d+ \/ PAD \d+$/.test(phoneBridgeStart.before.destination || '')
           && phoneBridgeStart.afterDestination === phoneBridgeStart.before.destination
           && phoneBridgeStart.handoff?.counts?.shared === 1 && phoneBridgeStart.handoff.counts.pending === 3
           && phoneBridgeStart.persisted?.sessions?.length === 1
@@ -10439,6 +10447,8 @@ async function main() {
           && phoneBridgeCorruptReloaded && phoneBridgeRecovery?.projectId === bridgeProjectId
           && phoneBridgeRecovery.library === bridgeLibraryCount && phoneBridgeRecovery.handoff === null
           && phoneBridgeRecovery.repaired?.schema === 1 && phoneBridgeRecovery.repaired.sessions?.length === 0
+          && phoneBridgeRecovery.workspace?.activeProjectId === bridgeProjectId
+          && phoneBridgeRecovery.persistedLibrary?.items?.length === bridgeLibraryCount
           && phoneImportLanding?.imported === true && phoneImportLanding.view === 'validation'
           && phoneImportLanding.buttons.join(',') === 'btn-sample-validation-back,btn-sample-validation-continue'),
         { phoneBridgeStart, phoneBridgeReloaded, phoneBridgeFlow, phoneBridgeMobile,
