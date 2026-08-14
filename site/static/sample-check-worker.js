@@ -5,7 +5,7 @@
 // scan limit are then inspected as PCM in this worker so a long sample never
 // occupies the UI thread and decodeAudioData never resamples the evidence.
 
-const HEADER_LIMIT_BYTES = 1024 * 1024;
+const MAX_WAV_CHUNKS = 4096;
 const PCM_SCAN_LIMIT_BYTES = 48 * 1024 * 1024;
 const SILENCE_AMPLITUDE = 0.001; // -60 dBFS
 
@@ -19,44 +19,47 @@ function ascii(view, offset, length) {
 }
 
 async function wavHeader(file) {
-  const headerBytes = await file.slice(0, Math.min(file.size, HEADER_LIMIT_BYTES)).arrayBuffer();
-  const view = new DataView(headerBytes);
-  if (view.byteLength < 12 || ascii(view, 0, 4) !== "RIFF" || ascii(view, 8, 4) !== "WAVE") return null;
+  const lead = new DataView(await file.slice(0, 12).arrayBuffer());
+  if (lead.byteLength < 12 || ascii(lead, 0, 4) !== "RIFF" || ascii(lead, 8, 4) !== "WAVE") return null;
 
   let offset = 12;
   let format = null;
-  let data = null;
-  while (offset + 8 <= view.byteLength) {
-    const id = ascii(view, offset, 4);
-    const size = view.getUint32(offset + 4, true);
+  for (let chunk = 0; chunk < MAX_WAV_CHUNKS && offset + 8 <= file.size; chunk += 1) {
+    // Read only each chunk header, then jump by its declared size. This keeps
+    // memory bounded while still finding `data` after large LIST/iXML/ID3
+    // metadata chunks instead of mislabeling an otherwise valid WAV.
+    const chunkHeader = new DataView(await file.slice(offset, offset + 8).arrayBuffer());
+    if (chunkHeader.byteLength < 8) return null;
+    const id = ascii(chunkHeader, 0, 4);
+    const size = chunkHeader.getUint32(4, true);
     const start = offset + 8;
-    if (id === "fmt " && size >= 16 && start + 16 <= view.byteLength) {
+    if (id === "fmt " && size >= 16 && start + 16 <= file.size) {
+      const fmt = new DataView(await file.slice(start, start + 16).arrayBuffer());
       format = {
-        audioFormat: view.getUint16(start, true),
-        channels: view.getUint16(start + 2, true),
-        sampleRate: view.getUint32(start + 4, true),
-        byteRate: view.getUint32(start + 8, true),
-        blockAlign: view.getUint16(start + 12, true),
-        bitDepth: view.getUint16(start + 14, true),
+        audioFormat: fmt.getUint16(0, true),
+        channels: fmt.getUint16(2, true),
+        sampleRate: fmt.getUint32(4, true),
+        byteRate: fmt.getUint32(8, true),
+        blockAlign: fmt.getUint16(12, true),
+        bitDepth: fmt.getUint16(14, true),
       };
     }
     if (id === "data") {
-      data = { offset: start, size };
-      break;
+      if (!format) return null;
+      const available = Math.max(0, file.size - start);
+      const dataSize = Math.min(size, available);
+      return {
+        ...format,
+        dataOffset: start,
+        dataSize,
+        duration: format.byteRate > 0 ? dataSize / format.byteRate : 0,
+      };
     }
     const next = start + size + (size % 2);
-    if (!Number.isSafeInteger(next) || next <= offset) break;
+    if (!Number.isSafeInteger(next) || next <= offset || next > file.size) return null;
     offset = next;
   }
-  if (!format || !data) return null;
-  const available = Math.max(0, file.size - data.offset);
-  const dataSize = Math.min(data.size, available);
-  return {
-    ...format,
-    dataOffset: data.offset,
-    dataSize,
-    duration: format.byteRate > 0 ? dataSize / format.byteRate : 0,
-  };
+  return null;
 }
 
 function pcmSample(view, offset, format, bitDepth) {

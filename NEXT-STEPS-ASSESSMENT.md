@@ -1,6 +1,6 @@
 # One Practice Loop
 
-**Independent product assessment · SEXY ONE (SXC-1 Trainer) · 2026-08-15**
+**Independent product assessment · SEXY ONE (SXC-1 Trainer) · 2026-08-15 JST**
 
 A critique of the "Audacity Round Trip" candidate and a recommendation for M16, grounded in a full read of the shipped code, docs, and milestone history. Response to `docs/FABLE-NEXT-STEPS-PROMPT.md`.
 
@@ -12,7 +12,7 @@ A critique of the "Audacity Round Trip" candidate and a recommendation for M16, 
 
 The most important unresolved problem is different from either half: **the app is authored as a fork, not a loop**. The home screen literally styles training as `wizard-yes` (green) and the Sample Lab as `wizard-no` (red). The two halves share zero data and zero cross-references; the course never teaches the 48kHz/16-bit spec the Lab enforces; loading a real pad — the strongest device evidence the app ever collects — counts for nothing in practice tracking.
 
-**Recommendation: ship "Sound Check" as M16** — the trimmed round trip (check → recipe → linked re-import → one Use/Keep decision) with the coherence tendons built in: a "Learn why" spec deck closing the G2 content debt, one fix-it card in Today's Session, handoff outcomes in Weekly Pulse, and the home fork rewritten as a sequenced loop.
+**Recommendation: ship "Sound Check" as M16** — the trimmed round trip (check → recipe → linked re-import → one Use/Keep decision) plus a "Learn why" specification deck closing the G2 content debt. Keep the cross-storage Today's Session, Weekly Pulse, and fully sequenced-home integration together as M17 One Practice Home rather than hiding a partial bridge inside M16.
 
 ---
 
@@ -69,35 +69,35 @@ A fourth candidate — a "Device Truth" spec deck closing the deferred G2–G6 c
 
 | Direction | User value | Complexity | Perf risk | Strategic |
 |---|---|---|---|---|
-| **Sound Check** (trimmed round trip + tendons) | 5 | 3 | 2 | 5 |
+| **Sound Check** (trimmed round trip + spec deck) | 5 | 3 | 2 | 5 |
 | **One Practice Home** | 4 | 2 | 1 | 5 |
 | **Pad Practice** | 4 | 4 | 2 | 5 |
 | **Phone Field Inbox** | 3 | 3 | 3 | 3 |
 | **Audacity Round Trip** (full, as written) | 3 | 5 | 3 | 2 |
 
-Sequence: **M16 Sound Check → M17 One Practice Home (full) → M18 Pad Practice**. Sound Check first because it's the highest value-per-complexity item with no dependencies and its tendons make the coherence thesis concrete on day one; One Practice Home completes the loop framing; Pad Practice is the payoff that needs the bridge both predecessors build. Phone Field Inbox waits until the loop exists to feed. The full seven-step Round Trip is last on the board: everything unique to it beyond Sound Check is the part most likely to be cut later.
+Sequence: **M16 Sound Check → M17 One Practice Home (full) → M18 Pad Practice**. Sound Check first because it's the highest value-per-complexity item with no dependencies and its specification deck connects a real Lab finding to the course; One Practice Home then owns the complete cross-storage loop framing; Pad Practice is the payoff that needs both predecessors. Phone Field Inbox waits until the loop exists to feed. The full seven-step Round Trip is last on the board: everything unique to it beyond Sound Check is the part most likely to be cut later.
 
 ## Q5 — Recommended milestone: M16 "Sound Check"
 
 The ideal end-to-end experience, under the two-button discipline throughout:
 
 1. **Check.** On any pad or library card, one button — *Check readiness*. It runs locally, on demand, offline, and replaces itself in place with a verdict card: pass/fail per criterion (format, 48kHz, 16-bit, channels, duration and size against device limits, plus advisory clipping and leading/trailing silence). WAV header values are authoritative; clipping and silence come from an exact scan of the WAV's own PCM bytes — never from `decodeAudioData`, which resamples. Non-WAV formats get an honest "convert to WAV in Audacity first" instead of fabricated verdicts.
-2. **Recipe.** If anything failed: *Copy Audacity recipe / Done*. The recipe lists only the failing checks as ordered, named Audacity operations ("Tracks → Resample → 48000", "Export → WAV, 16-bit PCM"), localized EN/JA, copyable as plain text. Each finding carries a quiet "Learn why" link into a new spec deck — the deferred G2 content, authored in this milestone — citing the same manual pages the course cites. The check becomes the course's knowledge applied to your own sound.
+2. **Recipe.** If anything failed: *Copy Audacity recipe / Done*. The recipe lists only the failing checks as ordered, named Audacity 3.7.8 operations ("File → Export Audio", then WAV, Stereo, 48000 Hz, and Signed 16-bit PCM), localized EN/JA, copyable as plain text. Each finding carries a quiet "Learn why" link into a new spec deck — the deferred G2 content, authored in this milestone — citing the same manual pages the course cites. The check becomes the course's knowledge applied to your own sound.
 3. **Round trip.** After editing in Audacity, *Import edited version* on the original ingests the export through the existing dedup pipeline, carries over name, source, tags, rights, notes, and BPM, and records a `replacesId` link. The check re-runs on the new file, then one decision — *Use this version / Keep current*. Use repoints every pad referencing the original across all projects; Keep changes nothing; the original is always recoverable.
 4. **Handoff, already correct.** An existing handoff session now shows exactly the swapped pads as pending while untouched pads keep their Loaded receipts — behavior M15 already ships via blobId row identity. The milestone verifies this with regressions rather than building an approval layer.
-5. **The loop closes.** A project with readiness findings may surface at most one fix-it card in Today's Session's fill slot; completing lab work and Loaded handoff outcomes write Weekly Pulse marks; the home screen's yes/no fork becomes a sequenced loop — "Practice today", then "Load your bank". Sampling visibly counts as practice.
+5. **Prepare the loop.** The Learn why link and neutral Lab entry establish the vocabulary and route into the course without inventing a second progress model. M17 owns the complete loop: at most one Lab card in Today's Session, Weekly Pulse marks for Lab outcomes, and a sequenced home surface.
 
 Explicitly cut: batch readiness sweeps, readiness scores or dashboards, in-browser auto-fix (duplicates Audacity), waveform diff views, revision approval states beyond the single Use/Keep decision, deep MP3/FLAC verdicts, any `.sxc1lab` schema change, and any wasm-side work.
 
 ## Q6 — Acceptance criteria
 
 - **A1.** Analysis runs only on explicit *Check readiness* — no new eager work at import, no decode on library or pad open. It completes offline and never blocks the UI.
-- **A2.** The verdict is per-criterion pass/fail. WAV headers are authoritative for format, rate, and depth; clipping/silence come from direct PCM scan of WAV data only; MP3/FLAC yield "convert to WAV" with no fabricated bit depth; `.cswp` and >48MB files degrade honestly to header-only results.
+- **A2.** The verdict is per-criterion pass/fail. WAV headers are authoritative for format, rate, and depth; clipping/silence come from direct PCM scan of the WAV `data` chunk only; MP3/FLAC yield "convert to WAV" with no fabricated bit depth; `.cswp` and WAVs whose PCM `data` chunk exceeds 48 MB degrade honestly to header-only results.
 - **A3.** The recipe contains only failing checks, as ordered Audacity operations, EN/JA, copyable; a ready sample produces no recipe. Every finding links to its spec-deck card, and the G2 spec deck ships in this milestone within existing bundle ceilings.
 - **A4.** *Import edited version* ingests via the existing dedup pipeline, records `replacesId`, and carries the original's metadata; the original record and blob remain reachable from the new version's detail.
 - **A5.** *Use this version* repoints every pad referencing the original across all projects in one action; *Keep current* changes nothing; no screen in the flow ever shows more than two primary buttons.
 - **A6.** After Use, an existing handoff session marks exactly the affected pads pending, preserves Loaded elsewhere, and both the handoff share and `.sxc1lab` export carry the approved bytes under unchanged schema 1. Blob GC never collects any member of a `replacesId` chain still referenced.
-- **A7.** Coherence tendons work end to end: at most one lab fix-it card per Today's Session; lab completions and Loaded outcomes appear in Weekly Pulse; the home screen presents training and Lab as one sequenced loop with no `wizard-no` framing.
+- **A7.** The Sound Check's Learn why action opens the bilingual specification deck, and the home Lab entry has neutral forward-action framing rather than `wizard-no`. M17 owns Today's Session Lab cards, Weekly Pulse Lab marks, and the fully sequenced home loop.
 - **A8.** `app.wasm` is byte-identical; `sample-lab.js` stays out of the first-load module graph and gains a gzip ceiling in `check-site.sh`; the full gate passes with new browser regressions covering check, recipe, re-import, Use/Keep, and handoff re-queue.
 
 ## Q7 — Overbuilding, overlooking, mis-sequencing
@@ -122,7 +122,7 @@ Explicitly cut: batch readiness sweeps, readiness scores or dashboards, in-brows
 ### Mis-sequenced
 
 - Building revision machinery one milestone after M15 shipped the identity model it would collide with — settle the loop's semantics first, which Sound Check's trimmed shape does.
-- Deepening the Sample Lab before wiring it to the course. Every Lab-only milestone from here widens the fork; Sound Check with tendons is the last Lab milestone that should ship without the loop, precisely because it carries the loop with it.
+- Deepening the Sample Lab before wiring it to the course. Every Lab-only milestone from here widens the fork; Sound Check's specification deck is the smallest honest bridge, and M17 must complete the loop before another Lab-only milestone.
 
 ---
 
@@ -130,7 +130,7 @@ Explicitly cut: batch readiness sweeps, readiness scores or dashboards, in-brows
 
 - The advocate wanted the full lean round trip; the skeptic wanted clipping/silence dropped entirely as "Audacity's home turf". **Ruling:** keep them for WAV via exact PCM scan — cheap, honest, and you otherwise discover clipping only through the device's speaker after loading — but advisory-only, never blocking.
 - The skeptic argued the pad swap itself should be the Use/Keep decision. **Ruling:** keep the explicit two-button moment — it is the app's grammar, it costs almost nothing, and it is the difference between a file manager and an instrument.
-- The coherence lens wanted a standalone connective-tissue milestone first. **Ruling:** fold the cheap tendons into M16 and ship the full One Practice Home as M17 — the tendons are small enough to carry, and Sound Check gives them something real to connect.
+- The coherence lens wanted a standalone connective-tissue milestone first. **Ruling:** M16 carries only the specification-deck link and neutral Lab framing; ship the cross-storage Today's Session/Weekly/home integration coherently as M17 One Practice Home.
 
 ## Key evidence
 

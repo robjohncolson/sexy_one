@@ -20,9 +20,10 @@ rate, bit-depth, or PCM findings.
 
 ## Audacity round trip
 
-The recipe is derived only from failed or advisory criteria. Current Audacity uses
-**File → Export Audio** for WAV format, channel count, sample rate, and Signed
-16-bit PCM encoding. Edge trimming uses **Edit → Remove Special → Trim Audio**.
+The recipe is derived only from failed or advisory criteria. Its menu names and
+export choices were verified against Audacity 3.7.8 on 2026-08-15 JST. Use
+**File → Export Audio** and choose WAV, Stereo, a 48,000 Hz output sample rate,
+and Signed 16-bit PCM encoding. Edge trimming uses **Edit → Remove Special → Trim Audio**.
 Clipping guidance recommends inspecting **View → Show Clipping** and preserving the
 original because normalization cannot recreate clipped detail.
 

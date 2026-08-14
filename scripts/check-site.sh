@@ -2928,55 +2928,8 @@ else
 fi
 rm -f "$M4_PROTOCOL_PY"
 
-# ===========================================================================
-# LEGACY SIZE LEDGER NOTE: M3's embedded-corpus projection below stopped being
-# predictive when M6 moved the corpus into fetched bundles. M16 replaces the
-# live instrument with an artifact ledger that records the actual executable,
-# first-load JS, deferred JS island, and fetched bundle costs. The old formula
-# remains below (disabled) as provenance for state/size-ledger.tsv.
-#
-# THE SIZE LEDGER (M3 harness, task "harness", item 4): a standing
-# instrument, not a check that goes red -- see the WASM_GZIP_CEILING_BYTES
-# comment above for the actual gate. This exists so "the full course does
-# not fit the ceiling unoptimized" (briefs/M3-manifest.json's own
-# top-level note; PLAN.md's "Size ruling") is a NUMBER RECORDED ON EVERY
-# RUN, forever, rather than something that has to be manually
-# rediscovered the next time the corpus grows -- "the instrument that
-# keeps the decision from being rediscovered at deck 40".
-#
-# THE COEFFICIENT (named, commented, a single easy-to-find constant so a
-# future re-measurement is a one-line, explained change -- never a silent
-# bump): 0.3456 gzip bytes per raw byte of .ex.md, measured by the M3
-# designer (briefs/M3-plan.md) from gzip(app.wasm) deltas against
-# content/exercises/*.ex.md raw-byte deltas as the corpus grew. This is a
-# LINEAR APPROXIMATION (content compresses reasonably uniformly; it is
-# not exact for any single deck) -- good enough for an early-warning
-# instrument, never treated as more precise than that.
-SXC1_SIZE_LEDGER_GZIP_PER_RAW_BYTE=0.3456
-SXC1_SIZE_LEDGER_TARGET_EXERCISES=435
-#
-# Method: measure the CURRENT corpus's raw bytes and exercise count
-# straight off disk (independent of the content axis -- this runs even
-# under --skip-content, since it needs no built binary, only
-# content/exercises/ and python3 for the one floating-point line), scale
-# both linearly to the 435-exercise target, and hold the app's own
-# non-content baseline fixed at whatever today's measured total minus
-# today's corpus's own estimated contribution implies. When the corpus
-# already IS the full 435-exercise course (true on this tree as of the
-# M3 harness wave: 435 "^id: " lines across content/exercises/), the
-# scale factor is 1 and the projection collapses to (and is a live
-# cross-check against) today's actual measurement; if the tree is ever
-# checked out at a smaller, partial-course state again (e.g. mid-authoring
-# on a future content branch), the same formula extrapolates forward
-# instead of silently under-reporting.
-#
-# This block FAILS if it cannot compute all three numbers (content/
-# exercises/ missing or empty, python3 unavailable, or app.wasm missing).
-# It NEVER fails merely because the projection is over
-# WASM_GZIP_CEILING_BYTES -- that is reported loudly as an info line
-# naming the exact shortfall, because acting on it is the coordinator's
-# call (PLAN.md), not a build-breaking assertion this task may add.
-# ===========================================================================
+# Record actual release artifacts. The historical embedded-corpus projection
+# stopped being predictive after M6 moved course content into fetched bundles.
 SIZE_LEDGER_DIR="$REPO_ROOT/state"
 ARTIFACT_LEDGER_FILE="$SIZE_LEDGER_DIR/artifact-size-ledger.tsv"
 mkdir -p "$SIZE_LEDGER_DIR"
@@ -2995,65 +2948,6 @@ if [ "${WASM_GZIP_BYTES:--1}" -ge 0 ] \
   ok "artifact size ledger: recorded actual wasm, first-load JS, deferred Sample Lab island, and fetched bundle gzips to state/artifact-size-ledger.tsv"
 else
   fail "artifact size ledger: recorded actual wasm, first-load JS, deferred Sample Lab island, and fetched bundle gzips to state/artifact-size-ledger.tsv (observed: a required artifact measurement was unavailable)"
-fi
-
-# Historical M3 projection implementation retained but no longer executed.
-if false; then
-SIZE_LEDGER_FILE="$SIZE_LEDGER_DIR/size-ledger.tsv"
-mkdir -p "$SIZE_LEDGER_DIR"
-if [ ! -f "$SIZE_LEDGER_FILE" ]; then
-  printf 'timestamp\tapp_wasm_gzip_bytes\tcorpus_raw_bytes\tcorpus_exercise_count\tprojected_435_gzip_bytes\tceiling_bytes\tover_ceiling_bytes\n' > "$SIZE_LEDGER_FILE"
-fi
-
-CORPUS_DIR="$REPO_ROOT/content/exercises"
-if [ -d "$CORPUS_DIR" ] && command -v python3 >/dev/null 2>&1 && [ -f "$WASM_FILE" ]; then
-  CORPUS_RAW_BYTES=0
-  CORPUS_EX_COUNT=0
-  for f in "$CORPUS_DIR"/*.ex.md; do
-    [ -e "$f" ] || continue
-    fsz="$(wc -c < "$f" | tr -d ' ')"
-    CORPUS_RAW_BYTES=$((CORPUS_RAW_BYTES + fsz))
-    fn="$(grep -cE '^id: ' "$f" || true)"
-    CORPUS_EX_COUNT=$((CORPUS_EX_COUNT + fn))
-  done
-
-  if [ "$CORPUS_RAW_BYTES" -gt 0 ] && [ "$CORPUS_EX_COUNT" -gt 0 ]; then
-    LEDGER_CALC="$(python3 - "$WASM_GZIP_BYTES" "$CORPUS_RAW_BYTES" "$CORPUS_EX_COUNT" \
-        "$SXC1_SIZE_LEDGER_GZIP_PER_RAW_BYTE" "$SXC1_SIZE_LEDGER_TARGET_EXERCISES" "$WASM_GZIP_CEILING_BYTES" <<'PYEOF'
-import sys
-wasm_gzip, corpus_raw, corpus_ex, target_ex, ceiling = (
-    int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[5]), int(sys.argv[6])
-)
-coeff = float(sys.argv[4])
-scaled_raw = corpus_raw * target_ex / corpus_ex
-current_contribution = corpus_raw * coeff
-baseline = wasm_gzip - current_contribution
-projected = baseline + scaled_raw * coeff
-projected_i = int(round(projected))
-over = projected_i - ceiling
-print("%d\t%d" % (projected_i, over))
-PYEOF
-)"
-    PROJECTED_435_BYTES="$(printf '%s' "$LEDGER_CALC" | cut -f1)"
-    OVER_CEILING="$(printf '%s' "$LEDGER_CALC" | cut -f2)"
-
-    SIZE_LEDGER_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf '%s\t%d\t%d\t%d\t%d\t%d\t%d\n' \
-      "$SIZE_LEDGER_TS" "$WASM_GZIP_BYTES" "$CORPUS_RAW_BYTES" "$CORPUS_EX_COUNT" \
-      "$PROJECTED_435_BYTES" "$WASM_GZIP_CEILING_BYTES" "$OVER_CEILING" \
-      >> "$SIZE_LEDGER_FILE"
-    ok "size ledger: recorded app.wasm=$WASM_GZIP_BYTES corpus_raw=$CORPUS_RAW_BYTES (${CORPUS_EX_COUNT} exercises) projected_435=$PROJECTED_435_BYTES to state/size-ledger.tsv"
-    if [ "$OVER_CEILING" -gt 0 ]; then
-      info "size ledger: the 435-exercise projection ($PROJECTED_435_BYTES bytes) is OVER the $WASM_GZIP_CEILING_BYTES byte ceiling by $OVER_CEILING bytes -- see PLAN.md 'Size ruling' (a coordinator decision, not a build failure)"
-    else
-      info "size ledger: the 435-exercise projection ($PROJECTED_435_BYTES bytes) is under the $WASM_GZIP_CEILING_BYTES byte ceiling (headroom $((0 - OVER_CEILING)) bytes)"
-    fi
-  else
-    fail "size ledger: recorded app.wasm/corpus/projection to state/size-ledger.tsv (observed: corpus_raw_bytes=$CORPUS_RAW_BYTES corpus_exercise_count=$CORPUS_EX_COUNT -- could not compute)"
-  fi
-else
-  fail "size ledger: recorded app.wasm/corpus/projection to state/size-ledger.tsv (observed: missing content/exercises/, python3, or app.wasm -- see checks above)"
-fi
 fi
 
 # ===========================================================================

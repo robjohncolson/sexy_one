@@ -4144,15 +4144,34 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
     );
 
     await h.goto('#/samples', '#sample-inbox-heading');
-    const sampleInboxJa = await h.evaluate(`(() => ({
-      lang: document.querySelector('#sxc1-sample-lab')?.dataset.lang || null,
-      inbox: document.querySelector('#sample-inbox-heading')?.textContent.trim() || null,
-      padMap: document.querySelector('#sample-pad-heading')?.textContent.trim() || null,
-      add: document.querySelector('#btn-sample-inbox-add')?.textContent.trim() || null,
-      fill: document.querySelector('#btn-sample-inbox-fill')?.textContent.trim() || null,
-      send: document.querySelector('#btn-sample-project-export')?.textContent.trim() || null,
-      handoff: document.querySelector('#btn-sample-handoff')?.textContent.trim() || null,
-    }))()`);
+    const sampleInboxJa = await h.evaluate(`(() => {
+      const diagnostics = window.__SXC1_SAMPLE_LAB;
+      const rows = diagnostics?.assignedPads || [];
+      const handoff = diagnostics?.handoff;
+      const matches = Boolean(handoff) && handoff.entries.length === rows.length
+        && handoff.entries.every((entry, index) => entry.key === JSON.stringify([
+          rows[index].slot, rows[index].bank, rows[index].pad, rows[index].blobId,
+        ]));
+      let expectedHandoff = 'スマートフォンで引き渡し開始';
+      if (matches) {
+        const counts = handoff.counts || {};
+        if ((counts.pending || 0) + (counts.shared || 0) === 0 && (counts.total || 0) > 0) {
+          expectedHandoff = '引き渡し記録を確認';
+        } else if (handoff.entries.some((entry) => entry.status !== 'pending')) {
+          expectedHandoff = 'スマートフォンで引き渡し再開';
+        }
+      }
+      return {
+        lang: document.querySelector('#sxc1-sample-lab')?.dataset.lang || null,
+        inbox: document.querySelector('#sample-inbox-heading')?.textContent.trim() || null,
+        padMap: document.querySelector('#sample-pad-heading')?.textContent.trim() || null,
+        add: document.querySelector('#btn-sample-inbox-add')?.textContent.trim() || null,
+        fill: document.querySelector('#btn-sample-inbox-fill')?.textContent.trim() || null,
+        send: document.querySelector('#btn-sample-project-export')?.textContent.trim() || null,
+        handoff: document.querySelector('#btn-sample-handoff')?.textContent.trim() || null,
+        expectedHandoff,
+      };
+    })()`);
     report(
       JA_COURSE_SAMPLE_INBOX_ASSERTION_NAME,
       Boolean(sampleInboxJa) && sampleInboxJa.lang === 'ja'
@@ -4161,7 +4180,7 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
         && sampleInboxJa.add === 'サンプルを追加'
         && sampleInboxJa.fill === '空きパッドへ配置'
         && sampleInboxJa.send === 'プロジェクトをスマートフォンへ送る'
-        && ['スマートフォンで引き渡し開始', 'スマートフォンで引き渡し再開'].includes(sampleInboxJa.handoff),
+        && sampleInboxJa.handoff === sampleInboxJa.expectedHandoff,
       sampleInboxJa,
     );
 
@@ -10504,6 +10523,33 @@ async function main() {
           }
           return bytes;
         };
+        const makeMetadataWav = () => {
+          const metadataBytes = 1024 * 1024 + 2;
+          const fmtOffset = 12;
+          const metadataOffset = fmtOffset + 24;
+          const dataOffset = metadataOffset + 8 + metadataBytes;
+          const bytes = new ArrayBuffer(dataOffset + 12);
+          const view = new DataView(bytes);
+          const ascii = (offset, text) => {
+            for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+          };
+          ascii(0, 'RIFF');
+          view.setUint32(4, bytes.byteLength - 8, true);
+          ascii(8, 'WAVE');
+          ascii(fmtOffset, 'fmt ');
+          view.setUint32(fmtOffset + 4, 16, true);
+          view.setUint16(fmtOffset + 8, 1, true);
+          view.setUint16(fmtOffset + 10, 2, true);
+          view.setUint32(fmtOffset + 12, 48000, true);
+          view.setUint32(fmtOffset + 16, 192000, true);
+          view.setUint16(fmtOffset + 20, 4, true);
+          view.setUint16(fmtOffset + 22, 16, true);
+          ascii(metadataOffset, 'JUNK');
+          view.setUint32(metadataOffset + 4, metadataBytes, true);
+          ascii(dataOffset, 'data');
+          view.setUint32(dataOffset + 4, 4, true);
+          return bytes;
+        };
         const addLibraryFiles = async (files) => {
           const before = window.__SXC1_SAMPLE_LAB.libraryItems.length;
           const input = document.querySelector('#sample-library-input');
@@ -10554,7 +10600,9 @@ async function main() {
         const anchorClick = HTMLAnchorElement.prototype.click;
         HTMLAnchorElement.prototype.click = function captureSoundCheckDownload() {};
         try {
-          while (document.querySelector('#sxc1-sample-lab')?.dataset.view === 'handoff') {
+          let drained = 0;
+          while (document.querySelector('#sxc1-sample-lab')?.dataset.view === 'handoff' && drained < 8) {
+            drained += 1;
             document.querySelector('#btn-sample-share-file')?.click();
             await waitFor(() => document.querySelector('#btn-sample-handoff-loaded'));
             document.querySelector('#btn-sample-handoff-loaded')?.click();
@@ -10572,6 +10620,15 @@ async function main() {
         document.querySelector('#btn-sample-inbox-fill')?.click();
         await waitFor(() => window.__SXC1_SAMPLE_LAB.assignedPads.length === 1);
         await switchProject(soundProjectId);
+
+        window.__SXC1_SAMPLE_LAB.beginSoundCheck(control.id);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.libraryItems
+          .find((item) => item.id === control.id)?.readiness?.checkedAt);
+        const cancelledCheck = {
+          view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+          soundCheck: window.__SXC1_SAMPLE_LAB.soundCheck,
+        };
 
         selectAsset(control.id);
         document.querySelector('#btn-sample-library-edit')?.click();
@@ -10632,6 +10689,9 @@ async function main() {
         const nonWav = await window.__SXC1_SAMPLE_LAB.inspectReadiness(
           new File([new Uint8Array([1, 2, 3, 4])], 'honest.mp3', { type: 'audio/mpeg' }),
         );
+        const metadataWav = await window.__SXC1_SAMPLE_LAB.inspectReadiness(
+          new File([makeMetadataWav()], 'metadata-before-data.wav', { type: 'audio/wav' }),
+        );
         return {
           soundProjectId,
           mirrorProjectId,
@@ -10648,6 +10708,8 @@ async function main() {
           candidateButtons: Array.from(document.querySelectorAll('.sample-sound-check-card .sample-primary-actions > button')).map((button) => button.id),
           candidateRows: document.querySelectorAll('.sample-sound-check-list li').length,
           nonWav,
+          metadataWav,
+          cancelledCheck,
         };
       })()`);
       await cdp.send('Emulation.setDeviceMetricsOverride', {
@@ -10732,6 +10794,11 @@ async function main() {
           && soundCheckBeforeUse.candidateButtons.join(',') === 'btn-sample-version-use,btn-sample-version-keep'
           && soundCheckBeforeUse.candidateRows === 8
           && soundCheckBeforeUse.nonWav?.kind === 'other' && soundCheckBeforeUse.nonWav?.scan?.status === 'not-wav'
+          && soundCheckBeforeUse.metadataWav?.kind === 'wav'
+          && soundCheckBeforeUse.metadataWav?.header?.sampleRate === 48000
+          && soundCheckBeforeUse.metadataWav?.header?.channels === 2
+          && soundCheckBeforeUse.cancelledCheck?.view === 'planner'
+          && soundCheckBeforeUse.cancelledCheck?.soundCheck === null
           && soundCheckMobile?.viewport === 320 && soundCheckMobile.scrollWidth <= 320
           && soundCheckMobile.view === 'sound-check' && soundCheckMobile.rows === 8
           && soundCheckMobile.buttons.length === 2

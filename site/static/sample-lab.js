@@ -1842,16 +1842,20 @@ async function beginSoundCheck(assetId) {
   const asset = libraryAssetById(assetId);
   if (!asset) return;
   stopPreview();
-  soundCheckState = { phase: "checking", assetId: asset.id, candidateId: "", result: null, candidateResult: null, message: "" };
+  const session = { phase: "checking", assetId: asset.id, candidateId: "", result: null, candidateResult: null, message: "" };
+  soundCheckState = session;
   renderSoundCheck();
   try {
-    soundCheckState.result = await checkLibraryAsset(asset);
-    soundCheckState.phase = "result";
+    const result = await checkLibraryAsset(asset);
+    if (soundCheckState !== session) return;
+    session.result = result;
+    session.phase = "result";
   } catch (_) {
-    soundCheckState.phase = "error";
-    soundCheckState.message = strings.checkFailed;
+    if (soundCheckState !== session) return;
+    session.phase = "error";
+    session.message = strings.checkFailed;
   }
-  renderSoundCheck();
+  if (soundCheckState === session) renderSoundCheck();
 }
 
 async function copyText(text) {
@@ -1879,35 +1883,57 @@ function recipeText(asset, result) {
 }
 
 async function importEditedVersion(file) {
-  const original = libraryAssetById(soundCheckState?.assetId);
-  if (!original) return;
+  const session = soundCheckState;
+  const original = libraryAssetById(session?.assetId);
+  if (!session || !original) return;
   const extension = extOf(file.name);
   if (!SUPPORTED_EXTENSIONS.has(extension) || file.size > MAX_AUDIO_BYTES) {
-    soundCheckState.message = file.size > MAX_AUDIO_BYTES ? strings.tooLarge : strings.invalidFile;
+    session.message = file.size > MAX_AUDIO_BYTES ? strings.tooLarge : strings.invalidFile;
     renderSoundCheck();
     return;
   }
-  soundCheckState.phase = "checking-edited";
-  soundCheckState.message = "";
+  session.phase = "checking-edited";
+  session.message = "";
   renderSoundCheck();
   let imported = null;
-  let previousReplacesId = "";
+  let previousCandidateState = null;
+  const rollbackImport = async () => {
+    if (!imported?.asset) return;
+    if (imported.reused && previousCandidateState) {
+      imported.asset.replacesId = previousCandidateState.replacesId;
+      imported.asset.readiness = previousCandidateState.readiness;
+      imported.asset.stage = previousCandidateState.stage;
+    }
+    if (!imported.reused) {
+      libraryState.items = libraryState.items.filter((item) => item.id !== imported.asset.id);
+      await deleteAudio(imported.asset.blobId);
+    }
+    persistProject();
+  };
   try {
     imported = await libraryAssetFromFile(file);
+    if (soundCheckState !== session) {
+      await rollbackImport();
+      return;
+    }
     const candidate = imported.asset;
     if (candidate.id === original.id) {
-      soundCheckState.phase = "copied";
-      soundCheckState.message = strings.sameVersion;
+      session.phase = "copied";
+      session.message = strings.sameVersion;
       renderSoundCheck();
       return;
     }
-    previousReplacesId = candidate.replacesId;
     if (imported.reused && candidate.replacesId && candidate.replacesId !== original.id) {
-      soundCheckState.phase = "copied";
-      soundCheckState.message = strings.linkedVersion;
+      session.phase = "copied";
+      session.message = strings.linkedVersion;
       renderSoundCheck();
       return;
     }
+    previousCandidateState = {
+      replacesId: candidate.replacesId,
+      readiness: candidate.readiness,
+      stage: candidate.stage,
+    };
     // A genuinely new export inherits the preparation context. If dedup finds
     // an existing Library sound, preserve that sound's established metadata.
     if (!imported.reused) {
@@ -1917,22 +1943,22 @@ async function importEditedVersion(file) {
     }
     candidate.replacesId = original.id;
     const candidateResult = await checkLibraryAsset(candidate);
-    soundCheckState.candidateId = candidate.id;
-    soundCheckState.candidateResult = candidateResult;
-    soundCheckState.phase = "candidate";
-    soundCheckState.message = strings.versionImported;
+    if (soundCheckState !== session) {
+      await rollbackImport();
+      return;
+    }
+    session.candidateId = candidate.id;
+    session.candidateResult = candidateResult;
+    session.phase = "candidate";
+    session.message = strings.versionImported;
     persistProject();
   } catch (_) {
-    if (imported?.asset) imported.asset.replacesId = previousReplacesId;
-    if (imported && !imported.reused) {
-      libraryState.items = libraryState.items.filter((item) => item.id !== imported.asset.id);
-      await deleteAudio(imported.asset.blobId);
-    }
-    soundCheckState.phase = "copied";
-    soundCheckState.message = strings.checkFailed;
-    persistProject();
+    await rollbackImport();
+    if (soundCheckState !== session) return;
+    session.phase = "copied";
+    session.message = strings.checkFailed;
   }
-  renderSoundCheck();
+  if (soundCheckState === session) renderSoundCheck();
 }
 
 function replaceAssetEverywhere(original, candidate) {
@@ -2234,12 +2260,15 @@ function renderSoundCheck() {
       copy.id = "btn-sample-recipe-copy";
       copy.type = "button";
       copy.addEventListener("click", async () => {
-        const copied = await copyText(recipeText(original, soundCheckState.result));
+        const session = soundCheckState;
+        if (!session?.result) return;
+        const copied = await copyText(recipeText(original, session.result));
+        if (soundCheckState !== session) return;
         if (copied) {
-          soundCheckState.phase = "copied";
-          soundCheckState.message = strings.recipeCopied;
+          session.phase = "copied";
+          session.message = strings.recipeCopied;
         } else {
-          soundCheckState.message = strings.recipeCopyFailed;
+          session.message = strings.recipeCopyFailed;
         }
         renderSoundCheck();
       });

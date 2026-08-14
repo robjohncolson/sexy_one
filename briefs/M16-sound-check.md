@@ -1,6 +1,6 @@
 # M16 brief — Sound Check
 
-Date: 2026-08-15
+Date: 2026-08-15 JST
 
 ## Product outcome
 
