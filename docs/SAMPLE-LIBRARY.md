@@ -13,8 +13,8 @@ still performs the final hardware assignment.
    stage, BPM, duration, and format. The stage filter separates Raw, Edited, and
    Ready sounds without replacing free-text search.
 3. Select a sound to audition it. The one `Add to library` action is replaced by
-   `Add to Inbox` / `Edit details`; editing replaces those with `Done` / `Remove
-   from Library`.
+   `Add to Inbox` / `Edit details`; editing exposes `Done` / `Check readiness`,
+   while destructive removal stays inside the closed Library options disclosure.
 4. Record provenance, edit notes, permission or credit, BPM, and production
    stage. Metadata auto-saves locally. Audio shaping stays in Audacity.
 5. Create or switch named projects, then add the same catalog sound to any
@@ -91,4 +91,6 @@ The full Japanese course sweep independently pins Sample Library's catalog,
 filter, import, and project decisions as `JAC9`. The offline gate pins the
 current versioned cache and boots the same deferred Sample Lab module at both
 root and nested deployment paths. M15's resumable outcome ledger is specified
-separately in [`PHONE-BRIDGE.md`](PHONE-BRIDGE.md).
+separately in [`PHONE-BRIDGE.md`](PHONE-BRIDGE.md). M16's on-demand analysis,
+revision link, and cross-project replacement contract is specified in
+[`SOUND-CHECK.md`](SOUND-CHECK.md).

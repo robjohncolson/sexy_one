@@ -214,6 +214,18 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   send/import controls, Japanese UI, and the 320 px mobile sweep, then passed
   77/77 against the byte-identical production deployment.
   Contract: `docs/PHONE-BRIDGE.md`.
+- **M16 — Sound Check.** Add one on-demand preparation step between the shared
+  Library and phone handoff: inspect original WAV bytes in a deferred worker,
+  report native-format requirements and clipping/edge-silence advisories without
+  invented facts, derive only the Audacity operations each file needs, and import
+  an edited version with a recoverable `replacesId` link. One **Use this version /
+  Keep current** decision either repoints every matching placement across projects
+  or changes none; existing M15 identity re-queues only changed handoff rows.
+  `.sxc1lab` remains schema 1. A bilingual three-card `lvl-16` deck teaches the
+  native target and distinguishes it from CASIO Sampler App's wider import list.
+  **IMPLEMENTATION COMPLETE 2026-08-15; release verification in progress.**
+  Contract: `docs/SOUND-CHECK.md`; implementation brief:
+  `briefs/M16-sound-check.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 

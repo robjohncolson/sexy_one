@@ -541,6 +541,9 @@ Chapters in teaching order, with deduplicated learning objectives. Preparation o
 - **q-5-90** (stretch) `INPUT SELECT` transmits CC 110 with MIC: 0, AUDIO IN: 64, USB: 127 (midi.md p. 3).
 - **q-5-91** (stretch) Pad 1 of Bank A is note number 36; each bank spans 16 consecutive notes (A: 36–51, B: 52–67, C: 68–83, D: 84–99) (midi.md p. 4).
 - **q-5-92** (stretch) Receive-only note numbers 100–115 trigger pads 1–16 of the current bank regardless of bank or mode (midi.md p. 4).
+- **q-5-93** (core) The SXC-1's documented sampling format is stereo WAV at 48 kHz / 16-bit linear PCM (p. 66).
+- **q-5-94** (core) One SXC-1 recording can run up to 15 minutes, approximately 173 MB (p. 66).
+- **q-5-95** (core) Distinguish CASIO Sampler App's accepted assignment files (WAV/MP3/FLAC/`.cswp`) from the unit's native stereo 48 kHz / 16-bit linear PCM WAV sampling format (pp. 57, 66).
 
 #### Device drill candidates
 - **d-5-01** (core) **Open and navigate the system settings** — Long-press `EDIT` in Performance mode, select an item (e.g. `LED Bright`) with ↑/↓, change with ←/→, exit with `EDIT`. Success: `SYSTEM SETTING` screen shown; LED brightness visibly changes. (p. 55; exit per midi.md p. 1)

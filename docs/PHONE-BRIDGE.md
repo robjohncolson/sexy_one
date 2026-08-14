@@ -69,4 +69,5 @@ and Loaded outcomes with automatic advancement, checks the persisted receipt at
 320 px, reloads and reviews it, retries only the unresolved rows, corrupts only
 the handoff key, and proves the valid M14 workspace and Library survive. A
 portable project imported through the phone-facing option must land in handoff
-review. The offline gate pins the `m15-v1` cache at root and nested paths.
+review. The offline gate pins the current cache at root and nested paths; M16's
+cache also carries the on-demand Sound Check worker.

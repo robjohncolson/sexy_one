@@ -369,7 +369,7 @@ Checks performed, in order:
      catches assertions being REMOVED, not replaced. What those five
      prove is the milestone claim itself: the ja bundle the site SHIPS
      renders the real Japanese course -- #sxc1-exercise-stats reports
-     50 decks / 352 exercises and the pinned deck's JAPANESE title; the
+     51 decks / 355 exercises and the pinned deck's JAPANESE title; the
      deck index card, deck page title and deck summary: are the
      corpus's Japanese; a real corpus quiz renders its JA title,
      question and both option labels and, clicked BY ITS JAPANESE
@@ -396,7 +396,7 @@ Checks performed, in order:
      course), and browser-check --check-bad-bundle must report exactly
      12/12: every sabotaged copy shows the visible #sxc1-content-error
      alert AND reports zero decks with the degraded #/x notice, while
-     the control shows no banner and the whole 50-deck/352-exercise
+     the control shows no banner and the whole 51-deck/355-exercise
      course. Skipped via skip() under --skip-browser.
   25. M6 GATE-1 STALLED-FETCH DEADLINE (browser axis): a threaded server
      answers the en content bundle with 200 + headers + a few bytes and
@@ -457,7 +457,7 @@ Checks performed, in order:
      --check-bad-manual-bundle must report exactly 14/14: every broken
      copy shows the visible #sxc1-content-error alert AND renders the
      named #sxc1-manual-degraded body with #btn-content-retry on a real
-     manual route WHILE THE EXERCISE COURSE STAYS WHOLE (50 decks --
+     manual route WHILE THE EXERCISE COURSE STAYS WHOLE (51 decks --
      the two bundles fail independently, which is the claim), while the
      control shows no banner, a readable manual page and the whole
      course. Skipped via skip() under --skip-browser.
@@ -750,8 +750,10 @@ info() {
 # M15 adds one full-stage interrupted Phone Bridge/receipt assertion. Its
 # bounded ledger is inside the already-required deferred module, so the shell
 # check count remains unchanged while the per-stage browser floor rises by one.
-M5_CHECK_TOTAL=136
-M5_BROWSER_ASSERT_FLOOR=241
+# M16 adds one required deferred PCM worker and one pinned JS-island budget,
+# plus one full-stage Sound Check/revision/handoff assertion.
+M5_CHECK_TOTAL=138
+M5_BROWSER_ASSERT_FLOOR=242
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -933,6 +935,7 @@ REQUIRED_FILES=(
   "index.html"
   "index.js"
   "sample-lab.js"
+  "sample-check-worker.js"
   "app.wasm"
   "ghc_wasm_jsffi.js"
   "qr-phone.svg"
@@ -987,12 +990,13 @@ assert any(icon.get("src") == "./app-icon.svg" and "maskable" in icon.get("purpo
 ET.parse(root / "app-icon.svg")
 
 worker = (root / "sw.js").read_text(encoding="utf-8")
-assert 'const CACHE_VERSION = "m15-v1"' in worker
+assert 'const CACHE_VERSION = "m16-v1"' in worker
 match = re.search(r"const CORE_RELATIVE_URLS = (\[.*?\]);", worker, re.S)
 assert match, "CORE_RELATIVE_URLS not found"
 urls = json.loads(match.group(1))
 assert len(urls) == len(set(urls)), "duplicate core URL"
 assert "./sample-lab.js" in urls, urls
+assert "./sample-check-worker.js" in urls, urls
 assert all(url.startswith("./") and not url.startswith("./pages/") for url in urls), urls
 for url in urls:
     rel = url[2:]
@@ -1391,6 +1395,37 @@ report_size() {
 
 report_size "$WASM_FILE" "app.wasm"
 report_size "$JSFFI_FILE" "ghc_wasm_jsffi.js"
+report_size "$DIR/index.js" "index.js (first-load loader)"
+report_size "$DIR/sample-lab.js" "sample-lab.js (deferred)"
+report_size "$DIR/sample-check-worker.js" "sample-check-worker.js (on demand)"
+
+# M16: the executable JS island had no tripwire while post-M11 work accumulated
+# there. Keep the boot loader and the complete deferred Sample Lab island on
+# separate budgets: loading Sample Lab must never spend the first-load budget,
+# while adding a worker must not hide growth by splitting one module into two.
+INDEX_JS_GZIP_CEILING_BYTES=32000
+SAMPLE_ISLAND_GZIP_CEILING_BYTES=50000
+INDEX_JS_GZIP_BYTES=-1
+SAMPLE_LAB_JS_GZIP_BYTES=-1
+SAMPLE_WORKER_GZIP_BYTES=-1
+if [ -f "$DIR/index.js" ]; then INDEX_JS_GZIP_BYTES="$(gzip -c "$DIR/index.js" | wc -c | tr -d ' ')"; fi
+if [ -f "$DIR/sample-lab.js" ]; then SAMPLE_LAB_JS_GZIP_BYTES="$(gzip -c "$DIR/sample-lab.js" | wc -c | tr -d ' ')"; fi
+if [ -f "$DIR/sample-check-worker.js" ]; then SAMPLE_WORKER_GZIP_BYTES="$(gzip -c "$DIR/sample-check-worker.js" | wc -c | tr -d ' ')"; fi
+SAMPLE_ISLAND_GZIP_BYTES=$((SAMPLE_LAB_JS_GZIP_BYTES + SAMPLE_WORKER_GZIP_BYTES))
+JS_BUDGET_LABEL="JavaScript budgets: gzip(index.js) is under the pinned 32000-byte first-load ceiling and gzip(sample-lab.js)+gzip(sample-check-worker.js) is under the pinned 50000-byte deferred-island ceiling"
+if [ "$INDEX_JS_GZIP_BYTES" -ge 0 ] \
+   && [ "$SAMPLE_LAB_JS_GZIP_BYTES" -ge 0 ] \
+   && [ "$SAMPLE_WORKER_GZIP_BYTES" -ge 0 ] \
+   && [ "$INDEX_JS_GZIP_BYTES" -lt "$INDEX_JS_GZIP_CEILING_BYTES" ] \
+   && [ "$SAMPLE_ISLAND_GZIP_BYTES" -lt "$SAMPLE_ISLAND_GZIP_CEILING_BYTES" ] \
+   && [ "$(grep -c '^INDEX_JS_GZIP_CEILING_BYTES=' "${BASH_SOURCE[0]}" || true)" -eq 1 ] \
+   && [ "$(grep -c '^SAMPLE_ISLAND_GZIP_CEILING_BYTES=' "${BASH_SOURCE[0]}" || true)" -eq 1 ] \
+   && grep -qx 'INDEX_JS_GZIP_CEILING_BYTES=32000' "${BASH_SOURCE[0]}" \
+   && grep -qx 'SAMPLE_ISLAND_GZIP_CEILING_BYTES=50000' "${BASH_SOURCE[0]}"; then
+  ok "$JS_BUDGET_LABEL (observed: first-load=$INDEX_JS_GZIP_BYTES; deferred=$SAMPLE_LAB_JS_GZIP_BYTES+$SAMPLE_WORKER_GZIP_BYTES=$SAMPLE_ISLAND_GZIP_BYTES)"
+else
+  fail "$JS_BUDGET_LABEL (observed: first-load=$INDEX_JS_GZIP_BYTES/$INDEX_JS_GZIP_CEILING_BYTES; deferred=$SAMPLE_LAB_JS_GZIP_BYTES+$SAMPLE_WORKER_GZIP_BYTES=$SAMPLE_ISLAND_GZIP_BYTES/$SAMPLE_ISLAND_GZIP_CEILING_BYTES; constants must remain literal and unique)"
+fi
 
 # ===========================================================================
 # Check 13 (A5 size tripwire, M1 gate round 3): hard gzip ceiling on
@@ -2894,6 +2929,12 @@ fi
 rm -f "$M4_PROTOCOL_PY"
 
 # ===========================================================================
+# LEGACY SIZE LEDGER NOTE: M3's embedded-corpus projection below stopped being
+# predictive when M6 moved the corpus into fetched bundles. M16 replaces the
+# live instrument with an artifact ledger that records the actual executable,
+# first-load JS, deferred JS island, and fetched bundle costs. The old formula
+# remains below (disabled) as provenance for state/size-ledger.tsv.
+#
 # THE SIZE LEDGER (M3 harness, task "harness", item 4): a standing
 # instrument, not a check that goes red -- see the WASM_GZIP_CEILING_BYTES
 # comment above for the actual gate. This exists so "the full course does
@@ -2937,6 +2978,27 @@ SXC1_SIZE_LEDGER_TARGET_EXERCISES=435
 # call (PLAN.md), not a build-breaking assertion this task may add.
 # ===========================================================================
 SIZE_LEDGER_DIR="$REPO_ROOT/state"
+ARTIFACT_LEDGER_FILE="$SIZE_LEDGER_DIR/artifact-size-ledger.tsv"
+mkdir -p "$SIZE_LEDGER_DIR"
+if [ ! -f "$ARTIFACT_LEDGER_FILE" ]; then
+  printf 'timestamp\tapp_wasm_gzip_bytes\tindex_js_gzip_bytes\tsample_island_gzip_bytes\tcontent_bundles_gzip_bytes\tmanual_bundles_gzip_bytes\n' > "$ARTIFACT_LEDGER_FILE"
+fi
+ARTIFACT_CONTENT_GZIP="${BUNDLE_COMBINED_GZIP:--1}"
+ARTIFACT_MANUAL_GZIP="${MANUAL_COMBINED_GZIP:--1}"
+if [ "${WASM_GZIP_BYTES:--1}" -ge 0 ] \
+   && [ "$INDEX_JS_GZIP_BYTES" -ge 0 ] \
+   && [ "$SAMPLE_ISLAND_GZIP_BYTES" -ge 0 ]; then
+  printf '%s\t%d\t%d\t%d\t%d\t%d\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$WASM_GZIP_BYTES" "$INDEX_JS_GZIP_BYTES" \
+    "$SAMPLE_ISLAND_GZIP_BYTES" "$ARTIFACT_CONTENT_GZIP" "$ARTIFACT_MANUAL_GZIP" \
+    >> "$ARTIFACT_LEDGER_FILE"
+  ok "artifact size ledger: recorded actual wasm, first-load JS, deferred Sample Lab island, and fetched bundle gzips to state/artifact-size-ledger.tsv"
+else
+  fail "artifact size ledger: recorded actual wasm, first-load JS, deferred Sample Lab island, and fetched bundle gzips to state/artifact-size-ledger.tsv (observed: a required artifact measurement was unavailable)"
+fi
+
+# Historical M3 projection implementation retained but no longer executed.
+if false; then
 SIZE_LEDGER_FILE="$SIZE_LEDGER_DIR/size-ledger.tsv"
 mkdir -p "$SIZE_LEDGER_DIR"
 if [ ! -f "$SIZE_LEDGER_FILE" ]; then
@@ -2991,6 +3053,7 @@ PYEOF
   fi
 else
   fail "size ledger: recorded app.wasm/corpus/projection to state/size-ledger.tsv (observed: missing content/exercises/, python3, or app.wasm -- see checks above)"
+fi
 fi
 
 # ===========================================================================
@@ -4877,7 +4940,7 @@ DEVICE_SUITE_LABEL="device assertions D1..D27 ran and passed inside check 7's ro
 CONTENT_MISSING_LABEL="fetch-failure degradation: served without the exercise content bundles the app still boots, names the failure, keeps manuals readable, and offers a retry (browser-check --check-content-missing, 4/4)"
 # M6 gate round 1 (briefs/M6-codex-gate1.json, findings M6-R1-1 and
 # M6-R1-5) -- see usage() checks 24 and 25 and each stage's own comment.
-BAD_BUNDLE_LABEL="bad-bundle rejection: five 200-response bundles (wrong language, stale text, delimiter-complete truncation, zero decks, one deck missing) each produce the VISIBLE #sxc1-content-error alert with ZERO decks rendered, while an unsabotaged control served beside them renders the whole 50-deck course (browser-check --check-bad-bundle, 12/12)"
+BAD_BUNDLE_LABEL="bad-bundle rejection: five 200-response bundles (wrong language, stale text, delimiter-complete truncation, zero decks, one deck missing) each produce the VISIBLE #sxc1-content-error alert with ZERO decks rendered, while an unsabotaged control served beside them renders the whole 51-deck course (browser-check --check-bad-bundle, 12/12)"
 STALLED_LABEL="stalled-fetch deadline: with the content bundle answered 200-then-never-finished, the app still boots inside the fetch deadline, names the TIMEOUT in the visible #sxc1-content-error banner, keeps the manuals readable and offers #btn-content-retry (browser-check --check-content-stalled, 4/4)"
 HINT_SPLIT_LABEL="ui/content language split: with ONLY the sxc1.uilang key's writes failing, the UI-language toggle does NOT reload onto the stale hint -- it switches in memory, degrades storage honestly (uiLang=ja, contentLang=en, available=false), renders the VISIBLE #sxc1-lang-split alert with #btn-lang-resync, and moves document lang (browser-check --check-hint-write-failure, 4/4)"
 # M6 W2: the ui-language toggle roundtrip stage -- see usage() check 22.

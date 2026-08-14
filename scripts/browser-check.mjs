@@ -469,7 +469,7 @@ Options:
                        alert AND zero decks in #sxc1-exercise-stats with
                        the degraded #/x notice -- never a smaller-but-
                        "healthy" course; the control must show no banner
-                       and the whole 50-deck course. Nothing is injected:
+                       and the whole 51-deck course. Nothing is injected:
                        the served bytes are the input.
   --check-content-stalled
                        M6 gate round 1 (finding M6-R1-5) stalled-fetch
@@ -526,7 +526,7 @@ Options:
                        VISIBLE #sxc1-content-error alert and the named
                        #sxc1-manual-degraded body with #btn-content-retry
                        on a real manual route, WHILE the exercise course
-                       still reports its whole 50 decks; the control must
+                       still reports its whole 51 decks; the control must
                        show no banner, a readable manual page and the
                        whole course. 14/14. Nothing is injected: the
                        SERVED BYTES are the input.
@@ -2649,7 +2649,7 @@ const COLD_BASELINE_ASSERTION_NAME =
 // M3 harness wave, urgent item: the RACE FIX for #sxc1-prompt-baseline.
 // This used to sample the element ONCE, immediately after the cold
 // target reported window.__SXC1_BOOTED === true. Measured (M3 designer,
-// against the full 50-deck/352-exercise artifact, which boots slower
+// against the full 51-deck/355-exercise artifact, which boots slower
 // than M2's): 1 failure in 7 runs on the slower artifact, 0 in 5 on a
 // faster one, then five clean re-runs of that SAME slow artifact right
 // after -- classic timing-window inference (house verification standard
@@ -2793,7 +2793,7 @@ const UILANG_ROUNDTRIP_ASSERTION_NAME =
 // is available in Japanese" a checked claim rather than a shipped file.
 //
 // Everything above pins the UI STRINGS (I18n.hs) under ja; these pin the
-// COURSE: the Japanese the 50 live decks are translated into,
+// COURSE: the Japanese the 51 live decks are translated into,
 // fetched from the bundle the site actually ships, rendered by the real
 // wasm, all the way through completing a quiz in Japanese.
 //
@@ -2816,7 +2816,7 @@ const UILANG_ROUNDTRIP_ASSERTION_NAME =
 // perturb what those assertions observe.
 // ---------------------------------------------------------------------------
 const JA_COURSE_PINS = {
-  totals: { decks: 50, exercises: 352 },
+  totals: { decks: 51, exercises: 355 },
   deck: {
     slug: 'pad-04',
     route: '#/x/pad-04',
@@ -2911,7 +2911,7 @@ const JA_MANUAL_TOC_ASSERTION_NAME =
   'ja manual: [JAM4] the manual TOC renders the Japanese outline (a pinned JA section link) with no .manual-fallback-note anywhere';
 
 const JA_COURSE_BUNDLE_ASSERTION_NAME =
-  'ja course: [JAC1] the SHIPPED ja bundle carries the whole course -- #sxc1-exercise-stats reports 50 decks / 352 exercises and the pinned deck\'s title is its JAPANESE title (an EN-fallback ja bundle fails here)';
+  'ja course: [JAC1] the SHIPPED ja bundle carries the whole course -- #sxc1-exercise-stats reports 51 decks / 355 exercises and the pinned deck\'s title is its JAPANESE title (an EN-fallback ja bundle fails here)';
 const JA_COURSE_INDEX_ASSERTION_NAME =
   'ja course: [JAC2] the deck index card, the deck page title and the deck summary: all render the corpus Japanese for the pinned deck';
 const JA_COURSE_QUIZ_RENDER_ASSERTION_NAME =
@@ -4161,7 +4161,7 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
         && sampleInboxJa.add === 'サンプルを追加'
         && sampleInboxJa.fill === '空きパッドへ配置'
         && sampleInboxJa.send === 'プロジェクトをスマートフォンへ送る'
-        && sampleInboxJa.handoff === 'スマートフォンで引き渡し開始',
+        && ['スマートフォンで引き渡し開始', 'スマートフォンで引き渡し再開'].includes(sampleInboxJa.handoff),
       sampleInboxJa,
     );
 
@@ -6853,8 +6853,8 @@ const BAD_BUNDLE_CASES = [
   { dir: 'missing-deck', why: 'one whole deck removed, header count adjusted' },
 ];
 const BAD_BUNDLE_HEALTHY_DIR = 'healthy';
-const BAD_BUNDLE_EXPECT_DECKS = 50;
-const BAD_BUNDLE_EXPECT_EXERCISES = 352;
+const BAD_BUNDLE_EXPECT_DECKS = 51;
+const BAD_BUNDLE_EXPECT_EXERCISES = 355;
 
 async function runBadBundleCheck(opts) {
   const deadline = Date.now() + opts.timeout;
@@ -7511,7 +7511,7 @@ async function runJaToggleCheck(opts) {
 // Each case asserts BOTH halves, because INDEPENDENCE is the actual
 // claim: the visible role=alert banner AND the named
 // #sxc1-manual-degraded body with #btn-content-retry on a real manual
-// route, WHILE #sxc1-exercise-stats still reports the whole 50-deck
+// route, WHILE #sxc1-exercise-stats still reports the whole 51-deck
 // course. A bad manual bundle must not take the course down with it,
 // and a shared "everything failed" state would hide exactly that.
 // ---------------------------------------------------------------------------
@@ -7524,7 +7524,7 @@ const BAD_MANUAL_CASES = [
   { dir: 'm-missing', why: 'the manual bundle file absent altogether (404)' },
 ];
 const BAD_MANUAL_HEALTHY_DIR = 'm-healthy';
-const BAD_MANUAL_EXPECT_DECKS = 50;
+const BAD_MANUAL_EXPECT_DECKS = 51;
 const BAD_MANUAL_ROUTE = '#/m/guide-book/p/15';
 
 async function runBadManualBundleCheck(opts) {
@@ -9130,7 +9130,7 @@ async function main() {
         "today's session builds a stable five-card mobile plan and carries its coach into the runner",
         "today's session marks a finished card and advances to the next planned card",
         'weekly pulse turns bounded local history and saved schedules into a seven-day phone-first reflection',
-        'mastery journey turns 50 skills and 49 prerequisites into a three-step queue and progressively disclosed chapter trail',
+        'mastery journey turns 51 skills and 50 prerequisites into a three-step queue and progressively disclosed chapter trail',
         'unsupported mobile WebAssembly fails fast with recovery guidance before app.wasm is requested',
         'panel-identification cards render their cited diagram beside the question',
         'flashcards quiz an actual choice, replace each two-action decision with Again/Hard or Good/Easy, advance without a repeat prompt, and persist the chosen grade',
@@ -9218,7 +9218,7 @@ async function main() {
         Boolean(pwaState
           && pwaState.state?.supported === true && pwaState.state.registered === true
           && pwaState.state.ready === true && pwaState.state.offlineCapable === true
-          && pwaState.state.cacheVersion === 'm15-v1' && pwaState.controlled === true
+          && pwaState.state.cacheVersion === 'm16-v1' && pwaState.controlled === true
           && pwaState.state.scope === expectedScope
           && pwaState.manifestStatus === 200
           && pwaState.manifest?.start_url === './#/x/today'
@@ -10201,7 +10201,7 @@ async function main() {
           && sampleLibrary.afterConcurrent.catalogMatches === 1 && sampleLibrary.afterConcurrent.inboxMatches === 1
           && sampleLibrary.visibleName === 1
           && sampleLibrary.selectedActions.join(',') === 'btn-sample-library-inbox,btn-sample-library-edit'
-          && sampleLibrary.editorActions.join(',') === 'btn-sample-library-done,btn-sample-library-remove'
+          && sampleLibrary.editorActions.join(',') === 'btn-sample-library-done,btn-sample-sound-check'
           && sampleLibrary.originalAfterReuse.id === legacyProjectId
           && sampleLibrary.originalAfterReuse.inbox === 4
           && sampleLibrary.originalAfterReuse.assigned === 4
@@ -10457,7 +10457,309 @@ async function main() {
       );
       await click('#btn-sample-validation-back');
 
-      // -- 3f. The focused coach is a deterministic, tab-scoped snapshot:
+      // -- 3f. M16 Sound Check. Analysis is an explicit, worker-owned read
+      // of the WAV bytes; its recipe advances by replacing controls rather
+      // than adding them. A revised export keeps one backward link, repoints
+      // the original across projects, and lets M15's blob-aware identity
+      // preserve the receipt for the unchanged pad while re-queuing only the
+      // changed one.
+      const soundCheckBeforeUse = await evaluate(`(async () => {
+        const waitFor = async (test, timeout = 12000) => {
+          const start = Date.now();
+          while (Date.now() - start < timeout) {
+            if (test()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          return Boolean(test());
+        };
+        const makeWav = (sampleRate, channels, mode) => {
+          const frames = mode === 'raw' ? 12000 : 4800;
+          const blockAlign = channels * 2;
+          const bytes = new ArrayBuffer(44 + frames * blockAlign);
+          const view = new DataView(bytes);
+          const ascii = (offset, text) => {
+            for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+          };
+          ascii(0, 'RIFF');
+          view.setUint32(4, 36 + frames * blockAlign, true);
+          ascii(8, 'WAVE');
+          ascii(12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, channels, true);
+          view.setUint32(24, sampleRate, true);
+          view.setUint32(28, sampleRate * blockAlign, true);
+          view.setUint16(32, blockAlign, true);
+          view.setUint16(34, 16, true);
+          ascii(36, 'data');
+          view.setUint32(40, frames * blockAlign, true);
+          const seed = mode === 'candidate' ? 17 : 0;
+          for (let frame = 0; frame < frames; frame += 1) {
+            const edgeSilence = mode === 'raw' && (frame < 3000 || frame >= 7000);
+            const sample = edgeSilence ? 0
+              : (mode === 'raw' && frame === 4000 ? 32767 : Math.round(Math.sin((frame + seed) / 11) * 10000));
+            for (let channel = 0; channel < channels; channel += 1) {
+              view.setInt16(44 + frame * blockAlign + channel * 2, sample, true);
+            }
+          }
+          return bytes;
+        };
+        const addLibraryFiles = async (files) => {
+          const before = window.__SXC1_SAMPLE_LAB.libraryItems.length;
+          const input = document.querySelector('#sample-library-input');
+          const transfer = new DataTransfer();
+          files.forEach((file) => transfer.items.add(file));
+          input.files = transfer.files;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          await waitFor(() => window.__SXC1_SAMPLE_LAB.libraryItems.length === before + files.length);
+        };
+        const selectAsset = (id) => document.querySelector('.sample-library-card[data-library-id="' + id + '"]')?.click();
+        const addAssetToInbox = async (id) => {
+          selectAsset(id);
+          document.querySelector('#btn-sample-library-inbox')?.click();
+          await waitFor(() => window.__SXC1_SAMPLE_LAB.librarySelection === null);
+        };
+        const createProject = async (name) => {
+          document.querySelector('#btn-sample-project-new')?.click();
+          const field = document.querySelector('#sample-new-project-name');
+          field.value = name;
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+          document.querySelector('#btn-sample-project-create')?.click();
+          await waitFor(() => window.__SXC1_SAMPLE_LAB.projectName === name);
+          return window.__SXC1_SAMPLE_LAB.projectId;
+        };
+        const switchProject = async (id) => {
+          const chooser = document.querySelector('#sample-project-select');
+          chooser.value = id;
+          chooser.dispatchEvent(new Event('change', { bubbles: true }));
+          await waitFor(() => window.__SXC1_SAMPLE_LAB.projectId === id);
+        };
+
+        const soundProjectId = await createProject('Sound Check Set');
+        await addLibraryFiles([
+          new File([makeWav(44100, 1, 'raw')], 'sound-check-raw.wav', { type: 'audio/wav' }),
+          new File([makeWav(48000, 2, 'ready')], 'sound-check-control.wav', { type: 'audio/wav' }),
+        ]);
+        const raw = window.__SXC1_SAMPLE_LAB.libraryItems.find((item) => item.filename === 'sound-check-raw.wav');
+        const control = window.__SXC1_SAMPLE_LAB.libraryItems.find((item) => item.filename === 'sound-check-control.wav');
+        await addAssetToInbox(raw.id);
+        await addAssetToInbox(control.id);
+        document.querySelector('#btn-sample-inbox-fill')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.assignedPads.length === 2);
+
+        document.querySelector('#btn-sample-handoff')?.click();
+        await waitFor(() => ['validation', 'handoff'].includes(document.querySelector('#sxc1-sample-lab')?.dataset.view));
+        document.querySelector('#btn-sample-validation-continue')?.click();
+        await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'handoff');
+        const anchorClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function captureSoundCheckDownload() {};
+        try {
+          while (document.querySelector('#sxc1-sample-lab')?.dataset.view === 'handoff') {
+            document.querySelector('#btn-sample-share-file')?.click();
+            await waitFor(() => document.querySelector('#btn-sample-handoff-loaded'));
+            document.querySelector('#btn-sample-handoff-loaded')?.click();
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+        } finally {
+          HTMLAnchorElement.prototype.click = anchorClick;
+        }
+        const loadedReceipt = window.__SXC1_SAMPLE_LAB.handoff?.counts || null;
+        document.querySelector('#btn-sample-handoff-finish')?.click();
+        await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'planner');
+
+        const mirrorProjectId = await createProject('Sound Check Mirror');
+        await addAssetToInbox(raw.id);
+        document.querySelector('#btn-sample-inbox-fill')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.assignedPads.length === 1);
+        await switchProject(soundProjectId);
+
+        selectAsset(control.id);
+        document.querySelector('#btn-sample-library-edit')?.click();
+        document.querySelector('#btn-sample-sound-check')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.soundCheck?.phase === 'result');
+        const readyResult = {
+          ready: window.__SXC1_SAMPLE_LAB.soundCheck?.ready,
+          buttons: Array.from(document.querySelectorAll('.sample-sound-check-card .sample-primary-actions > button')).map((button) => button.id),
+        };
+        document.querySelector('#btn-sample-check-done')?.click();
+        await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'planner');
+
+        selectAsset(raw.id);
+        document.querySelector('#btn-sample-library-edit')?.click();
+        const editorButtons = Array.from(document.querySelectorAll('.sample-library-actions > button')).map((button) => button.id);
+        document.querySelector('#btn-sample-sound-check')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.soundCheck?.phase === 'result');
+        const result = {
+          diagnostics: window.__SXC1_SAMPLE_LAB.soundCheck,
+          criteria: Array.from(document.querySelectorAll('.sample-sound-check-list li')).map((item) => ({
+            code: item.dataset.criterion,
+            status: item.dataset.status,
+            text: item.textContent.trim(),
+          })),
+          buttons: Array.from(document.querySelectorAll('.sample-sound-check-card .sample-primary-actions > button')).map((button) => button.id),
+          recipe: document.querySelector('.sample-recipe')?.textContent || '',
+          learnHref: document.querySelector('.sample-learn-link')?.getAttribute('href') || null,
+        };
+        const nativeClipboard = navigator.clipboard;
+        const nativeExecCommand = document.execCommand;
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          value: { writeText: async () => { throw new Error('clipboard refused'); } },
+        });
+        document.execCommand = () => false;
+        document.querySelector('#btn-sample-recipe-copy')?.click();
+        await waitFor(() => /could not be copied/.test(document.querySelector('#sample-lab-status')?.textContent || ''));
+        const copyFailure = {
+          phase: window.__SXC1_SAMPLE_LAB.soundCheck?.phase,
+          buttons: Array.from(document.querySelectorAll('.sample-sound-check-card .sample-primary-actions > button')).map((button) => button.id),
+        };
+        let copiedRecipeText = '';
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          value: { writeText: async (text) => { copiedRecipeText = text; } },
+        });
+        document.execCommand = nativeExecCommand;
+        document.querySelector('#btn-sample-recipe-copy')?.click();
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.soundCheck?.phase === 'copied');
+        const copiedButtons = Array.from(document.querySelectorAll('.sample-sound-check-card .sample-primary-actions > button')).map((button) => button.id);
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: nativeClipboard });
+        const editedInput = document.querySelector('#sample-edited-version-input');
+        const editedTransfer = new DataTransfer();
+        editedTransfer.items.add(new File([makeWav(48000, 2, 'candidate')], 'sound-check-ready.wav', { type: 'audio/wav' }));
+        editedInput.files = editedTransfer.files;
+        editedInput.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitFor(() => window.__SXC1_SAMPLE_LAB.soundCheck?.phase === 'candidate');
+        const nonWav = await window.__SXC1_SAMPLE_LAB.inspectReadiness(
+          new File([new Uint8Array([1, 2, 3, 4])], 'honest.mp3', { type: 'audio/mpeg' }),
+        );
+        return {
+          soundProjectId,
+          mirrorProjectId,
+          raw,
+          control,
+          readyResult,
+          loadedReceipt,
+          editorButtons,
+          result,
+          copyFailure,
+          copiedRecipeText,
+          copiedButtons,
+          candidate: window.__SXC1_SAMPLE_LAB.soundCheck,
+          candidateButtons: Array.from(document.querySelectorAll('.sample-sound-check-card .sample-primary-actions > button')).map((button) => button.id),
+          candidateRows: document.querySelectorAll('.sample-sound-check-list li').length,
+          nonWav,
+        };
+      })()`);
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
+      }, sessionId);
+      const soundCheckMobile = await evaluate(`(() => ({
+        viewport: innerWidth,
+        scrollWidth: document.scrollingElement?.scrollWidth || null,
+        view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+        rows: document.querySelectorAll('.sample-sound-check-list li').length,
+        buttons: Array.from(document.querySelectorAll('.sample-sound-check-card .sample-primary-actions > button'))
+          .map((button) => ({ id: button.id, height: button.getBoundingClientRect().height })),
+      }))()`);
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      const soundCheckAfterUse = await evaluate(`(async () => {
+        const start = Date.now();
+        document.querySelector('#btn-sample-version-use')?.click();
+        while (Date.now() - start < 8000 && document.querySelector('#sxc1-sample-lab')?.dataset.view !== 'planner') {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        const diagnostics = window.__SXC1_SAMPLE_LAB;
+        const workspace = JSON.parse(localStorage.getItem('sxc1.sample-workspace.v1') || 'null');
+        const library = JSON.parse(localStorage.getItem('sxc1.sample-library.v1') || 'null');
+        const candidate = diagnostics.libraryItems.find((item) => item.filename === 'sound-check-ready.wav');
+        const projectBlobs = (workspace?.projects || []).filter((project) =>
+          ['Sound Check Set', 'Sound Check Mirror'].includes(project.name)
+        ).map((project) => ({
+          name: project.name,
+          blobs: Object.values(project.slots || {}).flatMap((slot) => Object.values(slot.pads || {}).map((pad) => pad.blobId)),
+        }));
+        const exported = await diagnostics.exportProjectBlob();
+        const header = await exported.slice(0, 12).arrayBuffer();
+        const manifestLength = new DataView(header).getUint32(8, true);
+        const manifest = JSON.parse(await exported.slice(12, 12 + manifestLength).text());
+        return {
+          view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+          status: document.querySelector('#sample-lab-status')?.textContent || null,
+          candidate,
+          original: diagnostics.libraryItems.find((item) => item.id === candidate?.replacesId),
+          projectBlobs,
+          activePads: diagnostics.assignedPads,
+          handoff: diagnostics.handoff,
+          libraryPersisted: library,
+          manifestSchema: manifest.schema,
+          manifestBlobIds: manifest.files.map((item) => item.id),
+        };
+      })()`);
+      const soundCheckReloaded = await reloadPage('#sample-library-heading', 20000);
+      const soundCheckAfterReload = await evaluate(`(() => {
+        const diagnostics = window.__SXC1_SAMPLE_LAB;
+        const candidate = diagnostics?.libraryItems?.find((item) => item.filename === 'sound-check-ready.wav');
+        return {
+          candidate,
+          original: diagnostics?.libraryItems?.find((item) => item.id === candidate?.replacesId),
+          handoff: diagnostics?.handoff || null,
+          activePads: diagnostics?.assignedPads || [],
+        };
+      })()`);
+      const criterionMap = Object.fromEntries((soundCheckBeforeUse?.result?.criteria || []).map((item) => [item.code, item.status]));
+      report(
+        'Sound Check derives an exact local recipe and safely replaces one sound across projects and handoff receipts',
+        Boolean(soundCheckBeforeUse?.raw?.id && soundCheckBeforeUse.control?.id
+          && soundCheckBeforeUse.loadedReceipt?.loaded === 2
+          && soundCheckBeforeUse.readyResult?.ready === true
+          && soundCheckBeforeUse.readyResult.buttons.join(',') === 'btn-sample-check-done'
+          && soundCheckBeforeUse.editorButtons.join(',') === 'btn-sample-library-done,btn-sample-sound-check'
+          && soundCheckBeforeUse.result?.diagnostics?.ready === false
+          && criterionMap.format === 'pass' && criterionMap.rate === 'fail'
+          && criterionMap.depth === 'pass' && criterionMap.channels === 'fail'
+          && criterionMap.clipping === 'advisory' && criterionMap.silence === 'advisory'
+          && soundCheckBeforeUse.result.buttons.join(',') === 'btn-sample-recipe-copy,btn-sample-check-done'
+          && /48000 Hz/.test(soundCheckBeforeUse.result.recipe)
+          && /Signed 16-bit PCM/.test(soundCheckBeforeUse.result.recipe)
+          && /Show Clipping/.test(soundCheckBeforeUse.result.recipe)
+          && /Trim Audio/.test(soundCheckBeforeUse.result.recipe)
+          && soundCheckBeforeUse.result.learnHref === '#/x/lvl-16'
+          && soundCheckBeforeUse.copyFailure?.phase === 'result'
+          && soundCheckBeforeUse.copyFailure.buttons.join(',') === 'btn-sample-recipe-copy,btn-sample-check-done'
+          && /Show Clipping/.test(soundCheckBeforeUse.copiedRecipeText || '')
+          && soundCheckBeforeUse.copiedButtons.join(',') === 'btn-sample-version-import,btn-sample-check-done'
+          && soundCheckBeforeUse.candidate?.candidateReady === true
+          && soundCheckBeforeUse.candidateButtons.join(',') === 'btn-sample-version-use,btn-sample-version-keep'
+          && soundCheckBeforeUse.candidateRows === 8
+          && soundCheckBeforeUse.nonWav?.kind === 'other' && soundCheckBeforeUse.nonWav?.scan?.status === 'not-wav'
+          && soundCheckMobile?.viewport === 320 && soundCheckMobile.scrollWidth <= 320
+          && soundCheckMobile.view === 'sound-check' && soundCheckMobile.rows === 8
+          && soundCheckMobile.buttons.length === 2
+          && soundCheckMobile.buttons.every((button) => button.height >= 44)
+          && soundCheckAfterUse?.view === 'planner'
+          && /Updated 2 placement/.test(soundCheckAfterUse.status || '')
+          && soundCheckAfterUse.candidate?.replacesId === soundCheckBeforeUse.raw.id
+          && soundCheckAfterUse.candidate?.readiness?.ready === true
+          && soundCheckAfterUse.original?.id === soundCheckBeforeUse.raw.id
+          && ['rate', 'channels', 'clipping', 'silence'].every((code) => soundCheckAfterUse.original?.readiness?.findings?.includes(code))
+          && soundCheckAfterUse.projectBlobs.length === 2
+          && soundCheckAfterUse.projectBlobs.every((project) => project.blobs.includes(soundCheckAfterUse.candidate.blobId))
+          && soundCheckAfterUse.activePads.some((pad) => pad.blobId === soundCheckAfterUse.candidate.blobId)
+          && soundCheckAfterUse.activePads.some((pad) => pad.blobId === soundCheckBeforeUse.control.blobId)
+          && soundCheckAfterUse.handoff?.counts?.pending === 1 && soundCheckAfterUse.handoff?.counts?.loaded === 1
+          && soundCheckAfterUse.handoff.entries.filter((entry) => entry.status === 'loaded')[0]?.blobId === soundCheckBeforeUse.control.blobId
+          && soundCheckAfterUse.manifestSchema === 1
+          && soundCheckAfterUse.manifestBlobIds.includes(soundCheckAfterUse.candidate.blobId)
+          && !soundCheckAfterUse.manifestBlobIds.includes(soundCheckBeforeUse.raw.blobId)
+          && soundCheckReloaded
+          && soundCheckAfterReload?.candidate?.replacesId === soundCheckBeforeUse.raw.id
+          && soundCheckAfterReload.original?.id === soundCheckBeforeUse.raw.id
+          && soundCheckAfterReload.handoff?.counts?.pending === 1 && soundCheckAfterReload.handoff?.counts?.loaded === 1
+          && soundCheckAfterReload.activePads.some((pad) => pad.blobId === soundCheckAfterReload.candidate.blobId)),
+        { soundCheckBeforeUse, soundCheckMobile, soundCheckAfterUse, soundCheckReloaded, soundCheckAfterReload },
+      );
+
+      // -- 3g. The focused coach is a deterministic, tab-scoped snapshot:
       // route changes never reshuffle it, all five cards are unique links, and
       // opening one carries an out-of-tree session bar into the live runner.
       // A fresh profile has no due or partial work, so all five reasons must be
@@ -10679,15 +10981,15 @@ async function main() {
         };
       })()`);
       report(
-        'mastery journey turns 50 skills and 49 prerequisites into a three-step queue and progressively disclosed chapter trail',
+        'mastery journey turns 51 skills and 50 prerequisites into a three-step queue and progressively disclosed chapter trail',
         Boolean(masteryMap
           && masteryMap.state && masteryMap.state.mounted === true && masteryMap.state.renderer === 'dom'
-          && masteryMap.state.nodeCount === 50 && masteryMap.state.edgeCount === 49
+          && masteryMap.state.nodeCount === 51 && masteryMap.state.edgeCount === 50
           && masteryMap.queueCount === 3 && masteryMap.queueAllLinks
           && masteryMap.recommendedCount === 1
-          && masteryMap.fullListCount === 50 && masteryMap.allNamed && masteryMap.noLocks
+          && masteryMap.fullListCount === 51 && masteryMap.allNamed && masteryMap.noLocks
           && masteryMap.chapterCount >= 5 && masteryMap.chapterChanged && masteryMap.selectedTabs === 1
-          && masteryMap.trailCount > 0 && masteryMap.trailCount < 50 && masteryMap.trailHasContext
+          && masteryMap.trailCount > 0 && masteryMap.trailCount < 51 && masteryMap.trailHasContext
           && masteryMap.progressCount >= 2 && masteryMap.weeklyHref === '#/x/week'
           && masteryMap.canvasCount === 0),
         masteryMap,

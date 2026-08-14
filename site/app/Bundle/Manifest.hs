@@ -97,27 +97,28 @@ manifestDecks =
   , "098-lvl-13.ex.md"
   , "100-lvl-14.ex.md"
   , "102-lvl-15.ex.md"
+  , "104-lvl-16.ex.md"
   ]
 
 manifestDeckCount :: Int
-manifestDeckCount = 50
+manifestDeckCount = 51
 
 -- | Aggregate corpus counts, derived at build time from the SAME
 -- emission the bundles are written from and identical for both
 -- languages (the emitter refuses to emit when they disagree).
 manifestExercises :: Int
-manifestExercises = 352
+manifestExercises = 355
 
 manifestPrompts :: Int
-manifestPrompts = 467
+manifestPrompts = 470
 
 -- | FNV-1a\/32 over the WHOLE emitted exercise bundle's UTF-8 bytes --
 -- the catch-all identity check
 -- ("Exercises.Corpus".'Exercises.Corpus.fnv1a32' recomputes it over the
 -- fetched text). 'Nothing' for a language this build did not emit.
 manifestFingerprint :: Text -> Maybe Word32
-manifestFingerprint "en" = Just 770179603
-manifestFingerprint "ja" = Just 2747662516
+manifestFingerprint "en" = Just 636493608
+manifestFingerprint "ja" = Just 3410524726
 manifestFingerprint _    = Nothing
 
 -- | Every manual document slug, in the reader's fixed presentation

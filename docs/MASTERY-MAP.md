@@ -11,7 +11,7 @@ does not replace the dominant green Start/Continue action.
 
 ## Product contract
 
-- The 50 decks and their 49 authored `requires:` relationships remain the
+- The 51 decks and their 50 authored `requires:` relationships remain the
   source of truth. There is no second hand-maintained curriculum.
 - Prerequisites are advisory. They affect readiness and explanatory context;
   every deck remains a normal link and is never disabled.
@@ -51,7 +51,7 @@ The route has four progressively disclosed layers:
 1. an overall Strong count and five evidence totals;
 2. a three-item, due-first “Your next moves” queue;
 3. one chapter trail at a time, selected with native keyboard-operable tabs;
-4. a collapsed complete list of all 50 linked skills.
+4. a collapsed complete list of every linked skill.
 
 The chapter trail preserves dependency intelligence without rendering a spatial
 graph. Each row says which authored skills it builds on and whether those
@@ -89,7 +89,7 @@ The exercise self-test pins prompt/deck tiers, authored edge direction,
 topological depth, deterministic coordinates, due-first recommendation, and the
 advisory prerequisite rule.
 
-The live journey assertion requires 50 linked skills, 49 authored dependencies,
+The live journey assertion requires 51 linked skills, 50 authored dependencies,
 one recommendation, a three-item action queue, native chapter tabs, a rich trail
 smaller than the full course, prerequisite context, native progress meters, and
 zero canvases. A separate mobile negative-path assertion impersonates an older
