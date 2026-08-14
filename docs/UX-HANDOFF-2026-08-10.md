@@ -7,12 +7,12 @@ round of work.
 ## Current production state
 
 - Production: <https://sexy-one-gray.vercel.app/>
-- Vercel deployment: `dpl_CririMi6Sih9mjsaSpxVzvEJeizk`
-- Immutable deployment URL: <https://sexy-8jn943fvq-roberts-projects-19fe2013.vercel.app/>
+- Vercel deployment: `dpl_2UkEUH1aqSZXJBe6i3B1vu81jjJC`
+- Immutable deployment URL: <https://sexy-2v7na4r7d-roberts-projects-19fe2013.vercel.app/>
 - Course: 50 decks, 352 exercises, 467 prompts; no page-lookup exercises.
-- Last complete local gate: 136/136 checks, with 240/240 browser assertions at
+- Last complete local gate: 136/136 checks, with 241/241 browser assertions at
   both the origin root and a nested deployment path.
-- Last production quick gate: 76/76 assertions.
+- Last production quick gate: 77/77 assertions.
 
 ## Product decisions to preserve
 
@@ -90,6 +90,11 @@ round of work.
     exactly `Skip for now` / `Yes — done`; Skip records all remaining prompts as
     skipped and due, then continues. Do not make absence from the device look like
     mastery, and do not strand the learner on a repeat-card summary.
+17. Phone handoff never equates sharing a file with loading a pad. Keep the
+    two-step replacement flow `Share/Skip` → `Loaded/Problem`, advance from the
+    recorded outcome without a Next button, and persist the exact cursor plus
+    receipt independently from the project. Retrying unresolved rows must keep
+    Loaded rows complete. See `docs/PHONE-BRIDGE.md`.
 
 ## Regression anchors
 
@@ -113,13 +118,17 @@ round of work.
 - The mobile boot regressions cap initial WASM memory at 24 MiB and impersonate
   an older iPhone engine to prove it receives recovery guidance without an
   `app.wasm` request.
-- The phone-ready regressions require a registered `m14-v2` worker, relative
+- The phone-ready regressions require a registered `m15-v1` worker, relative
   standalone manifest, real network-disabled WASM boot at root and nested scope,
   the visible offline live region, byte-identical `.sxc1` download/file load,
   no pre-commit storage mutation, and a 320 px passport layout.
 - The Weekly Pulse regression pins a three-active-day fixture, four tracked
   answers, exact `[1,0,1,0,0,0,1]` review outlook, strengths, friction,
   due-first focus, Japanese chrome, zero canvases, and both small-phone sweeps.
+- The Phone Bridge regression reloads while Loaded/Problem is pending, resumes
+  the exact destination, records four mixed outcomes with automatic advance,
+  checks the 320 px receipt and retry path, corrupts only the receipt ledger,
+  and opens a portable phone import directly in handoff review.
 
 ## Build, verification, and deployment
 

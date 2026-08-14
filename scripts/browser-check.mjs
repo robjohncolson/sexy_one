@@ -4150,6 +4150,7 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
       padMap: document.querySelector('#sample-pad-heading')?.textContent.trim() || null,
       add: document.querySelector('#btn-sample-inbox-add')?.textContent.trim() || null,
       fill: document.querySelector('#btn-sample-inbox-fill')?.textContent.trim() || null,
+      send: document.querySelector('#btn-sample-project-export')?.textContent.trim() || null,
       handoff: document.querySelector('#btn-sample-handoff')?.textContent.trim() || null,
     }))()`);
     report(
@@ -4159,7 +4160,8 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
         && sampleInboxJa.padMap === 'パッド配置'
         && sampleInboxJa.add === 'サンプルを追加'
         && sampleInboxJa.fill === '空きパッドへ配置'
-        && sampleInboxJa.handoff === 'スマートフォンへ',
+        && sampleInboxJa.send === 'プロジェクトをスマートフォンへ送る'
+        && sampleInboxJa.handoff === 'スマートフォンで引き渡し開始',
       sampleInboxJa,
     );
 
@@ -9216,7 +9218,7 @@ async function main() {
         Boolean(pwaState
           && pwaState.state?.supported === true && pwaState.state.registered === true
           && pwaState.state.ready === true && pwaState.state.offlineCapable === true
-          && pwaState.state.cacheVersion === 'm14-v2' && pwaState.controlled === true
+          && pwaState.state.cacheVersion === 'm15-v1' && pwaState.controlled === true
           && pwaState.state.scope === expectedScope
           && pwaState.manifestStatus === 200
           && pwaState.manifest?.start_url === './#/x/today'
@@ -9755,7 +9757,7 @@ async function main() {
           && sampleLab.imported === true && sampleLab.legacyImported === true
           && sampleLab.legacyInboxCount === 0
           && sampleLab.plannerButtons.join(',') === 'btn-sample-project-export,btn-sample-handoff'
-          && sampleLab.handoffButtons.join(',') === 'btn-sample-share-file,btn-sample-next-pad'
+          && sampleLab.handoffButtons.join(',') === 'btn-sample-share-file,btn-sample-skip-pad'
           && sampleLab.handoffView === 'handoff'
           && sampleLab.destination === 'A / BANK 15 / PAD 1'
           && /1.*1/.test(sampleLab.progress || '')
@@ -9765,7 +9767,9 @@ async function main() {
           && sampleLabMobile.buttonHeights.every((height) => height >= 44)),
         { sampleLab, sampleLabMobile },
       );
-      await click('#btn-sample-next-pad');
+      await click('#btn-sample-skip-pad');
+      await waitForTrue(evaluate, "Boolean(document.querySelector('#btn-sample-handoff-finish'))", 8000);
+      await click('#btn-sample-handoff-finish');
 
       // -- 3c. M13 Sample Inbox. This drives both placement modes (desktop
       // drag and touch/keyboard-friendly select-then-pad), a non-destructive
@@ -10225,7 +10229,235 @@ async function main() {
           corruptLibraryRecovery, sampleLibraryMobile },
       );
 
-      // -- 3e. The focused coach is a deterministic, tab-scoped snapshot:
+      // -- 3e. M15 Phone Bridge. The per-pad decision is a persisted state
+      // machine, not a loose Next button: Share/Skip is replaced by
+      // Loaded/Problem, every terminal decision advances automatically, a
+      // reload resumes the exact shared pad, and the final receipt survives a
+      // second reload. Corrupting only the bounded handoff ledger must not
+      // disturb the valid M14 workspace/library. A user-facing project import
+      // lands directly in the handoff review while schema 1 remains unchanged.
+      const phoneBridgeStart = await evaluate(`(async () => {
+        const waitFor = async (test, timeout = 8000) => {
+          const start = Date.now();
+          while (Date.now() - start < timeout) {
+            if (test()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          return Boolean(test());
+        };
+        let projectDownload = null;
+        const projectClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function captureProject() { projectDownload = this.download || null; };
+        try {
+          document.querySelector('#btn-sample-project-export')?.click();
+          await waitFor(() => projectDownload);
+        } finally {
+          HTMLAnchorElement.prototype.click = projectClick;
+        }
+        document.querySelector('#btn-sample-handoff')?.click();
+        await waitFor(() => ['validation', 'handoff'].includes(document.querySelector('#sxc1-sample-lab')?.dataset.view));
+        document.querySelector('#btn-sample-validation-continue')?.click();
+        await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'handoff');
+        const before = {
+          destination: document.querySelector('.sample-handoff-destination')?.textContent.trim() || null,
+          buttons: Array.from(document.querySelectorAll('.sample-handoff-card .sample-primary-actions > button')).map((button) => button.id),
+        };
+        let downloaded = null;
+        const originalClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function captureDownload() { downloaded = this.download || null; };
+        try {
+          document.querySelector('#btn-sample-share-file')?.click();
+          await waitFor(() => document.querySelector('#btn-sample-handoff-loaded'));
+        } finally {
+          HTMLAnchorElement.prototype.click = originalClick;
+        }
+        return {
+          projectDownload,
+          before,
+          downloaded,
+          afterButtons: Array.from(document.querySelectorAll('.sample-handoff-card .sample-primary-actions > button')).map((button) => button.id),
+          afterDestination: document.querySelector('.sample-handoff-destination')?.textContent.trim() || null,
+          handoff: window.__SXC1_SAMPLE_LAB?.handoff || null,
+          persisted: JSON.parse(localStorage.getItem('sxc1.sample-handoffs.v1') || 'null'),
+        };
+      })()`);
+      const phoneBridgeReloaded = await reloadPage('#btn-sample-handoff', 20000);
+      const phoneBridgeFlow = await evaluate(`(async () => {
+        const waitFor = async (test, timeout = 8000) => {
+          const start = Date.now();
+          while (Date.now() - start < timeout) {
+            if (test()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          return Boolean(test());
+        };
+        const resumeLabel = document.querySelector('#btn-sample-handoff')?.textContent.trim() || null;
+        document.querySelector('#btn-sample-handoff')?.click();
+        await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'handoff');
+        const resumed = {
+          destination: document.querySelector('.sample-handoff-destination')?.textContent.trim() || null,
+          buttons: Array.from(document.querySelectorAll('.sample-handoff-card .sample-primary-actions > button')).map((button) => button.id),
+        };
+        const destinations = [resumed.destination];
+        document.querySelector('#btn-sample-handoff-loaded')?.click();
+        await waitFor(() => document.querySelector('#btn-sample-skip-pad'));
+        destinations.push(document.querySelector('.sample-handoff-destination')?.textContent.trim() || null);
+        document.querySelector('#btn-sample-skip-pad')?.click();
+        await waitFor(() => {
+          const destination = document.querySelector('.sample-handoff-destination')?.textContent.trim() || null;
+          return destination && destination !== destinations[destinations.length - 1]
+            && document.querySelector('#btn-sample-share-file');
+        });
+        destinations.push(document.querySelector('.sample-handoff-destination')?.textContent.trim() || null);
+
+        const downloads = [];
+        const originalClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function captureDownload() { downloads.push(this.download || null); };
+        try {
+          document.querySelector('#btn-sample-share-file')?.click();
+          await waitFor(() => document.querySelector('#btn-sample-handoff-problem'));
+          document.querySelector('#btn-sample-handoff-problem')?.click();
+          await waitFor(() => document.querySelector('#btn-sample-share-file'));
+          destinations.push(document.querySelector('.sample-handoff-destination')?.textContent.trim() || null);
+          document.querySelector('#btn-sample-share-file')?.click();
+          await waitFor(() => document.querySelector('#btn-sample-handoff-loaded'));
+          document.querySelector('#btn-sample-handoff-loaded')?.click();
+          await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'receipt');
+        } finally {
+          HTMLAnchorElement.prototype.click = originalClick;
+        }
+        return {
+          resumeLabel,
+          resumed,
+          destinations,
+          downloads,
+          view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+          summary: document.querySelector('.sample-handoff-hero .sample-lede')?.textContent.trim() || null,
+          statuses: Array.from(document.querySelectorAll('.sample-receipt-list li')).map((item) => item.dataset.status),
+          buttons: Array.from(document.querySelectorAll('.sample-receipt-card .sample-primary-actions > button')).map((button) => button.id),
+          handoff: window.__SXC1_SAMPLE_LAB?.handoff || null,
+          persisted: JSON.parse(localStorage.getItem('sxc1.sample-handoffs.v1') || 'null'),
+        };
+      })()`);
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
+      }, sessionId);
+      const phoneBridgeMobile = await evaluate(`(() => ({
+        viewport: innerWidth,
+        scrollWidth: document.scrollingElement?.scrollWidth || null,
+        view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+        items: document.querySelectorAll('.sample-receipt-list li').length,
+        buttonHeights: Array.from(document.querySelectorAll('.sample-receipt-card .sample-primary-actions > button'))
+          .map((button) => button.getBoundingClientRect().height),
+      }))()`);
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      const phoneBridgeReceiptReloaded = await reloadPage('#btn-sample-handoff', 20000);
+      const phoneBridgeReceipt = await evaluate(`(async () => {
+        const waitFor = async (test, timeout = 8000) => {
+          const start = Date.now();
+          while (Date.now() - start < timeout) {
+            if (test()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          return Boolean(test());
+        };
+        const reviewLabel = document.querySelector('#btn-sample-handoff')?.textContent.trim() || null;
+        document.querySelector('#btn-sample-handoff')?.click();
+        await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'receipt');
+        const receiptCounts = window.__SXC1_SAMPLE_LAB?.handoff?.counts || null;
+        document.querySelector('#btn-sample-handoff-retry')?.click();
+        await waitFor(() => document.querySelector('#sxc1-sample-lab')?.dataset.view === 'handoff');
+        return {
+          reviewLabel,
+          receiptCounts,
+          retryView: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+          retryButtons: Array.from(document.querySelectorAll('.sample-handoff-card .sample-primary-actions > button')).map((button) => button.id),
+          retryCounts: window.__SXC1_SAMPLE_LAB?.handoff?.counts || null,
+        };
+      })()`);
+      await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
+      const bridgeProjectId = await evaluate(`window.__SXC1_SAMPLE_LAB?.projectId || null`);
+      const bridgeLibraryCount = await evaluate(`window.__SXC1_SAMPLE_LAB?.libraryItems?.length ?? null`);
+      await evaluate(`localStorage.setItem('sxc1.sample-handoffs.v1', '{broken handoff json')`);
+      const phoneBridgeCorruptReloaded = await reloadPage('#btn-sample-handoff', 20000);
+      const phoneBridgeRecovery = await evaluate(`(() => ({
+        projectId: window.__SXC1_SAMPLE_LAB?.projectId || null,
+        library: window.__SXC1_SAMPLE_LAB?.libraryItems?.length ?? null,
+        handoff: window.__SXC1_SAMPLE_LAB?.handoff || null,
+        repaired: JSON.parse(localStorage.getItem('sxc1.sample-handoffs.v1') || 'null'),
+        workspace: JSON.parse(localStorage.getItem('sxc1.sample-workspace.v1') || 'null'),
+        persistedLibrary: JSON.parse(localStorage.getItem('sxc1.sample-library.v1') || 'null'),
+      }))()`);
+      const phoneImportLanding = await evaluate(`(async () => {
+        const waitFor = async (test, timeout = 10000) => {
+          const start = Date.now();
+          while (Date.now() - start < timeout) {
+            if (test()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          return Boolean(test());
+        };
+        const blob = await window.__SXC1_SAMPLE_LAB.exportProjectBlob();
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([blob], 'phone-receipt.sxc1lab', { type: 'application/octet-stream' }));
+        const input = document.querySelector('#sample-project-input');
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitFor(() => ['validation', 'handoff'].includes(document.querySelector('#sxc1-sample-lab')?.dataset.view));
+        return {
+          imported: /Project imported/.test(document.querySelector('#sample-lab-status')?.textContent || ''),
+          view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+          buttons: Array.from(document.querySelectorAll('.sample-validation-card .sample-primary-actions > button')).map((button) => button.id),
+        };
+      })()`);
+      report(
+        'Phone Bridge resumes exact pad decisions, advances from outcomes, and preserves a local handoff receipt',
+        Boolean(/\.sxc1lab$/i.test(phoneBridgeStart?.projectDownload || '')
+          && phoneBridgeStart.before?.buttons?.join(',') === 'btn-sample-share-file,btn-sample-skip-pad'
+          && /\.wav$/i.test(phoneBridgeStart.downloaded || '')
+          && phoneBridgeStart.afterButtons.join(',') === 'btn-sample-handoff-loaded,btn-sample-handoff-problem'
+          && /^[A-D] \/ BANK \d+ \/ PAD \d+$/.test(phoneBridgeStart.before.destination || '')
+          && phoneBridgeStart.afterDestination === phoneBridgeStart.before.destination
+          && phoneBridgeStart.handoff?.counts?.shared === 1 && phoneBridgeStart.handoff.counts.pending === 3
+          && phoneBridgeStart.persisted?.sessions?.length === 1
+          && phoneBridgeReloaded && phoneBridgeFlow?.resumeLabel === 'Resume phone handoff'
+          && phoneBridgeFlow.resumed.destination === phoneBridgeStart.before.destination
+          && phoneBridgeFlow.resumed.buttons.join(',') === 'btn-sample-handoff-loaded,btn-sample-handoff-problem'
+          && phoneBridgeFlow.destinations.length === 4
+          && new Set(phoneBridgeFlow.destinations).size === 4
+          && phoneBridgeFlow.downloads.length === 2 && phoneBridgeFlow.downloads.every((name) => /\.wav$/i.test(name || ''))
+          && phoneBridgeFlow.view === 'receipt'
+          && /2 loaded/.test(phoneBridgeFlow.summary || '')
+          && phoneBridgeFlow.statuses.join(',') === 'loaded,skipped,problem,loaded'
+          && phoneBridgeFlow.buttons.join(',') === 'btn-sample-handoff-retry,btn-sample-handoff-finish'
+          && phoneBridgeFlow.handoff?.counts?.total === 4 && phoneBridgeFlow.handoff.counts.loaded === 2
+          && phoneBridgeFlow.handoff.counts.problem === 1 && phoneBridgeFlow.handoff.counts.skipped === 1
+          && Boolean(phoneBridgeFlow.handoff.finishedAt)
+          && phoneBridgeFlow.persisted?.sessions?.[0]?.entries?.length === 4
+          && phoneBridgeMobile?.viewport === 320 && phoneBridgeMobile.scrollWidth <= 320
+          && phoneBridgeMobile.view === 'receipt' && phoneBridgeMobile.items === 4
+          && phoneBridgeMobile.buttonHeights.length === 2
+          && phoneBridgeMobile.buttonHeights.every((height) => height >= 44)
+          && phoneBridgeReceiptReloaded && phoneBridgeReceipt?.reviewLabel === 'Review handoff receipt'
+          && phoneBridgeReceipt.receiptCounts?.loaded === 2 && phoneBridgeReceipt.receiptCounts.problem === 1
+          && phoneBridgeReceipt.receiptCounts.skipped === 1
+          && phoneBridgeReceipt.retryView === 'handoff'
+          && phoneBridgeReceipt.retryButtons.join(',') === 'btn-sample-share-file,btn-sample-skip-pad'
+          && phoneBridgeReceipt.retryCounts?.loaded === 2 && phoneBridgeReceipt.retryCounts.pending === 2
+          && phoneBridgeCorruptReloaded && phoneBridgeRecovery?.projectId === bridgeProjectId
+          && phoneBridgeRecovery.library === bridgeLibraryCount && phoneBridgeRecovery.handoff === null
+          && phoneBridgeRecovery.repaired?.schema === 1 && phoneBridgeRecovery.repaired.sessions?.length === 0
+          && phoneBridgeRecovery.workspace?.activeProjectId === bridgeProjectId
+          && phoneBridgeRecovery.persistedLibrary?.items?.length === bridgeLibraryCount
+          && phoneImportLanding?.imported === true && phoneImportLanding.view === 'validation'
+          && phoneImportLanding.buttons.join(',') === 'btn-sample-validation-back,btn-sample-validation-continue'),
+        { phoneBridgeStart, phoneBridgeReloaded, phoneBridgeFlow, phoneBridgeMobile,
+          phoneBridgeReceiptReloaded, phoneBridgeReceipt, bridgeProjectId, bridgeLibraryCount,
+          phoneBridgeCorruptReloaded, phoneBridgeRecovery, phoneImportLanding },
+      );
+      await click('#btn-sample-validation-back');
+
+      // -- 3f. The focused coach is a deterministic, tab-scoped snapshot:
       // route changes never reshuffle it, all five cards are unique links, and
       // opening one carries an out-of-tree session bar into the live runner.
       // A fresh profile has no due or partial work, so all five reasons must be

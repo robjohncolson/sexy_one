@@ -4551,6 +4551,67 @@
     font-weight: 800;
   }
 
+  .sample-receipt-list {
+    display: grid;
+    gap: 0.55rem;
+    margin: 1rem 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sample-receipt-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.2rem 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.65rem;
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .sample-receipt-list li > strong {
+    grid-column: 1 / -1;
+    color: #ffffff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.76rem;
+  }
+
+  .sample-receipt-list li > span:not(.sample-receipt-status) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: #c8cfdd;
+    font-size: 0.78rem;
+  }
+
+  .sample-receipt-status {
+    justify-self: end;
+    padding: 0.25rem 0.48rem;
+    border-radius: 999px;
+    background: rgba(255, 190, 90, 0.13);
+    color: #ffcb7c;
+    font-size: 0.65rem;
+    font-weight: 800;
+  }
+
+  .sample-receipt-list li.is-loaded {
+    border-color: rgba(70, 225, 183, 0.22);
+  }
+
+  .sample-receipt-list li.is-loaded .sample-receipt-status {
+    background: rgba(70, 225, 183, 0.12);
+    color: #7bf2ce;
+  }
+
+  .sample-receipt-list li.is-problem {
+    border-color: rgba(255, 113, 121, 0.24);
+  }
+
+  .sample-receipt-list li.is-problem .sample-receipt-status {
+    background: rgba(255, 113, 121, 0.12);
+    color: #ff9ba1;
+  }
+
   @media (min-width: 48rem) {
     .sample-lab-shell[data-layout="wide"] {
       width: min(100% - 3rem, 72rem);

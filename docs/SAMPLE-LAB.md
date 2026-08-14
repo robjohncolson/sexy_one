@@ -88,4 +88,6 @@ unchanged.
 
 The bulk-organizing and validation extension is specified in
 [`SAMPLE-INBOX.md`](SAMPLE-INBOX.md); the shared catalog, deduplication, and
-named-project layer is specified in [`SAMPLE-LIBRARY.md`](SAMPLE-LIBRARY.md).
+named-project layer is specified in [`SAMPLE-LIBRARY.md`](SAMPLE-LIBRARY.md);
+the resumable phone outcome flow is specified in
+[`PHONE-BRIDGE.md`](PHONE-BRIDGE.md).

@@ -747,8 +747,11 @@ info() {
 # M14 adds one full-stage Sample Library/projects assertion plus JAC9 for the
 # independently rendered Japanese catalog. The static-module/cache checks still
 # cover the implementation, so check-site's own check count remains unchanged.
+# M15 adds one full-stage interrupted Phone Bridge/receipt assertion. Its
+# bounded ledger is inside the already-required deferred module, so the shell
+# check count remains unchanged while the per-stage browser floor rises by one.
 M5_CHECK_TOTAL=136
-M5_BROWSER_ASSERT_FLOOR=240
+M5_BROWSER_ASSERT_FLOOR=241
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -984,7 +987,7 @@ assert any(icon.get("src") == "./app-icon.svg" and "maskable" in icon.get("purpo
 ET.parse(root / "app-icon.svg")
 
 worker = (root / "sw.js").read_text(encoding="utf-8")
-assert 'const CACHE_VERSION = "m14-v2"' in worker
+assert 'const CACHE_VERSION = "m15-v1"' in worker
 match = re.search(r"const CORE_RELATIVE_URLS = (\[.*?\]);", worker, re.S)
 assert match, "CORE_RELATIVE_URLS not found"
 urls = json.loads(match.group(1))
@@ -4901,7 +4904,7 @@ SUBPATH_CARDINALITY_LABEL="M5 cardinality contract: sub-path browser stage repor
 # M10 adds JAC7 for the Weekly Pulse's JS-owned Japanese surface; M13 adds
 # JAC8 for Sample Inbox; M14 adds JAC9 for Sample Library and projects.
 JA_COURSE_ASSERT_COUNT=9
-JA_COURSE_LABEL="M6 W4 + M8/M10/M13/M14 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course plus the mastery journey, Weekly Pulse, Sample Inbox, and Sample Library JS-owned JA surfaces) -- counted BY STABLE ID (JAC1..JAC9, allowlisted in this script), so unplugging, renaming or substituting one cannot hide under the N/N floor"
+JA_COURSE_LABEL="M6 W4 + M8/M10/M13/M14/M15 JA course floor: BOTH full browser stages reported all $JA_COURSE_ASSERT_COUNT 'ja course:' assertions ok (the SHIPPED ja bundle renders the real Japanese course plus the mastery journey, Weekly Pulse, Sample Inbox/Phone Bridge, and Sample Library JS-owned JA surfaces) -- counted BY STABLE ID (JAC1..JAC9, allowlisted in this script), so unplugging, renaming or substituting one cannot hide under the N/N floor"
 
 # Parse one stage's captured output for its final "browser-check: N/M
 # assertions passed" summary line and enforce the contract: the line must
