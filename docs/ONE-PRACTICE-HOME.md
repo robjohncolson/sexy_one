@@ -27,8 +27,8 @@ the activity ledger. Neither source reshuffles the snapshot.
 ## Continuity and Skip
 
 Practice links carry a local hash intent such as
-`#/samples?practice=check&asset=…`. The deferred Sample Lab consumes that intent
-and opens the relevant sound, Inbox selection, or handoff. A successful Sound
+`#/samples?practice=check&project=…&asset=…`. The deferred Sample Lab consumes
+that intent and opens the relevant sound, Inbox selection, or handoff. A successful Sound
 Check decision, Inbox placement, or `Loaded` handoff outcome marks the task and
 routes to the next unhandled session item after a short result paint. It never
 asks whether to repeat.

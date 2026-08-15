@@ -1103,7 +1103,7 @@ scanForProgressPortability();
     const events = [];
     const sequences = new Set();
     if (raw && typeof raw === "object" && Array.isArray(raw.events)) {
-      raw.events.slice(-PRACTICE_CAP).forEach((candidate) => {
+      raw.events.forEach((candidate) => {
         if (!candidate || typeof candidate !== "object") return;
         const seq = positivePracticeInt(candidate.seq, Number.MAX_SAFE_INTEGER - 1);
         const day = positivePracticeInt(candidate.day, 100000000);
@@ -1116,9 +1116,13 @@ scanForProgressPortability();
           projectId: String(candidate.projectId || "").slice(0, 180),
           ref: String(candidate.ref || "").slice(0, 320),
         });
+        events.sort((a, b) => a.seq - b.seq);
+        if (events.length > PRACTICE_CAP) {
+          const dropped = events.shift();
+          sequences.delete(dropped.seq);
+        }
       });
     }
-    events.sort((a, b) => a.seq - b.seq);
     const lastSeq = events.at(-1)?.seq || 0;
     const storedNext = positivePracticeInt(raw?.nextSeq, Number.MAX_SAFE_INTEGER) || 1;
     return {
@@ -1171,6 +1175,7 @@ scanForProgressPortability();
     // outcome belongs to today's plan, mark it and continue to the next item
     // instead of asking for a redundant confirmation screen.
     const plan = readSession();
+    if (plan?.day !== event.day) return event;
     const item = plan?.items?.find((candidate) => practiceEventMatches(candidate, event));
     if (item) {
       const completed = new Set(Array.isArray(plan.completed) ? plan.completed : []);
@@ -1189,7 +1194,7 @@ scanForProgressPortability();
 
   function skipCurrentLabTask() {
     const plan = readSession();
-    if (!plan?.items) return false;
+    if (!plan?.items || plan.day !== Math.floor(Date.now() / 86400000)) return false;
     const completed = new Set(Array.isArray(plan.completed) ? plan.completed : []);
     const skipped = new Set(Array.isArray(plan.skipped) ? plan.skipped : []);
     const item = plan.items.find((candidate) => candidate.type === "lab"
@@ -1248,7 +1253,7 @@ scanForProgressPortability();
     const sound = needsWork || unchecked;
     if (sound?.id) return {
       ...base, id: `lab:check:${sound.id}`, ref: String(sound.id).slice(0, 180),
-      eventKinds: ["sound-ready"], href: `#/samples?practice=check&asset=${encodeURIComponent(sound.id)}`,
+      eventKinds: ["sound-ready"], href: `#/samples?practice=check&project=${encodeURIComponent(project.id)}&asset=${encodeURIComponent(sound.id)}`,
       title: lang === "ja"
         ? (needsWork ? "音を1つ仕上げる" : "音を1つチェックする")
         : (needsWork ? "Prepare one sound" : "Check one sound"),
@@ -1408,12 +1413,12 @@ scanForProgressPortability();
     const placed = labEvents.filter((entry) => entry.kind === "sample-placed").length;
     const loaded = labEvents.filter((entry) => entry.kind === "pad-loaded").length;
     const activeDaySet = new Set(recent.map((entry) => entry.day));
-    labEvents.forEach((entry) => activeDaySet.add(entry.day));
     if (!activeDaySet.size) {
       recs.forEach((rec) => {
         if (rec.lastSeen >= weekStart && rec.lastSeen <= today) activeDaySet.add(rec.lastSeen);
       });
     }
+    labEvents.forEach((entry) => activeDaySet.add(entry.day));
     const activeDays = activeDaySet.size;
     const rhythmIndex = activeDays >= 5 ? 3 : activeDays >= 3 ? 2 : activeDays >= 1 ? 1 : 0;
 
@@ -1835,7 +1840,7 @@ scanForProgressPortability();
   }
 
   function normalizedStoredSession(stored, exerciseIds) {
-    if (!stored || stored.version !== 2 || !Array.isArray(stored.items) || stored.items.length !== 5) return null;
+    if (!stored || stored.version !== 2 || !Array.isArray(stored.items) || stored.items.length > 5) return null;
     const itemIds = new Set();
     let labCount = 0;
     for (const item of stored.items) {

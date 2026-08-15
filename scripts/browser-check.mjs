@@ -10936,15 +10936,77 @@ async function main() {
         let planned = null;
         try { planned = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
         const labItem = planned?.items?.find((item) => item.type === 'lab') || null;
+        const courseItem = planned?.items?.find((item) => item.type !== 'lab') || null;
+        let shortPlan = null;
+        if (planned && labItem && courseItem) {
+          const storedShort = {
+            ...planned,
+            id: planned.id + ':short-fixture',
+            items: [courseItem, labItem],
+            completed: [],
+            skipped: [labItem.id],
+          };
+          sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify(storedShort));
+          root.replaceChildren(document.createComment('rehydrate short-plan fixture'));
+          const shortStart = Date.now();
+          while (Date.now() - shortStart < 4000) {
+            if (window.__sxc1TodaySession?.planId === storedShort.id) break;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          let shortStored = null;
+          try { shortStored = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+          shortPlan = {
+            state: window.__sxc1TodaySession || null,
+            ids: shortStored?.items?.map((item) => item.id) || [],
+            expectedIds: [courseItem.id, labItem.id],
+            labAfterSeq: shortStored?.items?.find((item) => item.type === 'lab')?.afterSeq,
+            expectedLabAfterSeq: labItem.afterSeq,
+          };
+          sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify(planned));
+          root.replaceChildren(document.createComment('restore adaptive fixture'));
+          const restoreStart = Date.now();
+          while (Date.now() - restoreStart < 4000) {
+            if (window.__sxc1TodaySession?.planId === planned.id) break;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+        }
         const event = window.__SXC1_PRACTICE_LOOP?.record?.('sound-ready', {
           projectId: 'project-m17', ref: 'asset-m17', name: 'must-not-persist.wav',
         }) || null;
         let afterOutcome = null;
         try { afterOutcome = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+        const originalHash = window.location.hash;
+        const stalePlan = planned ? { ...planned, day: today - 1, completed: [], skipped: [] } : null;
+        if (stalePlan) sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify(stalePlan));
+        if (labItem?.href) history.replaceState(null, '', labItem.href);
+        const staleEvent = window.__SXC1_PRACTICE_LOOP?.record?.('sound-ready', {
+          projectId: 'project-m17', ref: 'asset-m17',
+        }) || null;
+        await new Promise((resolve) => setTimeout(resolve, 320));
+        let staleAfter = null;
+        try { staleAfter = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+        const staleOutcome = {
+          eventStored: window.__SXC1_PRACTICE_LOOP?.read?.().events.some((entry) => entry.seq === staleEvent?.seq),
+          completed: Boolean(labItem && staleAfter?.completed?.includes(labItem.id)),
+          hash: window.location.hash,
+          expectedHash: labItem?.href || originalHash,
+        };
+        history.replaceState(null, '', originalHash);
+        if (afterOutcome) sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify(afterOutcome));
         for (let index = 0; index < 205; index += 1) {
           window.__SXC1_PRACTICE_LOOP?.record?.('sample-placed', { projectId: 'other', ref: String(index) });
         }
         const ledger = window.__SXC1_PRACTICE_LOOP?.read?.() || null;
+        const validEvents = Array.from({ length: 200 }, (_, index) => ({
+          seq: index + 1, day: today, kind: 'sample-placed', projectId: 'valid', ref: String(index),
+        }));
+        const malformedTail = Array.from({ length: 250 }, (_, index) => ({
+          seq: 201 + index, day: today, kind: 'not-an-outcome', projectId: 'invalid', ref: String(index),
+        }));
+        localStorage.setItem('sxc1.practice-loop.v1', JSON.stringify({
+          schema: 1, nextSeq: 451, events: [...validEvents, ...malformedTail],
+        }));
+        const repaired = window.__SXC1_PRACTICE_LOOP?.read?.() || null;
         observed.ledger = {
           schema: ledger?.schema,
           cap: window.__SXC1_PRACTICE_LOOP?.cap,
@@ -10953,7 +11015,12 @@ async function main() {
           privateShape: ledger?.events?.every((entry) => Object.keys(entry).sort().join(',') === 'day,kind,projectId,ref,seq'),
           eventKind: event?.kind,
           completed: Boolean(labItem && afterOutcome?.completed?.includes(labItem.id)),
+          retainedValidCount: repaired?.events?.length,
+          retainedValidFirst: repaired?.events?.[0]?.seq,
+          retainedValidLast: repaired?.events?.at(-1)?.seq,
         };
+        observed.shortPlan = shortPlan;
+        observed.staleOutcome = staleOutcome;
         progressElement.textContent = original;
         sessionStorage.removeItem('sxc1.today-session.v1');
         for (const [key, value] of Object.entries(originalLab)) {
@@ -10988,13 +11055,23 @@ async function main() {
           && adaptiveSession.state.reasonCounts?.new >= 1
           && adaptiveSession.reasons[0] === 'due'
           && adaptiveSession.reasons.filter((reason) => reason === 'prepare').length === 1
-          && adaptiveSession.hrefs.filter((href) => /^#\/samples\?practice=check&asset=asset-m17$/.test(href || '')).length === 1
+          && adaptiveSession.hrefs.filter((href) => /^#\/samples\?practice=check&project=project-m17&asset=asset-m17$/.test(href || '')).length === 1
           && adaptiveSession.actionCount <= 2
           && adaptiveSession.ledger?.schema === 1 && adaptiveSession.ledger.cap === 200
-          && adaptiveSession.ledger.count === 200 && adaptiveSession.ledger.nextSeq === 207
+          && adaptiveSession.ledger.count === 200 && adaptiveSession.ledger.nextSeq === 208
           && adaptiveSession.ledger.privateShape === true
           && adaptiveSession.ledger.eventKind === 'sound-ready'
-          && adaptiveSession.ledger.completed === true),
+          && adaptiveSession.ledger.completed === true
+          && adaptiveSession.ledger.retainedValidCount === 200
+          && adaptiveSession.ledger.retainedValidFirst === 1
+          && adaptiveSession.ledger.retainedValidLast === 200
+          && adaptiveSession.shortPlan?.state?.itemCount === 2
+          && adaptiveSession.shortPlan.state.skippedCount === 1
+          && JSON.stringify(adaptiveSession.shortPlan.ids) === JSON.stringify(adaptiveSession.shortPlan.expectedIds)
+          && adaptiveSession.shortPlan.labAfterSeq === adaptiveSession.shortPlan.expectedLabAfterSeq
+          && adaptiveSession.staleOutcome?.eventStored === true
+          && adaptiveSession.staleOutcome.completed === false
+          && adaptiveSession.staleOutcome.hash === adaptiveSession.staleOutcome.expectedHash),
         { sessionA, sessionB, coach, adaptiveSession },
       );
 
@@ -11062,6 +11139,16 @@ async function main() {
           labSummary: document.querySelector('.weekly-lab-summary')?.textContent.trim() || null,
           indexHref: null,
         };
+        progress.weeklyPulse = [];
+        progressElement.textContent = JSON.stringify(progress);
+        root.dataset.weeklyHydrated = 'false';
+        root.replaceChildren(document.createComment('rehydrate migrated-profile fixture'));
+        const migratedStart = Date.now();
+        while (Date.now() - migratedStart < 4000) {
+          if (window.__SXC1_WEEKLY?.historyCount === 0) break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        result.migratedActiveDays = window.__SXC1_WEEKLY?.activeDays;
         progressElement.textContent = original;
         if (originalPractice == null) localStorage.removeItem('sxc1.practice-loop.v1');
         else localStorage.setItem('sxc1.practice-loop.v1', originalPractice);
@@ -11078,6 +11165,7 @@ async function main() {
           && weeklyPulse.state.steadyAnswers === 2
           && weeklyPulse.state.labOutcomes === 3 && weeklyPulse.state.prepared === 1
           && weeklyPulse.state.placed === 1 && weeklyPulse.state.loaded === 1
+          && weeklyPulse.migratedActiveDays === 4
           && JSON.stringify(weeklyPulse.state.outlook) === JSON.stringify([1, 0, 1, 0, 0, 0, 1])
           && weeklyPulse.state.strengthenedCount >= 1 && weeklyPulse.state.frictionCount >= 1
           && weeklyPulse.state.focusHref === '#/x/today'
