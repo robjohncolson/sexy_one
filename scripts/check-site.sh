@@ -753,9 +753,10 @@ info() {
 # M16 adds one required deferred PCM worker and one pinned JS-island budget,
 # plus one full-stage Sound Check/revision/handoff assertion.
 # M17 adds one static cross-storage contract check. Its Home/session/Weekly
-# behavior extends existing full-stage assertions, so the browser floor stays.
-M5_CHECK_TOTAL=139
-M5_BROWSER_ASSERT_FLOOR=242
+# behavior extends existing full-stage assertions. M18 adds one named Pad
+# Practice contract check and one end-to-end browser assertion per mount path.
+M5_CHECK_TOTAL=140
+M5_BROWSER_ASSERT_FLOOR=243
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -992,7 +993,7 @@ assert any(icon.get("src") == "./app-icon.svg" and "maskable" in icon.get("purpo
 ET.parse(root / "app-icon.svg")
 
 worker = (root / "sw.js").read_text(encoding="utf-8")
-assert 'const CACHE_VERSION = "m17-v1"' in worker
+assert 'const CACHE_VERSION = "m18-v1"' in worker
 match = re.search(r"const CORE_RELATIVE_URLS = (\[.*?\]);", worker, re.S)
 assert match, "CORE_RELATIVE_URLS not found"
 urls = json.loads(match.group(1))
@@ -1034,7 +1035,7 @@ assert 'const PRACTICE_KEY = "sxc1.practice-loop.v1"' in shell
 assert 'const PRACTICE_CAP = 200' in shell
 assert 'const courseLimit = labTask ? 4 : 5' in shell
 assert 'version: 2' in shell and 'skipCurrentLabTask' in shell
-for kind in ("sound-ready", "sample-placed", "pad-loaded"):
+for kind in ("sound-ready", "sample-placed", "pad-loaded", "pad-played"):
     assert kind in shell and f'recordPractice("{kind}"' in lab, kind
 assert 'window.__SXC1_PRACTICE_LOOP' in shell
 assert 'window.__SXC1_PRACTICE_LOOP?.skip?.()' in lab
@@ -1050,6 +1051,42 @@ if [ -z "$M17_CONTRACT_OUT" ]; then
   ok "one-practice bridge is bounded, privacy-light, one-Lab-at-most, skippable, and Home has one primary path"
 else
   fail "one-practice bridge is bounded, privacy-light, one-Lab-at-most, skippable, and Home has one primary path (observed: $M17_CONTRACT_OUT)"
+fi
+
+# M18 keeps the practice walk deferred while atomically extending every
+# privacy-preserving event boundary in the shell and island. These named
+# assertions pin the phase walk, two-action renderer, eligibility branch,
+# coordinate-only event, intent, Weekly projection, and no-WebMIDI boundary.
+M18_PAD_PRACTICE_OUT=""
+if command -v python3 >/dev/null 2>&1; then
+  M18_PAD_PRACTICE_OUT="$(python3 - "$REPO_ROOT/site/static/index.js" "$REPO_ROOT/site/static/sample-lab.js" "$REPO_ROOT/site/static/sw.js" "$REPO_ROOT/docs/PAD-PRACTICE.md" <<'PY' 2>&1
+import pathlib
+import sys
+
+shell = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+lab = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
+worker = pathlib.Path(sys.argv[3]).read_text(encoding="utf-8")
+contract = pathlib.Path(sys.argv[4]).read_text(encoding="utf-8")
+for literal in ('"intro"', '"pad"', '"decision"', '"recorded"', '"reminder"', '"unavailable"'):
+    assert literal in lab, literal
+assert 'items.slice(0, 2)' in lab
+assert 'bankLastLoaded(rows)' in lab and 'status === "loaded"' in lab
+assert 'recordPractice("pad-played", { ref: `${slot}:${bank}` })' in lab
+assert 'practice=pads' in shell and '"pads"' in lab
+assert shell.count('"pad-played"') >= 5
+assert 'practiced: model.practiced' in shell
+assert 'const CACHE_VERSION = "m18-v1"' in worker
+assert 'requestMIDIAccess' not in shell and 'requestMIDIAccess' not in lab
+assert 'provenance, timing, or' in contract and 'MIDI.' in contract
+PY
+)" || true
+else
+  M18_PAD_PRACTICE_OUT="python3 missing"
+fi
+if [ -z "$M18_PAD_PRACTICE_OUT" ]; then
+  ok "M18 Pad Practice contract pins walk phases, two-action states, planner eligibility, private ledger round-trip, pads intent, Weekly count, cache cutover, and no-WebMIDI runtime"
+else
+  fail "M18 Pad Practice contract pins walk phases, two-action states, planner eligibility, private ledger round-trip, pads intent, Weekly count, cache cutover, and no-WebMIDI runtime (observed: $M18_PAD_PRACTICE_OUT)"
 fi
 
 # A browser may fetch a malformed SVG successfully (HTTP 200) but refuse to
