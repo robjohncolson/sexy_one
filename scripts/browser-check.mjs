@@ -9242,7 +9242,7 @@ async function main() {
         Boolean(pwaState
           && pwaState.state?.supported === true && pwaState.state.registered === true
           && pwaState.state.ready === true && pwaState.state.offlineCapable === true
-          && pwaState.state.cacheVersion === 'm18-v1' && pwaState.controlled === true
+          && pwaState.state.cacheVersion === 'm18-v2' && pwaState.controlled === true
           && pwaState.state.scope === expectedScope
           && pwaState.manifestStatus === 200
           && pwaState.manifest?.start_url === './#/x/today'
@@ -11081,6 +11081,19 @@ async function main() {
       // The complete stage runs at both root and nested mounts.
       const reloadPadPracticePage = (readySelector, timeoutMs = 12000) =>
         reloadPage(readySelector, timeoutMs);
+      const gotoPadPracticeHash = async (hash, readySelector, timeoutMs = 12000) => {
+        await evaluate(`location.hash = ${JSON.stringify(hash)}; true`);
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+          const settled = await evaluate(`location.hash === ${JSON.stringify(hash)}`);
+          if (settled && await elementExists(readySelector)) {
+            await sleep(60);
+            if (await evaluate(`location.hash === ${JSON.stringify(hash)}`) && await elementExists(readySelector)) return true;
+          }
+          await sleep(20);
+        }
+        return false;
+      };
       await evaluate(`(() => {
         const keys = ['sxc1.sample-workspace.v1', 'sxc1.sample-library.v1', 'sxc1.sample-handoffs.v1', 'sxc1.practice-loop.v1'];
         sessionStorage.setItem('sxc1.m18-browser-backup', JSON.stringify(Object.fromEntries(
@@ -11215,6 +11228,36 @@ async function main() {
         };
       })()`);
       await sleep(320);
+      const padPracticeExit = await evaluate(`(() => ({
+        hash: location.hash,
+        state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
+      }))()`);
+      await evaluate(`(() => {
+        const base = ${JSON.stringify(padPracticePlan?.item || null)};
+        const item = { ...base,
+          id: 'lab:place:project-m18', ref: '', matchProject: true,
+          eventKinds: ['sample-placed'],
+          href: '#/samples?practice=organize&project=project-m18',
+        };
+        sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify({
+          version: 2, day: Math.floor(Date.now() / 86400000), signature: 'm18-later-step',
+          id: 'm18-later-step', items: [item], completed: [], skipped: [],
+        }));
+        return true;
+      })()`);
+      await gotoPadPracticeHash('#/samples?practice=organize&project=project-m18', '#btn-sample-practice-skip', 12000);
+      const padPracticeLaterStep = await evaluate(`(() => ({
+        headerSkip: Boolean(document.querySelector('#btn-sample-practice-skip')),
+        state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
+      }))()`);
+      await evaluate(`(() => {
+        const item = ${JSON.stringify(padPracticePlan?.item || null)};
+        sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify({
+          version: 2, day: Math.floor(Date.now() / 86400000), signature: 'm18-pad-step',
+          id: 'm18-pad-step', items: [item], completed: [item.id], skipped: [],
+        }));
+        return true;
+      })()`);
       await gotoSessionSurface(padPracticeHref, '#btn-pad-practice-walk', 12000);
       const padPracticeSkip = await evaluate(`(async () => {
         const before = window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0;
@@ -11251,6 +11294,47 @@ async function main() {
           hash: location.hash,
         };
       })()`);
+      await gotoPadPracticeHash('#/samples', '.sample-library-card[data-library-id="asset-m18-0"]', 12000);
+      await evaluate(`document.querySelector('.sample-library-card[data-library-id="asset-m18-0"]')?.click(); true`);
+      await gotoPadPracticeHash(padPracticeHref, '#btn-pad-practice-walk', 12000);
+      const padPracticeEscape = await evaluate(`(async () => {
+        const before = window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0;
+        const selectedBefore = window.__SXC1_SAMPLE_LAB?.librarySelection || null;
+        const viewBefore = document.querySelector('#sxc1-sample-lab')?.dataset.view || null;
+        document.querySelector('#btn-pad-practice-walk')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return {
+          before,
+          after: window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0,
+          selectedBefore, viewBefore,
+          hash: location.hash,
+          view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
+          state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
+        };
+      })()`);
+      await evaluate(`(() => {
+        const base = ${JSON.stringify(padPracticePlan?.item || null)};
+        const item = { ...base,
+          id: 'lab:load:unrelated-m18', projectId: 'unrelated-m18', ref: '', matchProject: true,
+          eventKinds: ['pad-loaded'],
+          href: '#/samples?practice=handoff&project=unrelated-m18',
+        };
+        sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify({
+          version: 2, day: Math.floor(Date.now() / 86400000), signature: 'm18-unrelated-step',
+          id: 'm18-unrelated-step', items: [item], completed: [], skipped: [],
+        }));
+        return true;
+      })()`);
+      await gotoPadPracticeHash(padPracticeHref, '#btn-pad-practice-walk', 12000);
+      const padPracticeReplay = await evaluate(`(async () => {
+        document.querySelector('#btn-sample-practice-skip')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        let plan = null;
+        try { plan = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+        return { hash: location.hash, skipped: plan?.skipped || [] };
+      })()`);
       await evaluate(`(() => {
         const stored = JSON.parse(localStorage.getItem('sxc1.sample-handoffs.v1'));
         stored.sessions[0].entries.find((entry) => entry.slot === 'B').status = 'pending';
@@ -11267,12 +11351,50 @@ async function main() {
         buttons: Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id),
         totalButtons: document.querySelectorAll('#sxc1-sample-lab button').length,
       }))()`);
+      await evaluate(`(() => {
+        const item = ${JSON.stringify(padPracticePlan?.item || null)};
+        sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify({
+          version: 2, day: Math.floor(Date.now() / 86400000), signature: 'm18-reminder-step',
+          id: 'm18-reminder-step', items: [item], completed: [], skipped: [],
+        }));
+        return true;
+      })()`);
+      await gotoPadPracticeHash(padPracticeHref, '#btn-pad-practice-back', 12000);
+      const padPracticeReminderBack = await evaluate(`(async () => {
+        const buttons = Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id);
+        document.querySelector('#btn-pad-practice-back')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        let plan = null;
+        try { plan = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+        return { buttons, hash: location.hash, skipped: plan?.skipped || [] };
+      })()`);
       await gotoSessionSurface('#/samples?practice=pads&project=deleted-m18&slot=B&bank=42', '#btn-pad-practice-back', 12000);
       const padPracticeDeleted = await evaluate(`(() => ({
         state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
         title: document.querySelector('.sample-pad-practice-hero h1')?.textContent.trim() || null,
         totalButtons: document.querySelectorAll('#sxc1-sample-lab button').length,
       }))()`);
+      await evaluate(`(() => {
+        const base = ${JSON.stringify(padPracticePlan?.item || null)};
+        const item = { ...base,
+          id: 'lab:practice:deleted-m18:B:42', projectId: 'deleted-m18', ref: 'B:42',
+          href: '#/samples?practice=pads&project=deleted-m18&slot=B&bank=42&today=1',
+        };
+        sessionStorage.setItem('sxc1.today-session.v1', JSON.stringify({
+          version: 2, day: Math.floor(Date.now() / 86400000), signature: 'm18-unavailable-step',
+          id: 'm18-unavailable-step', items: [item], completed: [], skipped: [],
+        }));
+        return true;
+      })()`);
+      await gotoPadPracticeHash('#/samples?practice=pads&project=deleted-m18&slot=B&bank=42&today=1', '#btn-pad-practice-back', 12000);
+      const padPracticeUnavailableBack = await evaluate(`(async () => {
+        const buttons = Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id);
+        document.querySelector('#btn-pad-practice-back')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        let plan = null;
+        try { plan = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+        return { buttons, hash: location.hash, skipped: plan?.skipped || [] };
+      })()`);
       await evaluate(`(() => {
         let backup = {};
         try { backup = JSON.parse(sessionStorage.getItem('sxc1.m18-browser-backup') || '{}'); } catch (_) {}
@@ -11336,6 +11458,25 @@ async function main() {
           && /no longer available/i.test(padPracticeDeleted.title || '')),
         { padPracticePlan, padPracticeIntro, padPracticeMobile, padPracticeRun,
           padPracticeSkip, padPracticeHeaderSkip, padPracticeAbandon, padPracticeFallback, padPracticeReminder, padPracticeDeleted },
+      );
+      report(
+        'Pad Practice hardening clears stale walks, contains Escape, identity-binds Today skip, and makes Back side-effect free',
+        Boolean(padPracticeExit?.state === null
+          && !String(padPracticeExit.hash || '').startsWith('#/samples')
+          && padPracticeLaterStep?.headerSkip === true && padPracticeLaterStep.state === null
+          && padPracticeEscape?.selectedBefore === 'asset-m18-0'
+          && padPracticeEscape.viewBefore === 'pad-practice'
+          && padPracticeEscape.before === padPracticeEscape.after
+          && padPracticeEscape.hash === '#/samples'
+          && padPracticeEscape.view === 'planner' && padPracticeEscape.state === null
+          && padPracticeReplay?.hash === '#/samples'
+          && Array.isArray(padPracticeReplay.skipped) && padPracticeReplay.skipped.length === 0
+          && padPracticeReminderBack?.buttons?.join(',') === 'btn-pad-practice-back,btn-pad-practice-skip'
+          && padPracticeReminderBack.hash === '#/samples' && padPracticeReminderBack.skipped?.length === 0
+          && padPracticeUnavailableBack?.buttons?.join(',') === 'btn-pad-practice-back,btn-pad-practice-skip'
+          && padPracticeUnavailableBack.hash === '#/samples' && padPracticeUnavailableBack.skipped?.length === 0),
+        { padPracticeExit, padPracticeLaterStep, padPracticeEscape, padPracticeReplay,
+          padPracticeReminderBack, padPracticeUnavailableBack },
       );
 
       // -- 3c. Weekly Pulse: manufacture a precise, current-schema week in

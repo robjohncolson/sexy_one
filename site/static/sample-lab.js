@@ -612,6 +612,17 @@ function practiceRouteIntent() {
   } catch (_) { return null; }
 }
 
+function practiceIntentTaskId(intent = activePracticeIntent) {
+  if (!intent?.projectId) return "";
+  if (intent.practice === "check" && intent.assetId) return `lab:check:${intent.assetId}`;
+  if (intent.practice === "organize") return `lab:place:${intent.projectId}`;
+  if (intent.practice === "handoff") return `lab:load:${intent.projectId}`;
+  if (intent.practice === "pads" && intent.slot && intent.bank) {
+    return `lab:practice:${intent.projectId}:${intent.slot}:${intent.bank}`;
+  }
+  return "";
+}
+
 function clampInt(value, min, max, fallback) {
   const parsed = Number.parseInt(String(value), 10);
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
@@ -1629,6 +1640,7 @@ function bankLastLoaded(rows) {
 }
 
 function beginPadPractice(slot, bank, unavailable = false) {
+  stopPreview();
   const targetSlot = SLOT_NAMES.includes(slot) ? slot : "";
   const targetBank = clampInt(bank, 15, 80, 0);
   const current = targetSlot ? state?.slots?.[targetSlot] : null;
@@ -1654,13 +1666,21 @@ function beginPadPractice(slot, bank, unavailable = false) {
   renderPadPractice();
 }
 
-function leavePadPractice() {
+function backToPadPlanner() {
+  stopPreview();
   padPracticeState = null;
-  if (activePracticeIntent?.today && window.__SXC1_PRACTICE_LOOP?.skip?.()) return;
   history.replaceState(null, "", ROUTE);
   activePracticeIntent = null;
   lastPracticeIntent = "";
   renderPlanner();
+}
+
+function leavePadPractice() {
+  const taskId = practiceIntentTaskId();
+  stopPreview();
+  padPracticeState = null;
+  if (activePracticeIntent?.today && window.__SXC1_PRACTICE_LOOP?.skip?.(taskId)) return;
+  backToPadPlanner();
 }
 
 function markPadPracticed() {
@@ -1702,14 +1722,20 @@ function renderPadPractice() {
 
   if (session.phase === "unavailable") {
     card.append(el("p", "sample-lede", strings.padPracticeUnavailableBody));
-    card.append(padPracticeActions([{ id: "btn-pad-practice-back", label: strings.backPlanner, primary: true, run: leavePadPractice }]));
+    card.append(padPracticeActions([
+      { id: "btn-pad-practice-back", label: strings.backPlanner, primary: true, run: backToPadPlanner },
+      ...(activePracticeIntent?.today ? [{ id: "btn-pad-practice-skip", label: strings.skipToday, run: leavePadPractice }] : []),
+    ]));
   } else if (session.phase === "reminder") {
     heroSection.append(el("p", "sample-lede", fill(strings.padPracticeIntro, session)));
     card.append(el("h2", "sample-panel-heading", strings.padPracticeUnloaded));
     card.append(el("p", "sample-help", strings.padPracticeUnloadedBody));
-    card.append(padPracticeActions([
-      { id: "btn-pad-practice-handoff", label: strings.padPracticeOpenHandoff, primary: true, run: () => { padPracticeState = null; beginHandoff(); } },
-      { id: "btn-pad-practice-back", label: strings.backPlanner, run: leavePadPractice },
+    card.append(padPracticeActions(activePracticeIntent?.today ? [
+      { id: "btn-pad-practice-back", label: strings.backPlanner, primary: true, run: backToPadPlanner },
+      { id: "btn-pad-practice-skip", label: strings.skipToday, run: leavePadPractice },
+    ] : [
+      { id: "btn-pad-practice-handoff", label: strings.padPracticeOpenHandoff, primary: true, run: () => { backToPadPlanner(); beginHandoff(); } },
+      { id: "btn-pad-practice-back", label: strings.backPlanner, run: backToPadPlanner },
     ]));
   } else if (session.phase === "intro") {
     heroSection.append(el("p", "sample-lede", fill(strings.padPracticeIntro, session)));
@@ -1748,7 +1774,7 @@ function renderPadPractice() {
   } else {
     card.append(el("h2", "sample-panel-heading", fill(strings.padPracticeRecorded, session)));
     card.append(el("p", "sample-help", fill(strings.padPracticeRecordedBody, session)));
-    card.append(padPracticeActions([{ id: "btn-pad-practice-back", label: strings.backPlanner, primary: true, run: leavePadPractice }]));
+    card.append(padPracticeActions([{ id: "btn-pad-practice-back", label: strings.backPlanner, primary: true, run: backToPadPlanner }]));
   }
   shell.append(projectHeader(), heroSection, card);
   overlay.replaceChildren(shell);
@@ -1770,6 +1796,11 @@ function setRouteActive() {
     const intent = practiceRouteIntent();
     activePracticeIntent = intent;
     const freshIntent = intent && intent.key !== lastPracticeIntent;
+    if (padPracticeState && (!intent || (freshIntent && intent.practice !== "pads"))) {
+      stopPreview();
+      padPracticeState = null;
+    }
+    if (!intent) lastPracticeIntent = "";
     if (!intent || freshIntent) renderPlanner();
     if (freshIntent) {
       lastPracticeIntent = intent.key;
@@ -1779,9 +1810,11 @@ function setRouteActive() {
   } else {
     stopPreview();
     armedPlacement = null;
+    padPracticeState = null;
     activePracticeIntent = null;
     lastPracticeIntent = "";
     document.title = "SEXY ONE — SXC-1 Trainer";
+    publishDiagnostics();
   }
 }
 
@@ -1858,7 +1891,9 @@ function projectHeader() {
     skip.id = "btn-sample-practice-skip";
     skip.type = "button";
     skip.setAttribute("aria-label", `${strings.todayStep}: ${strings.skipToday}`);
-    skip.addEventListener("click", () => padPracticeState ? leavePadPractice() : window.__SXC1_PRACTICE_LOOP?.skip?.());
+    skip.addEventListener("click", () => padPracticeState
+      ? leavePadPractice()
+      : window.__SXC1_PRACTICE_LOOP?.skip?.(practiceIntentTaskId()));
     header.append(skip);
   } else header.append(badge);
   return header;
@@ -3743,9 +3778,10 @@ export async function startSampleLab(options = {}) {
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || overlay.hidden) return;
     if (armedPlacement) { event.preventDefault(); cancelPlacement(); return; }
-    if (["validation", "handoff", "receipt", "sound-check"].includes(overlay.dataset.view)) {
+    if (["validation", "handoff", "receipt", "sound-check", "pad-practice"].includes(overlay.dataset.view)) {
       event.preventDefault();
       if (overlay.dataset.view === "sound-check") closeSoundCheck();
+      else if (overlay.dataset.view === "pad-practice") backToPadPlanner();
       else {
         renderPlanner();
         requestAnimationFrame(() => overlay.querySelector("#btn-sample-handoff")?.focus());

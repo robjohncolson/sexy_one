@@ -754,9 +754,10 @@ info() {
 # plus one full-stage Sound Check/revision/handoff assertion.
 # M17 adds one static cross-storage contract check. Its Home/session/Weekly
 # behavior extends existing full-stage assertions. M18 adds one named Pad
-# Practice contract check and one end-to-end browser assertion per mount path.
-M5_CHECK_TOTAL=140
-M5_BROWSER_ASSERT_FLOOR=243
+# Practice contract check and one end-to-end browser assertion per mount path;
+# its hardening pass adds one named static check and one browser assertion.
+M5_CHECK_TOTAL=141
+M5_BROWSER_ASSERT_FLOOR=244
 
 # ---------------------------------------------------------------------------
 # Server + log cleanup (m1/n1 fix): every server we start and every log file
@@ -993,7 +994,7 @@ assert any(icon.get("src") == "./app-icon.svg" and "maskable" in icon.get("purpo
 ET.parse(root / "app-icon.svg")
 
 worker = (root / "sw.js").read_text(encoding="utf-8")
-assert 'const CACHE_VERSION = "m18-v1"' in worker
+assert 'const CACHE_VERSION = "m18-v2"' in worker
 match = re.search(r"const CORE_RELATIVE_URLS = (\[.*?\]);", worker, re.S)
 assert match, "CORE_RELATIVE_URLS not found"
 urls = json.loads(match.group(1))
@@ -1038,7 +1039,7 @@ assert 'version: 2' in shell and 'skipCurrentLabTask' in shell
 for kind in ("sound-ready", "sample-placed", "pad-loaded", "pad-played"):
     assert kind in shell and f'recordPractice("{kind}"' in lab, kind
 assert 'window.__SXC1_PRACTICE_LOOP' in shell
-assert 'window.__SXC1_PRACTICE_LOOP?.skip?.()' in lab
+assert 'window.__SXC1_PRACTICE_LOOP?.skip?.(' in lab
 wizard = home.split('P.id_ "sxc1-wizard-actions"', 1)[1].split('P.id_ "sxc1-browse-library"', 1)[0]
 assert wizard.count('Progress.primaryTrainingView pd') == 1
 assert 'btn-sample-lab' not in wizard
@@ -1075,7 +1076,7 @@ assert 'recordPractice("pad-played", { ref: `${slot}:${bank}` })' in lab
 assert 'practice=pads' in shell and '"pads"' in lab
 assert shell.count('"pad-played"') >= 5
 assert 'practiced: model.practiced' in shell
-assert 'const CACHE_VERSION = "m18-v1"' in worker
+assert 'const CACHE_VERSION = "m18-v2"' in worker
 assert 'requestMIDIAccess' not in shell and 'requestMIDIAccess' not in lab
 assert 'provenance, timing, or' in contract and 'MIDI.' in contract
 PY
@@ -1087,6 +1088,40 @@ if [ -z "$M18_PAD_PRACTICE_OUT" ]; then
   ok "M18 Pad Practice contract pins walk phases, two-action states, planner eligibility, private ledger round-trip, pads intent, Weekly count, cache cutover, and no-WebMIDI runtime"
 else
   fail "M18 Pad Practice contract pins walk phases, two-action states, planner eligibility, private ledger round-trip, pads intent, Weekly count, cache cutover, and no-WebMIDI runtime (observed: $M18_PAD_PRACTICE_OUT)"
+fi
+
+# M18 post-merge hardening: bind Today skips to the exact planned Lab item,
+# distinguish Back from Skip, dispose the walk on every exit, contain Escape,
+# and silence browser preview audio before physical practice begins.
+M18_HARDENING_OUT=""
+if command -v python3 >/dev/null 2>&1; then
+  M18_HARDENING_OUT="$(python3 - "$REPO_ROOT/site/static/index.js" "$REPO_ROOT/site/static/sample-lab.js" "$REPO_ROOT/briefs/M18-pad-practice.md" <<'PY' 2>&1
+import pathlib
+import sys
+
+shell = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+lab = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
+brief = pathlib.Path(sys.argv[3]).read_text(encoding="utf-8")
+assert 'candidate.id === targetId' in shell
+assert 'function practiceIntentTaskId(' in lab
+assert 'skip?.(practiceIntentTaskId())' in lab
+assert 'function backToPadPlanner()' in lab
+assert lab.count('run: backToPadPlanner') >= 3
+assert '"sound-check", "pad-practice"' in lab
+assert 'padPracticeState = null;\n    activePracticeIntent = null;' in lab
+assert 'if (!intent) lastPracticeIntent = "";' in lab
+begin = lab.split('function beginPadPractice(', 1)[1].split('function backToPadPlanner(', 1)[0]
+assert 'stopPreview();' in begin
+assert 'project-global' in brief
+PY
+)" || true
+else
+  M18_HARDENING_OUT="python3 missing"
+fi
+if [ -z "$M18_HARDENING_OUT" ]; then
+  ok "M18 hardening identity-binds Today skip, separates Back, clears every walk exit, contains Escape, stops preview audio, and clarifies project-global eligibility"
+else
+  fail "M18 hardening identity-binds Today skip, separates Back, clears every walk exit, contains Escape, stops preview audio, and clarifies project-global eligibility (observed: $M18_HARDENING_OUT)"
 fi
 
 # A browser may fetch a malformed SVG successfully (HTTP 200) but refuse to

@@ -6,7 +6,7 @@
  * cannot combine an old worker's app.wasm with a new deployment's bundles;
  * the cache is strictly the connection-failure fallback.
  */
-const CACHE_VERSION = "m18-v1";
+const CACHE_VERSION = "m18-v2";
 const CORE_CACHE = `sxc1-core-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `sxc1-runtime-${CACHE_VERSION}`;
 const CORE_RELATIVE_URLS = [

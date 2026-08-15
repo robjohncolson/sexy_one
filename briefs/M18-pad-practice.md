@@ -39,6 +39,8 @@ complete; it is the reward state, never a queue-jumper.
   bank is Loaded and no earlier-priority Lab work exists. When unloaded
   assignments remain, "Load one pad" stands. At most one Lab step per plan,
   as shipped in M17.
+  This eligibility fence is project-global: any unloaded current assignment
+  keeps the project on Load, and only then does recurrence choose among banks.
 - Bank recurrence is a one-line rule: suggest the eligible bank practiced
   longest ago (oldest `pad-played` day from the ledger; never practiced wins).
   No coverage model, no scheduler, no ease.
