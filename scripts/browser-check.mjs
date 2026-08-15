@@ -4141,7 +4141,7 @@ async function runUiLangJaAssertions(h, fixture, coldLoadFn, cfg) {
         && weeklyJa.forecast === '7日間の復習見通し'
         && weeklyJa.strength === '伸びているスキル'
         && weeklyJa.friction === 'もう一度取り組む価値あり'
-        && /^準備 \d+・配置 \d+・読込済み \d+$/.test(weeklyJa.lab || '')
+        && /^準備 \d+・配置 \d+・読込済み \d+・練習済み \d+$/.test(weeklyJa.lab || '')
         && weeklyJa.labLabel === true
         && typeof weeklyJa.focus === 'string' && weeklyJa.focus.length > 4
         && weeklyJa.bars === 7 && weeklyJa.state?.renderer === 'dom',
@@ -9242,7 +9242,7 @@ async function main() {
         Boolean(pwaState
           && pwaState.state?.supported === true && pwaState.state.registered === true
           && pwaState.state.ready === true && pwaState.state.offlineCapable === true
-          && pwaState.state.cacheVersion === 'm17-v1' && pwaState.controlled === true
+          && pwaState.state.cacheVersion === 'm18-v1' && pwaState.controlled === true
           && pwaState.state.scope === expectedScope
           && pwaState.manifestStatus === 200
           && pwaState.manifest?.start_url === './#/x/today'
@@ -11075,6 +11075,253 @@ async function main() {
         { sessionA, sessionB, coach, adaptiveSession },
       );
 
+      // -- 3h. M18 Pad Practice. Install two fully Loaded banks, prove the
+      // least-recently-practiced planner choice and pre-plan sequence fence,
+      // then exercise every island phase and the coordinate-only receipt.
+      // The complete stage runs at both root and nested mounts.
+      const reloadPadPracticePage = async (readySelector, timeoutMs = 12000) => {
+        await cdp.send('Page.reload', { ignoreCache: true }, sessionId);
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+          if (await elementExists(readySelector)) return true;
+          await sleep(20);
+        }
+        return elementExists(readySelector);
+      };
+      await evaluate(`(() => {
+        const keys = ['sxc1.sample-workspace.v1', 'sxc1.sample-library.v1', 'sxc1.sample-handoffs.v1', 'sxc1.practice-loop.v1'];
+        sessionStorage.setItem('sxc1.m18-browser-backup', JSON.stringify(Object.fromEntries(
+          keys.map((key) => [key, localStorage.getItem(key)]),
+        )));
+        sessionStorage.setItem('sxc1.m18-session-backup', sessionStorage.getItem('sxc1.today-session.v1') || '');
+        const pad = (blobId, name, color) => ({
+          blobId, originalName: blobId + '.wav', name, color, bytes: 128,
+          previewable: true, duration: 1, sampleRate: 48000, bitDepth: 16,
+        });
+        const slots = {
+          A: { bank: 15, name: 'Warm bank', pads: { 1: pad('blob-a1', 'Kick air', 'amber') } },
+          B: { bank: 42, name: 'Rain bank', pads: {
+            2: pad('blob-b2', 'Rain loop', 'cyan'),
+            7: pad('blob-b7', 'Glass hit', 'violet'),
+          } },
+          C: { bank: 17, name: 'Bank 17', pads: {} },
+          D: { bank: 18, name: 'Bank 18', pads: {} },
+        };
+        const project = {
+          schema: 1, id: 'project-m18', name: 'M18 Practice', activeSlot: 'B', selectedPad: 2,
+          inbox: [], slots,
+        };
+        const rows = Object.entries(slots).flatMap(([slot, bank]) =>
+          Object.entries(bank.pads).map(([number, data]) => ({ slot, bank: bank.bank, pad: Number(number), data })));
+        const entries = rows.map((row) => ({
+          key: JSON.stringify([row.slot, row.bank, row.pad, row.data.blobId]),
+          slot: row.slot, bank: row.bank, pad: row.pad, blobId: row.data.blobId,
+          name: row.data.name, originalName: row.data.originalName, status: 'loaded',
+          sharedAt: '2026-08-15T00:00:00.000Z', resolvedAt: '2026-08-15T00:01:00.000Z',
+        }));
+        localStorage.setItem('sxc1.sample-workspace.v1', JSON.stringify({
+          schema: 1, activeProjectId: project.id, projects: [project],
+        }));
+        localStorage.setItem('sxc1.sample-library.v1', JSON.stringify({
+          schema: 1,
+          items: rows.map((row, index) => ({
+            ...row.data, id: 'asset-m18-' + index, stage: 'ready',
+            readiness: { ready: true, checkedAt: '2026-08-15T00:00:00.000Z' },
+          })),
+        }));
+        localStorage.setItem('sxc1.sample-handoffs.v1', JSON.stringify({
+          schema: 1, sessions: [{
+            projectId: project.id, entries, currentKey: '',
+            startedAt: '2026-08-15T00:00:00.000Z', updatedAt: '2026-08-15T00:01:00.000Z',
+            finishedAt: '2026-08-15T00:01:00.000Z',
+          }],
+        }));
+        const today = Math.floor(Date.now() / 86400000);
+        localStorage.setItem('sxc1.practice-loop.v1', JSON.stringify({
+          schema: 1, nextSeq: 3, events: [
+            { seq: 1, day: today - 5, kind: 'pad-played', projectId: project.id, ref: 'B:42' },
+            { seq: 2, day: today - 1, kind: 'pad-played', projectId: project.id, ref: 'A:15' },
+          ],
+        }));
+        sessionStorage.removeItem('sxc1.today-session.v1');
+        history.replaceState(null, '', '#/x/today');
+        return true;
+      })()`);
+      await reloadPadPracticePage('#sxc1-session .session-card');
+      const padPracticePlan = await evaluate(`(() => {
+        let plan = null;
+        try { plan = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+        const item = plan?.items?.find((candidate) => candidate.type === 'lab') || null;
+        return {
+          item,
+          completedBefore: Boolean(item && plan?.completed?.includes(item.id)),
+          task: window.__SXC1_PRACTICE_LOOP?.task?.('en') || null,
+        };
+      })()`);
+      const padPracticeHref = padPracticePlan?.item?.href || '#/samples?practice=pads&project=project-m18&slot=B&bank=42';
+      await gotoSessionSurface(padPracticeHref, '#btn-pad-practice-walk', 12000);
+      const padPracticeIntro = await evaluate(`(() => ({
+        state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
+        phase: document.querySelector('#sxc1-sample-lab')?.dataset.practicePhase || null,
+        title: document.querySelector('.sample-pad-practice-hero h1')?.textContent.trim() || null,
+        intro: document.querySelector('.sample-pad-practice-hero .sample-lede')?.textContent.trim() || null,
+        honesty: document.querySelector('.sample-pad-practice-honesty')?.textContent.trim() || null,
+        pads: Array.from(document.querySelectorAll('.sample-pad-practice-pad')).map((item) => ({
+          pad: item.dataset.pad, color: item.dataset.color, name: item.querySelector('.sample-pad-name')?.textContent.trim(),
+        })),
+        buttons: Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id),
+      }))()`);
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
+      }, sessionId);
+      const padPracticeMobile = await evaluate(`(() => ({
+        viewport: innerWidth,
+        scrollWidth: document.scrollingElement?.scrollWidth || null,
+        buttonHeights: Array.from(document.querySelectorAll('.sample-pad-practice-actions > button'))
+          .map((button) => button.getBoundingClientRect().height),
+      }))()`);
+      await cdp.send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      const padPracticeRun = await evaluate(`(async () => {
+        const waitFor = async (test, timeout = 4000) => {
+          const start = Date.now();
+          while (Date.now() - start < timeout) {
+            if (test()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          return Boolean(test());
+        };
+        const state = () => window.__SXC1_SAMPLE_LAB?.padPractice || null;
+        const buttonIds = () => Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id);
+        document.querySelector('#btn-pad-practice-walk')?.click();
+        await waitFor(() => state()?.phase === 'pad');
+        const firstPad = { state: state(), buttons: buttonIds(), cue: document.querySelector('.sample-pad-practice-cue')?.textContent.trim() };
+        document.querySelector('#btn-pad-practice-next')?.click();
+        await waitFor(() => state()?.index === 1);
+        const secondPad = { state: state(), buttons: buttonIds(), cue: document.querySelector('.sample-pad-practice-cue')?.textContent.trim() };
+        document.querySelector('#btn-pad-practice-finish')?.click();
+        await waitFor(() => state()?.phase === 'decision');
+        const decision = { state: state(), buttons: buttonIds() };
+        const mark = document.querySelector('#btn-pad-practice-mark');
+        mark?.click();
+        mark?.click();
+        await waitFor(() => state()?.phase === 'recorded');
+        const ledger = window.__SXC1_PRACTICE_LOOP?.read?.() || null;
+        let plan = null;
+        try { plan = JSON.parse(sessionStorage.getItem('sxc1.today-session.v1') || 'null'); } catch (_) {}
+        const item = plan?.items?.find((candidate) => candidate.type === 'lab') || null;
+        const played = ledger?.events?.filter((event) => event.kind === 'pad-played' && event.ref === 'B:42') || [];
+        return {
+          firstPad, secondPad, decision,
+          receipt: { state: state(), buttons: buttonIds() },
+          playedCount: played.length,
+          newest: played.at(-1) || null,
+          privateShape: played.every((event) => Object.keys(event).sort().join(',') === 'day,kind,projectId,ref,seq'),
+          completedAfter: Boolean(item && plan?.completed?.includes(item.id)),
+        };
+      })()`);
+      await sleep(320);
+      await gotoSessionSurface(padPracticeHref, '#btn-pad-practice-walk', 12000);
+      const padPracticeSkip = await evaluate(`(async () => {
+        const before = window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0;
+        document.querySelector('#btn-pad-practice-free')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        document.querySelector('#btn-pad-practice-skip')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return {
+          before,
+          after: window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0,
+          hash: location.hash,
+        };
+      })()`);
+      await gotoSessionSurface(padPracticeHref, '#btn-pad-practice-walk', 12000);
+      const padPracticeAbandon = await evaluate(`(async () => {
+        const before = window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0;
+        document.querySelector('#btn-pad-practice-walk')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        document.querySelector('#btn-sample-practice-skip')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return {
+          before,
+          after: window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0,
+          hash: location.hash,
+        };
+      })()`);
+      await evaluate(`(() => {
+        const stored = JSON.parse(localStorage.getItem('sxc1.sample-handoffs.v1'));
+        stored.sessions[0].entries.find((entry) => entry.slot === 'B').status = 'pending';
+        localStorage.setItem('sxc1.sample-handoffs.v1', JSON.stringify(stored));
+        history.replaceState(null, '', '#/samples?practice=pads&project=project-m18&slot=B&bank=42');
+        return true;
+      })()`);
+      await reloadPadPracticePage('#btn-pad-practice-handoff');
+      const padPracticeFallback = await evaluate(`(() => ({
+        task: window.__SXC1_PRACTICE_LOOP?.task?.('en') || null,
+      }))()`);
+      const padPracticeReminder = await evaluate(`(() => ({
+        state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
+        buttons: Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id),
+      }))()`);
+      await gotoSessionSurface('#/samples?practice=pads&project=deleted-m18&slot=B&bank=42', '#btn-pad-practice-back', 12000);
+      const padPracticeDeleted = await evaluate(`(() => ({
+        state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
+        title: document.querySelector('.sample-pad-practice-hero h1')?.textContent.trim() || null,
+      }))()`);
+      await evaluate(`(() => {
+        let backup = {};
+        try { backup = JSON.parse(sessionStorage.getItem('sxc1.m18-browser-backup') || '{}'); } catch (_) {}
+        for (const [key, value] of Object.entries(backup)) {
+          if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+        }
+        const savedSession = sessionStorage.getItem('sxc1.m18-session-backup') || '';
+        if (savedSession) sessionStorage.setItem('sxc1.today-session.v1', savedSession);
+        else sessionStorage.removeItem('sxc1.today-session.v1');
+        sessionStorage.removeItem('sxc1.m18-browser-backup');
+        sessionStorage.removeItem('sxc1.m18-session-backup');
+        return true;
+      })()`);
+      report(
+        'Pad Practice chooses the oldest eligible Loaded bank, walks two-action phases, and records one private coordinate receipt',
+        Boolean(padPracticePlan?.item?.eventKinds?.join(',') === 'pad-played'
+          && padPracticePlan.item.ref === 'B:42'
+          && /practice=pads&project=project-m18&slot=B&bank=42$/.test(padPracticePlan.item.href || '')
+          && padPracticePlan.completedBefore === false
+          && padPracticePlan.task?.ref === 'B:42'
+          && padPracticeIntro?.phase === 'intro'
+          && padPracticeIntro.state?.slot === 'B' && padPracticeIntro.state.bank === 42
+          && padPracticeIntro.state.padCount === 2 && padPracticeIntro.state.loaded === true
+          && /Bank 42/.test(padPracticeIntro.title || '') && /slot B/i.test(padPracticeIntro.intro || '')
+          && /last loaded/i.test(padPracticeIntro.honesty || '')
+          && JSON.stringify(padPracticeIntro.pads) === JSON.stringify([
+            { pad: '2', color: 'cyan', name: 'Rain loop' },
+            { pad: '7', color: 'violet', name: 'Glass hit' },
+          ])
+          && padPracticeIntro.buttons.join(',') === 'btn-pad-practice-walk,btn-pad-practice-free'
+          && padPracticeMobile?.viewport === 320 && padPracticeMobile.scrollWidth <= 320
+          && padPracticeMobile.buttonHeights.length === 2
+          && padPracticeMobile.buttonHeights.every((height) => height >= 44)
+          && padPracticeRun?.firstPad?.state?.phase === 'pad'
+          && padPracticeRun.firstPad.buttons.length <= 2 && /Rain loop/.test(padPracticeRun.firstPad.cue || '')
+          && padPracticeRun.secondPad?.state?.index === 1
+          && padPracticeRun.secondPad.buttons.length <= 2 && /Glass hit/.test(padPracticeRun.secondPad.cue || '')
+          && padPracticeRun.decision?.state?.phase === 'decision'
+          && padPracticeRun.decision.buttons.join(',') === 'btn-pad-practice-mark,btn-pad-practice-skip'
+          && padPracticeRun.receipt?.state?.phase === 'recorded'
+          && padPracticeRun.receipt.buttons.join(',') === 'btn-pad-practice-back'
+          && padPracticeRun.playedCount === 2 && padPracticeRun.newest?.projectId === 'project-m18'
+          && padPracticeRun.newest.ref === 'B:42' && padPracticeRun.privateShape === true
+          && padPracticeRun.completedAfter === true
+          && padPracticeSkip?.before === padPracticeSkip.after
+          && padPracticeAbandon?.before === padPracticeAbandon.after
+          && padPracticeFallback?.task?.eventKinds?.join(',') === 'pad-loaded'
+          && /practice=handoff/.test(padPracticeFallback.task.href || '')
+          && padPracticeReminder?.state?.phase === 'reminder'
+          && padPracticeReminder.buttons.join(',') === 'btn-pad-practice-handoff,btn-pad-practice-back'
+          && padPracticeDeleted?.state?.phase === 'unavailable'
+          && /no longer available/i.test(padPracticeDeleted.title || '')),
+        { padPracticePlan, padPracticeIntro, padPracticeMobile, padPracticeRun,
+          padPracticeSkip, padPracticeAbandon, padPracticeFallback, padPracticeReminder, padPracticeDeleted },
+      );
+
       // -- 3c. Weekly Pulse: manufacture a precise, current-schema week in
       // the machine payload, then let the shipped DOM projector derive every
       // learner-facing signal. The outlook expectation is independent and
@@ -11113,10 +11360,11 @@ async function main() {
           [today, parsed[2].deck, parsed[2].exercise, null, 'good'],
         ];
         localStorage.setItem('sxc1.practice-loop.v1', JSON.stringify({
-          schema: 1, nextSeq: 4, events: [
+          schema: 1, nextSeq: 5, events: [
             { seq: 1, day: today - 3, kind: 'sound-ready', projectId: 'project-m17', ref: 'asset-a' },
             { seq: 2, day: today - 1, kind: 'sample-placed', projectId: 'project-m17', ref: 'inbox-a' },
             { seq: 3, day: today, kind: 'pad-loaded', projectId: 'project-m17', ref: 'A:15:1' },
+            { seq: 4, day: today - 2, kind: 'pad-played', projectId: 'project-m18', ref: 'B:42' },
           ],
         }));
         progressElement.textContent = JSON.stringify(progress);
@@ -11163,15 +11411,16 @@ async function main() {
           && weeklyPulse.state.historyCap === 200 && weeklyPulse.state.historyCount === 5
           && weeklyPulse.state.activeDays === 4 && weeklyPulse.state.answers === 4
           && weeklyPulse.state.steadyAnswers === 2
-          && weeklyPulse.state.labOutcomes === 3 && weeklyPulse.state.prepared === 1
+          && weeklyPulse.state.labOutcomes === 4 && weeklyPulse.state.prepared === 1
           && weeklyPulse.state.placed === 1 && weeklyPulse.state.loaded === 1
+          && weeklyPulse.state.practiced === 1
           && weeklyPulse.migratedActiveDays === 4
           && JSON.stringify(weeklyPulse.state.outlook) === JSON.stringify([1, 0, 1, 0, 0, 0, 1])
           && weeklyPulse.state.strengthenedCount >= 1 && weeklyPulse.state.frictionCount >= 1
           && weeklyPulse.state.focusHref === '#/x/today'
           && weeklyPulse.bars === 7 && weeklyPulse.insightLinks >= 2
           && weeklyPulse.focusHref === '#/x/today' && weeklyPulse.focusHeight >= 44
-          && weeklyPulse.labSummary === 'Prepare 1 · Place 1 · Loaded 1'
+          && weeklyPulse.labSummary === 'Prepare 1 · Place 1 · Loaded 1 · Practiced 1'
           && weeklyPulse.canvasCount === 0 && weeklyPulse.indexHref === '#/x/week'),
         weeklyPulse,
       );

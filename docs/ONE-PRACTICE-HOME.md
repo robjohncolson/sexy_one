@@ -16,7 +16,8 @@ highest-priority Lab task:
 1. load the next pending/shared handoff pad;
 2. prepare a sound with a failed check, or check an unchecked sound;
 3. place one active-project Inbox sound;
-4. begin handoff for an assigned project.
+4. begin handoff for an assigned project, or practice the least-recently
+   practiced fully Loaded bank when no load work remains.
 
 At most one Lab step appears. The stored plan records the activity ledger's
 sequence baseline, project, optional asset/row reference, and accepted outcome
@@ -28,8 +29,9 @@ the activity ledger. Neither source reshuffles the snapshot.
 
 Practice links carry a local hash intent such as
 `#/samples?practice=check&project=…&asset=…`. The deferred Sample Lab consumes
-that intent and opens the relevant sound, Inbox selection, or handoff. A successful Sound
-Check decision, Inbox placement, or `Loaded` handoff outcome marks the task and
+that intent and opens the relevant sound, Inbox selection, handoff, or
+`practice=pads` bank walk. A successful Sound Check decision, Inbox placement,
+`Loaded` handoff outcome, or marked bank practice marks the task and
 routes to the next unhandled session item after a short result paint. It never
 asks whether to repeat.
 
@@ -51,7 +53,7 @@ At every Today state there are at most two actions:
 - `schema: 1`;
 - monotonic `nextSeq`;
 - at most 200 `{seq, day, kind, projectId, ref}` events;
-- kinds: `sound-ready`, `sample-placed`, `pad-loaded`.
+- kinds: `sound-ready`, `sample-placed`, `pad-loaded`, `pad-played`.
 
 Normalization rejects unknown kinds and malformed rows, clips identifiers, sorts
 by sequence, and reapplies the cap. The current page keeps an in-memory fallback
@@ -67,7 +69,7 @@ browser where they occurred.
 
 Weekly Pulse unions Lab event days with course-history days for the seven-day
 active-day rhythm. It reports one visible `Lab outcomes` stat plus a compact
-`Prepare · Place · Loaded` breakdown. Answer and steady-answer calculations,
+`Prepare · Place · Loaded · Practiced` breakdown. Answer and steady-answer calculations,
 the exact review forecast, strengths, friction, and scheduler focus retain their
 existing semantics. The entire route remains semantic DOM with no canvas,
 network write, or background analysis.
