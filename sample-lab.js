@@ -25,13 +25,15 @@ const MAX_HANDOFF_SESSIONS = 32;
 const MAX_HANDOFF_ENTRIES = 64;
 const MAX_HANDOFF_KEY_CHARS = 320;
 const MAX_HANDOFF_TIMESTAMP_CHARS = 40;
+const SXC1_MAX_SAMPLE_BYTES = 173 * 1024 * 1024;
+const SXC1_MAX_SAMPLE_SECONDS = 15 * 60;
 const SLOT_NAMES = ["A", "B", "C", "D"];
 const SUPPORTED_EXTENSIONS = new Set(["wav", "mp3", "flac", "cswp"]);
 
 const COPY = {
   en: {
-    homeTitle: "Build a sample library",
-    homeSub: "Catalog sounds and plan SXC-1 pad banks",
+    homeTitle: "Prepare a sound",
+    homeSub: "Check, place, and load your next sample",
     library: "Manuals, course, and progress",
     back: "Back to SEXY ONE",
     eyebrow: "LOCAL SAMPLE WORKSPACE",
@@ -66,6 +68,7 @@ const COPY = {
     addToInbox: "Add to Inbox",
     editDetails: "Edit details",
     doneEditing: "Done",
+    libraryOptions: "Library options",
     removeLibrary: "Remove from Library",
     removeLibraryConfirm: "Remove this sound from Sample Library? Any project assignments remain safe.",
     libraryNotes: "Notes",
@@ -133,6 +136,68 @@ const COPY = {
     supported: "Supported by CASIO app",
     retained: "Retained as project data",
     recommendWav: "For the closest hardware match, export 48 kHz / 16-bit PCM WAV from Audacity.",
+    soundCheckEyebrow: "SOUND CHECK",
+    soundCheckTitle: "Is this sound ready?",
+    soundCheckIntro: "Read the original file locally, then leave Audacity only the work that matters.",
+    checkReadiness: "Check readiness",
+    checkWorking: "Reading the original WAV bytes…",
+    checkFailed: "This sound could not be checked. Its original bytes are unchanged.",
+    checkAgain: "Try again",
+    checkDone: "Done",
+    readyTitle: "Ready for the SXC-1",
+    readyBody: "The required file checks pass. Advisory findings are yours to judge by ear.",
+    needsWorkTitle: "Prepare this in Audacity",
+    needsWorkBody: "Only the findings below need attention before the next handoff.",
+    criterionFormat: "Format",
+    criterionRate: "Sample rate",
+    criterionDepth: "Bit depth",
+    criterionChannels: "Channels",
+    criterionDuration: "Duration",
+    criterionSize: "File size",
+    criterionClipping: "Clipping",
+    criterionSilence: "Edge silence",
+    criterionPass: "Pass",
+    criterionFix: "Fix",
+    criterionReview: "Review",
+    criterionUnknown: "Not inspected",
+    pcmWav: "PCM WAV",
+    convertWav: "Convert to PCM WAV",
+    invalidWav: "The WAV container could not be read",
+    stereo: "Stereo",
+    noClipping: "No full-scale samples found",
+    clippingFound: "{count} clipped frame(s) found",
+    noEdgeSilence: "No meaningful silence at the edges",
+    edgeSilence: "{leading}s leading · {trailing}s trailing",
+    allSilence: "The scanned audio is silent",
+    scanTooLarge: "Header checked; PCM scan skipped above 48 MB",
+    scanUnsupported: "Header checked; this WAV encoding cannot be scanned exactly",
+    convertFirst: "Convert to WAV before checking PCM details",
+    deviceLimit: "15:00 maximum",
+    sizeLimit: "About 173 MB maximum",
+    recipeTitle: "Audacity recipe",
+    recipeIntro: "This recipe contains only this file’s findings.",
+    copyRecipe: "Copy Audacity recipe",
+    recipeCopied: "Recipe copied. Make the edits in Audacity, then bring back the export.",
+    recipeCopyFailed: "The recipe could not be copied. Nothing changed; try again or keep this check open beside Audacity.",
+    importEdited: "Import edited version",
+    checkingEdited: "Checking the edited export…",
+    editedVersion: "Edited version",
+    editedVersionIntro: "Compare the new check, then make one decision for every pad using the original.",
+    useVersion: "Use this version",
+    keepCurrent: "Keep current",
+    sameVersion: "That export is byte-for-byte identical to the current sound.",
+    linkedVersion: "That file is already linked as a newer version of another sound.",
+    versionImported: "Edited version imported; the current pad assignments have not changed yet.",
+    versionUsed: "Updated {placements} placement(s) across {projects} project(s).",
+    versionKept: "Kept the current version. The edited export remains in the Library.",
+    previousVersion: "Previous version: {name}",
+    protectsVersion: "A newer version points back to this original. Remove the newer version first.",
+    learnWhy: "Learn why these limits matter",
+    recipeOpen: "Open the source in Audacity.",
+    recipeExport: "File → Export Audio: choose WAV, Stereo, 48000 Hz, and Signed 16-bit PCM.",
+    recipeTrim: "Select the audio to keep, then Edit → Remove Special → Trim Audio. Keep it under 15:00 and about 173 MB.",
+    recipeClipping: "Use View → Show Clipping. Re-record or lower gain when possible; use Clip Fix only for a short damaged region.",
+    recipeSilence: "Select the intended sound and use Edit → Remove Special → Trim Audio to remove the flagged edge silence.",
     saveShare: "Send project to phone",
     handoff: "Start phone handoff",
     resumeHandoff: "Resume phone handoff",
@@ -204,8 +269,8 @@ const COPY = {
     shareCancelled: "Sharing was cancelled; nothing changed.",
   },
   ja: {
-    homeTitle: "サンプルライブラリを作る",
-    homeSub: "音声を整理してSXC-1のパッドを計画",
+    homeTitle: "音源を準備する",
+    homeSub: "確認・配置・読み込みをひとつの流れで",
     library: "マニュアル、コース、進捗",
     back: "SEXY ONEへ戻る",
     eyebrow: "ローカル・サンプル・ワークスペース",
@@ -240,6 +305,7 @@ const COPY = {
     addToInbox: "受け皿へ追加",
     editDetails: "詳細を編集",
     doneEditing: "完了",
+    libraryOptions: "ライブラリのオプション",
     removeLibrary: "ライブラリから削除",
     removeLibraryConfirm: "この音声をサンプルライブラリから削除しますか？ プロジェクト内の割り当ては残ります。",
     libraryNotes: "メモ",
@@ -307,6 +373,68 @@ const COPY = {
     supported: "CASIOアプリ対応形式",
     retained: "プロジェクトデータとして保持",
     recommendWav: "ハードウェアに合わせる場合は、Audacityから48 kHz / 16-bit PCM WAVで書き出してください。",
+    soundCheckEyebrow: "サウンドチェック",
+    soundCheckTitle: "この音源は準備できていますか？",
+    soundCheckIntro: "元ファイルを端末内で読み取り、必要な作業だけをAudacityへ渡します。",
+    checkReadiness: "準備状態を確認",
+    checkWorking: "元のWAVデータを確認中…",
+    checkFailed: "この音源を確認できませんでした。元データは変更されていません。",
+    checkAgain: "もう一度確認",
+    checkDone: "完了",
+    readyTitle: "SXC-1で使用できます",
+    readyBody: "必須のファイル確認に合格しました。注意項目は実際に聴いて判断してください。",
+    needsWorkTitle: "Audacityで準備してください",
+    needsWorkBody: "次の引き渡し前に、下記の項目だけを修正してください。",
+    criterionFormat: "形式",
+    criterionRate: "サンプルレート",
+    criterionDepth: "ビット深度",
+    criterionChannels: "チャンネル",
+    criterionDuration: "長さ",
+    criterionSize: "ファイルサイズ",
+    criterionClipping: "クリッピング",
+    criterionSilence: "前後の無音",
+    criterionPass: "合格",
+    criterionFix: "修正",
+    criterionReview: "確認",
+    criterionUnknown: "未確認",
+    pcmWav: "PCM WAV",
+    convertWav: "PCM WAVへ変換",
+    invalidWav: "WAVコンテナを読み取れませんでした",
+    stereo: "ステレオ",
+    noClipping: "最大振幅に達したサンプルはありません",
+    clippingFound: "クリッピングしたフレーム：{count}",
+    noEdgeSilence: "前後に目立つ無音はありません",
+    edgeSilence: "冒頭 {leading}秒・末尾 {trailing}秒",
+    allSilence: "確認した音声は無音です",
+    scanTooLarge: "ヘッダーのみ確認（48 MBを超えるためPCM走査を省略）",
+    scanUnsupported: "ヘッダーのみ確認（このWAV形式は正確に走査できません）",
+    convertFirst: "PCM情報を確認する前にWAVへ変換してください",
+    deviceLimit: "最大15分",
+    sizeLimit: "最大約173 MB",
+    recipeTitle: "Audacityレシピ",
+    recipeIntro: "このファイルで必要な項目だけを表示しています。",
+    copyRecipe: "Audacityレシピをコピー",
+    recipeCopied: "レシピをコピーしました。Audacityで編集し、書き出したファイルを戻してください。",
+    recipeCopyFailed: "レシピをコピーできませんでした。内容は変更されていません。もう一度試すか、この画面をAudacityと並べて使用してください。",
+    importEdited: "編集済みファイルを読み込む",
+    checkingEdited: "編集済みファイルを確認中…",
+    editedVersion: "編集済みバージョン",
+    editedVersionIntro: "新しい確認結果を見て、元ファイルを使う全パッドについて1つ選んでください。",
+    useVersion: "このバージョンを使う",
+    keepCurrent: "現在のまま",
+    sameVersion: "現在の音源とまったく同じファイルです。",
+    linkedVersion: "このファイルは、すでに別の音源の新しいバージョンとして関連付けられています。",
+    versionImported: "編集済みバージョンを読み込みました。パッドの割り当てはまだ変更していません。",
+    versionUsed: "{projects}件のプロジェクトで{placements}か所を更新しました。",
+    versionKept: "現在のバージョンを維持しました。編集済みファイルはライブラリに残ります。",
+    previousVersion: "前のバージョン：{name}",
+    protectsVersion: "新しいバージョンからこの元ファイルが参照されています。先に新しいバージョンを削除してください。",
+    learnWhy: "この制限の理由を学ぶ",
+    recipeOpen: "Audacityで元ファイルを開きます。",
+    recipeExport: "「ファイル」→「オーディオをエクスポート」で、WAV・ステレオ・48000 Hz・Signed 16-bit PCMを選びます。",
+    recipeTrim: "残す音声を選択し、「編集」→「特殊な削除」→「オーディオをトリミング」を実行します。15分・約173 MB以内に収めます。",
+    recipeClipping: "「表示」→「クリッピングを表示」で確認します。可能なら録り直すか入力ゲインを下げ、短い損傷部分だけClip Fixを使います。",
+    recipeSilence: "残す音声を選び、「編集」→「特殊な削除」→「オーディオをトリミング」で前後の無音を除きます。",
     saveShare: "プロジェクトをスマートフォンへ送る",
     handoff: "スマートフォンで引き渡し開始",
     resumeHandoff: "スマートフォンで引き渡し再開",
@@ -401,6 +529,7 @@ let libraryEditing = false;
 let libraryQuery = "";
 let libraryStageFilter = "all";
 let creatingProject = false;
+let soundCheckState = null;
 let metadataPersistTimer = null;
 let libraryImportQueue = Promise.resolve();
 const memoryAudio = new Map();
@@ -612,6 +741,19 @@ function normalizeWorkspace(raw, legacyProject = null) {
   return { schema: 1, activeProjectId, projects };
 }
 
+function normalizeReadiness(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const findings = Array.isArray(raw.findings)
+    ? raw.findings.filter((value) => typeof value === "string").slice(0, 12).map((value) => value.slice(0, 40))
+    : [];
+  return {
+    checkedAt: typeof raw.checkedAt === "string" ? raw.checkedAt.slice(0, 40) : "",
+    ready: raw.ready === true,
+    advisory: clampInt(raw.advisory, 0, 12, 0),
+    findings,
+  };
+}
+
 function normalizeLibraryItem(raw) {
   const pad = normalizePad(raw);
   if (!pad) return null;
@@ -621,6 +763,8 @@ function normalizeLibraryItem(raw) {
     stage: ["raw", "edited", "ready"].includes(raw.stage) ? raw.stage : "raw",
     notes: String(raw.notes || "").slice(0, 500),
     rights: String(raw.rights || "").slice(0, 300),
+    replacesId: typeof raw.replacesId === "string" ? raw.replacesId.slice(0, 180) : "",
+    readiness: normalizeReadiness(raw.readiness),
     addedAt: typeof raw.addedAt === "string" ? raw.addedAt : new Date().toISOString(),
   };
 }
@@ -639,6 +783,10 @@ function normalizeLibrary(raw) {
       }
     });
   }
+  const validIds = new Set(result.items.map((item) => item.id));
+  result.items.forEach((item) => {
+    if (item.replacesId === item.id || !validIds.has(item.replacesId)) item.replacesId = "";
+  });
   if (raw && typeof raw.updatedAt === "string") result.updatedAt = raw.updatedAt;
   return result;
 }
@@ -739,6 +887,7 @@ function switchProject(projectId) {
   armedPlacement = null;
   librarySelection = null;
   libraryEditing = false;
+  soundCheckState = null;
   handoffSession = null;
   state = next;
   workspace.activeProjectId = next.id;
@@ -761,6 +910,7 @@ function createProject(name) {
   armedPlacement = null;
   librarySelection = null;
   libraryEditing = false;
+  soundCheckState = null;
   handoffSession = null;
   persistProject();
   renderPlanner();
@@ -780,6 +930,7 @@ async function deleteCurrentProject() {
   armedPlacement = null;
   librarySelection = null;
   libraryEditing = false;
+  soundCheckState = null;
   handoffSession = null;
   handoffState.sessions = handoffState.sessions.filter((session) => session.projectId !== deletedProjectId);
   persistHandoffs();
@@ -1025,16 +1176,18 @@ async function libraryAssetFromFileUnsafe(file) {
 function activeBank() { return state.slots[state.activeSlot]; }
 function selectedPad() { return activeBank().pads[state.selectedPad] || null; }
 
-function allAssignedPads() {
+function assignedPadsForProject(project = state) {
   const rows = [];
   SLOT_NAMES.forEach((slot) => {
-    const bank = state.slots[slot];
+    const bank = project.slots[slot];
     for (let pad = 1; pad <= 16; pad += 1) {
       if (bank.pads[pad]) rows.push({ slot, bank: bank.bank, bankName: bank.name, pad, data: bank.pads[pad] });
     }
   });
   return rows;
 }
+
+function allAssignedPads() { return assignedPadsForProject(state); }
 
 function handoffRowKey(row) {
   return JSON.stringify([row.slot, row.bank, row.pad, row.data.blobId]);
@@ -1068,8 +1221,8 @@ function handoffButtonLabel() {
   return strings.handoff;
 }
 
-function syncHandoffSession(rows = allAssignedPads()) {
-  const previous = savedHandoffForProject();
+function syncHandoffSessionForProject(project, rows = assignedPadsForProject(project), shouldPersist = true) {
+  const previous = savedHandoffForProject(project.id);
   const previousEntries = new Map((previous?.entries || []).map((entry) => [entry.key, entry]));
   const now = new Date().toISOString();
   const entries = rows.slice(0, MAX_HANDOFF_ENTRIES).map((row) => {
@@ -1097,14 +1250,14 @@ function syncHandoffSession(rows = allAssignedPads()) {
   const finished = entries.length > 0 && entries.every((entry) => ["loaded", "problem", "skipped"].includes(entry.status));
   if (finished) currentKey = "";
   const session = {
-    projectId: state.id,
+    projectId: project.id,
     entries,
     currentKey,
     startedAt: previous?.startedAt || now,
     updatedAt: now,
     finishedAt: finished ? (changed ? now : previous?.finishedAt || now) : "",
   };
-  const index = handoffState.sessions.findIndex((candidate) => candidate.projectId === state.id);
+  const index = handoffState.sessions.findIndex((candidate) => candidate.projectId === project.id);
   if (index >= 0) handoffState.sessions[index] = session;
   else {
     handoffState.sessions.push(session);
@@ -1113,9 +1266,13 @@ function syncHandoffSession(rows = allAssignedPads()) {
       handoffState.sessions.length = MAX_HANDOFF_SESSIONS;
     }
   }
-  handoffSession = session;
-  persistHandoffs();
+  if (project.id === state.id) handoffSession = session;
+  if (shouldPersist) persistHandoffs();
   return session;
+}
+
+function syncHandoffSession(rows = allAssignedPads()) {
+  return syncHandoffSessionForProject(state, rows);
 }
 
 function currentHandoffEntry() {
@@ -1407,7 +1564,7 @@ function enhanceHome() {
   if (!wizard || !primary || !browse) return;
   let sample = document.getElementById("btn-sample-lab");
   if (!sample) {
-    sample = el("a", "wizard-choice wizard-no sample-lab-home-action");
+    sample = el("a", "wizard-choice wizard-next sample-lab-home-action");
     sample.id = "btn-sample-lab";
     sample.href = ROUTE;
     sample.append(el("strong", "", strings.homeTitle), el("small", "primary-training-card", strings.homeSub));
@@ -1416,7 +1573,7 @@ function enhanceHome() {
     const primaryShell = primary.parentElement;
     wizard.replaceChildren(primaryShell, sample);
   }
-  browse.classList.remove("wizard-choice", "wizard-no");
+  browse.classList.remove("wizard-choice", "wizard-no", "wizard-next");
   browse.classList.add("home-disclosure", "sample-library-disclosure");
   const summary = browse.querySelector(":scope > summary");
   // Do not rewrite an already-correct text node: this function runs from a
@@ -1542,6 +1699,326 @@ function selectedLibraryAsset() {
   return libraryState.items.find((item) => item.id === librarySelection) || null;
 }
 
+function libraryAssetById(assetId) {
+  return libraryState.items.find((item) => item.id === assetId) || null;
+}
+
+function readinessFile(asset, record) {
+  return new File([record.blob], asset.originalName, {
+    type: asset.mime || record.type || record.blob.type || "application/octet-stream",
+    lastModified: Date.now(),
+  });
+}
+
+function inspectReadiness(file) {
+  return new Promise((resolve, reject) => {
+    let worker;
+    try {
+      worker = new Worker(new URL("./sample-check-worker.js", import.meta.url), { type: "module" });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    const id = uid("check");
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      reject(new Error("Sound Check timed out"));
+    }, 90000);
+    const finish = (callback) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      callback();
+    };
+    worker.addEventListener("message", (event) => {
+      if (event.data?.id !== id) return;
+      if (event.data.ok) finish(() => resolve(event.data.result));
+      else finish(() => reject(new Error(event.data.error || "Sound Check failed")));
+    });
+    worker.addEventListener("error", (event) => finish(() => reject(new Error(event.message || "Sound Check worker failed"))), { once: true });
+    worker.postMessage({ id, file });
+  });
+}
+
+function makeCriterion(code, label, status, value) {
+  return { code, label, status, value };
+}
+
+function readinessFromInspection(asset, inspection) {
+  const header = inspection?.header || null;
+  const scan = inspection?.scan || { status: "not-inspected" };
+  const wav = inspection?.kind === "wav";
+  const validPcm = wav && header?.audioFormat === 1;
+  const known = (value) => Number.isFinite(value) && value > 0;
+  const criteria = [];
+  criteria.push(makeCriterion("format", strings.criterionFormat,
+    validPcm ? "pass" : "fail",
+    validPcm ? strings.pcmWav : (inspection?.kind === "invalid-wav" ? strings.invalidWav : strings.convertWav)));
+  criteria.push(makeCriterion("rate", strings.criterionRate,
+    known(header?.sampleRate) ? (header.sampleRate === 48000 ? "pass" : "fail") : "unknown",
+    known(header?.sampleRate) ? `${(header.sampleRate / 1000).toFixed(1)} kHz` : strings.convertFirst));
+  criteria.push(makeCriterion("depth", strings.criterionDepth,
+    known(header?.bitDepth) ? (header.bitDepth === 16 ? "pass" : "fail") : "unknown",
+    known(header?.bitDepth) ? `${header.bitDepth}-bit` : strings.convertFirst));
+  criteria.push(makeCriterion("channels", strings.criterionChannels,
+    known(header?.channels) ? (header.channels === 2 ? "pass" : "fail") : "unknown",
+    known(header?.channels) ? (header.channels === 2 ? strings.stereo : `${header.channels} ch`) : strings.convertFirst));
+  criteria.push(makeCriterion("duration", strings.criterionDuration,
+    known(header?.duration) ? (header.duration <= SXC1_MAX_SAMPLE_SECONDS ? "pass" : "fail") : "unknown",
+    known(header?.duration) ? `${formatDuration(header.duration)} · ${strings.deviceLimit}` : strings.convertFirst));
+  criteria.push(makeCriterion("size", strings.criterionSize,
+    asset.bytes <= SXC1_MAX_SAMPLE_BYTES ? "pass" : "fail",
+    `${formatBytes(asset.bytes)} · ${strings.sizeLimit}`));
+
+  if (scan.status === "scanned") {
+    criteria.push(makeCriterion("clipping", strings.criterionClipping,
+      scan.clippedFrames > 0 ? "advisory" : "pass",
+      scan.clippedFrames > 0 ? fill(strings.clippingFound, { count: scan.clippedFrames }) : strings.noClipping));
+    const edgeFinding = scan.silent || scan.leadingSilence >= 0.05 || scan.trailingSilence >= 0.1;
+    criteria.push(makeCriterion("silence", strings.criterionSilence,
+      edgeFinding ? "advisory" : "pass",
+      scan.silent ? strings.allSilence : edgeFinding
+        ? fill(strings.edgeSilence, { leading: scan.leadingSilence.toFixed(2), trailing: scan.trailingSilence.toFixed(2) })
+        : strings.noEdgeSilence));
+  } else {
+    const reason = scan.status === "too-large" ? strings.scanTooLarge
+      : scan.status === "unsupported-pcm" ? strings.scanUnsupported : strings.convertFirst;
+    criteria.push(makeCriterion("clipping", strings.criterionClipping, "unknown", reason));
+    criteria.push(makeCriterion("silence", strings.criterionSilence, "unknown", reason));
+  }
+
+  const required = criteria.filter((item) => !["clipping", "silence"].includes(item.code));
+  const ready = required.every((item) => item.status === "pass");
+  const findings = criteria.filter((item) => item.status === "fail" || item.status === "advisory").map((item) => item.code);
+  return {
+    ready,
+    criteria,
+    findings,
+    advisory: criteria.filter((item) => item.status === "advisory").length,
+    inspection,
+  };
+}
+
+function audacityRecipe(result) {
+  if (!result) return [];
+  const statuses = new Map(result.criteria.map((item) => [item.code, item.status]));
+  const steps = [];
+  const needsFormatExport = ["format", "rate", "depth", "channels"].some((code) => statuses.get(code) !== "pass");
+  const needsTrim = ["duration", "size"].some((code) => statuses.get(code) === "fail");
+  const needsAudioEdit = needsTrim || statuses.get("clipping") === "advisory" || statuses.get("silence") === "advisory";
+  if (needsFormatExport || needsAudioEdit) {
+    steps.push(strings.recipeOpen);
+  }
+  if (statuses.get("clipping") === "advisory") steps.push(strings.recipeClipping);
+  if (needsTrim) steps.push(strings.recipeTrim);
+  else if (statuses.get("silence") === "advisory") steps.push(strings.recipeSilence);
+  // Every Audacity edit still needs a new file; omitting the final export would
+  // leave the learner with a corrected project but no corrected handoff asset.
+  if (needsFormatExport || needsAudioEdit) steps.push(strings.recipeExport);
+  return steps;
+}
+
+function persistedReadiness(result) {
+  return normalizeReadiness({
+    checkedAt: new Date().toISOString(),
+    ready: result.ready,
+    advisory: result.advisory,
+    findings: result.findings,
+  });
+}
+
+async function checkLibraryAsset(asset) {
+  const record = await getAudio(asset.blobId);
+  if (!record?.blob) throw new Error("Missing audio");
+  const inspection = await inspectReadiness(readinessFile(asset, record));
+  const result = readinessFromInspection(asset, inspection);
+  asset.readiness = persistedReadiness(result);
+  if (result.ready) asset.stage = "ready";
+  else if (asset.stage === "ready") asset.stage = "edited";
+  persistProject();
+  return result;
+}
+
+async function beginSoundCheck(assetId) {
+  const asset = libraryAssetById(assetId);
+  if (!asset) return;
+  stopPreview();
+  const session = { phase: "checking", assetId: asset.id, candidateId: "", result: null, candidateResult: null, message: "" };
+  soundCheckState = session;
+  renderSoundCheck();
+  try {
+    const result = await checkLibraryAsset(asset);
+    if (soundCheckState !== session) return;
+    session.result = result;
+    session.phase = "result";
+  } catch (_) {
+    if (soundCheckState !== session) return;
+    session.phase = "error";
+    session.message = strings.checkFailed;
+  }
+  if (soundCheckState === session) renderSoundCheck();
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (_) {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    let copied = false;
+    try { copied = document.execCommand("copy"); } catch (_) { copied = false; }
+    area.remove();
+    return copied;
+  }
+}
+
+function recipeText(asset, result) {
+  const steps = audacityRecipe(result);
+  return [`${strings.recipeTitle}: ${asset.name}`, ...steps.map((step, index) => `${index + 1}. ${step}`)].join("\n");
+}
+
+async function importEditedVersion(file) {
+  const session = soundCheckState;
+  const original = libraryAssetById(session?.assetId);
+  if (!session || !original) return;
+  const extension = extOf(file.name);
+  if (!SUPPORTED_EXTENSIONS.has(extension) || file.size > MAX_AUDIO_BYTES) {
+    session.message = file.size > MAX_AUDIO_BYTES ? strings.tooLarge : strings.invalidFile;
+    renderSoundCheck();
+    return;
+  }
+  session.phase = "checking-edited";
+  session.message = "";
+  renderSoundCheck();
+  let imported = null;
+  let previousCandidateState = null;
+  const rollbackImport = async () => {
+    if (!imported?.asset) return;
+    if (imported.reused && previousCandidateState) {
+      imported.asset.replacesId = previousCandidateState.replacesId;
+      imported.asset.readiness = previousCandidateState.readiness;
+      imported.asset.stage = previousCandidateState.stage;
+    }
+    if (!imported.reused) {
+      libraryState.items = libraryState.items.filter((item) => item.id !== imported.asset.id);
+      await deleteAudio(imported.asset.blobId);
+    }
+    persistProject();
+  };
+  try {
+    imported = await libraryAssetFromFile(file);
+    if (soundCheckState !== session) {
+      await rollbackImport();
+      return;
+    }
+    const candidate = imported.asset;
+    if (candidate.id === original.id) {
+      session.phase = "copied";
+      session.message = strings.sameVersion;
+      renderSoundCheck();
+      return;
+    }
+    if (imported.reused && candidate.replacesId && candidate.replacesId !== original.id) {
+      session.phase = "copied";
+      session.message = strings.linkedVersion;
+      renderSoundCheck();
+      return;
+    }
+    previousCandidateState = {
+      replacesId: candidate.replacesId,
+      readiness: candidate.readiness,
+      stage: candidate.stage,
+    };
+    // A genuinely new export inherits the preparation context. If dedup finds
+    // an existing Library sound, preserve that sound's established metadata.
+    if (!imported.reused) {
+      ["name", "source", "tags", "color", "playMode", "bpm", "group", "notes", "rights"].forEach((key) => {
+        candidate[key] = original[key];
+      });
+    }
+    candidate.replacesId = original.id;
+    const candidateResult = await checkLibraryAsset(candidate);
+    if (soundCheckState !== session) {
+      await rollbackImport();
+      return;
+    }
+    session.candidateId = candidate.id;
+    session.candidateResult = candidateResult;
+    session.phase = "candidate";
+    session.message = strings.versionImported;
+    persistProject();
+  } catch (_) {
+    await rollbackImport();
+    if (soundCheckState !== session) return;
+    session.phase = "copied";
+    session.message = strings.checkFailed;
+  }
+  if (soundCheckState === session) renderSoundCheck();
+}
+
+function replaceAssetEverywhere(original, candidate) {
+  let placements = 0;
+  const changedProjects = [];
+  workspace.projects.forEach((project) => {
+    let changed = false;
+    SLOT_NAMES.forEach((slot) => {
+      Object.entries(project.slots[slot].pads).forEach(([number, pad]) => {
+        if (pad.blobId !== original.blobId) return;
+        project.slots[slot].pads[number] = padFromLibraryAsset(candidate, pad);
+        placements += 1;
+        changed = true;
+      });
+    });
+    project.inbox = project.inbox.map((item) => {
+      if (item.blobId !== original.blobId) return item;
+      placements += 1;
+      changed = true;
+      return { ...padFromLibraryAsset(candidate, item), id: item.id };
+    });
+    if (changed) {
+      project.updatedAt = new Date().toISOString();
+      changedProjects.push(project);
+      if (savedHandoffForProject(project.id)) syncHandoffSessionForProject(project, assignedPadsForProject(project), false);
+    }
+  });
+  if (changedProjects.some((project) => savedHandoffForProject(project.id))) persistHandoffs();
+  persistProject();
+  return { placements, projects: changedProjects.length };
+}
+
+function useEditedVersion() {
+  const original = libraryAssetById(soundCheckState?.assetId);
+  const candidate = libraryAssetById(soundCheckState?.candidateId);
+  if (!original || !candidate) return;
+  const changed = replaceAssetEverywhere(original, candidate);
+  librarySelection = candidate.id;
+  libraryEditing = false;
+  soundCheckState = null;
+  renderPlanner();
+  announce(fill(strings.versionUsed, changed));
+}
+
+function keepCurrentVersion() {
+  const originalId = soundCheckState?.assetId;
+  soundCheckState = null;
+  librarySelection = originalId || null;
+  libraryEditing = false;
+  renderPlanner();
+  announce(strings.versionKept);
+}
+
+function closeSoundCheck() {
+  soundCheckState = null;
+  libraryEditing = false;
+  renderPlanner();
+  requestAnimationFrame(() => overlay.querySelector("#btn-sample-library-edit")?.focus());
+}
+
 function addSelectedLibraryToInbox() {
   const asset = selectedLibraryAsset();
   if (!asset) return;
@@ -1559,6 +2036,10 @@ function addSelectedLibraryToInbox() {
 
 async function removeSelectedLibrary() {
   const asset = selectedLibraryAsset();
+  if (asset && libraryState.items.some((item) => item.replacesId === asset.id)) {
+    announce(strings.protectsVersion, "warning");
+    return;
+  }
   if (!asset || !window.confirm(strings.removeLibraryConfirm)) return;
   libraryState.items = libraryState.items.filter((item) => item.id !== asset.id);
   librarySelection = null;
@@ -1577,6 +2058,10 @@ function libraryEditor(section, asset) {
   [asset.originalName, formatBytes(asset.bytes), formatDuration(asset.duration), extOf(asset.originalName).toUpperCase()]
     .filter(Boolean).forEach((value) => facts.append(el("span", "", value)));
   editor.append(facts);
+  if (asset.replacesId) {
+    const previous = libraryAssetById(asset.replacesId);
+    if (previous) editor.append(el("p", "sample-version-note", fill(strings.previousVersion, { name: previous.name })));
+  }
 
   const form = el("div", "sample-library-fields");
   const name = textInput("sample-library-name", asset.name, 80);
@@ -1630,13 +2115,182 @@ function libraryEditor(section, asset) {
     renderPlanner();
     announce(strings.libraryUpdated);
   });
+  const check = el("button", "sample-button sample-button-secondary", strings.checkReadiness);
+  check.id = "btn-sample-sound-check";
+  check.type = "button";
+  check.addEventListener("click", () => {
+    persistProject();
+    beginSoundCheck(asset.id);
+  });
+  actions.append(done, check);
+  const options = el("details", "sample-library-options");
+  options.append(el("summary", "", strings.libraryOptions));
   const remove = el("button", "sample-button sample-button-danger", strings.removeLibrary);
   remove.id = "btn-sample-library-remove";
   remove.type = "button";
   remove.addEventListener("click", removeSelectedLibrary);
-  actions.append(done, remove);
-  editor.append(actions);
+  options.append(remove);
+  editor.append(actions, options);
   section.append(editor);
+}
+
+function criterionStatusLabel(status) {
+  if (status === "pass") return strings.criterionPass;
+  if (status === "fail") return strings.criterionFix;
+  if (status === "advisory") return strings.criterionReview;
+  return strings.criterionUnknown;
+}
+
+function readinessResultView(result, titleText) {
+  const fragment = document.createDocumentFragment();
+  const heading = el("h2", "sample-sound-check-summary", titleText || (result.ready ? strings.readyTitle : strings.needsWorkTitle));
+  fragment.append(heading, el("p", "sample-sound-check-body", result.ready ? strings.readyBody : strings.needsWorkBody));
+  const list = el("ul", "sample-sound-check-list");
+  result.criteria.forEach((criterion) => {
+    const item = el("li", `is-${criterion.status}`);
+    item.dataset.criterion = criterion.code;
+    item.dataset.status = criterion.status;
+    item.append(
+      el("strong", "sample-sound-check-criterion", criterion.label),
+      el("span", "sample-sound-check-value", criterion.value),
+      el("span", "sample-sound-check-status", criterionStatusLabel(criterion.status)),
+    );
+    list.append(item);
+  });
+  fragment.append(list);
+  const recipe = audacityRecipe(result);
+  if (recipe.length) {
+    const recipeSection = el("section", "sample-recipe");
+    recipeSection.append(el("h3", "", strings.recipeTitle), el("p", "", strings.recipeIntro));
+    const steps = el("ol", "");
+    recipe.forEach((step) => steps.append(el("li", "", step)));
+    const learn = el("a", "sample-learn-link", strings.learnWhy);
+    learn.href = "#/x/lvl-16";
+    recipeSection.append(steps, learn);
+    fragment.append(recipeSection);
+  }
+  return fragment;
+}
+
+function editedVersionInput() {
+  const input = document.createElement("input");
+  input.id = "sample-edited-version-input";
+  input.type = "file";
+  input.accept = ".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac";
+  input.hidden = true;
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (file) await importEditedVersion(file);
+  });
+  return input;
+}
+
+function renderSoundCheck() {
+  if (!soundCheckState) { renderPlanner(); return; }
+  const original = libraryAssetById(soundCheckState.assetId);
+  if (!original) { soundCheckState = null; renderPlanner(); return; }
+  overlay.dataset.view = "sound-check";
+  const shell = el("div", "sample-lab-shell sample-sound-check-shell");
+  const heroSection = el("section", "sample-hero sample-sound-check-hero");
+  heroSection.append(el("p", "sample-eyebrow", strings.soundCheckEyebrow));
+  const title = el("h1", "", strings.soundCheckTitle);
+  title.tabIndex = -1;
+  const back = el("a", "sample-handoff-back", `← ${strings.sampleLibrary}`);
+  back.href = ROUTE;
+  back.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (soundCheckState?.phase === "candidate") keepCurrentVersion();
+    else closeSoundCheck();
+  });
+  heroSection.append(title, el("p", "sample-lede", strings.soundCheckIntro), back);
+
+  const card = el("section", "sample-sound-check-card");
+  const identity = el("div", "sample-sound-check-identity");
+  identity.append(el("strong", "", original.name), el("span", "", `${original.originalName} · ${formatBytes(original.bytes)}`));
+  card.append(identity);
+
+  const phase = soundCheckState.phase;
+  if (phase === "checking" || phase === "checking-edited") {
+    card.setAttribute("aria-busy", "true");
+    card.append(el("p", "sample-sound-check-working", phase === "checking-edited" ? strings.checkingEdited : strings.checkWorking));
+  } else if (phase === "candidate" && soundCheckState.candidateResult) {
+    const candidate = libraryAssetById(soundCheckState.candidateId);
+    card.append(readinessResultView(soundCheckState.candidateResult, strings.editedVersion));
+    if (candidate) card.append(el("p", "sample-version-note", `${candidate.originalName} · ${formatBytes(candidate.bytes)}`));
+    card.append(el("p", "sample-sound-check-body", strings.editedVersionIntro));
+  } else if (soundCheckState.result) {
+    card.append(readinessResultView(soundCheckState.result));
+  } else {
+    card.append(el("h2", "sample-sound-check-summary", strings.checkFailed));
+  }
+
+  const status = el("p", "sample-status", soundCheckState.message || "");
+  status.id = "sample-lab-status";
+  status.setAttribute("aria-live", "polite");
+  card.append(status);
+
+  const actions = el("div", "sample-primary-actions");
+  if (phase === "error") {
+    const retry = el("button", "sample-button sample-button-primary", strings.checkAgain);
+    retry.id = "btn-sample-check-retry";
+    retry.type = "button";
+    retry.addEventListener("click", () => beginSoundCheck(original.id));
+    const done = el("button", "sample-button sample-button-secondary", strings.checkDone);
+    done.id = "btn-sample-check-done";
+    done.type = "button";
+    done.addEventListener("click", closeSoundCheck);
+    actions.append(retry, done);
+  } else if (phase === "candidate") {
+    const use = el("button", "sample-button sample-button-primary", strings.useVersion);
+    use.id = "btn-sample-version-use";
+    use.type = "button";
+    use.addEventListener("click", useEditedVersion);
+    const keep = el("button", "sample-button sample-button-secondary", strings.keepCurrent);
+    keep.id = "btn-sample-version-keep";
+    keep.type = "button";
+    keep.addEventListener("click", keepCurrentVersion);
+    actions.append(use, keep);
+  } else if (phase === "result" || phase === "copied") {
+    const input = editedVersionInput();
+    card.append(input);
+    const recipe = audacityRecipe(soundCheckState.result);
+    if (phase === "result" && recipe.length) {
+      const copy = el("button", "sample-button sample-button-primary", strings.copyRecipe);
+      copy.id = "btn-sample-recipe-copy";
+      copy.type = "button";
+      copy.addEventListener("click", async () => {
+        const session = soundCheckState;
+        if (!session?.result) return;
+        const copied = await copyText(recipeText(original, session.result));
+        if (soundCheckState !== session) return;
+        if (copied) {
+          session.phase = "copied";
+          session.message = strings.recipeCopied;
+        } else {
+          session.message = strings.recipeCopyFailed;
+        }
+        renderSoundCheck();
+      });
+      actions.append(copy);
+    } else if (phase === "copied") {
+      const importButton = el("button", "sample-button sample-button-primary", strings.importEdited);
+      importButton.id = "btn-sample-version-import";
+      importButton.type = "button";
+      importButton.addEventListener("click", () => input.click());
+      actions.append(importButton);
+    }
+    const done = el("button", "sample-button sample-button-secondary", strings.checkDone);
+    done.id = "btn-sample-check-done";
+    done.type = "button";
+    done.addEventListener("click", closeSoundCheck);
+    actions.append(done);
+  }
+  if (actions.childElementCount) card.append(actions);
+  shell.append(projectHeader(), heroSection, card);
+  overlay.replaceChildren(shell);
+  title.focus();
+  publishDiagnostics();
 }
 
 function libraryPanel() {
@@ -2716,13 +3370,30 @@ function publishDiagnostics() {
     projectId: state?.id || null,
     projectName: state?.name || null,
     projects: workspace ? workspace.projects.map((project) => ({ id: project.id, name: project.name, inbox: project.inbox.length, assigned: assignedPadCount(project) })) : [],
-    libraryItems: libraryState ? libraryState.items.map((item) => ({ id: item.id, blobId: item.blobId, name: item.name, filename: item.originalName, stage: item.stage, fingerprint: item.fingerprint })) : [],
+    libraryItems: libraryState ? libraryState.items.map((item) => ({
+      id: item.id,
+      blobId: item.blobId,
+      name: item.name,
+      filename: item.originalName,
+      stage: item.stage,
+      fingerprint: item.fingerprint,
+      replacesId: item.replacesId,
+      readiness: item.readiness,
+    })) : [],
     librarySelection,
     activeSlot: state?.activeSlot || null,
     selectedPad: state?.selectedPad || null,
     inboxItems: state ? state.inbox.map((item) => ({ id: item.id, name: item.name, filename: item.originalName, bytes: item.bytes })) : [],
     placement: armedPlacement ? { ...armedPlacement } : null,
-    assignedPads: state ? allAssignedPads().map((row) => ({ slot: row.slot, bank: row.bank, pad: row.pad, name: row.data.name, filename: row.data.originalName })) : [],
+    assignedPads: state ? allAssignedPads().map((row) => ({ slot: row.slot, bank: row.bank, pad: row.pad, blobId: row.data.blobId, name: row.data.name, filename: row.data.originalName })) : [],
+    soundCheck: soundCheckState ? {
+      phase: soundCheckState.phase,
+      assetId: soundCheckState.assetId,
+      candidateId: soundCheckState.candidateId,
+      ready: soundCheckState.result?.ready ?? null,
+      candidateReady: soundCheckState.candidateResult?.ready ?? null,
+      criteria: (soundCheckState.candidateResult || soundCheckState.result)?.criteria?.map((item) => ({ code: item.code, status: item.status, value: item.value })) || [],
+    } : null,
     handoff: savedHandoff ? {
       projectId: savedHandoff.projectId,
       currentKey: savedHandoff.currentKey,
@@ -2733,6 +3404,7 @@ function publishDiagnostics() {
         slot: entry.slot,
         bank: entry.bank,
         pad: entry.pad,
+        blobId: entry.blobId,
         name: entry.name,
         filename: entry.originalName,
         status: entry.status,
@@ -2742,6 +3414,8 @@ function publishDiagnostics() {
     importProjectFile,
     validateProject,
     beginHandoff,
+    beginSoundCheck,
+    inspectReadiness,
   };
 }
 
@@ -2771,10 +3445,13 @@ export async function startSampleLab(options = {}) {
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || overlay.hidden) return;
     if (armedPlacement) { event.preventDefault(); cancelPlacement(); return; }
-    if (["validation", "handoff", "receipt"].includes(overlay.dataset.view)) {
+    if (["validation", "handoff", "receipt", "sound-check"].includes(overlay.dataset.view)) {
       event.preventDefault();
-      renderPlanner();
-      requestAnimationFrame(() => overlay.querySelector("#btn-sample-handoff")?.focus());
+      if (overlay.dataset.view === "sound-check") closeSoundCheck();
+      else {
+        renderPlanner();
+        requestAnimationFrame(() => overlay.querySelector("#btn-sample-handoff")?.focus());
+      }
       return;
     }
     if (libraryEditing || librarySelection || creatingProject) {

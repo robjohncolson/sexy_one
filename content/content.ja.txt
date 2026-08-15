@@ -1,4 +1,4 @@
-!SXC1-BUNDLE v1 ja 50
+!SXC1-BUNDLE v1 ja 51
 !SXC1-DECK 000-ch0-01.ex.md
 # 安全上の表示を理解する
 
@@ -7633,3 +7633,74 @@ check: 本機が自動的に再起動し、サンプリングしたデータが�
 ### Why
 
 Initialize は確実にまっさらな状態へ戻る唯一の方法で、それを安全に行えるのはアプリの「バックアップ」と「リストア」の組み合わせがあるからです。初期化で削除されるサンプリングしたデータは、ほかのどんな方法でも復元できません。
+!SXC1-DECK 104-lvl-16.ex.md
+# SXC-1向けに音源ファイルを準備する
+
+deck: lvl-16
+chapter: Part: Leveling up
+tier: core
+requires: lvl-12
+summary: CASIO Sampler Appが読み込める形式と、SXC-1本体の録音仕様の違いを理解する。
+cite: guide-book 57 "WAV, MP3, and FLAC sound files or .cswp files can be used"
+cite: guide-book 66 "Sampling rate: 16-bit linear / 48 kHz"
+
+Sample LabではCASIO Sampler Appが対応する形式を扱えますが、サウンドチェックでは本機自身の録音形式をもっとも安全な準備目標にしています。
+この3枚のカードで、2つの説明が矛盾しない理由を確認します。
+
+## SXC-1本体のサンプリング形式
+
+type: quiz
+id: q-5-93
+cite: guide-book 66 "Recording format: WAV (stereo)"
+tags: leveling-up, core, sample-lab
+
+SXC-1の製品仕様に記載されたサンプリング形式はどれですか。
+
+- [x] ステレオWAV、48 kHz、16ビットリニアPCM
+- [ ] モノラルMP3、44.1 kHz、16ビット
+- [ ] ステレオFLAC、96 kHz、24ビット
+- [ ] サンプルレートが固定されない`.cswp`
+
+### Why
+
+製品仕様には、16ビットリニア、48 kHz、WAV、ステレオの4点がまとめて記載されています。
+サウンドチェックはこの組み合わせを準備完了の目標にし、それ以外の対応ファイルも変更せず保持します。
+
+## 録音時間の上限
+
+type: quiz
+id: q-5-94
+cite: guide-book 66 "Recording time: up to 15 minutes (approx. 173 MB)"
+tags: leveling-up, core, sample-lab
+
+SXC-1のサンプル1つについて、製品仕様に記載された録音時間と容量の上限はどれですか。
+
+- [x] 最大15分、約173 MB
+- [ ] 最大5分、約48 MB
+- [ ] 最大30分、約346 MB
+- [ ] サンプルごとの上限はない
+
+### Why
+
+サウンドチェックの48 MBは、アプリがPCMを詳しく走査するための端末内の境界であり、本機の録音上限ではありません。
+SXC-1の仕様は最大15分、約173 MBです。
+
+## 「対応形式」と「本機の形式」は同じではない
+
+type: quiz
+id: q-5-95
+cite: guide-book 57 "WAV, MP3, and FLAC sound files or .cswp files can be used"
+cite: guide-book 66 "Recording format: WAV (stereo)"
+tags: leveling-up, core, sample-lab
+
+CASIO Sampler AppではMP3を登録できます。それでもサウンドチェックがAudacityからステレオ48 kHz／16ビットPCM WAVで書き出すよう勧めるのはなぜですか。
+
+- [x] MP3は登録に対応し、そのWAV形式は本機自身のサンプリング仕様に一致するから
+- [ ] CASIO Sampler AppはMP3を受け付けないから
+- [ ] WAVにすると必ず音量が上がるから
+- [ ] SXC-1はAudacityで作ったファイルしか再生できないから
+
+### Why
+
+アプリの読み込み一覧は互換性を示し、製品仕様は本機自身の録音形式を示します。
+Sample Labは両方を区別して表示します。対応ファイルは引き渡すことができ、本機のWAV形式なら準備完了になります。

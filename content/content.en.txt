@@ -1,4 +1,4 @@
-!SXC1-BUNDLE v1 en 50
+!SXC1-BUNDLE v1 en 51
 !SXC1-DECK 000-ch0-01.ex.md
 # Understand the safety labels
 
@@ -8205,3 +8205,80 @@ Confirm with the `A` button.
 Initialize is the only way back to a known-clean state, and the app's Backup /
 Restore pair is what makes it survivable -- the sampled data it deletes cannot
 be recovered any other way.
+!SXC1-DECK 104-lvl-16.ex.md
+# Prepare a sound file for the SXC-1
+
+deck: lvl-16
+chapter: Part: Leveling up
+tier: core
+requires: lvl-12
+summary: Connect the files accepted by CASIO Sampler App with the SXC-1's own recording specification.
+cite: guide-book 57 "WAV, MP3, and FLAC sound files or .cswp files can be used"
+cite: guide-book 66 "Sampling rate: 16-bit linear / 48 kHz"
+
+Sample Lab can carry every format supported by CASIO Sampler App, but Sound
+Check uses the unit's own recording format as its safest preparation target.
+These three cards explain why those statements do not conflict.
+
+## The SXC-1's native sampling format
+
+type: quiz
+id: q-5-93
+cite: guide-book 66 "Recording format: WAV (stereo)"
+tags: leveling-up, core, sample-lab
+
+Which combination matches the SXC-1's documented sampling specification?
+
+- [x] Stereo WAV, 48 kHz, 16-bit linear PCM
+- [ ] Mono MP3, 44.1 kHz, 16-bit
+- [ ] Stereo FLAC, 96 kHz, 24-bit
+- [ ] `.cswp`, with no fixed sample rate
+
+### Why
+
+The product specification names all four parts together: 16-bit linear,
+48 kHz, WAV, and stereo. Sound Check treats that exact combination as the
+ready target while preserving other supported files unchanged.
+
+## The recording limit
+
+type: quiz
+id: q-5-94
+cite: guide-book 66 "Recording time: up to 15 minutes (approx. 173 MB)"
+tags: leveling-up, core, sample-lab
+
+What maximum recording length and approximate size does the specification give
+for one SXC-1 sample?
+
+- [x] Up to 15 minutes, approximately 173 MB
+- [ ] Up to 5 minutes, approximately 48 MB
+- [ ] Up to 30 minutes, approximately 346 MB
+- [ ] There is no per-sample limit
+
+### Why
+
+The 48 MB boundary in Sound Check is only the app's local threshold for a deep
+PCM scan; it is not the sampler's recording limit. The SXC-1 specification is
+15 minutes and approximately 173 MB.
+
+## Supported is not the same as native
+
+type: quiz
+id: q-5-95
+cite: guide-book 57 "WAV, MP3, and FLAC sound files or .cswp files can be used"
+cite: guide-book 66 "Recording format: WAV (stereo)"
+tags: leveling-up, core, sample-lab
+
+CASIO Sampler App can assign an MP3 file. Why can Sound Check still recommend
+exporting a stereo 48 kHz / 16-bit PCM WAV from Audacity?
+
+- [x] MP3 is accepted for assignment, while that WAV combination matches the unit's own documented sampling format
+- [ ] MP3 files are rejected by CASIO Sampler App
+- [ ] WAV always makes a sample louder
+- [ ] The SXC-1 can play only files created by Audacity
+
+### Why
+
+The app's import list describes compatibility; the product specification
+describes the unit's native recording. Sample Lab keeps both truths visible:
+supported files can travel, and the native WAV target receives a ready verdict.
