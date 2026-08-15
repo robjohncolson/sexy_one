@@ -1109,7 +1109,7 @@ scanForProgressPortability();
         const day = positivePracticeInt(candidate.day, 100000000);
         const kind = String(candidate.kind || "").slice(0, 32);
         if (!seq || !day || sequences.has(seq)
-          || !["sample-placed", "sound-ready", "pad-loaded"].includes(kind)) return;
+          || !["sample-placed", "sound-ready", "pad-loaded", "pad-played"].includes(kind)) return;
         sequences.add(seq);
         events.push({
           seq, day, kind,
@@ -1156,7 +1156,7 @@ scanForProgressPortability();
   }
 
   function recordPracticeEvent(kind, detail = {}) {
-    if (!["sample-placed", "sound-ready", "pad-loaded"].includes(kind)) return null;
+    if (!["sample-placed", "sound-ready", "pad-loaded", "pad-played"].includes(kind)) return null;
     const ledger = readPracticeLedger();
     const event = {
       seq: ledger.nextSeq,
@@ -1241,6 +1241,8 @@ scanForProgressPortability();
       title: lang === "ja" ? "次のパッドを読み込む" : "Load the next pad",
     };
 
+    const assigned = Object.entries(project.slots || {}).flatMap(([slot, bank]) =>
+      Object.entries(bank?.pads || {}).map(([pad, data]) => ({ slot, bank: bank.bank, pad: Number(pad), blobId: data?.blobId })));
     const projectBlobIds = new Set([
       ...(Array.isArray(project.inbox) ? project.inbox : []),
       ...Object.values(project.slots || {}).flatMap((slot) => Object.values(slot?.pads || {})),
@@ -1263,13 +1265,34 @@ scanForProgressPortability();
       eventKinds: ["sample-placed"], href: `#/samples?practice=organize&project=${encodeURIComponent(project.id)}`,
       title: lang === "ja" ? "受信箱の音を1つ配置する" : "Place one inbox sound",
     };
-    const assigned = Object.values(project.slots || {})
-      .some((slot) => Object.keys(slot?.pads || {}).length > 0);
-    if (assigned) return {
-      ...base, id: `lab:load:${project.id}`, ref: "", matchProject: true,
-      eventKinds: ["pad-loaded"], href: `#/samples?practice=handoff&project=${encodeURIComponent(project.id)}`,
-      title: lang === "ja" ? "パッドを1つ読み込む" : "Load one pad",
-    };
+    if (assigned.length) {
+      const receipts = new Map((session?.entries || []).map((entry) =>
+        [`${entry.slot}:${entry.bank}:${entry.pad}:${entry.blobId}`, entry.status]));
+      const unloaded = assigned.some((row) =>
+        receipts.get(`${row.slot}:${row.bank}:${row.pad}:${row.blobId}`) !== "loaded");
+      if (unloaded) return {
+        ...base, id: `lab:load:${project.id}`, ref: "", matchProject: true,
+        eventKinds: ["pad-loaded"], href: `#/samples?practice=handoff&project=${encodeURIComponent(project.id)}`,
+        title: lang === "ja" ? "パッドを1つ読み込む" : "Load one pad",
+      };
+      const banks = [...new Map(assigned.map((row) => [`${row.slot}:${row.bank}`, row])).values()];
+      const lastPlayed = new Map();
+      ledger.events.forEach((event) => {
+        if (event.kind === "pad-played" && event.projectId === project.id) {
+          lastPlayed.set(event.ref, Math.max(lastPlayed.get(event.ref) || 0, event.day));
+        }
+      });
+      banks.sort((a, b) => (lastPlayed.get(`${a.slot}:${a.bank}`) || 0)
+        - (lastPlayed.get(`${b.slot}:${b.bank}`) || 0) || a.slot.localeCompare(b.slot));
+      const bank = banks[0];
+      const ref = `${bank.slot}:${bank.bank}`;
+      return {
+        ...base, id: `lab:practice:${project.id}:${ref}`, ref,
+        eventKinds: ["pad-played"],
+        href: `#/samples?practice=pads&project=${encodeURIComponent(project.id)}&slot=${bank.slot}&bank=${bank.bank}&today=1`,
+        title: lang === "ja" ? `BANK ${bank.bank}を練習` : `Practice Bank ${bank.bank}`,
+      };
+    }
     return null;
   }
 
@@ -1296,7 +1319,7 @@ scanForProgressPortability();
       answers: "Answers",
       steady: "Steady answers",
       labOutcomes: "Lab outcomes",
-      labSummary: "Prepare {prepared} · Place {placed} · Loaded {loaded}",
+      labSummary: "Prepare {prepared} · Place {placed} · Loaded {loaded} · Practiced {practiced}",
       streak: "Current rhythm",
       dayUnit: "days",
       forecastTitle: "Seven-day review outlook",
@@ -1334,7 +1357,7 @@ scanForProgressPortability();
       answers: "解答",
       steady: "安定した解答",
       labOutcomes: "ラボ成果",
-      labSummary: "準備 {prepared}・配置 {placed}・読込済み {loaded}",
+      labSummary: "準備 {prepared}・配置 {placed}・読込済み {loaded}・練習済み {practiced}",
       streak: "現在のリズム",
       dayUnit: "日",
       forecastTitle: "7日間の復習見通し",
@@ -1412,6 +1435,7 @@ scanForProgressPortability();
     const prepared = labEvents.filter((entry) => entry.kind === "sound-ready").length;
     const placed = labEvents.filter((entry) => entry.kind === "sample-placed").length;
     const loaded = labEvents.filter((entry) => entry.kind === "pad-loaded").length;
+    const practiced = labEvents.filter((entry) => entry.kind === "pad-played").length;
     const activeDaySet = new Set(recent.map((entry) => entry.day));
     if (!activeDaySet.size) {
       recs.forEach((rec) => {
@@ -1495,7 +1519,7 @@ scanForProgressPortability();
     return {
       today, historyCount: history.length, records: recs.size, activeDays,
       answers: answers.length, steadyAnswers: steadyAnswers.length,
-      labOutcomes: labEvents.length, prepared, placed, loaded,
+      labOutcomes: labEvents.length, prepared, placed, loaded, practiced,
       streak: Number(progress.streak) || 0, rhythm: strings.rhythms[rhythmIndex],
       outlook, strengths, friction: frictionTop, focus,
     };
@@ -1541,7 +1565,7 @@ scanForProgressPortability();
     });
 
     const labSummary = makeEl("p", "weekly-lab-summary",
-      fill(strings.labSummary, { prepared: model.prepared, placed: model.placed, loaded: model.loaded }));
+      fill(strings.labSummary, { prepared: model.prepared, placed: model.placed, loaded: model.loaded, practiced: model.practiced }));
     labSummary.setAttribute("aria-label", strings.labOutcomes);
 
     const forecast = makeEl("section", "weekly-section weekly-forecast-section");
@@ -1631,6 +1655,7 @@ scanForProgressPortability();
       prepared: model.prepared,
       placed: model.placed,
       loaded: model.loaded,
+      practiced: model.practiced,
       outlook: model.outlook.map((day) => day.count),
       strengthenedCount: model.strengths.length,
       frictionCount: model.friction.length,
@@ -1852,7 +1877,7 @@ scanForProgressPortability();
           || typeof item.href !== "string" || !item.href.startsWith("#/samples?practice=")
           || !Array.isArray(item.eventKinds) || item.eventKinds.length !== 1
           || !Number.isSafeInteger(item.afterSeq) || item.afterSeq < 0
-          || !["sample-placed", "sound-ready", "pad-loaded"].includes(item.eventKinds[0])) return null;
+          || !["sample-placed", "sound-ready", "pad-loaded", "pad-played"].includes(item.eventKinds[0])) return null;
       } else if (!exerciseIds.has(item.id)
         || typeof item.href !== "string" || !/^#\/x\/[^/]+\/[^/]+$/.test(item.href)) return null;
     }

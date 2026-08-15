@@ -269,6 +269,26 @@ const COPY = {
     projectDownloaded: "Project saved — move the .sxc1lab file to your phone and open it in SEXY ONE.",
     projectShared: "Project shared. Open the .sxc1lab file on your phone to continue.",
     shareCancelled: "Sharing was cancelled; nothing changed.",
+    practiceBank: "Practice this bank",
+    padPracticeEyebrow: "PAD PRACTICE",
+    padPracticeTitle: "Practice Bank {bank}",
+    padPracticeIntro: "Switch to slot {slot}. These are the pads you last loaded for this bank.",
+    padPracticeLastLoaded: "Last loaded is a saved handoff receipt, not a live check of the SXC-1.",
+    padPracticeWalk: "Walk pad by pad",
+    padPracticeStep: "Pad {current} of {total}",
+    padPracticePlay: "Play pad {pad} — {name}",
+    padPracticeNext: "Next pad",
+    padPracticeFinish: "Finish practice",
+    padPracticeDecision: "How did this bank practice go?",
+    padPracticeDecisionBody: "Make one honest decision for the whole run. Individual pad steps are only navigation.",
+    padPracticeMark: "Mark practiced",
+    padPracticeRecorded: "Bank {bank} marked practiced",
+    padPracticeRecordedBody: "One private practice receipt was saved for {slot}:{bank}.",
+    padPracticeUnloaded: "Load this bank first",
+    padPracticeUnloadedBody: "One or more assigned pads do not have a matching Loaded receipt. Open the existing phone handoff before practicing this bank.",
+    padPracticeOpenHandoff: "Open phone handoff",
+    padPracticeUnavailable: "This practice bank is no longer available",
+    padPracticeUnavailableBody: "The project, slot, or bank may have changed since this link was created. Nothing was recorded.",
   },
   ja: {
     homeTitle: "音源を準備する",
@@ -508,6 +528,26 @@ const COPY = {
     projectDownloaded: ".sxc1labファイルを保存しました。スマートフォンへ移し、SEXY ONEで開いてください。",
     projectShared: "プロジェクトを共有しました。スマートフォンで.sxc1labファイルを開いて続けてください。",
     shareCancelled: "共有をキャンセルしました。変更はありません。",
+    practiceBank: "このバンクを練習",
+    padPracticeEyebrow: "パッド練習",
+    padPracticeTitle: "BANK {bank}を練習",
+    padPracticeIntro: "スロット{slot}へ切り替えます。このバンクで最後に読込済みにしたパッドです。",
+    padPracticeLastLoaded: "「最後に読込済み」は保存された引き渡し記録で、SXC-1の現在状態を確認するものではありません。",
+    padPracticeWalk: "パッドごとに確認",
+    padPracticeStep: "{total}件中 {current}番目",
+    padPracticePlay: "PAD {pad} — {name} を演奏",
+    padPracticeNext: "次のパッド",
+    padPracticeFinish: "練習を終える",
+    padPracticeDecision: "このバンクの練習はどうでしたか？",
+    padPracticeDecisionBody: "バンク全体について1回だけ正直に記録します。各パッド画面は移動の案内だけです。",
+    padPracticeMark: "練習済みにする",
+    padPracticeRecorded: "BANK {bank}を練習済みにしました",
+    padPracticeRecordedBody: "{slot}:{bank} の非公開練習記録を1件保存しました。",
+    padPracticeUnloaded: "先にこのバンクを読み込む",
+    padPracticeUnloadedBody: "割り当て済みパッドの一部に一致する読込済み記録がありません。練習前に既存のスマートフォン引き渡しを開いてください。",
+    padPracticeOpenHandoff: "スマートフォン引き渡しを開く",
+    padPracticeUnavailable: "この練習バンクは利用できません",
+    padPracticeUnavailableBody: "リンク作成後にプロジェクト、スロット、またはバンクが変わった可能性があります。記録は保存されていません。",
   },
 };
 
@@ -534,6 +574,7 @@ let libraryQuery = "";
 let libraryStageFilter = "all";
 let creatingProject = false;
 let soundCheckState = null;
+let padPracticeState = null;
 let activePracticeIntent = null;
 let lastPracticeIntent = "";
 let metadataPersistTimer = null;
@@ -558,12 +599,15 @@ function practiceRouteIntent() {
   try {
     const url = new URL(window.location.hash.slice(1), window.location.origin);
     const practice = url.searchParams.get("practice");
-    if (!["organize", "check", "handoff"].includes(practice)) return null;
+    if (!["organize", "check", "handoff", "pads"].includes(practice)) return null;
     return {
       key: url.pathname + url.search,
       practice,
       projectId: String(url.searchParams.get("project") || "").slice(0, 180),
       assetId: String(url.searchParams.get("asset") || "").slice(0, 180),
+      slot: String(url.searchParams.get("slot") || "").slice(0, 1).toUpperCase(),
+      bank: clampInt(url.searchParams.get("bank"), 15, 80, 0),
+      today: url.searchParams.get("today") === "1",
     };
   } catch (_) { return null; }
 }
@@ -916,6 +960,7 @@ function switchProject(projectId) {
   librarySelection = null;
   libraryEditing = false;
   soundCheckState = null;
+  padPracticeState = null;
   handoffSession = null;
   state = next;
   workspace.activeProjectId = next.id;
@@ -939,6 +984,7 @@ function createProject(name) {
   librarySelection = null;
   libraryEditing = false;
   soundCheckState = null;
+  padPracticeState = null;
   handoffSession = null;
   persistProject();
   renderPlanner();
@@ -959,6 +1005,7 @@ async function deleteCurrentProject() {
   librarySelection = null;
   libraryEditing = false;
   soundCheckState = null;
+  padPracticeState = null;
   handoffSession = null;
   handoffState.sessions = handoffState.sessions.filter((session) => session.projectId !== deletedProjectId);
   persistHandoffs();
@@ -1569,6 +1616,146 @@ async function previewPad(button, pad) {
   }
 }
 
+function bankPracticeRows(slot = state?.activeSlot, bank = state?.slots?.[slot]?.bank) {
+  return assignedPadsForProject().filter((row) => row.slot === slot && row.bank === bank);
+}
+
+function bankLastLoaded(rows) {
+  const receipt = savedHandoffForProject();
+  const loaded = new Set((receipt?.entries || [])
+    .filter((entry) => entry.status === "loaded")
+    .map((entry) => entry.key));
+  return rows.length > 0 && rows.every((row) => loaded.has(handoffRowKey(row)));
+}
+
+function beginPadPractice(slot, bank, unavailable = false) {
+  const targetSlot = SLOT_NAMES.includes(slot) ? slot : "";
+  const targetBank = clampInt(bank, 15, 80, 0);
+  const current = targetSlot ? state?.slots?.[targetSlot] : null;
+  const rows = !unavailable && current?.bank === targetBank
+    ? bankPracticeRows(targetSlot, targetBank)
+    : [];
+  if (!rows.length) {
+    padPracticeState = { phase: "unavailable", slot: targetSlot, bank: targetBank, rows: [], index: 0, recorded: false };
+  } else {
+    if (state.activeSlot !== targetSlot) {
+      state.activeSlot = targetSlot;
+      persistProject();
+    }
+    padPracticeState = {
+      phase: bankLastLoaded(rows) ? "intro" : "reminder",
+      slot: targetSlot,
+      bank: targetBank,
+      rows,
+      index: 0,
+      recorded: false,
+    };
+  }
+  renderPadPractice();
+}
+
+function leavePadPractice() {
+  padPracticeState = null;
+  if (activePracticeIntent?.today && window.__SXC1_PRACTICE_LOOP?.skip?.()) return;
+  history.replaceState(null, "", ROUTE);
+  activePracticeIntent = null;
+  lastPracticeIntent = "";
+  renderPlanner();
+}
+
+function markPadPracticed() {
+  if (!padPracticeState || padPracticeState.recorded || padPracticeState.phase !== "decision") return;
+  padPracticeState.recorded = true;
+  padPracticeState.phase = "recorded";
+  const { slot, bank } = padPracticeState;
+  recordPractice("pad-played", { ref: `${slot}:${bank}` });
+  renderPadPractice();
+}
+
+function padPracticeActions(items) {
+  const actions = el("div", "sample-primary-actions sample-pad-practice-actions");
+  items.slice(0, 2).forEach(({ id, label, primary = false, run }) => {
+    const button = el("button", `sample-button ${primary ? "sample-button-primary" : "sample-button-secondary"}`, label);
+    button.id = id;
+    button.type = "button";
+    button.addEventListener("click", run);
+    actions.append(button);
+  });
+  return actions;
+}
+
+function renderPadPractice() {
+  const session = padPracticeState;
+  if (!session) { renderPlanner(); return; }
+  overlay.dataset.view = "pad-practice";
+  overlay.dataset.practicePhase = session.phase;
+  const shell = el("div", "sample-lab-shell sample-pad-practice-shell");
+  const heroSection = el("section", "sample-hero sample-pad-practice-hero");
+  heroSection.append(el("p", "sample-eyebrow", strings.padPracticeEyebrow));
+  const titleText = session.phase === "unavailable"
+    ? strings.padPracticeUnavailable
+    : fill(strings.padPracticeTitle, session);
+  const title = el("h1", "", titleText);
+  title.tabIndex = -1;
+  heroSection.append(title);
+  const card = el("section", "sample-panel sample-pad-practice-card");
+
+  if (session.phase === "unavailable") {
+    card.append(el("p", "sample-lede", strings.padPracticeUnavailableBody));
+    card.append(padPracticeActions([{ id: "btn-pad-practice-back", label: strings.backPlanner, primary: true, run: leavePadPractice }]));
+  } else if (session.phase === "reminder") {
+    heroSection.append(el("p", "sample-lede", fill(strings.padPracticeIntro, session)));
+    card.append(el("h2", "sample-panel-heading", strings.padPracticeUnloaded));
+    card.append(el("p", "sample-help", strings.padPracticeUnloadedBody));
+    card.append(padPracticeActions([
+      { id: "btn-pad-practice-handoff", label: strings.padPracticeOpenHandoff, primary: true, run: () => { padPracticeState = null; beginHandoff(); } },
+      { id: "btn-pad-practice-back", label: strings.backPlanner, run: leavePadPractice },
+    ]));
+  } else if (session.phase === "intro") {
+    heroSection.append(el("p", "sample-lede", fill(strings.padPracticeIntro, session)));
+    card.append(el("p", "sample-pad-practice-honesty", strings.padPracticeLastLoaded));
+    const grid = el("ol", "sample-pad-practice-grid");
+    session.rows.forEach((row) => {
+      const item = el("li", `sample-pad-practice-pad sample-pad-${row.data.color || "white"}`);
+      item.dataset.pad = String(row.pad);
+      item.dataset.color = row.data.color || "white";
+      item.append(el("span", "sample-pad-number", String(row.pad)), el("strong", "sample-pad-name", row.data.name));
+      grid.append(item);
+    });
+    card.append(grid, padPracticeActions([
+      { id: "btn-pad-practice-walk", label: strings.padPracticeWalk, primary: true, run: () => { session.phase = "pad"; renderPadPractice(); } },
+    ]));
+  } else if (session.phase === "pad") {
+    const row = session.rows[session.index];
+    heroSection.append(el("p", "sample-lede", fill(strings.padPracticeIntro, session)));
+    card.append(
+      el("p", "sample-handoff-progress", fill(strings.padPracticeStep, { current: session.index + 1, total: session.rows.length })),
+      el("h2", "sample-pad-practice-cue", fill(strings.padPracticePlay, { pad: row.pad, name: row.data.name })),
+      el("p", "sample-help", `${row.slot} / BANK ${row.bank} / PAD ${row.pad}`),
+    );
+    const last = session.index >= session.rows.length - 1;
+    card.append(padPracticeActions([
+      ...(!last ? [{ id: "btn-pad-practice-next", label: strings.padPracticeNext, primary: true, run: () => { session.index += 1; renderPadPractice(); } }] : []),
+      { id: "btn-pad-practice-finish", label: strings.padPracticeFinish, primary: last, run: () => { session.phase = "decision"; renderPadPractice(); } },
+    ]));
+  } else if (session.phase === "decision") {
+    card.append(el("h2", "sample-panel-heading", strings.padPracticeDecision));
+    card.append(el("p", "sample-help", strings.padPracticeDecisionBody));
+    card.append(padPracticeActions([
+      { id: "btn-pad-practice-mark", label: strings.padPracticeMark, primary: true, run: markPadPracticed },
+      { id: "btn-pad-practice-skip", label: strings.skipToday, run: leavePadPractice },
+    ]));
+  } else {
+    card.append(el("h2", "sample-panel-heading", fill(strings.padPracticeRecorded, session)));
+    card.append(el("p", "sample-help", fill(strings.padPracticeRecordedBody, session)));
+    card.append(padPracticeActions([{ id: "btn-pad-practice-back", label: strings.backPlanner, primary: true, run: leavePadPractice }]));
+  }
+  shell.append(projectHeader(), heroSection, card);
+  overlay.replaceChildren(shell);
+  title.focus();
+  publishDiagnostics();
+}
+
 function setRouteActive() {
   const active = window.location.hash === ROUTE
     || window.location.hash.startsWith(`${ROUTE}/`)
@@ -1582,8 +1769,9 @@ function setRouteActive() {
     document.title = `${strings.title} — SEXY ONE`;
     const intent = practiceRouteIntent();
     activePracticeIntent = intent;
-    renderPlanner();
-    if (intent && intent.key !== lastPracticeIntent) {
+    const freshIntent = intent && intent.key !== lastPracticeIntent;
+    if (!intent || freshIntent) renderPlanner();
+    if (freshIntent) {
       lastPracticeIntent = intent.key;
       window.setTimeout(() => applyPracticeIntent(intent), 0);
     }
@@ -1619,7 +1807,13 @@ function enhanceHome() {
 
 async function applyPracticeIntent(intent) {
   if (!intent || !overlay || overlay.hidden || intent.key !== lastPracticeIntent) return;
-  if (intent.projectId && intent.projectId !== state.id) switchProject(intent.projectId);
+  if (intent.projectId && intent.projectId !== state.id) {
+    if (!workspace.projects.some((project) => project.id === intent.projectId)) {
+      if (intent.practice === "pads") beginPadPractice(intent.slot, intent.bank, true);
+      return;
+    }
+    switchProject(intent.projectId);
+  }
   if (intent.practice === "check") {
     const asset = libraryAssetById(intent.assetId);
     if (!asset) return;
@@ -1638,6 +1832,8 @@ async function applyPracticeIntent(intent) {
     const report = await validateProject();
     if (report.blocking || report.issues.length) renderValidation(report);
     else beginHandoff();
+  } else if (intent.practice === "pads") {
+    beginPadPractice(intent.slot, intent.bank);
   }
 }
 
@@ -1656,12 +1852,13 @@ function projectHeader() {
   back.href = "#/";
   const badge = el("span", `sample-local-badge${persistentAudio ? "" : " is-warning"}`, persistentAudio ? strings.local : strings.temporary);
   header.append(back);
-  if (activePracticeIntent) {
+  const padHeaderSkip = padPracticeState?.phase === "intro" && activePracticeIntent?.today;
+  if (activePracticeIntent && (!padPracticeState || padHeaderSkip)) {
     const skip = el("button", "sample-button sample-button-secondary sample-practice-skip", strings.skipToday);
     skip.id = "btn-sample-practice-skip";
     skip.type = "button";
     skip.setAttribute("aria-label", `${strings.todayStep}: ${strings.skipToday}`);
-    skip.addEventListener("click", () => window.__SXC1_PRACTICE_LOOP?.skip?.());
+    skip.addEventListener("click", () => padPracticeState ? leavePadPractice() : window.__SXC1_PRACTICE_LOOP?.skip?.());
     header.append(skip);
   } else header.append(badge);
   return header;
@@ -2506,6 +2703,22 @@ function bankStrip() {
   bankName.addEventListener("input", () => { activeBank().name = bankName.value; persistProject(); });
   fields.append(labeledField(strings.bankNumber, bankSelect), labeledField(strings.bankName, bankName));
   section.append(heading, tabs, fields);
+  if (bankPracticeRows().length) {
+    const actions = el("div", "sample-action-row sample-bank-practice-actions");
+    const practice = el("button", "sample-button sample-button-secondary", strings.practiceBank);
+    practice.id = "btn-sample-practice-bank";
+    practice.type = "button";
+    practice.addEventListener("click", () => {
+      const slot = state.activeSlot;
+      const bank = activeBank().bank;
+      history.replaceState(null, "", `${ROUTE}?practice=pads&project=${encodeURIComponent(state.id)}&slot=${slot}&bank=${bank}`);
+      activePracticeIntent = practiceRouteIntent();
+      lastPracticeIntent = activePracticeIntent?.key || "";
+      beginPadPractice(slot, bank);
+    });
+    actions.append(practice);
+    section.append(actions);
+  }
   return section;
 }
 
@@ -3469,6 +3682,15 @@ function publishDiagnostics() {
       candidateReady: soundCheckState.candidateResult?.ready ?? null,
       criteria: (soundCheckState.candidateResult || soundCheckState.result)?.criteria?.map((item) => ({ code: item.code, status: item.status, value: item.value })) || [],
     } : null,
+    padPractice: padPracticeState ? {
+      phase: padPracticeState.phase,
+      slot: padPracticeState.slot,
+      bank: padPracticeState.bank,
+      padCount: padPracticeState.rows.length,
+      index: padPracticeState.index,
+      recorded: padPracticeState.recorded,
+      loaded: padPracticeState.rows.length ? bankLastLoaded(padPracticeState.rows) : false,
+    } : null,
     handoff: savedHandoff ? {
       projectId: savedHandoff.projectId,
       currentKey: savedHandoff.currentKey,
@@ -3490,6 +3712,7 @@ function publishDiagnostics() {
     validateProject,
     beginHandoff,
     beginSoundCheck,
+    beginPadPractice,
     inspectReadiness,
   };
 }

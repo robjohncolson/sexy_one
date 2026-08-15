@@ -4249,6 +4249,58 @@
   .sample-pad-violet::after { background: #b881ff; box-shadow: 0 0 0.9rem #b881ff; }
   .sample-pad-white::after { background: #f5f6ff; box-shadow: 0 0 0.9rem #f5f6ff; }
 
+  .sample-pad-practice-shell {
+    max-width: 48rem;
+  }
+
+  .sample-pad-practice-honesty {
+    margin: 0 0 1rem;
+    padding: 0.75rem 0.9rem;
+    border-left: 3px solid #7bf2ce;
+    border-radius: 0 0.55rem 0.55rem 0;
+    background: rgba(70, 225, 183, 0.06);
+    color: #aeb8ca;
+    font-size: 0.82rem;
+  }
+
+  .sample-pad-practice-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(0.4rem, 1.8vw, 0.7rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sample-pad-practice-pad {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 4.5rem;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.35rem;
+    overflow: hidden;
+    padding: 0.65rem;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 0.68rem;
+    background: #12141b;
+  }
+
+  .sample-pad-practice-pad::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 3px;
+  }
+
+  .sample-pad-practice-cue {
+    margin: 1rem 0 0;
+    color: #f9faff;
+    font-size: clamp(1.25rem, 5vw, 2rem);
+    overflow-wrap: anywhere;
+  }
+
   @keyframes sample-pulse {
     from { filter: brightness(1); }
     to { filter: brightness(1.35); }
