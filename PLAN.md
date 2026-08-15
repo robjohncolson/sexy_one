@@ -246,6 +246,26 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   Vercel deployment: `dpl_ChJGzCpq1UuhWWWGzTYjZC62Yhqy`; Pages deployment:
   `34af971`. Contract: `docs/ONE-PRACTICE-HOME.md`;
   implementation brief: `briefs/M17-one-practice-home.md`.
+- **M18 — Pad Practice.** Add a bank-practice walk inside Sample Lab for banks
+  whose assigned pads all carry current Loaded receipts. The intro shows the
+  SXC-1 slot, user-bank number, and each pad's number, name, and color; optional
+  pad-by-pad navigation leads to exactly one evidence decision, **Mark practiced
+  / Skip for today**. A completed run records one privacy-light `pad-played`
+  ledger event whose ref is only the bank coordinate, while Today's Session
+  chooses the eligible bank practiced longest ago and preserves every M16/M17
+  planner and two-action contract. **COMPLETE AND DEPLOYED 2026-08-15 JST;
+  ACCEPTANCE A9 PENDING OWNER PHYSICAL-DEVICE VERIFICATION.** The optimized
+  artifact passed 140/140 local checks with 243/243 browser assertions at both
+  root and nested deployment paths; the byte-identical Vercel and GitHub Pages
+  releases each passed 79/79 production assertions. `app.wasm` remained
+  byte-identical at SHA-256
+  `407a07aeb09bdae4e99b99fe045c603b2ec2ca33fc7e296b431b85d127f552a2`.
+  Vercel deployment: `dpl_3r6xsth9uRRKgzAkJKBqf4G5invo`; Pages deployment:
+  `a947b71` (legacy Pages build `1152559929`). A9 is deliberately pending, not
+  skipped: one owner run against a physical SXC-1, followed by the checks listed
+  in the M18 completion handoff, will close it and can close M9's remaining
+  phone/device acceptance at the same time. Contract: `docs/PAD-PRACTICE.md`;
+  implementation brief: `briefs/M18-pad-practice.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 
@@ -285,9 +305,9 @@ Vercel (2026-08-07, owner-requested): the same static build also deploys to
 sexy-one.vercel.app belongs to an unrelated third party — never share that
 one). Deploy: copy `site/public` to a scratch dir named `sexy-one`, run
 `vercel deploy --prod --yes` (CLI authenticated as the owner's account).
-Initially verified 70/70 by browser-check against production. The current M17 release
-(`dpl_ChJGzCpq1UuhWWWGzTYjZC62Yhqy`) was deployed 2026-08-15 JST and verified
-78/78 against the main alias, with the
+Initially verified 70/70 by browser-check against production. The current M18 release
+(`dpl_3r6xsth9uRRKgzAkJKBqf4G5invo`) was deployed 2026-08-15 JST and verified
+79/79 against the main alias, with the
 deployed files byte-identical to the locally gated artifact and the correct
 `application/wasm` content type. First-visit CDN cold-decode latency on the
 108-image sweep warms after one pass. Audience note: the site will be shared
