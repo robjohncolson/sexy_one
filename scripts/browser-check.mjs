@@ -11079,15 +11079,8 @@ async function main() {
       // least-recently-practiced planner choice and pre-plan sequence fence,
       // then exercise every island phase and the coordinate-only receipt.
       // The complete stage runs at both root and nested mounts.
-      const reloadPadPracticePage = async (readySelector, timeoutMs = 12000) => {
-        await cdp.send('Page.reload', { ignoreCache: true }, sessionId);
-        const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-          if (await elementExists(readySelector)) return true;
-          await sleep(20);
-        }
-        return elementExists(readySelector);
-      };
+      const reloadPadPracticePage = (readySelector, timeoutMs = 12000) =>
+        reloadPage(readySelector, timeoutMs);
       await evaluate(`(() => {
         const keys = ['sxc1.sample-workspace.v1', 'sxc1.sample-library.v1', 'sxc1.sample-handoffs.v1', 'sxc1.practice-loop.v1'];
         sessionStorage.setItem('sxc1.m18-browser-backup', JSON.stringify(Object.fromEntries(
