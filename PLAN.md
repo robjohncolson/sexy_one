@@ -95,7 +95,7 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
 - **M5 — Ship.** Mobile/a11y polish, content completeness audit against the manuals,
   whole-project Codex review, GitHub Pages publish, shareable link.
 - **M6 — Japanese.** Owner directive: "It's important that the course is available
-  in Japanese too." UI strings and all 435 exercises in Japanese, selectable at
+  in Japanese too." UI strings and all then-live 435 exercises in Japanese, selectable at
   runtime, with progress shared across languages. *Done when: a learner can take
   the whole course in Japanese and their history follows them between languages.*
   **IMPLEMENTATION COMPLETE 2026-08-08** (waves 1-4; gate pending): the corpus
@@ -105,7 +105,7 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   ceiling); inline `ja:` variants in the same `.ex.md` files keep one id and one
   registry per exercise, so progress is shared by construction; a `Lang`-indexed
   UI string table plus a `uiLang` pref (prefs schema v2) and a header toggle; all
-  52 decks translated against the original Japanese manual pages and
+  then-live 52 decks translated against the original Japanese manual pages and
   QA-verified deck by deck. JA completeness is enforced hard (`E-JA-MISSING`),
   and both full browser stages complete a real Japanese quiz out of the shipped
   `ja` bundle. Gate: `check-site` **109/109 result=complete**, **238** assertions
@@ -214,6 +214,18 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   send/import controls, Japanese UI, and the 320 px mobile sweep, then passed
   77/77 against the byte-identical production deployment.
   Contract: `docs/PHONE-BRIDGE.md`.
+- **M16 — Sound Check.** Add one on-demand preparation step between the shared
+  Library and phone handoff: inspect original WAV bytes in a deferred worker,
+  report native-format requirements and clipping/edge-silence advisories without
+  invented facts, derive only the Audacity operations each file needs, and import
+  an edited version with a recoverable `replacesId` link. One **Use this version /
+  Keep current** decision either repoints every matching placement across projects
+  or changes none; existing M15 identity re-queues only changed handoff rows.
+  `.sxc1lab` remains schema 1. A bilingual three-card `lvl-16` deck teaches the
+  native target and distinguishes it from CASIO Sampler App's wider import list.
+  **IMPLEMENTATION COMPLETE 2026-08-15 JST; release verification in progress.**
+  Contract: `docs/SOUND-CHECK.md`; implementation brief:
+  `briefs/M16-sound-check.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 
@@ -263,7 +275,7 @@ with a Japanese speaker — M3 adds a persistent JA-first reading mode.
 
 Size ruling (coordinator, 2026-08-07, for explicit Codex scrutiny at the M3
 gate): **wasm-opt is adopted into the default build** (M3 design §5.2 lever 1).
-Grounds: the full 435-id course cannot fit under the 1,000,000 ceiling
+Grounds: the historical full 435-id M3 course could not fit under the 1,000,000 ceiling
 unoptimized (measured ~1,100K; corpus bytes are the binding constraint at
 0.3456 gzip B/raw B); wasm-opt ships the full course at ~920K — smaller than
 M2 today; the M0-era miscompile concern was attacked empirically (could not

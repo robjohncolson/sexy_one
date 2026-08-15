@@ -10,7 +10,7 @@ hardware.
 
 ## Workflow
 
-1. Export a trimmed sample from Audacity. WAV at 48 kHz, 16-bit PCM is the safest
+1. Export a trimmed sample from Audacity. Stereo WAV at 48 kHz, 16-bit PCM is the safest
    match for the SXC-1's own recording format. The planner accepts the official
    app's documented file choices: WAV, MP3, FLAC, and `.cswp`.
 2. Open `#/samples` and add an Audacity batch to Sample Library. Search or
@@ -18,11 +18,15 @@ hardware.
    onto the 4×4 pad mockup; `Fill empty pads` places the Inbox in order without
    overwriting anything. Bank numbers are limited to the SXC-1 user-bank range,
    15-80. Direct pad and Inbox imports also join the Library automatically.
-3. Add the human context the file cannot carry: pad name, where it came from,
+3. Open a Library sound's details and run **Check readiness**. Sound Check reads
+   the original file locally, reports each required/advisory finding, and creates
+   only the Audacity steps that apply. Importing an edited version then offers
+   one recoverable **Use this version / Keep current** decision.
+4. Add the human context the file cannot carry: pad name, where it came from,
    tags, colour, one-shot/loop intent, BPM, and mute group.
-4. Save/share one `.sxc1lab` project file. Import that file on the phone; all
+5. Save/share one `.sxc1lab` project file. Import that file on the phone; all
    audio and pad notes travel together without an account or server.
-5. Enter Phone handoff. SEXY ONE presents one filled pad at a time with its exact
+6. Enter Phone handoff. SEXY ONE presents one filled pad at a time with its exact
    bank/pad destination and lets the phone share or download the corresponding
    audio file. In CASIO Sampler App use Assign Sound -> Select from file, then
    continue to the next pad.
@@ -90,4 +94,5 @@ The bulk-organizing and validation extension is specified in
 [`SAMPLE-INBOX.md`](SAMPLE-INBOX.md); the shared catalog, deduplication, and
 named-project layer is specified in [`SAMPLE-LIBRARY.md`](SAMPLE-LIBRARY.md);
 the resumable phone outcome flow is specified in
-[`PHONE-BRIDGE.md`](PHONE-BRIDGE.md).
+[`PHONE-BRIDGE.md`](PHONE-BRIDGE.md); on-demand preparation and edited-version
+replacement are specified in [`SOUND-CHECK.md`](SOUND-CHECK.md).

@@ -342,8 +342,9 @@
   }
 
   /* -------------------------------------------------------------------
-     Home: visible QR, then one green learning path and one red Sample Lab
-     path. Browsing/progress details stay in a quieter disclosure below.
+     Home: visible QR, then learning and sound-preparation steps in one
+     practice palette. Browsing/progress details stay in a quieter
+     disclosure below.
      ------------------------------------------------------------------- */
 
   #sxc1-home > p {
@@ -402,6 +403,18 @@
     align-items: center;
     justify-content: center;
     padding: 1rem 1.2rem;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  a.wizard-next {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--accent);
+    background: var(--card-bg);
+    color: var(--accent);
     text-align: center;
     text-decoration: none;
   }
@@ -1928,7 +1941,7 @@
          #sxc1-wizard-actions (exactly two primary choices after deferred
                               Sample Lab enhancement)
            #sxc1-primary-training > a#btn-primary-training.wizard-yes
-           a#btn-sample-lab.wizard-no -> #/samples
+           a#btn-sample-lab.wizard-next -> #/samples
          details#sxc1-browse-library.home-disclosure
              (course outline, manuals, and the two disclosures below)
              details#sxc1-study-details (review, continue, streak)
@@ -4354,6 +4367,34 @@
     color: #7bf2ce;
   }
 
+  .sample-version-note {
+    margin: 0.65rem 0;
+    color: #9ca5b8;
+    font-size: 0.76rem;
+    overflow-wrap: anywhere;
+  }
+
+  .sample-library-options {
+    margin-top: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.65rem;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .sample-library-options > summary {
+    min-height: 44px;
+    padding: 0.7rem 0.85rem;
+    color: #9ca5b8;
+    cursor: pointer;
+    font-size: 0.76rem;
+    font-weight: 750;
+  }
+
+  .sample-library-options > .sample-button {
+    width: calc(100% - 1.4rem);
+    margin: 0 0.7rem 0.7rem;
+  }
+
   .sample-metadata-grid {
     margin-top: 1rem;
   }
@@ -4465,6 +4506,161 @@
   .sample-validation-list li.is-blocking > strong {
     background: rgba(255, 85, 95, 0.17);
     color: #ff9ba1;
+  }
+
+  .sample-sound-check-shell {
+    max-width: 48rem;
+  }
+
+  .sample-sound-check-hero {
+    padding-bottom: 1.5rem;
+  }
+
+  .sample-sound-check-hero h1 {
+    max-width: 11ch;
+  }
+
+  .sample-sound-check-card {
+    padding: clamp(1.1rem, 4vw, 2rem);
+    border: 1px solid rgba(123, 242, 206, 0.28);
+    border-radius: 1rem;
+    background: linear-gradient(150deg, rgba(25, 37, 39, 0.98), rgba(15, 18, 24, 0.98));
+    box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.34);
+  }
+
+  .sample-sound-check-identity {
+    display: grid;
+    gap: 0.25rem;
+    margin-bottom: 1.1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .sample-sound-check-identity strong {
+    color: #ffffff;
+    font-size: 1rem;
+  }
+
+  .sample-sound-check-identity span,
+  .sample-sound-check-body,
+  .sample-sound-check-working {
+    color: #aab2c4;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .sample-sound-check-working {
+    min-height: 5rem;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    color: #7bf2ce;
+  }
+
+  .sample-sound-check-summary {
+    margin: 0;
+    color: #ffffff;
+    font-size: 1.2rem;
+  }
+
+  .sample-sound-check-body {
+    margin: 0.45rem 0 1rem;
+  }
+
+  .sample-sound-check-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sample-sound-check-list li {
+    display: grid;
+    grid-template-columns: minmax(7rem, 0.45fr) minmax(0, 1fr) auto;
+    gap: 0.65rem;
+    align-items: center;
+    min-height: 3.25rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.65rem;
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .sample-sound-check-criterion {
+    color: #e8ebf2;
+    font-size: 0.76rem;
+  }
+
+  .sample-sound-check-value {
+    min-width: 0;
+    color: #aeb6c5;
+    font-size: 0.73rem;
+    overflow-wrap: anywhere;
+  }
+
+  .sample-sound-check-status {
+    justify-self: end;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    color: #9ca5b8;
+    font-size: 0.62rem;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .sample-sound-check-list li.is-pass .sample-sound-check-status {
+    background: rgba(70, 225, 183, 0.12);
+    color: #7bf2ce;
+  }
+
+  .sample-sound-check-list li.is-fail .sample-sound-check-status {
+    background: rgba(255, 113, 121, 0.12);
+    color: #ff9ba1;
+  }
+
+  .sample-sound-check-list li.is-advisory .sample-sound-check-status {
+    background: rgba(255, 190, 90, 0.13);
+    color: #ffcb7c;
+  }
+
+  .sample-recipe {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(113, 146, 255, 0.22);
+    border-radius: 0.75rem;
+    background: rgba(113, 146, 255, 0.055);
+  }
+
+  .sample-recipe h3,
+  .sample-recipe p {
+    margin: 0;
+  }
+
+  .sample-recipe h3 {
+    color: #ffffff;
+    font-size: 0.9rem;
+  }
+
+  .sample-recipe p,
+  .sample-recipe ol {
+    color: #b8c0cf;
+    font-size: 0.76rem;
+    line-height: 1.55;
+  }
+
+  .sample-recipe ol {
+    display: grid;
+    gap: 0.45rem;
+    margin: 0.7rem 0;
+    padding-left: 1.3rem;
+  }
+
+  .sample-learn-link {
+    color: #8da8ff;
+    font-size: 0.76rem;
+    font-weight: 750;
   }
 
   .sample-handoff-hero {
@@ -4689,6 +4885,15 @@
 
     .sample-project-controls > .sample-button {
       width: 100%;
+    }
+
+    .sample-sound-check-list li {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .sample-sound-check-value {
+      grid-column: 1 / -1;
+      grid-row: 2;
     }
 
     .sample-library-tray {

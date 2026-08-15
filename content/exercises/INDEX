@@ -1,4 +1,4 @@
-# Reading order for the operation-first course: 50 decks, 352 live ids.
+# Reading order for the operation-first course: 51 decks, 355 live ids.
 # Manual-navigation/reference lookups are intentionally retired: the digital
 # reader links source material directly, while the course tests SXC-1 use.
 # Order otherwise follows briefs/M3-plan.md §2.4, chapter by chapter.
@@ -58,3 +58,4 @@
 098-lvl-13.ex.md
 100-lvl-14.ex.md
 102-lvl-15.ex.md
+104-lvl-16.ex.md
