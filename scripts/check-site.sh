@@ -1039,7 +1039,7 @@ assert 'version: 2' in shell and 'skipCurrentLabTask' in shell
 for kind in ("sound-ready", "sample-placed", "pad-loaded", "pad-played"):
     assert kind in shell and f'recordPractice("{kind}"' in lab, kind
 assert 'window.__SXC1_PRACTICE_LOOP' in shell
-assert 'window.__SXC1_PRACTICE_LOOP?.skip?.(' in lab
+assert 'window.__SXC1_PRACTICE_LOOP?.skip?.(taskId)' in lab
 wizard = home.split('P.id_ "sxc1-wizard-actions"', 1)[1].split('P.id_ "sxc1-browse-library"', 1)[0]
 assert wizard.count('Progress.primaryTrainingView pd') == 1
 assert 'btn-sample-lab' not in wizard

@@ -11309,6 +11309,7 @@ async function main() {
           before,
           after: window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0,
           selectedBefore, viewBefore,
+          selectedAfter: window.__SXC1_SAMPLE_LAB?.librarySelection || null,
           hash: location.hash,
           view: document.querySelector('#sxc1-sample-lab')?.dataset.view || null,
           state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
@@ -11465,6 +11466,7 @@ async function main() {
           && !String(padPracticeExit.hash || '').startsWith('#/samples')
           && padPracticeLaterStep?.headerSkip === true && padPracticeLaterStep.state === null
           && padPracticeEscape?.selectedBefore === 'asset-m18-0'
+          && padPracticeEscape.selectedAfter === padPracticeEscape.selectedBefore
           && padPracticeEscape.viewBefore === 'pad-practice'
           && padPracticeEscape.before === padPracticeEscape.after
           && padPracticeEscape.hash === '#/samples'
