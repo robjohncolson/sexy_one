@@ -265,7 +265,17 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   skipped: one owner run against a physical SXC-1, followed by the checks listed
   in the M18 completion handoff, will close it and can close M9's remaining
   phone/device acceptance at the same time. Contract: `docs/PAD-PRACTICE.md`;
-  implementation brief: `briefs/M18-pad-practice.md`.
+  implementation brief: `briefs/M18-pad-practice.md`. **HARDENED AND REDEPLOYED
+  2026-08-15 JST via PR #10, merge `23bf3c9`.** The route-lifecycle, Escape,
+  Today-task identity, side-effect-free Back, and preview-stop fixes passed
+  141/141 local checks with 244/244 browser assertions at both root and nested
+  paths. Both production hosts then passed 80/80 assertions and served cache
+  `m18-v2`; `app.wasm` retained the SHA-256 above and `application/wasm` content
+  type. Vercel deployment: `dpl_3eTt6fLrqfmWWCYNUwLhMdprL9vF`; Pages
+  deployment: `5e20577` (legacy Pages build `1152662311`). Adversarial review
+  also caught and fixed the same-URL intent re-entry regression, the required
+  installed-PWA cache cutover, and two under-specified test assertions. A9
+  remains pending owner physical-device verification.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 
@@ -305,9 +315,9 @@ Vercel (2026-08-07, owner-requested): the same static build also deploys to
 sexy-one.vercel.app belongs to an unrelated third party — never share that
 one). Deploy: copy `site/public` to a scratch dir named `sexy-one`, run
 `vercel deploy --prod --yes` (CLI authenticated as the owner's account).
-Initially verified 70/70 by browser-check against production. The current M18 release
-(`dpl_3r6xsth9uRRKgzAkJKBqf4G5invo`) was deployed 2026-08-15 JST and verified
-79/79 against the main alias, with the
+Initially verified 70/70 by browser-check against production. The current M18
+hardening release (`dpl_3eTt6fLrqfmWWCYNUwLhMdprL9vF`) was deployed 2026-08-15
+JST and verified 80/80 against the main alias, with the
 deployed files byte-identical to the locally gated artifact and the correct
 `application/wasm` content type. First-visit CDN cold-decode latency on the
 108-image sweep warms after one pass. Audience note: the site will be shared
