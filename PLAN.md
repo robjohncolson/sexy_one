@@ -239,10 +239,12 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   schedule-neutral `Skip for today`; Home and every Today state retain the
   two-action ceiling. The planner reads no audio and starts no worker, the
   deferred module boundary remains intact, and neither the progress passport
-  nor `.sxc1lab` format changes. **IMPLEMENTATION COMPLETE 2026-08-15 JST.**
+  nor `.sxc1lab` format changes. **COMPLETE AND DEPLOYED 2026-08-15 JST.**
   The optimized artifact passed 139/139 local checks with 242/242 browser
-  assertions at both root and nested deployment paths; production release
-  verification is in progress. Contract: `docs/ONE-PRACTICE-HOME.md`;
+  assertions at both root and nested deployment paths, then the byte-identical
+  Vercel and GitHub Pages releases each passed 78/78 production assertions.
+  Vercel deployment: `dpl_ChJGzCpq1UuhWWWGzTYjZC62Yhqy`; Pages deployment:
+  `34af971`. Contract: `docs/ONE-PRACTICE-HOME.md`;
   implementation brief: `briefs/M17-one-practice-home.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
@@ -283,8 +285,8 @@ Vercel (2026-08-07, owner-requested): the same static build also deploys to
 sexy-one.vercel.app belongs to an unrelated third party — never share that
 one). Deploy: copy `site/public` to a scratch dir named `sexy-one`, run
 `vercel deploy --prod --yes` (CLI authenticated as the owner's account).
-Initially verified 70/70 by browser-check against production. The current M16 release
-(`dpl_Hbo81r9TnDyBMm8zXEVjQcYLoT4z`) was deployed 2026-08-15 JST and verified
+Initially verified 70/70 by browser-check against production. The current M17 release
+(`dpl_ChJGzCpq1UuhWWWGzTYjZC62Yhqy`) was deployed 2026-08-15 JST and verified
 78/78 against the main alias, with the
 deployed files byte-identical to the locally gated artifact and the correct
 `application/wasm` content type. First-visit CDN cold-decode latency on the

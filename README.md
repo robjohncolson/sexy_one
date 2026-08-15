@@ -107,8 +107,9 @@ answers, or timing—and intentionally changes neither the progress passport nor
 `.sxc1lab`. The planner reads metadata only; the Lab and readiness worker remain
 deferred. See [`docs/ONE-PRACTICE-HOME.md`](docs/ONE-PRACTICE-HOME.md).
 The optimized artifact passed the complete 139/139 local release gate with
-242/242 browser assertions at both root and nested paths; production release
-verification is in progress.
+242/242 browser assertions at both root and nested paths. That byte-identical
+artifact is live on Vercel (`dpl_ChJGzCpq1UuhWWWGzTYjZC62Yhqy`) and GitHub
+Pages (`34af971`), and each production URL passed 78/78 browser assertions.
 
 **M16 Sound Check.** A Library sound now has an on-demand, entirely
 local readiness check before phone handoff. A deferred worker reads the original
