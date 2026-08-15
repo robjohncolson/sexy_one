@@ -1938,12 +1938,11 @@
 
        "#/" (home):
          aside#sxc1-phone-qr (always visible)
-         #sxc1-wizard-actions (exactly two primary choices after deferred
-                              Sample Lab enhancement)
+         #sxc1-wizard-actions (M17: exactly one sequenced primary choice)
            #sxc1-primary-training > a#btn-primary-training.wizard-yes
-           a#btn-sample-lab.wizard-next -> #/samples
          details#sxc1-browse-library.home-disclosure
-             (course outline, manuals, and the two disclosures below)
+             (Sample Lab, course outline, manuals, and the two disclosures below)
+             a#btn-sample-lab -> #/samples
              details#sxc1-study-details (review, continue, streak)
              details#sxc1-progress-data (export/import/wipe)
          #sxc1-corrupt-banner.progress-banner?  (state == "corrupt")
@@ -2611,6 +2610,11 @@
     color: var(--success);
   }
 
+  .session-item.is-skipped .session-card {
+    box-shadow: none;
+    opacity: 0.62;
+  }
+
   .session-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -2872,6 +2876,14 @@
   .weekly-stats span {
     color: var(--muted);
     font-size: 0.72rem;
+  }
+
+  .weekly-lab-summary {
+    margin: 0.65rem 0 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
   }
 
   .weekly-section {
@@ -3614,6 +3626,11 @@
     justify-content: space-between;
     gap: 1rem;
     min-height: 3rem;
+  }
+
+  .sample-practice-skip {
+    min-height: 44px;
+    margin-left: auto;
   }
 
   .sample-back,

@@ -66,8 +66,8 @@ bytes are retained exactly.
 
 ## Interaction contract
 
-- Home still presents exactly two primary directions: learn the SXC-1 or build a
-  sample bank. Course/manual/progress tools remain in a quieter disclosure.
+- Home presents one primary direction: Today's Session. Direct Sample Lab,
+  course/manual/progress tools remain in a quieter disclosure.
 - The 16 pads and A-D bank selectors are the instrument being modelled, not a
   wall of unrelated calls to action.
 - A selected filled pad has two immediate organization decisions: Move / swap
@@ -80,6 +80,10 @@ bytes are retained exactly.
   field never creates another confirmation button.
 - Phone handoff replaces the planner and advances one pad at a time. It does not
   append a second workflow below the first.
+- A Today intent opens the relevant place/check/handoff state with a
+  `Skip for today` escape. Placement, ready-sound, and Loaded outcomes continue
+  the stored five-step plan automatically and feed Weekly Pulse; no filename or
+  sample name enters the activity ledger.
 
 ## Delivery architecture
 
@@ -96,3 +100,5 @@ named-project layer is specified in [`SAMPLE-LIBRARY.md`](SAMPLE-LIBRARY.md);
 the resumable phone outcome flow is specified in
 [`PHONE-BRIDGE.md`](PHONE-BRIDGE.md); on-demand preparation and edited-version
 replacement are specified in [`SOUND-CHECK.md`](SOUND-CHECK.md).
+The sequenced Home, session task, local outcome ledger, and Weekly projection are
+specified in [`ONE-PRACTICE-HOME.md`](ONE-PRACTICE-HOME.md).

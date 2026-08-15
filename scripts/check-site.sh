@@ -739,7 +739,7 @@ info() {
 # negative-path assertion: an unsupported SIMD engine must fail before it
 # requests app.wasm and must show actionable recovery guidance.
 # Today's Session adds one full-stage assertion covering the stable adaptive
-# five-card plan, cross-route coach, DOM-only renderer, and mobile-safe links.
+# five-step plan, cross-route coach, DOM-only renderer, and mobile-safe links.
 # M12 adds one required static module and one full-stage Sample Lab workflow
 # assertion. The module is separately cached but deferred out of first boot.
 # M13 adds one full-stage Sample Inbox assertion; check-site's own check count
@@ -752,7 +752,9 @@ info() {
 # check count remains unchanged while the per-stage browser floor rises by one.
 # M16 adds one required deferred PCM worker and one pinned JS-island budget,
 # plus one full-stage Sound Check/revision/handoff assertion.
-M5_CHECK_TOTAL=138
+# M17 adds one static cross-storage contract check. Its Home/session/Weekly
+# behavior extends existing full-stage assertions, so the browser floor stays.
+M5_CHECK_TOTAL=139
 M5_BROWSER_ASSERT_FLOOR=242
 
 # ---------------------------------------------------------------------------
@@ -990,7 +992,7 @@ assert any(icon.get("src") == "./app-icon.svg" and "maskable" in icon.get("purpo
 ET.parse(root / "app-icon.svg")
 
 worker = (root / "sw.js").read_text(encoding="utf-8")
-assert 'const CACHE_VERSION = "m16-v1"' in worker
+assert 'const CACHE_VERSION = "m17-v1"' in worker
 match = re.search(r"const CORE_RELATIVE_URLS = (\[.*?\]);", worker, re.S)
 assert match, "CORE_RELATIVE_URLS not found"
 urls = json.loads(match.group(1))
@@ -1014,6 +1016,40 @@ if [ -z "$PWA_CONTRACT_OUT" ]; then
   ok "phone-ready manifest/service-worker contract is subpath-safe, versioned, complete, and excludes manual scans from precache"
 else
   fail "phone-ready manifest/service-worker contract is subpath-safe, versioned, complete, and excludes manual scans from precache (observed: $PWA_CONTRACT_OUT)"
+fi
+
+# M17's bridge is intentionally tiny and split across the already-loaded shell
+# and deferred Lab module. Pin the privacy/bounds vocabulary and the one-Lab
+# planner shape without coupling the Haskell progress codec to Lab metadata.
+M17_CONTRACT_OUT=""
+if command -v python3 >/dev/null 2>&1; then
+  M17_CONTRACT_OUT="$(python3 - "$REPO_ROOT/site/static/index.js" "$REPO_ROOT/site/static/sample-lab.js" "$REPO_ROOT/site/app/View/Pages.hs" <<'PY' 2>&1
+import pathlib
+import sys
+
+shell = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+lab = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
+home = pathlib.Path(sys.argv[3]).read_text(encoding="utf-8")
+assert 'const PRACTICE_KEY = "sxc1.practice-loop.v1"' in shell
+assert 'const PRACTICE_CAP = 200' in shell
+assert 'const courseLimit = labTask ? 4 : 5' in shell
+assert 'version: 2' in shell and 'skipCurrentLabTask' in shell
+for kind in ("sound-ready", "sample-placed", "pad-loaded"):
+    assert kind in shell and f'recordPractice("{kind}"' in lab, kind
+assert 'window.__SXC1_PRACTICE_LOOP' in shell
+assert 'window.__SXC1_PRACTICE_LOOP?.skip?.()' in lab
+wizard = home.split('P.id_ "sxc1-wizard-actions"', 1)[1].split('P.id_ "sxc1-browse-library"', 1)[0]
+assert wizard.count('Progress.primaryTrainingView pd') == 1
+assert 'btn-sample-lab' not in wizard
+PY
+)" || true
+else
+  M17_CONTRACT_OUT="python3 missing"
+fi
+if [ -z "$M17_CONTRACT_OUT" ]; then
+  ok "one-practice bridge is bounded, privacy-light, one-Lab-at-most, skippable, and Home has one primary path"
+else
+  fail "one-practice bridge is bounded, privacy-light, one-Lab-at-most, skippable, and Home has one primary path (observed: $M17_CONTRACT_OUT)"
 fi
 
 # A browser may fetch a malformed SVG successfully (HTTP 200) but refuse to

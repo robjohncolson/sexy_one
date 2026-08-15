@@ -473,10 +473,10 @@ deviceStateView :: T.Text -> View model action
 deviceStateView t = H.div_ [ P.id_ "sxc1-device-state", P.hidden_ True ] [ text (ms t) ]
 
 --------------------------------------------------------------------------
--- Home ("#/"): a visible phone handoff, then a two-choice wizard fork.
--- The green path goes straight to the best next card; the red path opens
--- the deferred local Sample Lab. Course/manual/progress tools remain in a
--- quieter disclosure below, without becoming a third primary choice.
+-- Home ("#/"): a visible phone handoff, then one calm front door into the
+-- daily practice loop. Sample Lab, course/manual browsing, and progress tools
+-- remain available in the quieter disclosure below; they no longer compete
+-- with the sequenced plan as simultaneous primary choices.
 --------------------------------------------------------------------------
 
 -- | The shareable production URL encoded in @site\/static\/qr-phone.svg@.
@@ -493,17 +493,12 @@ homeView lang mn ph pd = H.section_ [ P.id_ "sxc1-home" ]
     ]
     ++ Progress.progressHomeNotices pd
     ++ [ H.div_ [ P.id_ "sxc1-wizard-actions", P.class_ "wizard-actions" ]
-          [ Progress.primaryTrainingView pd
-          , H.a_ [ P.id_ "btn-sample-lab", P.class_ "wizard-choice wizard-no sample-lab-home-action"
-                 , P.href_ "#/samples" ]
-              [ H.strong_ [] [ text (ms (iSampleLabTitle lang)) ]
-              , H.small_ [ P.class_ "primary-training-card" ] [ text (ms (iSampleLabCardSub lang)) ]
-              ]
-          ]
+          [ Progress.primaryTrainingView pd ]
        , H.details_ [ P.id_ "sxc1-browse-library", P.class_ "home-disclosure sample-library-disclosure" ]
             ( H.summary_ [] [ text (ms (iBrowseLibrary lang)) ]
             : H.ul_ [ P.class_ "manual-list" ]
-                (trainingCard lang : weeklyCard lang : masteryCard lang : map (manualCard lang mn) (mnStats mn))
+                (trainingCard lang : sampleLabCard lang : weeklyCard lang : masteryCard lang
+                  : map (manualCard lang mn) (mnStats mn))
             : Progress.progressHomeView ph pd
             )
        ]
@@ -545,6 +540,17 @@ trainingCard lang = H.li_ []
   [ H.a_ [ P.class_ "manual-card", P.href_ (ms (renderRoute RExercises)) ]
       [ H.strong_ [] [ text (ms (iTraining lang)) ]
       , H.small_ [] [ text (ms (iTrainingCardSub lang)) ]
+      ]
+  ]
+
+-- | Sample Lab remains directly reachable for deliberate library/planning
+-- work, but Today's Session decides when it belongs in the active loop.
+sampleLabCard :: Lang -> View model action
+sampleLabCard lang = H.li_ []
+  [ H.a_ [ P.id_ "btn-sample-lab", P.class_ "manual-card sample-lab-home-action"
+         , P.href_ "#/samples" ]
+      [ H.strong_ [] [ text (ms (iSampleLabTitle lang)) ]
+      , H.small_ [] [ text (ms (iSampleLabCardSub lang)) ]
       ]
   ]
 

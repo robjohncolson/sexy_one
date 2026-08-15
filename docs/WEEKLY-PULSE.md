@@ -1,7 +1,8 @@
 # Weekly Pulse
 
 M10 adds `#/x/week`: a phone-first reflection over the learner's existing
-review schedule and a new bounded recent-history ledger. It answers four
+review schedule and bounded recent-history ledger. M17 also projects bounded
+Sample Lab outcomes into the same view. It answers four
 questions without creating an account or analytics stream:
 
 1. How steady has practice felt over the last seven UTC days?
@@ -27,7 +28,7 @@ Grades are the scheduler's stable integer alphabet: Again=0, Hard=1, Good=2,
 Easy=3. A `-` prompt marks exercise completion. The record intentionally omits
 elapsed time, answer content, hints, MIDI messages, and device information.
 
-Only the latest 200 marks survive. The same cap is enforced while folding live
+Only the latest 200 course marks survive. The same cap is enforced while folding live
 events and while decoding imported text, so a large or hostile passport cannot
 silently produce an unbounded in-memory ledger. The ledger stays inside the
 existing `sxc1.progress` key and therefore moves through the existing validated
@@ -39,10 +40,17 @@ starts empty because historic outcomes cannot be reconstructed truthfully. In
 that state the UI says detailed tracking begins with the next answer, while its
 forecast and recent-practice fallback already use the saved scheduler records.
 
+M17 deliberately leaves that passport wire format unchanged. Lab outcomes live
+in the independently repairable `sxc1.practice-loop.v1` envelope, capped at 200
+events containing only sequence, UTC day, outcome kind, project id, and an opaque
+reference. They stay in the browser where the Lab work occurred.
+
 ## Projection rules
 
-- The rhythm counts distinct active days in `[today-6, today]`. It uses ledger
-  days first and falls back to prompt `lastSeen` days for migrated profiles.
+- The rhythm counts distinct course-or-Lab active days in `[today-6, today]`.
+  It uses ledger days first and falls back to prompt `lastSeen` days for migrated profiles.
+- Lab outcomes visibly separate successful Sound Check preparation, Inbox-to-pad
+  placement, and handoff `Loaded` decisions. Skip/Problem never count as success.
 - Answers and steady answers use prompt-bearing ledger marks only; completion
   marks do not inflate either count. Good/Easy are steady evidence.
 - The forecast buckets every known prompt due in `[today, today+6]`. Anything
@@ -67,9 +75,9 @@ complete in English and Japanese; the shipped Japanese flow asserts the title,
 forecast, both insight headings, action, and seven bars.
 
 `window.__SXC1_WEEKLY` exposes bounded diagnostic values for regression tests.
-Nothing is transmitted. The footer states that the data stays on the device
-and that only the latest 200 coarse marks are included in the progress
-passport.
+Nothing is transmitted. The footer distinguishes the latest 200 course marks
+included in the progress passport from the latest 200 Lab outcomes retained in
+this browser.
 
 ## Regression anchors
 
@@ -80,5 +88,6 @@ passport.
   precedence, and route round-tripping.
 - `scripts/browser-check.mjs` injects an independently specified three-day
   week and requires the exact outlook `[1,0,1,0,0,0,1]`, the recent evidence
-  counts, friction, due-first focus, training-index discovery, Mastery link,
+  counts, Lab active-day union and Prepare/Place/Loaded totals, friction,
+  due-first focus, training-index discovery, Mastery link,
   zero canvases, Japanese rendering, and both 360/320 px route sweeps.

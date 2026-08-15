@@ -34,7 +34,9 @@ const COPY = {
   en: {
     homeTitle: "Prepare a sound",
     homeSub: "Check, place, and load your next sample",
-    library: "Manuals, course, and progress",
+    library: "Course, Sample Lab, manuals, and progress",
+    todayStep: "Today's practice step",
+    skipToday: "Skip for today",
     back: "Back to SEXY ONE",
     eyebrow: "LOCAL SAMPLE WORKSPACE",
     title: "Sample Lab",
@@ -271,7 +273,9 @@ const COPY = {
   ja: {
     homeTitle: "音源を準備する",
     homeSub: "確認・配置・読み込みをひとつの流れで",
-    library: "マニュアル、コース、進捗",
+    library: "コース、Sample Lab、マニュアル、進捗",
+    todayStep: "今日の練習ステップ",
+    skipToday: "今日はスキップ",
     back: "SEXY ONEへ戻る",
     eyebrow: "ローカル・サンプル・ワークスペース",
     title: "Sample Lab",
@@ -530,6 +534,8 @@ let libraryQuery = "";
 let libraryStageFilter = "all";
 let creatingProject = false;
 let soundCheckState = null;
+let activePracticeIntent = null;
+let lastPracticeIntent = "";
 let metadataPersistTimer = null;
 let libraryImportQueue = Promise.resolve();
 const memoryAudio = new Map();
@@ -538,6 +544,28 @@ function uid(prefix = "id") {
   try { return `${prefix}-${crypto.randomUUID()}`; } catch (_) {
     return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   }
+}
+
+function recordPractice(kind, detail = {}) {
+  return window.__SXC1_PRACTICE_LOOP?.record?.(kind, {
+    projectId: state?.id || "",
+    ...detail,
+  }) || null;
+}
+
+function practiceRouteIntent() {
+  if (!window.location.hash.startsWith(`${ROUTE}?`)) return null;
+  try {
+    const url = new URL(window.location.hash.slice(1), window.location.origin);
+    const practice = url.searchParams.get("practice");
+    if (!["organize", "check", "handoff"].includes(practice)) return null;
+    return {
+      key: url.pathname + url.search,
+      practice,
+      projectId: String(url.searchParams.get("project") || "").slice(0, 180),
+      assetId: String(url.searchParams.get("asset") || "").slice(0, 180),
+    };
+  } catch (_) { return null; }
 }
 
 function clampInt(value, min, max, fallback) {
@@ -1311,6 +1339,7 @@ function markCurrentHandoff(status) {
     : status === "problem"
       ? fill(strings.problemPadStatus, { destination })
       : fill(strings.skippedPad, { destination });
+  if (status === "loaded") recordPractice("pad-loaded", { ref: entry.key });
   finishOrAdvanceHandoff(message);
 }
 
@@ -1412,6 +1441,7 @@ function placeArmedOnPad(slot, number) {
     state.selectedPad = number;
     armedPlacement = null;
     persistProject();
+    recordPractice("sample-placed", { ref: item.id });
     renderPlanner();
     announce(fill(destination ? strings.replacedTo : strings.assignedTo, {
       name: pad.name,
@@ -1540,7 +1570,9 @@ async function previewPad(button, pad) {
 }
 
 function setRouteActive() {
-  const active = window.location.hash === ROUTE || window.location.hash.startsWith(`${ROUTE}/`);
+  const active = window.location.hash === ROUTE
+    || window.location.hash.startsWith(`${ROUTE}/`)
+    || window.location.hash.startsWith(`${ROUTE}?`);
   document.body.classList.toggle("sample-lab-active", active);
   const app = document.getElementById("app");
   if (app) active ? app.setAttribute("aria-hidden", "true") : app.removeAttribute("aria-hidden");
@@ -1548,11 +1580,19 @@ function setRouteActive() {
   overlay.hidden = !active;
   if (active) {
     document.title = `${strings.title} — SEXY ONE`;
+    const intent = practiceRouteIntent();
+    activePracticeIntent = intent;
     renderPlanner();
+    if (intent && intent.key !== lastPracticeIntent) {
+      lastPracticeIntent = intent.key;
+      window.setTimeout(() => applyPracticeIntent(intent), 0);
+    }
     requestAnimationFrame(() => overlay.querySelector("h1")?.focus());
   } else {
     stopPreview();
     armedPlacement = null;
+    activePracticeIntent = null;
+    lastPracticeIntent = "";
     document.title = "SEXY ONE — SXC-1 Trainer";
   }
 }
@@ -1562,17 +1602,11 @@ function enhanceHome() {
   const primary = document.getElementById("btn-primary-training");
   const browse = document.getElementById("sxc1-browse-library");
   if (!wizard || !primary || !browse) return;
-  let sample = document.getElementById("btn-sample-lab");
-  if (!sample) {
-    sample = el("a", "wizard-choice wizard-next sample-lab-home-action");
-    sample.id = "btn-sample-lab";
-    sample.href = ROUTE;
-    sample.append(el("strong", "", strings.homeTitle), el("small", "primary-training-card", strings.homeSub));
+  const sample = document.getElementById("btn-sample-lab");
+  if (wizard.children.length !== 1 || wizard.children[0] !== primary.parentElement) {
+    wizard.replaceChildren(primary.parentElement);
   }
-  if (wizard.children.length !== 2 || wizard.children[0] !== primary.parentElement || wizard.children[1] !== sample) {
-    const primaryShell = primary.parentElement;
-    wizard.replaceChildren(primaryShell, sample);
-  }
+  if (sample) sample.classList.remove("wizard-choice", "wizard-no", "wizard-next");
   browse.classList.remove("wizard-choice", "wizard-no", "wizard-next");
   browse.classList.add("home-disclosure", "sample-library-disclosure");
   const summary = browse.querySelector(":scope > summary");
@@ -1581,6 +1615,30 @@ function enhanceHome() {
   // schedule itself forever on an otherwise settled Home screen.
   if (summary && summary.textContent !== strings.library) summary.textContent = strings.library;
   if (browse.previousElementSibling !== wizard) wizard.insertAdjacentElement("afterend", browse);
+}
+
+async function applyPracticeIntent(intent) {
+  if (!intent || !overlay || overlay.hidden || intent.key !== lastPracticeIntent) return;
+  if (intent.projectId && intent.projectId !== state.id) switchProject(intent.projectId);
+  if (intent.practice === "check") {
+    const asset = libraryAssetById(intent.assetId);
+    if (!asset) return;
+    librarySelection = asset.id;
+    await beginSoundCheck(asset.id);
+  } else if (intent.practice === "organize") {
+    const item = state.inbox[0];
+    if (item) armInbox(item);
+  } else if (intent.practice === "handoff") {
+    const saved = savedHandoffForProject();
+    if (saved?.entries?.some((entry) => ["pending", "shared"].includes(entry.status))) {
+      handoffSession = saved;
+      beginHandoff();
+      return;
+    }
+    const report = await validateProject();
+    if (report.blocking || report.issues.length) renderValidation(report);
+    else beginHandoff();
+  }
 }
 
 function scheduleRender() {
@@ -1597,7 +1655,15 @@ function projectHeader() {
   const back = el("a", "sample-back", `← ${strings.back}`);
   back.href = "#/";
   const badge = el("span", `sample-local-badge${persistentAudio ? "" : " is-warning"}`, persistentAudio ? strings.local : strings.temporary);
-  header.append(back, badge);
+  header.append(back);
+  if (activePracticeIntent) {
+    const skip = el("button", "sample-button sample-button-secondary sample-practice-skip", strings.skipToday);
+    skip.id = "btn-sample-practice-skip";
+    skip.type = "button";
+    skip.setAttribute("aria-label", `${strings.todayStep}: ${strings.skipToday}`);
+    skip.addEventListener("click", () => window.__SXC1_PRACTICE_LOOP?.skip?.());
+    header.append(skip);
+  } else header.append(badge);
   return header;
 }
 
@@ -1996,11 +2062,18 @@ function useEditedVersion() {
   const candidate = libraryAssetById(soundCheckState?.candidateId);
   if (!original || !candidate) return;
   const changed = replaceAssetEverywhere(original, candidate);
+  if (candidate.readiness?.ready) recordPractice("sound-ready", { ref: original.id });
   librarySelection = candidate.id;
   libraryEditing = false;
   soundCheckState = null;
   renderPlanner();
   announce(fill(strings.versionUsed, changed));
+}
+
+function finishSoundCheck() {
+  const assetId = soundCheckState?.assetId || "";
+  if (soundCheckState?.result?.ready) recordPractice("sound-ready", { ref: assetId });
+  closeSoundCheck();
 }
 
 function keepCurrentVersion() {
@@ -2239,7 +2312,7 @@ function renderSoundCheck() {
     const done = el("button", "sample-button sample-button-secondary", strings.checkDone);
     done.id = "btn-sample-check-done";
     done.type = "button";
-    done.addEventListener("click", closeSoundCheck);
+    done.addEventListener("click", finishSoundCheck);
     actions.append(retry, done);
   } else if (phase === "candidate") {
     const use = el("button", "sample-button sample-button-primary", strings.useVersion);
@@ -2283,7 +2356,7 @@ function renderSoundCheck() {
     const done = el("button", "sample-button sample-button-secondary", strings.checkDone);
     done.id = "btn-sample-check-done";
     done.type = "button";
-    done.addEventListener("click", closeSoundCheck);
+    done.addEventListener("click", finishSoundCheck);
     actions.append(done);
   }
   if (actions.childElementCount) card.append(actions);
@@ -2488,6 +2561,7 @@ function autoFillActiveBank() {
   state.selectedPad = empty[count - 1];
   armedPlacement = null;
   persistProject();
+  recordPractice("sample-placed", { ref: `autofill:${count}` });
   renderPlanner();
   announce(fill(strings.autoFilled, { count }));
 }
@@ -2982,6 +3056,7 @@ async function importSample(file) {
     activeBank().pads[state.selectedPad] = pad;
     if (old) state.inbox.push(returnableInboxItem(old));
     persistProject();
+    recordPractice("sample-placed", { ref: pad.blobId });
     renderPlanner();
     announce(strings.saved);
   } catch (_) {

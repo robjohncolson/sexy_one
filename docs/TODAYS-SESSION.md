@@ -1,8 +1,8 @@
 # Today's session
 
-`#/x/today` is the app's primary training path. It turns the existing course,
-saved completion state, and spaced-repetition records into a stable five-card
-plan intended to take about 5–10 minutes.
+`#/x/today` is the app's one primary practice path. It turns course progress,
+spaced-repetition records, and actionable local Sample Lab metadata into a
+stable five-step plan intended to take about 5–10 minutes.
 
 ## Planning contract
 
@@ -11,8 +11,14 @@ The planner works in course order and never duplicates an exercise. It selects:
 1. up to two exercises with prompts due today, with the most due prompts first;
 2. up to two unfinished exercises that already have recall evidence;
 3. at least one unseen exercise whose suggested prerequisite decks are complete;
-4. remaining ready or incomplete work until the plan contains five cards;
+4. remaining ready or incomplete work until the plan contains five course cards;
 5. maintenance cards only when the course has no incomplete alternative.
+
+M17 then reserves at most one position for real Sample Lab work when it exists,
+leaving four course cards. Handoff load comes first, then a failed/unchecked
+Sound Check, Inbox placement, and a new handoff for assigned pads. Planning reads
+metadata only; it never opens audio or starts the readiness worker. See
+[One Practice Home](ONE-PRACTICE-HOME.md) for the cross-storage contract.
 
 Within each group it prefers an exercise kind not already represented, so a
 session mixes quizzes and hands-on drills when the eligible work allows it.
@@ -25,8 +31,8 @@ storage is refused. Completing a card updates its status but does not reshuffle
 the remaining cards. “Build a new plan” is the explicit refresh action.
 
 The tab-local plan owns ordering, not completion truth. Every render reconciles
-its five exercise ids against the Haskell progress payload's persisted
-`masteryDone` list. Work completed after the plan was built, from another course
+its course exercise ids against `masteryDone` and its optional Lab step against
+post-baseline activity events. Work completed after the plan was built, from another course
 entry point, or immediately before a hard refresh therefore updates the meter
 and rows; wiping progress clears those completion marks again.
 
@@ -38,7 +44,7 @@ no corpus parser, graph dependency, canvas, or WebGL context to `app.wasm`.
 
 Opening a planned exercise shows `#sxc1-session-coach` as a body-level bar. It
 lives outside Miso's managed tree so exercise state updates cannot corrupt it.
-The bar links back to the plan and reports the current card and completion count.
+The bar links back to the plan and reports the current step and completion count.
 When a forward flashcard grade completes the exercise, the DOM bridge consumes the
 engine's transient `#ex-summary`, marks the card complete, and opens the next planned
 card before the redundant repeat decision can be shown. Every review grade moves
@@ -46,6 +52,11 @@ forward; `Again` changes the schedule so the card returns sooner. Hands-on cards
 offer only `Skip for now` and `Yes — done`; Skip records unfinished prompts and
 continues without claiming success. Safe-area insets and the 320 px layout are
 part of its CSS contract.
+
+A planned Lab link opens the relevant check/place/handoff state. Its real outcome
+automatically continues just like a grade. `Skip for today` is available both on
+the plan and in the Lab intent header; it advances without recording success.
+The Today footer never exceeds two choices, including after completion.
 
 All session-owned strings have complete English and Japanese records. Exercise
 and deck titles continue to come from the fetched language bundle.
@@ -55,8 +66,8 @@ and deck titles continue to come from the fetched language bundle.
 The full browser stages prove that:
 
 - the Home primary action and training index reach `#/x/today`;
-- a fresh plan has five unique exercise links, a 5–10 minute estimate, mixed
-  exercise kinds, stable ids across route changes, and no canvas;
+- a plan has five unique links, at most one Lab link, a 5–10 minute estimate,
+  mixed exercise kinds, stable ids across route changes, and no canvas;
 - synthetic due and in-progress evidence produces a due-first plan containing
   due, continue, and new work;
 - the coach is visible, mobile-safe, and outside `#app`;

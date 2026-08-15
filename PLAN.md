@@ -230,6 +230,20 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   `dpl_Hbo81r9TnDyBMm8zXEVjQcYLoT4z`; Pages deployment: `71356d4`.
   Contract: `docs/SOUND-CHECK.md`; implementation brief:
   `briefs/M16-sound-check.md`.
+- **M17 — One Practice Home.** Make Today's Session the one primary Home path
+  and let its stable five-step snapshot contain at most one task projected from
+  real Sample Lab metadata. Successful Sound Check, Inbox placement, and Loaded
+  handoff outcomes write a privacy-light, independently repairable 200-event
+  local ledger, complete the planned Lab step, continue automatically, and
+  appear in Weekly Pulse alongside course activity. Lab tasks provide a
+  schedule-neutral `Skip for today`; Home and every Today state retain the
+  two-action ceiling. The planner reads no audio and starts no worker, the
+  deferred module boundary remains intact, and neither the progress passport
+  nor `.sxc1lab` format changes. **IMPLEMENTATION COMPLETE 2026-08-15 JST.**
+  The optimized artifact passed 139/139 local checks with 242/242 browser
+  assertions at both root and nested deployment paths; production release
+  verification is in progress. Contract: `docs/ONE-PRACTICE-HOME.md`;
+  implementation brief: `briefs/M17-one-practice-home.md`.
 
 ## Non-negotiable constraints (Opus latitude ends here)
 
