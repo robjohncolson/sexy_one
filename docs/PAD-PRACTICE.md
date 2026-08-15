@@ -12,9 +12,9 @@ can inspect the device.
 
 `practice=pads` opens one bank by project, slot, and user-bank number. The
 intro shows that coordinate plus every assigned pad's number, name, and color.
-The learner may walk the pads one at a time or go directly to the closing
-decision. Pad steps are navigation only: they never create evidence and do not
-ask for a per-pad confirmation.
+The learner may step forward pad by pad or finish from the current pad at any
+time. Pad steps are navigation only: they never create evidence and do not ask
+for a per-pad confirmation.
 
 The closing decision is `Mark practiced` / `Skip for today`. Mark writes one
 event for the entire run. Skip, using the Lab header, returning to the planner,

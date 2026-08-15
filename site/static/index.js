@@ -1278,7 +1278,9 @@ scanForProgressPortability();
       const banks = [...new Map(assigned.map((row) => [`${row.slot}:${row.bank}`, row])).values()];
       const lastPlayed = new Map();
       ledger.events.forEach((event) => {
-        if (event.kind === "pad-played" && event.projectId === project.id) lastPlayed.set(event.ref, event.day);
+        if (event.kind === "pad-played" && event.projectId === project.id) {
+          lastPlayed.set(event.ref, Math.max(lastPlayed.get(event.ref) || 0, event.day));
+        }
       });
       banks.sort((a, b) => (lastPlayed.get(`${a.slot}:${a.bank}`) || 0)
         - (lastPlayed.get(`${b.slot}:${b.bank}`) || 0) || a.slot.localeCompare(b.slot));
@@ -1287,7 +1289,7 @@ scanForProgressPortability();
       return {
         ...base, id: `lab:practice:${project.id}:${ref}`, ref,
         eventKinds: ["pad-played"],
-        href: `#/samples?practice=pads&project=${encodeURIComponent(project.id)}&slot=${bank.slot}&bank=${bank.bank}`,
+        href: `#/samples?practice=pads&project=${encodeURIComponent(project.id)}&slot=${bank.slot}&bank=${bank.bank}&today=1`,
         title: lang === "ja" ? `BANK ${bank.bank}を練習` : `Practice Bank ${bank.bank}`,
       };
     }

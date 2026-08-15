@@ -275,7 +275,6 @@ const COPY = {
     padPracticeIntro: "Switch to slot {slot}. These are the pads you last loaded for this bank.",
     padPracticeLastLoaded: "Last loaded is a saved handoff receipt, not a live check of the SXC-1.",
     padPracticeWalk: "Walk pad by pad",
-    padPracticeFree: "Practice freely",
     padPracticeStep: "Pad {current} of {total}",
     padPracticePlay: "Play pad {pad} — {name}",
     padPracticeNext: "Next pad",
@@ -535,7 +534,6 @@ const COPY = {
     padPracticeIntro: "スロット{slot}へ切り替えます。このバンクで最後に読込済みにしたパッドです。",
     padPracticeLastLoaded: "「最後に読込済み」は保存された引き渡し記録で、SXC-1の現在状態を確認するものではありません。",
     padPracticeWalk: "パッドごとに確認",
-    padPracticeFree: "自由に練習",
     padPracticeStep: "{total}件中 {current}番目",
     padPracticePlay: "PAD {pad} — {name} を演奏",
     padPracticeNext: "次のパッド",
@@ -609,6 +607,7 @@ function practiceRouteIntent() {
       assetId: String(url.searchParams.get("asset") || "").slice(0, 180),
       slot: String(url.searchParams.get("slot") || "").slice(0, 1).toUpperCase(),
       bank: clampInt(url.searchParams.get("bank"), 15, 80, 0),
+      today: url.searchParams.get("today") === "1",
     };
   } catch (_) { return null; }
 }
@@ -1657,7 +1656,7 @@ function beginPadPractice(slot, bank, unavailable = false) {
 
 function leavePadPractice() {
   padPracticeState = null;
-  if (window.__SXC1_PRACTICE_LOOP?.skip?.()) return;
+  if (activePracticeIntent?.today && window.__SXC1_PRACTICE_LOOP?.skip?.()) return;
   history.replaceState(null, "", ROUTE);
   activePracticeIntent = null;
   lastPracticeIntent = "";
@@ -1725,7 +1724,6 @@ function renderPadPractice() {
     });
     card.append(grid, padPracticeActions([
       { id: "btn-pad-practice-walk", label: strings.padPracticeWalk, primary: true, run: () => { session.phase = "pad"; renderPadPractice(); } },
-      { id: "btn-pad-practice-free", label: strings.padPracticeFree, run: () => { session.phase = "decision"; renderPadPractice(); } },
     ]));
   } else if (session.phase === "pad") {
     const row = session.rows[session.index];
@@ -1854,7 +1852,8 @@ function projectHeader() {
   back.href = "#/";
   const badge = el("span", `sample-local-badge${persistentAudio ? "" : " is-warning"}`, persistentAudio ? strings.local : strings.temporary);
   header.append(back);
-  if (activePracticeIntent) {
+  const padHeaderSkip = padPracticeState?.phase === "intro" && activePracticeIntent?.today;
+  if (activePracticeIntent && (!padPracticeState || padHeaderSkip)) {
     const skip = el("button", "sample-button sample-button-secondary sample-practice-skip", strings.skipToday);
     skip.id = "btn-sample-practice-skip";
     skip.type = "button";

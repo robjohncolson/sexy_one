@@ -11170,6 +11170,7 @@ async function main() {
           pad: item.dataset.pad, color: item.dataset.color, name: item.querySelector('.sample-pad-name')?.textContent.trim(),
         })),
         buttons: Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id),
+        allButtons: Array.from(document.querySelectorAll('#sxc1-sample-lab button')).map((button) => button.id),
       }))()`);
       await cdp.send('Emulation.setDeviceMetricsOverride', {
         width: 320, height: 568, deviceScaleFactor: 2, mobile: true,
@@ -11192,15 +11193,16 @@ async function main() {
         };
         const state = () => window.__SXC1_SAMPLE_LAB?.padPractice || null;
         const buttonIds = () => Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id);
+        const totalButtons = () => document.querySelectorAll('#sxc1-sample-lab button').length;
         document.querySelector('#btn-pad-practice-walk')?.click();
         await waitFor(() => state()?.phase === 'pad');
-        const firstPad = { state: state(), buttons: buttonIds(), cue: document.querySelector('.sample-pad-practice-cue')?.textContent.trim() };
+        const firstPad = { state: state(), buttons: buttonIds(), totalButtons: totalButtons(), cue: document.querySelector('.sample-pad-practice-cue')?.textContent.trim() };
         document.querySelector('#btn-pad-practice-next')?.click();
         await waitFor(() => state()?.index === 1);
-        const secondPad = { state: state(), buttons: buttonIds(), cue: document.querySelector('.sample-pad-practice-cue')?.textContent.trim() };
+        const secondPad = { state: state(), buttons: buttonIds(), totalButtons: totalButtons(), cue: document.querySelector('.sample-pad-practice-cue')?.textContent.trim() };
         document.querySelector('#btn-pad-practice-finish')?.click();
         await waitFor(() => state()?.phase === 'decision');
-        const decision = { state: state(), buttons: buttonIds() };
+        const decision = { state: state(), buttons: buttonIds(), totalButtons: totalButtons() };
         const mark = document.querySelector('#btn-pad-practice-mark');
         mark?.click();
         mark?.click();
@@ -11212,7 +11214,7 @@ async function main() {
         const played = ledger?.events?.filter((event) => event.kind === 'pad-played' && event.ref === 'B:42') || [];
         return {
           firstPad, secondPad, decision,
-          receipt: { state: state(), buttons: buttonIds() },
+          receipt: { state: state(), buttons: buttonIds(), totalButtons: totalButtons() },
           playedCount: played.length,
           newest: played.at(-1) || null,
           privateShape: played.every((event) => Object.keys(event).sort().join(',') === 'day,kind,projectId,ref,seq'),
@@ -11223,7 +11225,9 @@ async function main() {
       await gotoSessionSurface(padPracticeHref, '#btn-pad-practice-walk', 12000);
       const padPracticeSkip = await evaluate(`(async () => {
         const before = window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0;
-        document.querySelector('#btn-pad-practice-free')?.click();
+        document.querySelector('#btn-pad-practice-walk')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        document.querySelector('#btn-pad-practice-finish')?.click();
         await new Promise((resolve) => setTimeout(resolve, 20));
         document.querySelector('#btn-pad-practice-skip')?.click();
         await new Promise((resolve) => setTimeout(resolve, 40));
@@ -11234,11 +11238,19 @@ async function main() {
         };
       })()`);
       await gotoSessionSurface(padPracticeHref, '#btn-pad-practice-walk', 12000);
+      const padPracticeHeaderSkip = await evaluate(`(async () => {
+        const before = window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0;
+        const present = Boolean(document.querySelector('#btn-sample-practice-skip'));
+        document.querySelector('#btn-sample-practice-skip')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return { present, before, after: window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0, hash: location.hash };
+      })()`);
+      await gotoSessionSurface(padPracticeHref, '#btn-pad-practice-walk', 12000);
       const padPracticeAbandon = await evaluate(`(async () => {
         const before = window.__SXC1_PRACTICE_LOOP?.read?.().events.length || 0;
         document.querySelector('#btn-pad-practice-walk')?.click();
         await new Promise((resolve) => setTimeout(resolve, 20));
-        document.querySelector('#btn-sample-practice-skip')?.click();
+        location.hash = '#/samples';
         await new Promise((resolve) => setTimeout(resolve, 40));
         return {
           before,
@@ -11260,11 +11272,13 @@ async function main() {
       const padPracticeReminder = await evaluate(`(() => ({
         state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
         buttons: Array.from(document.querySelectorAll('.sample-pad-practice-actions > button')).map((button) => button.id),
+        totalButtons: document.querySelectorAll('#sxc1-sample-lab button').length,
       }))()`);
       await gotoSessionSurface('#/samples?practice=pads&project=deleted-m18&slot=B&bank=42', '#btn-pad-practice-back', 12000);
       const padPracticeDeleted = await evaluate(`(() => ({
         state: window.__SXC1_SAMPLE_LAB?.padPractice || null,
         title: document.querySelector('.sample-pad-practice-hero h1')?.textContent.trim() || null,
+        totalButtons: document.querySelectorAll('#sxc1-sample-lab button').length,
       }))()`);
       await evaluate(`(() => {
         let backup = {};
@@ -11283,7 +11297,7 @@ async function main() {
         'Pad Practice chooses the oldest eligible Loaded bank, walks two-action phases, and records one private coordinate receipt',
         Boolean(padPracticePlan?.item?.eventKinds?.join(',') === 'pad-played'
           && padPracticePlan.item.ref === 'B:42'
-          && /practice=pads&project=project-m18&slot=B&bank=42$/.test(padPracticePlan.item.href || '')
+          && /practice=pads&project=project-m18&slot=B&bank=42&today=1$/.test(padPracticePlan.item.href || '')
           && padPracticePlan.completedBefore === false
           && padPracticePlan.task?.ref === 'B:42'
           && padPracticeIntro?.phase === 'intro'
@@ -11295,31 +11309,40 @@ async function main() {
             { pad: '2', color: 'cyan', name: 'Rain loop' },
             { pad: '7', color: 'violet', name: 'Glass hit' },
           ])
-          && padPracticeIntro.buttons.join(',') === 'btn-pad-practice-walk,btn-pad-practice-free'
+          && padPracticeIntro.buttons.join(',') === 'btn-pad-practice-walk'
+          && padPracticeIntro.allButtons.join(',') === 'btn-sample-practice-skip,btn-pad-practice-walk'
           && padPracticeMobile?.viewport === 320 && padPracticeMobile.scrollWidth <= 320
-          && padPracticeMobile.buttonHeights.length === 2
+          && padPracticeMobile.buttonHeights.length === 1
           && padPracticeMobile.buttonHeights.every((height) => height >= 44)
           && padPracticeRun?.firstPad?.state?.phase === 'pad'
-          && padPracticeRun.firstPad.buttons.length <= 2 && /Rain loop/.test(padPracticeRun.firstPad.cue || '')
+          && padPracticeRun.firstPad.buttons.length <= 2 && padPracticeRun.firstPad.totalButtons <= 2
+          && /Rain loop/.test(padPracticeRun.firstPad.cue || '')
           && padPracticeRun.secondPad?.state?.index === 1
-          && padPracticeRun.secondPad.buttons.length <= 2 && /Glass hit/.test(padPracticeRun.secondPad.cue || '')
+          && padPracticeRun.secondPad.buttons.length <= 2 && padPracticeRun.secondPad.totalButtons <= 2
+          && /Glass hit/.test(padPracticeRun.secondPad.cue || '')
           && padPracticeRun.decision?.state?.phase === 'decision'
           && padPracticeRun.decision.buttons.join(',') === 'btn-pad-practice-mark,btn-pad-practice-skip'
+          && padPracticeRun.decision.totalButtons === 2
           && padPracticeRun.receipt?.state?.phase === 'recorded'
           && padPracticeRun.receipt.buttons.join(',') === 'btn-pad-practice-back'
+          && padPracticeRun.receipt.totalButtons === 1
           && padPracticeRun.playedCount === 2 && padPracticeRun.newest?.projectId === 'project-m18'
           && padPracticeRun.newest.ref === 'B:42' && padPracticeRun.privateShape === true
           && padPracticeRun.completedAfter === true
           && padPracticeSkip?.before === padPracticeSkip.after
+          && padPracticeHeaderSkip?.present === true
+          && padPracticeHeaderSkip.before === padPracticeHeaderSkip.after
           && padPracticeAbandon?.before === padPracticeAbandon.after
           && padPracticeFallback?.task?.eventKinds?.join(',') === 'pad-loaded'
           && /practice=handoff/.test(padPracticeFallback.task.href || '')
           && padPracticeReminder?.state?.phase === 'reminder'
           && padPracticeReminder.buttons.join(',') === 'btn-pad-practice-handoff,btn-pad-practice-back'
+          && padPracticeReminder.totalButtons === 2
           && padPracticeDeleted?.state?.phase === 'unavailable'
+          && padPracticeDeleted.totalButtons === 1
           && /no longer available/i.test(padPracticeDeleted.title || '')),
         { padPracticePlan, padPracticeIntro, padPracticeMobile, padPracticeRun,
-          padPracticeSkip, padPracticeAbandon, padPracticeFallback, padPracticeReminder, padPracticeDeleted },
+          padPracticeSkip, padPracticeHeaderSkip, padPracticeAbandon, padPracticeFallback, padPracticeReminder, padPracticeDeleted },
       );
 
       // -- 3c. Weekly Pulse: manufacture a precise, current-schema week in
