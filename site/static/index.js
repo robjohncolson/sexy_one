@@ -1192,12 +1192,12 @@ scanForProgressPortability();
     return event;
   }
 
-  function skipCurrentLabTask() {
+  function skipCurrentLabTask(targetId) {
     const plan = readSession();
     if (!plan?.items || plan.day !== Math.floor(Date.now() / 86400000)) return false;
     const completed = new Set(Array.isArray(plan.completed) ? plan.completed : []);
     const skipped = new Set(Array.isArray(plan.skipped) ? plan.skipped : []);
-    const item = plan.items.find((candidate) => candidate.type === "lab"
+    const item = plan.items.find((candidate) => candidate.id === targetId && candidate.type === "lab"
       && !completed.has(candidate.id) && !skipped.has(candidate.id));
     if (!item) return false;
     skipped.add(item.id);
