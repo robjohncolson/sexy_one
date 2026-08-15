@@ -286,8 +286,8 @@ iTrainingCardSub = t "Quizzes and hands-on device drills"
                      "\12463\12452\12474\12392\23455\27231\12489\12522\12523"
 
 iBrowseLibrary :: Lang -> Text
-iBrowseLibrary = t "Manuals, course, and progress"
-                   "\12510\12491\12517\12450\12523\12289\12467\12540\12473\12289\36914\25431"
+iBrowseLibrary = t "Course, Sample Lab, manuals, and progress"
+                   "\12467\12540\12473\12289Sample Lab\12289\12510\12491\12517\12450\12523\12289\36914\25431"
 
 iSampleLabTitle :: Lang -> Text
 iSampleLabTitle = t "Build a sample bank"
@@ -684,8 +684,8 @@ iTodaySessionTitle :: Lang -> Text
 iTodaySessionTitle = t "Today's session" "今日のセッション"
 
 iTodaySessionSub :: Lang -> Text
-iTodaySessionSub = t "A focused 5–10 minute plan"
-                     "5〜10分の集中プラン"
+iTodaySessionSub = t "Learn, prepare, and load — one step at a time"
+                     "\23398\12406\12289\28310\20633\12375\12289\35501\12415\36796\12416\8212\19968\27497\12378\12388"
 
 iWeeklyTitle :: Lang -> Text
 iWeeklyTitle = t "Weekly pulse" "週間パルス"

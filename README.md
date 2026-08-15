@@ -12,8 +12,9 @@ offline and can be installed from a supporting phone or desktop browser.
 - <https://robjohncolson.github.io/sexy_one/> (GitHub Pages)
 - <https://sexy-one-gray.vercel.app/> (Vercel mirror — the same bundle)
 
-In your first minute you can open **Today's session**, a stable five-card mix of due,
-in-progress, and useful next work from the guided course (every card cites the manual page it teaches),
+In your first minute you can open **Today's session**, a stable five-step mix of due,
+in-progress, useful next course work, and—when your local Sample Lab has something
+actionable—one prepare/load task; you can also
 open the **Weekly pulse** for a calm view of your recent rhythm, the next seven days
 of review load, skills in motion, and one recommended focus,
 open the **Mastery journey** for a focused review/continue/learn-next route through all 51 skills,
@@ -92,7 +93,24 @@ The contract is in [`docs/FLASHCARD-FLOW.md`](docs/FLASHCARD-FLOW.md).
 This optimized M11 artifact is deployed at the Vercel mirror below and passed the
 complete 135/135 local gate plus 73/73 assertions against production.
 
-**Current (M16 Sound Check).** A Library sound now has an on-demand, entirely
+**Current (M17 One Practice Home).** Home now has one primary path: **Today's
+session**. Its stable five-step plan keeps the existing due/continue/new course
+logic and may reserve exactly one step for real local Sample Lab work: resume a
+handoff, prepare/check a sound, place an Inbox sound, or begin loading an assigned
+project. Real Ready/Placed/Loaded outcomes complete that step and continue to the
+next one without a redundant confirmation. `Skip for today` handles times when
+the learner is away from the phone, files, or SXC-1 without claiming success.
+Weekly Pulse now unions those Lab days into the rhythm and visibly reports
+Prepare, Place, and Loaded totals. Its independent `sxc1.practice-loop.v1` ledger
+keeps only 200 privacy-light events—no names, filenames, provenance, audio, MIDI,
+answers, or timing—and intentionally changes neither the progress passport nor
+`.sxc1lab`. The planner reads metadata only; the Lab and readiness worker remain
+deferred. See [`docs/ONE-PRACTICE-HOME.md`](docs/ONE-PRACTICE-HOME.md).
+The optimized artifact passed the complete 139/139 local release gate with
+242/242 browser assertions at both root and nested paths; production release
+verification is in progress.
+
+**M16 Sound Check.** A Library sound now has an on-demand, entirely
 local readiness check before phone handoff. A deferred worker reads the original
 WAV header and, for PCM data up to 48 MB, scans the file's own samples for
 full-scale clipping and edge silence without blocking the interface or silently
@@ -198,14 +216,14 @@ state locally. The product and cache contracts are in
 both root and nested paths; physical iPhone/Android acceptance remains the final
 field check.
 
-**Today's session coach.** `#/x/today` is now the dominant green path
-from Home: a stable, tab-scoped five-card plan balancing due review, unfinished
-work, and a prerequisite-aware next step. The plan prefers a mix of quizzes and
-drills, stays fixed while the learner works through it, marks real engine
-completions, and carries a mobile-safe next-card coach into each planned
-exercise. It is another DOM-only projection over the already accepted course
-bundle and progress payload, so it adds no graph or rendering dependency to
-`app.wasm`. The product and regression contracts are recorded in
+**Today's session coach.** `#/x/today` is the single primary path from Home: a
+stable, tab-scoped five-step plan balancing due review, unfinished work, a
+prerequisite-aware next step, and at most one actionable Sample Lab task. The
+plan prefers a mix of quizzes and drills, stays fixed while the learner works
+through it, reconciles course and Lab completions, provides an away-from-device
+Skip, and carries a mobile-safe next-step coach into planned exercises. It is a
+DOM-only projection over accepted course/progress data and bounded Lab metadata,
+so it adds no graph or rendering dependency to `app.wasm`. Contracts are in
 [`docs/TODAYS-SESSION.md`](docs/TODAYS-SESSION.md).
 
 **M8 (mastery journey + mobile boot).** `#/x/map` turns the course’s authored
@@ -1425,9 +1443,9 @@ measured at an earlier milestone's close say so):
 | Warm build, unoptimized (nothing changed) | <1s |
 | Warm build, `--optimize` (nothing changed — `wasm-opt`/strip still re-run every time; `-Oz --converge` iterates to a fixed point, so it costs more than M3's `-O2` ~5s: the `wasm-opt` pass alone measures ≈11s on this machine) | ~15s |
 | `app.wasm`, unoptimized default build (`build-site.sh`, no flags; measured at M3's close — M4 ships only the optimized flavour, and grew, so this is still *over* the ceiling) | ≈5,220,000 bytes raw / **≈1,094,000–1,097,000 bytes gzipped** — *over* the 1,000,000 ceiling |
-| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**) | 2,380,324 bytes raw / **866,048 bytes gzipped** |
+| `app.wasm`, `--optimize`d build (`build-site.sh --optimize` — **the shipping artifact**) | 2,380,327 bytes raw / **865,795 bytes gzipped** |
 | `app.wasm` at M6's close, for comparison (the pre-manual-externalization baseline `briefs/M7-budget.json` records as `m6_final`) | 2,439,911 bytes raw / 887,732 bytes gzipped |
-| Current gzip delta over the M6 close after manual externalization and subsequent UI revisions | **−21,684 bytes** — beyond the M11-rebaselined `M7_SHRINK_MIN` of 20,000 |
+| Current gzip delta over the M6 close after manual externalization and subsequent UI revisions | **−21,937 bytes** — beyond the M11-rebaselined `M7_SHRINK_MIN` of 20,000 |
 | `app.wasm` at M5's close, for comparison (the pre-externalization baseline `briefs/M6-budget.json` records as `m5_final`) | 2,662,016 bytes raw / 933,305 bytes gzipped |
 | M6 gzip delta over the M5 close: corpus externalization **−73,560**, then the JA UI string table **+19,416** | **−54,144 bytes** net — no new wasm ceiling was granted or needed |
 | `content/content.en.txt` (the EN exercise bundle the app fetches at boot) | 255,177 bytes raw / **69,008 bytes gzipped** |
@@ -1439,12 +1457,12 @@ measured at an earlier milestone's close say so):
 | **All four language bundles fetched at boot**, against `M7_BUNDLE_TOTAL_CEILING` (= 300,000 + 250,000, asserted with its arithmetic in `check-site.sh`) | **268,943 / 550,000 bytes** — 281,057 of headroom |
 | M4 gzip delta over the M3 baseline (890,713 bytes, `briefs/M4-budget.json`; M4 closed at 927,008) | **+36,295 bytes** — inside M4's 42,000-byte budget |
 | M5 gzip delta over the M4 close (927,008 bytes; ruling in `briefs/M5-budget.json`, constants pinned in `check-site.sh`) | **+6,297 bytes** — under the M5 task-local 987,008-byte ceiling (headroom 53,703) |
-| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 133,952 bytes of headroom remain |
+| Frozen gzip ceiling (`WASM_GZIP_CEILING_BYTES` in `scripts/check-site.sh`, unchanged since M1) | **1,000,000 bytes** — 134,205 bytes of headroom remain |
 | `ghc_wasm_jsffi.js` | 49,500 bytes raw / 10,307 bytes gzipped (identical either way — `wasm-opt` only touches `app.wasm`) |
-| Deferred Sample Lab island | `sample-lab.js` 149,342 raw / **36,985 gzip** + on-demand `sample-check-worker.js` 5,958 raw / **2,201 gzip** = **39,186 / 50,000 gzip** |
+| Deferred Sample Lab island | `sample-lab.js` 152,306 raw / **37,755 gzip** + on-demand `sample-check-worker.js` 5,958 raw / **2,201 gzip** = **39,956 / 50,000 gzip** |
 | Committed page images (`site/static/pages/`, 108 files) | 9,375,040 bytes (≈9.4 MB, unchanged since M1) |
-| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,249,598 bytes (≈13.2 MB) |
-| `check-site.sh`, full run (**138** checks, both browser sweeps of 108 routes, **242** browser assertions per served stage incl. real offline boot, Sound Check replacement across projects, resumable Phone Bridge receipt, Sample Library/Inbox migration, deduplication and project round-trip, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and manuals) | ≈2–3 min |
+| `site/public/` total, after `build-site.sh --optimize` (`du -sb`) | 13,266,435 bytes (≈13.3 MB) |
+| `check-site.sh`, full run (**139** checks, both browser sweeps of 108 routes, **242** browser assertions per served stage incl. real offline boot, One Practice Home's bounded Lab projection/ledger/Skip, Sound Check replacement across projects, resumable Phone Bridge receipt, Sample Library/Inbox migration, deduplication and project round-trip, progress passport, Today's Session, Weekly Pulse, the bilingual mastery journey, mobile boot/memory guards, visual-card and flashcard-grade flows, hands-on Skip, D1–D27 device suite, JA course and manuals) | ≈2–3 min |
 | Per-stage browser floor / JA course floor / JA manual floor (pinned in `check-site.sh`; floors, never equalities) | **242** assertions per stage / **9** named `ja course:` (JAC1–JAC9, including mastery, Weekly Pulse, Sample Inbox/Phone Bridge, and Sample Library) / **4** named `ja manual:` (JAM1–JAM4) per stage |
 | `exe:exercise-check --bundle-structural-diff` (EN/JA exercise corpus) / `--manual-structural-diff` (EN/JA manual documents, the reader's own parser) | **52/52** checks (1 + one per live deck) / **109/109** checks (1 + one per page), each with its own negative controls |
 | `node scripts/browser-check.mjs --self-test` / `--self-test-negative` | **198/198** assertions / **42/42** sabotage passes, each catching exactly its own mapped assertion(s) |

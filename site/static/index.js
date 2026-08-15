@@ -1085,19 +1085,213 @@ scanForProgressPortability();
     hydrateMasteryJourney(document.getElementById("sxc1-mastery"));
   }
 
-  // M10 Weekly Pulse. This is a projection over the versioned, bounded
+  // M17 One Practice Home. Course progress remains owned by the Haskell
+  // progress passport; these small, privacy-light events are the bridge from
+  // Sample Lab into Today's Session and Weekly Pulse. The ledger deliberately
+  // stores no filenames or sample names, is independently recoverable, and is
+  // bounded to the same 200-event horizon as the learning history.
+  const PRACTICE_KEY = "sxc1.practice-loop.v1";
+  const PRACTICE_CAP = 200;
+  let memoryPracticeLedger = { schema: 1, nextSeq: 1, events: [] };
+
+  function positivePracticeInt(value, max) {
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number > 0 && number <= max ? number : 0;
+  }
+
+  function normalizedPracticeLedger(raw) {
+    const events = [];
+    const sequences = new Set();
+    if (raw && typeof raw === "object" && Array.isArray(raw.events)) {
+      raw.events.slice(-PRACTICE_CAP).forEach((candidate) => {
+        if (!candidate || typeof candidate !== "object") return;
+        const seq = positivePracticeInt(candidate.seq, Number.MAX_SAFE_INTEGER - 1);
+        const day = positivePracticeInt(candidate.day, 100000000);
+        const kind = String(candidate.kind || "").slice(0, 32);
+        if (!seq || !day || sequences.has(seq)
+          || !["sample-placed", "sound-ready", "pad-loaded"].includes(kind)) return;
+        sequences.add(seq);
+        events.push({
+          seq, day, kind,
+          projectId: String(candidate.projectId || "").slice(0, 180),
+          ref: String(candidate.ref || "").slice(0, 320),
+        });
+      });
+    }
+    events.sort((a, b) => a.seq - b.seq);
+    const lastSeq = events.at(-1)?.seq || 0;
+    const storedNext = positivePracticeInt(raw?.nextSeq, Number.MAX_SAFE_INTEGER) || 1;
+    return {
+      schema: 1,
+      nextSeq: Math.max(lastSeq + 1, storedNext),
+      events: events.slice(-PRACTICE_CAP),
+    };
+  }
+
+  function readPracticeLedger() {
+    try {
+      const raw = window.localStorage.getItem(PRACTICE_KEY);
+      memoryPracticeLedger = normalizedPracticeLedger(raw ? JSON.parse(raw) : null);
+    } catch (_) { memoryPracticeLedger = normalizedPracticeLedger(memoryPracticeLedger); }
+    return memoryPracticeLedger;
+  }
+
+  function writePracticeLedger(ledger) {
+    memoryPracticeLedger = normalizedPracticeLedger(ledger);
+    try { window.localStorage.setItem(PRACTICE_KEY, JSON.stringify(memoryPracticeLedger)); }
+    catch (_) { /* the current page still sees the event */ }
+    return memoryPracticeLedger;
+  }
+
+  function practiceEventMatches(item, event) {
+    return item?.type === "lab"
+      && Array.isArray(item.eventKinds) && item.eventKinds.includes(event.kind)
+      && (!item.projectId || item.projectId === event.projectId)
+      && (item.matchProject === true || !item.ref || item.ref === event.ref)
+      && event.seq > (Number(item.afterSeq) || 0);
+  }
+
+  function recordPracticeEvent(kind, detail = {}) {
+    if (!["sample-placed", "sound-ready", "pad-loaded"].includes(kind)) return null;
+    const ledger = readPracticeLedger();
+    const event = {
+      seq: ledger.nextSeq,
+      day: Math.floor(Date.now() / 86400000),
+      kind,
+      projectId: String(detail.projectId || "").slice(0, 180),
+      ref: String(detail.ref || "").slice(0, 320),
+    };
+    ledger.nextSeq += 1;
+    ledger.events.push(event);
+    if (ledger.events.length > PRACTICE_CAP) ledger.events.splice(0, ledger.events.length - PRACTICE_CAP);
+    writePracticeLedger(ledger);
+    window.dispatchEvent(new CustomEvent("sxc1:practice", { detail: event }));
+
+    // A completed Lab outcome is already the learner's decision. When that
+    // outcome belongs to today's plan, mark it and continue to the next item
+    // instead of asking for a redundant confirmation screen.
+    const plan = readSession();
+    const item = plan?.items?.find((candidate) => practiceEventMatches(candidate, event));
+    if (item) {
+      const completed = new Set(Array.isArray(plan.completed) ? plan.completed : []);
+      completed.add(item.id);
+      writeSession({ ...plan, completed: plan.items.filter((candidate) => completed.has(candidate.id)).map((candidate) => candidate.id) });
+      const handled = new Set([...completed, ...(Array.isArray(plan.skipped) ? plan.skipped : [])]);
+      const index = plan.items.findIndex((candidate) => candidate.id === item.id);
+      const next = plan.items.slice(index + 1).find((candidate) => !handled.has(candidate.id))
+        || plan.items.find((candidate) => !handled.has(candidate.id));
+      if (window.location.hash.startsWith("#/samples")) {
+        window.setTimeout(() => { window.location.hash = next?.href || "#/x/today"; }, 240);
+      }
+    }
+    return event;
+  }
+
+  function skipCurrentLabTask() {
+    const plan = readSession();
+    if (!plan?.items) return false;
+    const completed = new Set(Array.isArray(plan.completed) ? plan.completed : []);
+    const skipped = new Set(Array.isArray(plan.skipped) ? plan.skipped : []);
+    const item = plan.items.find((candidate) => candidate.type === "lab"
+      && !completed.has(candidate.id) && !skipped.has(candidate.id));
+    if (!item) return false;
+    skipped.add(item.id);
+    const updated = { ...plan, skipped: plan.items.filter((candidate) => skipped.has(candidate.id)).map((candidate) => candidate.id) };
+    writeSession(updated);
+    const handled = new Set([...completed, ...skipped]);
+    const index = plan.items.findIndex((candidate) => candidate.id === item.id);
+    const next = plan.items.slice(index + 1).find((candidate) => !handled.has(candidate.id))
+      || plan.items.find((candidate) => !handled.has(candidate.id));
+    window.location.hash = next?.href || "#/x/today";
+    return true;
+  }
+
+  function readJsonStorage(key) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+
+  function practiceLabTask(lang = "en") {
+    const workspace = readJsonStorage("sxc1.sample-workspace.v1");
+    const library = readJsonStorage("sxc1.sample-library.v1");
+    const handoffs = readJsonStorage("sxc1.sample-handoffs.v1");
+    const projects = Array.isArray(workspace?.projects) ? workspace.projects : [];
+    const project = projects.find((candidate) => candidate?.id === workspace?.activeProjectId) || projects[0];
+    if (!project?.id) return null;
+    const ledger = readPracticeLedger();
+    const base = {
+      type: "lab", deckId: "sample-lab", deckTitle: "Sample Lab", projectId: String(project.id).slice(0, 180),
+      reason: "prepare", minutes: 2, afterSeq: ledger.nextSeq - 1,
+    };
+    const session = (Array.isArray(handoffs?.sessions) ? handoffs.sessions : [])
+      .find((candidate) => candidate?.projectId === project.id);
+    const pending = Array.isArray(session?.entries)
+      ? session.entries.find((entry) => entry && ["pending", "shared"].includes(entry.status))
+      : null;
+    if (pending) return {
+      ...base, id: `lab:load:${project.id}`, ref: String(pending.key || "").slice(0, 320), matchProject: true,
+      eventKinds: ["pad-loaded"], href: `#/samples?practice=handoff&project=${encodeURIComponent(project.id)}`,
+      title: lang === "ja" ? "次のパッドを読み込む" : "Load the next pad",
+    };
+
+    const projectBlobIds = new Set([
+      ...(Array.isArray(project.inbox) ? project.inbox : []),
+      ...Object.values(project.slots || {}).flatMap((slot) => Object.values(slot?.pads || {})),
+    ].map((item) => item?.blobId).filter(Boolean));
+    const assets = Array.isArray(library?.items) ? library.items : [];
+    const relevant = assets.filter((asset) => projectBlobIds.has(asset?.blobId));
+    const candidates = relevant.length ? relevant : assets;
+    const needsWork = candidates.find((asset) => asset?.readiness && asset.readiness.ready !== true);
+    const unchecked = candidates.find((asset) => !asset?.readiness?.checkedAt);
+    const sound = needsWork || unchecked;
+    if (sound?.id) return {
+      ...base, id: `lab:check:${sound.id}`, ref: String(sound.id).slice(0, 180),
+      eventKinds: ["sound-ready"], href: `#/samples?practice=check&asset=${encodeURIComponent(sound.id)}`,
+      title: lang === "ja"
+        ? (needsWork ? "音を1つ仕上げる" : "音を1つチェックする")
+        : (needsWork ? "Prepare one sound" : "Check one sound"),
+    };
+    if (Array.isArray(project.inbox) && project.inbox.length) return {
+      ...base, id: `lab:place:${project.id}`, ref: "", matchProject: true,
+      eventKinds: ["sample-placed"], href: `#/samples?practice=organize&project=${encodeURIComponent(project.id)}`,
+      title: lang === "ja" ? "受信箱の音を1つ配置する" : "Place one inbox sound",
+    };
+    const assigned = Object.values(project.slots || {})
+      .some((slot) => Object.keys(slot?.pads || {}).length > 0);
+    if (assigned) return {
+      ...base, id: `lab:load:${project.id}`, ref: "", matchProject: true,
+      eventKinds: ["pad-loaded"], href: `#/samples?practice=handoff&project=${encodeURIComponent(project.id)}`,
+      title: lang === "ja" ? "パッドを1つ読み込む" : "Load one pad",
+    };
+    return null;
+  }
+
+  window.__SXC1_PRACTICE_LOOP = {
+    schema: 1,
+    cap: PRACTICE_CAP,
+    read: () => readPracticeLedger(),
+    record: recordPracticeEvent,
+    task: (lang) => practiceLabTask(lang === "ja" ? "ja" : "en"),
+    skip: skipCurrentLabTask,
+  };
+
+  // M10/M17 Weekly Pulse. This is a projection over the versioned, bounded
   // progress ledger and review schedule. It is all ordinary DOM/CSS: no
   // canvas, animation loop, analytics endpoint, or background work.
   const WEEKLY_STRINGS = {
     en: {
       kicker: "Reflection",
       title: "Weekly pulse",
-      intro: "A calm view of your recent rhythm, the review load ahead, and the most useful next focus.",
+      intro: "A calm view of your recent learning, Sample Lab outcomes, review load, and next focus.",
       rhythms: ["A clean week ahead", "Momentum started", "A steady rhythm", "A strong rhythm"],
-      rhythmBody: "{days} active days · {answers} answers tracked locally",
+      rhythmBody: "{days} active days · {answers} answers · {lab} Lab outcomes",
       activeDays: "Active days",
       answers: "Answers",
       steady: "Steady answers",
+      labOutcomes: "Lab outcomes",
+      labSummary: "Prepare {prepared} · Place {placed} · Loaded {loaded}",
       streak: "Current rhythm",
       dayUnit: "days",
       forecastTitle: "Seven-day review outlook",
@@ -1123,17 +1317,19 @@ scanForProgressPortability();
       openExercise: "Open focused practice",
       openDeck: "Open this skill",
       trackingNote: "Detailed weekly history starts with your next answer. The outlook already uses your saved review schedule.",
-      localNote: "Stored only on this device and included in your progress passport (latest 200 learning marks).",
+      localNote: "Learning marks are included in your progress passport. The latest 200 Lab outcomes stay in this browser's Sample Lab.",
     },
     ja: {
       kicker: "振り返り",
       title: "週間パルス",
-      intro: "最近の学習リズム、これからの復習量、次に重点を置く内容を落ち着いて確認できます。",
+      intro: "最近の学習、Sample Labの成果、これからの復習量、次の重点を落ち着いて確認できます。",
       rhythms: ["新しい一週間へ", "勢いが生まれています", "安定したリズム", "力強いリズム"],
-      rhythmBody: "学習日 {days}日・端末内に記録した解答 {answers}件",
+      rhythmBody: "学習日 {days}日・解答 {answers}件・ラボ成果 {lab}件",
       activeDays: "学習日",
       answers: "解答",
       steady: "安定した解答",
+      labOutcomes: "ラボ成果",
+      labSummary: "準備 {prepared}・配置 {placed}・読込済み {loaded}",
       streak: "現在のリズム",
       dayUnit: "日",
       forecastTitle: "7日間の復習見通し",
@@ -1159,7 +1355,7 @@ scanForProgressPortability();
       openExercise: "重点練習を開く",
       openDeck: "このスキルを開く",
       trackingNote: "詳しい週間履歴は次の解答から始まります。復習見通しには、保存済みの予定をすでに反映しています。",
-      localNote: "この端末内だけに保存し、進捗パスポートに含めます（最新200件の学習記録）。",
+      localNote: "学習記録は進捗パスポートに含まれます。最新200件のラボ成果は、このブラウザーのSample Labに保存されます。",
     },
   };
 
@@ -1172,11 +1368,11 @@ scanForProgressPortability();
     let progress;
     try { progress = JSON.parse(progressElement ? progressElement.textContent : ""); }
     catch (_) { return null; }
-    return decks.length && progress ? { decks, progress } : null;
+    return decks.length && progress ? { decks, progress, practice: readPracticeLedger() } : null;
   }
 
   function weeklyProjection(inputs, lang, strings) {
-    const { decks, progress } = inputs;
+    const { decks, progress, practice } = inputs;
     const today = Number(progress.masteryToday) || Math.floor(Date.now() / 86400000);
     const recs = new Map((progress.masteryRecs || []).map((rec) => [rec[0], {
       reps: Number(rec[1]) || 0,
@@ -1207,7 +1403,12 @@ scanForProgressPortability();
     const recent = history.filter((entry) => entry.day >= weekStart && entry.day <= today);
     const answers = recent.filter((entry) => entry.prompt !== null);
     const steadyAnswers = answers.filter((entry) => entry.grade === "good" || entry.grade === "easy");
+    const labEvents = (practice?.events || []).filter((entry) => entry.day >= weekStart && entry.day <= today);
+    const prepared = labEvents.filter((entry) => entry.kind === "sound-ready").length;
+    const placed = labEvents.filter((entry) => entry.kind === "sample-placed").length;
+    const loaded = labEvents.filter((entry) => entry.kind === "pad-loaded").length;
     const activeDaySet = new Set(recent.map((entry) => entry.day));
+    labEvents.forEach((entry) => activeDaySet.add(entry.day));
     if (!activeDaySet.size) {
       recs.forEach((rec) => {
         if (rec.lastSeen >= weekStart && rec.lastSeen <= today) activeDaySet.add(rec.lastSeen);
@@ -1289,6 +1490,7 @@ scanForProgressPortability();
     return {
       today, historyCount: history.length, records: recs.size, activeDays,
       answers: answers.length, steadyAnswers: steadyAnswers.length,
+      labOutcomes: labEvents.length, prepared, placed, loaded,
       streak: Number(progress.streak) || 0, rhythm: strings.rhythms[rhythmIndex],
       outlook, strengths, friction: frictionTop, focus,
     };
@@ -1316,7 +1518,8 @@ scanForProgressPortability();
     const rhythm = makeEl("div", "weekly-rhythm");
     rhythm.append(
       makeEl("strong", "", model.rhythm),
-      makeEl("span", "", fill(strings.rhythmBody, { days: model.activeDays, answers: model.answers })),
+      makeEl("span", "", fill(strings.rhythmBody,
+        { days: model.activeDays, answers: model.answers, lab: model.labOutcomes })),
     );
     hero.append(rhythm);
 
@@ -1324,13 +1527,17 @@ scanForProgressPortability();
     [
       [strings.activeDays, `${model.activeDays}/7`],
       [strings.answers, String(model.answers)],
-      [strings.steady, String(model.steadyAnswers)],
+      [strings.labOutcomes, String(model.labOutcomes)],
       [strings.streak, `${model.streak} ${strings.dayUnit}`],
     ].forEach(([label, value]) => {
       const item = makeEl("li", "");
       item.append(makeEl("strong", "", value), makeEl("span", "", label));
       stats.append(item);
     });
+
+    const labSummary = makeEl("p", "weekly-lab-summary",
+      fill(strings.labSummary, { prepared: model.prepared, placed: model.placed, loaded: model.loaded }));
+    labSummary.setAttribute("aria-label", strings.labOutcomes);
 
     const forecast = makeEl("section", "weekly-section weekly-forecast-section");
     const forecastHeader = makeEl("header", "weekly-section-heading");
@@ -1406,7 +1613,7 @@ scanForProgressPortability();
     if (!model.historyCount && model.records) notes.append(makeEl("p", "weekly-tracking-note", strings.trackingNote));
     notes.append(makeEl("p", "", strings.localNote));
 
-    root.replaceChildren(hero, stats, forecast, insightGrid, focus, notes);
+    root.replaceChildren(hero, stats, labSummary, forecast, insightGrid, focus, notes);
     window.__SXC1_WEEKLY = {
       mounted: true,
       renderer: "dom",
@@ -1415,6 +1622,10 @@ scanForProgressPortability();
       activeDays: model.activeDays,
       answers: model.answers,
       steadyAnswers: model.steadyAnswers,
+      labOutcomes: model.labOutcomes,
+      prepared: model.prepared,
+      placed: model.placed,
+      loaded: model.loaded,
       outlook: model.outlook.map((day) => day.count),
       strengthenedCount: model.strengths.length,
       frictionCount: model.friction.length,
@@ -1426,8 +1637,9 @@ scanForProgressPortability();
     hydrateWeeklyPulse(document.getElementById("sxc1-weekly"));
   }
 
-  // Today's Session is a tab-scoped coaching layer over the same course and
-  // progress projection. Its five-card plan is deliberately stable while the
+  // Today's Session is a tab-scoped coaching layer over course progress and,
+  // when real Sample Lab work is waiting, one concrete Lab outcome. Its
+  // five-item plan is deliberately stable while the
   // learner moves between routes: progress can update the completion marks,
   // but does not reshuffle the work underneath them. sessionStorage is only a
   // convenience; privacy modes that refuse it fall back to in-memory state.
@@ -1438,18 +1650,21 @@ scanForProgressPortability();
     en: {
       kicker: "Training",
       title: "Today's session",
-      intro: "Five well-chosen cards: review what is due, continue what you started, then add one useful next step.",
-      measure: "{count} cards · about {minutes} min",
+      intro: "Five calm steps across learning, preparation, and loading—only the work that is ready now.",
+      measure: "{count} steps · about {minutes} min",
       progress: "{done} of {total} complete",
       due: "Review due",
       continue: "Continue",
       new: "Learn next",
       maintain: "Keep sharp",
+      prepare: "Prepare / load",
       ready: "Ready",
       done: "Done",
+      skipped: "Skipped today",
       start: "Start session",
       resume: "Resume session",
       reset: "Build a new plan",
+      skipLab: "Skip for today",
       completeTitle: "Session complete",
       completeBody: "Nicely done. Your review schedule and mastery journey now reflect this work.",
       mastery: "See your mastery journey",
@@ -1458,23 +1673,26 @@ scanForProgressPortability();
       inExercise: "Card {current} of {total}",
       next: "Next session card",
       finish: "Finish session",
-      kinds: { quiz: "Quiz", drill: "Practice", lookup: "Find it" },
+      kinds: { quiz: "Quiz", drill: "Practice", lookup: "Find it", lab: "Lab task" },
     },
     ja: {
       kicker: "トレーニング",
       title: "今日のセッション",
-      intro: "復習する内容、学習中の内容、次の一歩を組み合わせた5つのカードです。",
-      measure: "{count}カード・約{minutes}分",
+      intro: "学習・準備・読込みを、今できる5つの落ち着いたステップにまとめます。",
+      measure: "{count}ステップ・約{minutes}分",
       progress: "{total}件中{done}件完了",
       due: "復習時期",
       continue: "続きから",
       new: "次を学ぶ",
       maintain: "定着を保つ",
+      prepare: "準備・読込み",
       ready: "準備完了",
       done: "完了",
+      skipped: "今日はスキップ",
       start: "セッションを開始",
       resume: "セッションを再開",
       reset: "新しいプランを作成",
+      skipLab: "今日はスキップ",
       completeTitle: "セッション完了",
       completeBody: "お疲れさまでした。今回の学習は復習予定と習熟の道筋に反映されました。",
       mastery: "習熟の道筋を見る",
@@ -1483,7 +1701,7 @@ scanForProgressPortability();
       inExercise: "{total}件中{current}件目",
       next: "次のセッションカード",
       finish: "セッションを完了",
-      kinds: { quiz: "クイズ", drill: "練習", lookup: "検索" },
+      kinds: { quiz: "クイズ", drill: "練習", lookup: "検索", lab: "ラボタスク" },
     },
   };
 
@@ -1516,11 +1734,11 @@ scanForProgressPortability();
     let progress;
     try { progress = JSON.parse(progressElement ? progressElement.textContent : ""); }
     catch (_) { return null; }
-    return decks.length && progress ? { decks, progress } : null;
+    return decks.length && progress ? { decks, progress, labTask: practiceLabTask(progress.uiLang === "ja" ? "ja" : "en") } : null;
   }
 
   function makeSessionPlan(inputs, lang) {
-    const { decks, progress } = inputs;
+    const { decks, progress, labTask } = inputs;
     const today = Number(progress.masteryToday) || 0;
     const done = new Set(progress.masteryDone || []);
     const recs = new Map((progress.masteryRecs || []).map((rec) => [rec[0], {
@@ -1554,11 +1772,12 @@ scanForProgressPortability();
     }));
 
     const chosen = [];
+    const courseLimit = labTask ? 4 : 5;
     const used = new Set();
     const usedKinds = new Set();
     const addFrom = (candidates, reason, limit = 99) => {
       let added = 0;
-      while (chosen.length < 5 && added < limit) {
+      while (chosen.length < courseLimit && added < limit) {
         const available = candidates.filter((item) => !used.has(item.id));
         if (!available.length) break;
         const item = available.find((candidate) => !usedKinds.has(candidate.type)) || available[0];
@@ -1584,21 +1803,28 @@ scanForProgressPortability();
     addFrom(all, "maintain");
 
     const signature = `${lang}:${all.length}:${all[0]?.id || "none"}:${all.at(-1)?.id || "none"}`;
-    const items = chosen.map(({ courseIndex, prereqsMet, seen, finished, ...item }) => item);
+    const courseItems = chosen.map(({ courseIndex, prereqsMet, seen, finished, ...item }) => item);
+    const items = labTask && courseItems.length
+      ? [courseItems[0], labTask, ...courseItems.slice(1)]
+      : labTask ? [labTask] : courseItems;
     return {
-      version: 1,
+      version: 2,
       day: today,
       signature,
       id: `${today}:${signature}:${items.map((item) => `${item.id}:${item.reason}`).join(",")}`,
       items,
       completed: items.filter((item) => done.has(item.id)).map((item) => item.id),
+      skipped: [],
     };
   }
 
   function reconcileSessionCompletion(plan, progress) {
     const persisted = new Set(progress.masteryDone || []);
+    const ledger = readPracticeLedger();
     const completed = plan.items
-      .filter((item) => persisted.has(item.id))
+      .filter((item) => item.type === "lab"
+        ? ledger.events.some((event) => practiceEventMatches(item, event))
+        : persisted.has(item.id))
       .map((item) => item.id);
     const previous = Array.isArray(plan.completed) ? plan.completed : [];
     if (completed.length === previous.length
@@ -1608,15 +1834,37 @@ scanForProgressPortability();
     return reconciled;
   }
 
+  function normalizedStoredSession(stored, exerciseIds) {
+    if (!stored || stored.version !== 2 || !Array.isArray(stored.items) || stored.items.length !== 5) return null;
+    const itemIds = new Set();
+    let labCount = 0;
+    for (const item of stored.items) {
+      if (!item || typeof item.id !== "string" || itemIds.has(item.id)) return null;
+      itemIds.add(item.id);
+      if (item.type === "lab") {
+        labCount += 1;
+        if (labCount > 1 || !item.id.startsWith("lab:")
+          || typeof item.href !== "string" || !item.href.startsWith("#/samples?practice=")
+          || !Array.isArray(item.eventKinds) || item.eventKinds.length !== 1
+          || !Number.isSafeInteger(item.afterSeq) || item.afterSeq < 0
+          || !["sample-placed", "sound-ready", "pad-loaded"].includes(item.eventKinds[0])) return null;
+      } else if (!exerciseIds.has(item.id)
+        || typeof item.href !== "string" || !/^#\/x\/[^/]+\/[^/]+$/.test(item.href)) return null;
+    }
+    const completed = [...new Set(Array.isArray(stored.completed) ? stored.completed : [])]
+      .filter((id) => itemIds.has(id));
+    const skipped = [...new Set(Array.isArray(stored.skipped) ? stored.skipped : [])]
+      .filter((id) => itemIds.has(id) && !completed.includes(id));
+    return { ...stored, items: stored.items.slice(), completed, skipped };
+  }
+
   function currentSession(inputs, lang) {
     const allExercises = inputs.decks.flatMap((deck) => deck.exercises);
     const signature = `${lang}:${allExercises.length}:${allExercises[0]?.id || "none"}:${allExercises.at(-1)?.id || "none"}`;
     const today = Number(inputs.progress.masteryToday) || 0;
     const ids = new Set(allExercises.map((exercise) => exercise.id));
-    const stored = readSession();
-    if (stored && stored.version === 1 && stored.day === today && stored.signature === signature
-      && Array.isArray(stored.items) && stored.items.length > 0
-      && stored.items.every((item) => ids.has(item.id))) {
+    const stored = normalizedStoredSession(readSession(), ids);
+    if (stored && stored.day === today && stored.signature === signature) {
       return reconcileSessionCompletion(stored, inputs.progress);
     }
     const plan = makeSessionPlan(inputs, lang);
@@ -1626,6 +1874,7 @@ scanForProgressPortability();
 
   function publishSession(plan, mounted) {
     const completed = new Set(plan.completed || []);
+    const skipped = new Set(plan.skipped || []);
     const reasonCounts = plan.items.reduce((counts, item) => {
       counts[item.reason] = (counts[item.reason] || 0) + 1;
       return counts;
@@ -1637,6 +1886,9 @@ scanForProgressPortability();
       planId: plan.id,
       itemCount: plan.items.length,
       completedCount: completed.size,
+      handledCount: new Set([...completed, ...skipped]).size,
+      skippedCount: skipped.size,
+      labCount: plan.items.filter((item) => item.type === "lab").length,
       ids: plan.items.map((item) => item.id),
       types: plan.items.map((item) => item.type),
       reasonCounts,
@@ -1651,13 +1903,15 @@ scanForProgressPortability();
     const inputs = sessionInputs();
     if (!inputs) return;
     let plan = currentSession(inputs, lang);
-    const renderKey = () => `${plan.id}:${(plan.completed || []).join(",")}`;
+    const renderKey = () => `${plan.id}:${(plan.completed || []).join(",")}:${(plan.skipped || []).join(",")}`;
     if (renderedSessionKeys.get(root) === renderKey() && root.querySelector(".session-hero")) return;
 
     const render = () => {
       renderedSessionKeys.set(root, renderKey());
       const completed = new Set(plan.completed || []);
-      const remaining = plan.items.filter((item) => !completed.has(item.id));
+      const skipped = new Set(plan.skipped || []);
+      const handled = new Set([...completed, ...skipped]);
+      const remaining = plan.items.filter((item) => !handled.has(item.id));
       const minutes = Math.max(5, plan.items.reduce((sum, item) => sum + item.minutes, 0));
       const hero = makeEl("header", "session-hero");
       hero.append(
@@ -1666,14 +1920,14 @@ scanForProgressPortability();
         makeEl("p", "session-intro", remaining.length ? strings.intro : strings.completeBody),
       );
       const meter = makeEl("div", "session-meter");
-      const progressText = fill(strings.progress, { done: completed.size, total: plan.items.length });
+      const progressText = fill(strings.progress, { done: handled.size, total: plan.items.length });
       meter.append(
         makeEl("strong", "", remaining.length ? fill(strings.measure, { count: plan.items.length, minutes }) : progressText),
         makeEl("span", "", progressText),
       );
       const progress = makeEl("progress", "session-progress");
       progress.max = plan.items.length;
-      progress.value = completed.size;
+      progress.value = handled.size;
       progress.setAttribute("aria-label", progressText);
       meter.append(progress);
       hero.append(meter);
@@ -1681,19 +1935,20 @@ scanForProgressPortability();
       const list = makeEl("ol", "session-list");
       plan.items.forEach((item, index) => {
         const isDone = completed.has(item.id);
-        const row = makeEl("li", `session-item session-reason-${item.reason}${isDone ? " is-done" : ""}`);
+        const isSkipped = skipped.has(item.id);
+        const row = makeEl("li", `session-item session-reason-${item.reason}${isDone ? " is-done" : ""}${isSkipped ? " is-skipped" : ""}`);
         row.dataset.exercise = item.id;
         row.dataset.reason = item.reason;
         const link = makeEl("a", "session-card");
         link.href = item.href;
-        const number = makeEl("span", "session-number", isDone ? "✓" : String(index + 1));
+        const number = makeEl("span", "session-number", isDone ? "✓" : isSkipped ? "—" : String(index + 1));
         const copy = makeEl("span", "session-copy");
         copy.append(
           makeEl("span", "session-reason", strings[item.reason]),
           makeEl("strong", "session-title", item.title),
           makeEl("span", "session-context", `${item.deckTitle} · ${strings.kinds[item.type] || item.type}`),
         );
-        const status = makeEl("span", "session-status", isDone ? strings.done : strings.ready);
+        const status = makeEl("span", "session-status", isDone ? strings.done : isSkipped ? strings.skipped : strings.ready);
         link.append(number, copy, status);
         row.append(link);
         list.append(row);
@@ -1702,10 +1957,32 @@ scanForProgressPortability();
       const actions = makeEl("div", "session-actions");
       if (remaining.length) {
         const start = makeEl("a", "primary-training-action wizard-choice wizard-yes",
-          completed.size ? strings.resume : strings.start);
+          handled.size ? strings.resume : strings.start);
         start.id = "btn-session-start";
         start.href = remaining[0].href;
         actions.append(start);
+        if (remaining[0].type === "lab") {
+          const skip = makeEl("button", "session-reset", strings.skipLab);
+          skip.id = "btn-session-skip-lab";
+          skip.type = "button";
+          skip.addEventListener("click", () => {
+            plan = { ...plan, skipped: [...skipped, remaining[0].id] };
+            writeSession(plan);
+            render();
+          });
+          actions.append(skip);
+        } else {
+          const reset = makeEl("button", "session-reset", strings.reset);
+          reset.id = "btn-session-reset";
+          reset.type = "button";
+          reset.addEventListener("click", () => {
+            removeSession();
+            plan = makeSessionPlan(inputs, lang);
+            writeSession(plan);
+            render();
+          });
+          actions.append(reset);
+        }
       } else {
         const weekly = makeEl("a", "primary-training-action wizard-choice wizard-yes", strings.weekly);
         weekly.id = "btn-session-weekly";
@@ -1716,16 +1993,6 @@ scanForProgressPortability();
         mastery.href = "#/x/map";
         actions.append(mastery);
       }
-      const reset = makeEl("button", "session-reset", strings.reset);
-      reset.id = "btn-session-reset";
-      reset.type = "button";
-      reset.addEventListener("click", () => {
-        removeSession();
-        plan = makeSessionPlan(inputs, lang);
-        writeSession(plan);
-        render();
-      });
-      actions.append(reset);
       root.replaceChildren(hero, list, actions);
       publishSession(plan, true);
     };
@@ -1763,8 +2030,9 @@ scanForProgressPortability();
       writeSession(plan);
     }
     const completed = new Set(plan.completed || []);
-    const next = plan.items.slice(index + 1).find((item) => !completed.has(item.id))
-      || plan.items.find((item) => !completed.has(item.id));
+    const handled = new Set([...completed, ...(plan.skipped || [])]);
+    const next = plan.items.slice(index + 1).find((item) => !handled.has(item.id))
+      || plan.items.find((item) => !handled.has(item.id));
     const signature = `${plan.id}:${route.exercise}:${summaryVisible}:${completed.size}:${next?.id || "done"}`;
     if (oldBar?.dataset.signature === signature) return;
 
