@@ -105,6 +105,10 @@ then one **Use this version / Keep current** decision either repoints every matc
 placement across projects or changes none. Existing handoff receipts re-queue only
 changed pads, `.sxc1lab` stays schema 1, and a new bilingual three-card deck explains
 the underlying specification. See [`docs/SOUND-CHECK.md`](docs/SOUND-CHECK.md).
+The optimized artifact passed the complete 138/138 release gate with 242/242
+browser assertions at both root and nested paths. That byte-identical artifact is
+live on Vercel (`dpl_Hbo81r9TnDyBMm8zXEVjQcYLoT4z`) and GitHub Pages
+(`71356d4`), and each production URL passed 78/78 browser assertions.
 
 **M15 Phone Bridge + resumable handoff.** The computer's **Send
 project to phone** action shares the existing schema-1 `.sxc1lab` file through
