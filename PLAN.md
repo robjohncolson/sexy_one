@@ -151,7 +151,9 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   a connection disappears, preserve coherent updates at both root and nested
   paths, expose local field-performance evidence, and wrap the existing
   validated progress envelope in file save/share/load controls. **IMPLEMENTATION
-  COMPLETE 2026-08-11; physical-device acceptance pending.** Contract:
+  COMPLETE 2026-08-11; physical-device acceptance CLOSED 2026-08-21** during the
+  M18 A9 owner run (offline relaunch, Today's Session completion, Japanese
+  switching, backup share/restore — record in the M18 entry). Contract:
   `docs/PHONE-READY.md`.
 - **M10 — Weekly Pulse.** Turn recent practice and the saved review schedule into
   a calm seven-day reflection: rhythm, review outlook, skills in motion,
@@ -254,17 +256,17 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   ledger event whose ref is only the bank coordinate, while Today's Session
   chooses the eligible bank practiced longest ago and preserves every M16/M17
   planner and two-action contract. **COMPLETE AND DEPLOYED 2026-08-15 JST;
-  ACCEPTANCE A9 PENDING OWNER PHYSICAL-DEVICE VERIFICATION.** The optimized
+  ACCEPTANCE A9 CLOSED 2026-08-21.** The optimized
   artifact passed 140/140 local checks with 243/243 browser assertions at both
   root and nested deployment paths; the byte-identical Vercel and GitHub Pages
   releases each passed 79/79 production assertions. `app.wasm` remained
   byte-identical at SHA-256
   `407a07aeb09bdae4e99b99fe045c603b2ec2ca33fc7e296b431b85d127f552a2`.
   Vercel deployment: `dpl_3r6xsth9uRRKgzAkJKBqf4G5invo`; Pages deployment:
-  `a947b71` (legacy Pages build `1152559929`). A9 is deliberately pending, not
-  skipped: one owner run against a physical SXC-1, followed by the checks listed
-  in the M18 completion handoff, will close it and can close M9's remaining
-  phone/device acceptance at the same time. Contract: `docs/PAD-PRACTICE.md`;
+  `a947b71` (legacy Pages build `1152559929`). A9 was deliberately held open
+  until one owner run against a physical SXC-1; that run happened 2026-08-21
+  and closed both A9 and M9's remaining phone/device acceptance (record at the
+  end of this entry). Contract: `docs/PAD-PRACTICE.md`;
   implementation brief: `briefs/M18-pad-practice.md`. **HARDENED AND REDEPLOYED
   2026-08-15 JST via PR #10, merge `23bf3c9`.** The route-lifecycle, Escape,
   Today-task identity, side-effect-free Back, and preview-stop fixes passed
@@ -274,8 +276,18 @@ Each milestone ends with: Opus sign-off → Codex adversarial review → fixes �
   type. Vercel deployment: `dpl_3eTt6fLrqfmWWCYNUwLhMdprL9vF`; Pages
   deployment: `5e20577` (legacy Pages build `1152662311`). Adversarial review
   also caught and fixed the same-URL intent re-entry regression, the required
-  installed-PWA cache cutover, and two under-specified test assertions. A9
-  remains pending owner physical-device verification.
+  installed-PWA cache cutover, and two under-specified test assertions.
+  **A9 CLOSED 2026-08-21:** the owner ran the practice walk once against the
+  physical SXC-1 using a fresh 16-sound bank of generated one-shots
+  (deterministic stdlib synthesis, every file independently verified against
+  the Sound Check worker's exact thresholds before import; loaded through the
+  CASIO Sampler App with per-pad Loaded receipts true by construction). Every
+  pad's sound matched its named pad during the walk, Mark practiced recorded
+  cleanly, and Today's Session and Weekly Pulse reflected the practice credit.
+  The same session closed M9's remaining physical-phone acceptance: offline
+  relaunch of the installed app, Today's Session completion, Japanese
+  switching, and backup share and restore all confirmed on the owner's phone
+  (docs/PHONE-READY.md field checklist).
 
 ## Non-negotiable constraints (Opus latitude ends here)
 
